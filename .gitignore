@@ -1,0 +1,13 @@
+__pycache__
+.venv/
+.vscode
+*.pyc
+*.so
+*.egg-info
+/env
+venv
+package.json
+package-lock.json
+temp
+*.csv
+.DS_Store
