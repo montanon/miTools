@@ -11,3 +11,4 @@ package-lock.json
 temp
 *.csv
 .DS_Store
+*api_key.cfg
