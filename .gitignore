@@ -12,3 +12,4 @@ temp
 *.csv
 .DS_Store
 *api_key.cfg
+*api_key.py
