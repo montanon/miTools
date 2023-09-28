@@ -4,27 +4,32 @@ import seaborn as sns
 
 from sklearn.cluster import KMeans, AgglomerativeClustering
 from sklearn.metrics import silhouette_score
+from sklearn.metrics.pairwise import pairwise_distances, cosine_similarity
+from sklearn.neighbors import NearestCentroid
+from scipy.stats import gaussian_kde
+from scipy.spatial.distance import euclidean
 from tqdm import tqdm
 from typing import Optional, List, Dict, Any
-from pandas import DataFrame
+from pandas import DataFrame, IndexSlice
 from matplotlib.axes import Axes
 
-def kmeans_ncluster_search(dataframe: DataFrame, max_clusters: Optional[int]=25, 
+
+def kmeans_ncluster_search(data: DataFrame, max_clusters: Optional[int]=25, 
                            random_state: Optional[int]=0, n_init: Optional[str]='auto'):
     silhouette_scores = []
     inertia = []
     for n_clusters in tqdm(range(2, max_clusters)):
         kmeans_clustering = KMeans(n_clusters=n_clusters, random_state=random_state, n_init=n_init)
-        kmeans_clustering.fit_predict(dataframe)
-        score = silhouette_score(dataframe, kmeans_clustering.labels_)
+        kmeans_clustering.fit_predict(data)
+        score = silhouette_score(data, kmeans_clustering.labels_)
         silhouette_scores.append(score)
         inertia.append(kmeans_clustering.inertia_)
     return silhouette_scores, inertia
 
-def kmeans_clustering(dataframe: DataFrame, n_clusters: int,
+def kmeans_clustering(data: DataFrame, n_clusters: int,
                       random_state: Optional[int]=0, n_init: Optional[str]='auto'):
     kmeans_clustering = KMeans(n_clusters=n_clusters, random_state=random_state, n_init=n_init)
-    return kmeans_clustering.fit_predict(dataframe)
+    return kmeans_clustering.fit_predict(data)
 
 def plot_kmeans_ncluster_search(silhouette_scores: List[float], inertia: List[float]):
     fig, ax = plt.subplots(nrows=2, ncols=1, figsize=(14, 10))
@@ -57,20 +62,20 @@ def plot_kmeans_ncluster_search(silhouette_scores: List[float], inertia: List[fl
 
     plt.tight_layout()
 
-    plt.show()
+    return ax
 
-def agglomerative_ncluster_search(dataframe: DataFrame, max_clusters: Optional[int]=25):
+def agglomerative_ncluster_search(data: DataFrame, max_clusters: Optional[int]=25):
     silhouette_scores = []
     for n_clusters in tqdm(range(2, max_clusters)):
         agg_clustering = AgglomerativeClustering(n_clusters=n_clusters)
-        agg_clustering.fit_predict(dataframe)
-        score = silhouette_score(dataframe, agg_clustering.labels_)
+        agg_clustering.fit_predict(data)
+        score = silhouette_score(data, agg_clustering.labels_)
         silhouette_scores.append(score)
     return silhouette_scores
 
-def agglomerative_clustering(dataframe: DataFrame, n_clusters: int):
+def agglomerative_clustering(data: DataFrame, n_clusters: int):
     agg_clustering = AgglomerativeClustering(n_clusters=n_clusters)
-    return agg_clustering.fit_predict(dataframe)
+    return agg_clustering.fit_predict(data)
 
 def plot_agglomerative_ncluster_search(silhouette_scores: List[float]):
     fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(14, 5))
@@ -86,9 +91,9 @@ def plot_agglomerative_ncluster_search(silhouette_scores: List[float]):
     for x, y in zip(x_values_silhouette, silhouette_scores):
         ax.vlines(x, min_y_silhouette, y, linestyles='dotted', colors='grey', linewidth=0.5)
     
-    plt.show()
+    return ax
 
-def plot_clusters(dataframe: DataFrame, cluster_col: str, x_col: str, y_col: str,
+def plot_clusters(data: DataFrame, cluster_col: str, x_col: str, y_col: str,
                   ax: Optional[Axes]=None, labels: Optional[bool]=True, **kwargs: Dict[str, Any]):
     if ax is None:
         _, ax = plt.subplots(1, 1, figsize=(14, 10))
@@ -96,18 +101,116 @@ def plot_clusters(dataframe: DataFrame, cluster_col: str, x_col: str, y_col: str
     if kwargs is None:
         kwargs = dict(alpha=0.75, marker='o', size=5)
         
-    classes = dataframe[cluster_col].sort_values().unique()
-    colors = sns.color_palette("cubehelix", len(classes))
+    classes = data[cluster_col].sort_values().unique()
+    colors = sns.color_palette("husl", len(classes))[::1]
     
     for i, cls in enumerate(classes):
         ax.scatter(
-            dataframe[dataframe[cluster_col] == cls][x_col], 
-            dataframe[dataframe[cluster_col] == cls][y_col],
+            data[data[cluster_col] == cls][x_col], 
+            data[data[cluster_col] == cls][y_col],
             color=colors[i],
             label=cls if labels else None,
             **kwargs)
         
     ax.set_xticks([])
     ax.set_yticks([])
+
+    return ax
+
+def get_clusters_centroids(data: DataFrame, cluster_col: str):
+    clf = NearestCentroid()
+    clf.fit(data.values, data.index.get_level_values(cluster_col).values)
+    return DataFrame(clf.centroids_, columns=data.columns, 
+                     index=np.unique(data.index.get_level_values(cluster_col)))
+
+def get_clusters_centroids_distances(centroids: DataFrame):
+    return DataFrame(
+        pairwise_distances(centroids)
+        )
+
+def display_clusters_size(data: DataFrame, cluster_col: str):
+    cluster_count = data[[cluster_col]].value_counts().sort_index().to_frame()
+    cluster_count.columns = ['N Elements']
+    return cluster_count
+
+def plot_clusters_growth(data: DataFrame, time_col: str, cluster_col: str):
+    clusters_count = data.groupby(time_col)[cluster_col].value_counts().to_frame().sort_index(axis=1, level=1)
+
+    fig, ax = plt.subplots(1, 1, figsize=(21,7))
+
+    clusters = clusters_count.index.get_level_values(1).unique().sort_values()
+    times = clusters_count.index.get_level_values(0).unique().sort_values()
+
+    colors = sns.color_palette("husl", len(clusters))
+
+    for cl in clusters:
+        cluster_papers = clusters_count.loc[IndexSlice[:, cl], :]
+        cluster_papers.index = cluster_papers.index.droplevel(1)
+        cluster_papers = cluster_papers.reindex(times, fill_value=0)
+        ax.plot(times[:-1], cluster_papers['count'][:-1], c=colors[cl])
+
+    ax.set_title('Cluster Size Evolution')
+    ax.set_ylabel('N° Elements')
+    ax.set_xlabel('Year')
+
+    return ax
+
+def get_cosine_similarities(data: DataFrame, cluster_col: str):
+    def cosine_similarity_group(group):
+        return cosine_similarity(group.values)
+    cosine_similarities = (data.groupby(level=cluster_col)
+                           .apply(cosine_similarity_group)
+                           .to_dict())
+    return {k: DataFrame(v) for k, v in cosine_similarities.items()}
+
+def plot_cosine_similarities(cosine_similarities: Dict[int,DataFrame], normed: Optional[bool]=False):
+    fig, ax = plt.subplots(1, 1, figsize=(14, 6))
+    
+    palette = sns.color_palette('husl', len(cosine_similarities))[::-1]
+    for cl, similarities in cosine_similarities.items():
+        upper_tri_vals = similarities.values[np.triu_indices(similarities.shape[0], k=1)]
+        if not normed:
+            ax = sns.histplot(upper_tri_vals, bins=30, ax=ax, alpha=0.05, stat="density", color=palette[cl], legend=False)
+            ax = sns.kdeplot(upper_tri_vals, ax=ax, color=palette[cl], label=f"Cluster {cl}")
+        else:
+            kde = gaussian_kde(upper_tri_vals)
+            x_vals = np.linspace(min(upper_tri_vals), max(upper_tri_vals), 1000)
+            y_vals = kde(x_vals) / max(kde(x_vals))
+            ax.plot(x_vals, y_vals, alpha=1.0, label=f"Cluster {cl}", color=palette[cl])
+
+    ax.set_title('Distributions of Cosine Similarities per Cluster')
+    ax.set_xlabel('Cosine Similarity')
+    ax.set_ylabel('Frequency')
+    ax.legend()
+    
+    return ax
+
+def get_distances_to_centroids(data: DataFrame, centroids: DataFrame, cluster_col: str):
+    distances = []
+    label_pos = data.index.names.index(cluster_col)
+    for idx, values in data.iterrows():
+        cluster = idx[label_pos]
+        centroid = centroids.loc[cluster]
+        distance = euclidean(values, centroid)
+        distances.append(distance)
+    distances = DataFrame(distances)
+    distances.index = data.index.get_level_values(1)
+    return distances.sort_index()
+
+def plot_distances_to_centroids(distances: DataFrame, cluster_col: str):
+    fig, ax = plt.subplots(1, 1, figsize=(14, 6))
+
+    palette = sns.color_palette('husl', len(distances.index.unique()))[::1]
+    for cl, distances in distances.groupby(cluster_col):
+        distances = distances[0].values
+        kde = gaussian_kde(distances)
+        x_vals = np.linspace(min(distances), max(distances), 1000)
+        y_vals = kde(x_vals) / max(kde(x_vals))
+        ax.plot(x_vals, y_vals, alpha=1.0, label=f"Cluster {cl}", color=palette[cl])
+
+    ax.set_title('Standardized Distribution of Distances to Centroid of Embeddings by Cluster')
+    ax.set_xlabel('Distance to Centroid')
+    ax.set_ylabel('Density')
+    ax.legend()
 
     return ax
