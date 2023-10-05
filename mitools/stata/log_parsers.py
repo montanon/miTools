@@ -182,6 +182,12 @@ def dict_to_df(model_dict: Dict):
     df = df[relevant_cols]
     df.index.names = ['Dep Var', 'Lag', 'Time Span']
     df = df.set_index('variable', append=True)
+    print(model_dict['indep_vars'])
+    if model_dict['indep_vars'] == 0:
+        model_dict['indep_vars'] = [str(model_dict['indep_vars'])]
+        print(model_dict['indep_vars'])
+    df['Indep Var'] = [v for v in model_dict['indep_vars'] if v.find('.') == -1][0]
+    df = df.set_index('Indep Var', append=True)
     return df
 
 def add_significance(row):
@@ -229,7 +235,7 @@ def read_regressions_log(log):
             log = False
 
         count += 1
-    return pd.concat(dataframes)
+        return pd.concat(dataframes)
 
 def extract_regression_from_log(log):
 
