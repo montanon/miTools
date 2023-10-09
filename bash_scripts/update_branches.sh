@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Fetch latest changes from remote
-git fetch origin
+git fetch -p origin
 
 # Get the name of the current branch
 current_branch=$(git rev-parse --abbrev-ref HEAD)
