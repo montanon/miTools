@@ -20,7 +20,7 @@ OLS_VAR_NAMES = ['Coefficient', 'Std. err.', 't', 'P>|t|', '95% Conf. Low', '95%
 
 def get_ols_data_from_log(ols_str: str):
     
-    n_obs = get_numbers_from_str(re.search(r'Number of obs += +\n* *-?\d*\.*\d+\n', ols_str).group(0))[-1]
+    n_obs = get_numbers_from_str(re.search(r'Number of obs += +\n* *-?\d*\,*\d*\.*\d+\n', ols_str).group(0))[-1]
     F_stats = get_numbers_from_str(re.search(r'F\(\d+, \d+\) += +-?\d*\.*\d+\n', ols_str).group(0))[-1]
     Prob_F = get_numbers_from_str(re.search(r'Prob > F += +-?\d*\.*\d+\n', ols_str).group(0))[-1]
     R_sq = get_numbers_from_str(re.search(r'R-squared += +-?\d*\.*\d+\n', ols_str).group(0))[-1]
@@ -89,7 +89,7 @@ def get_csardl_data_from_log(csardl_str):
         obs_p_group = get_numbers_from_str(re.search(r'Obs per group \(T\) += +-?\d*\.*\d+\n', csardl_str).group(0))[-1]
     except AttributeError:
         obs_p_group = get_numbers_from_str(re.search(rf'avg *= +(({NUMBER_PATTERN})|(.))+\n', csardl_str).group(0))[-1]
-    F_stats = get_numbers_from_str(re.search(rf'F\(\d+, \d+\) += +(({NUMBER_PATTERN})|(.))+\n', csardl_str).group(0))[-1]
+    F_stats = get_numbers_from_str(re.search(rf'F\(-?\d+, -?\d+\) += +(({NUMBER_PATTERN})|(.))+\n', csardl_str).group(0))[-1]
     Prob_F = get_numbers_from_str(re.search(rf'Prob > F += +(({NUMBER_PATTERN})|(.))+\n', csardl_str).group(0))[-1]
     R_sq = get_numbers_from_str(re.search(rf'R-squared += +(({NUMBER_PATTERN})|(.))+\n', csardl_str).group(0))[-1]
     R_sqMG = get_numbers_from_str(re.search(rf'R-squared \(MG\) += +(({NUMBER_PATTERN})|(.))+\n', csardl_str).group(0))[-1]
@@ -182,10 +182,8 @@ def dict_to_df(model_dict: Dict):
     df = df[relevant_cols]
     df.index.names = ['Dep Var', 'Lag', 'Time Span']
     df = df.set_index('variable', append=True)
-    print(model_dict['indep_vars'])
     if model_dict['indep_vars'] == 0:
         model_dict['indep_vars'] = [str(model_dict['indep_vars'])]
-        print(model_dict['indep_vars'])
     df['Indep Var'] = [v for v in model_dict['indep_vars'] if v.find('.') == -1][0]
     df = df.set_index('Indep Var', append=True)
     return df
@@ -201,17 +199,29 @@ def add_significance(row):
     else:
         return row
     
-def color_by_significance(val):
-    var = val.name[-1]
-    val = val['Result']
-    if var.find('Indicator') == -1:
-        if '***' in val:
-            return ['background-color: limegreen']
-        elif '**' in val:
-            return ['background-color: springgreen']
-        elif '*' in val:
-            return ['background-color: aquamarine']
-    return ['']
+def color_by_significance(var):
+    styles = []
+    for val in var:
+        try:
+            if not isinstance(val, float) and var.name[0] not in var.name[-1]:
+                if '***' in val:
+                    val_style = 'background-color: limegreen'
+                elif '**' in val:
+                    val_style = 'background-color: springgreen'
+                elif '*' in val:
+                    val_style = 'background-color: aquamarine'
+                else:
+                    val_style = ''
+            else:
+                val_style = ''
+        except Exception as e:
+            print(str(e))
+            print(np.isnan(val))
+            print(val)
+            print(type(val))
+            print(var)
+        styles.append(val_style)
+    return styles
 
 def read_regressions_log(log):
     
@@ -224,7 +234,11 @@ def read_regressions_log(log):
             ols_str, csardl_str = get_models_from_regression(regression_str)
 
             ols_data = get_ols_data_from_log(ols_str)
-            csardl_data = get_csardl_data_from_log(csardl_str)
+            try:
+                csardl_data = get_csardl_data_from_log(csardl_str)
+            except Exception as e:
+                print(csardl_str)
+                raise Exception(str(e))
             csardl_df = regression_data_to_df(csardl_data)
             
             dataframes.append(csardl_df)
@@ -235,7 +249,7 @@ def read_regressions_log(log):
             log = False
 
         count += 1
-        return pd.concat(dataframes)
+    return pd.concat(dataframes)
 
 def extract_regression_from_log(log):
 
