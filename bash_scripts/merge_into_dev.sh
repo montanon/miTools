@@ -6,6 +6,9 @@ git fetch -p origin
 # Get the name of the current branch to return to it at the end
 current_branch=$(git rev-parse --abbrev-ref HEAD)
 
+# Stash any changes in the working directory and stage
+git stash push -u -m "Temporary stash for merge_into_dev script"
+
 # Ensure we're working with the latest version of dev
 git checkout dev
 git pull origin dev
@@ -29,5 +32,10 @@ done
 
 # Switch back to the original branch
 git checkout $current_branch
+
+# Pop the stashed changes to restore the working directory and stage
+if git stash list | grep -q "Temporary stash for merge_into_dev script"; then
+    git stash pop "$(git stash list | grep "Temporary stash for merge_into_dev script" | awk -F: '{print $1}')"
+fi
 
 echo "Done."
