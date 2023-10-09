@@ -1,4 +1,6 @@
 import matplotlib.pyplot as plt
+from matplotlib.patches import Ellipse
+import matplotlib.transforms as transforms
 import numpy as np
 import seaborn as sns
 
@@ -9,7 +11,7 @@ from sklearn.neighbors import NearestCentroid
 from scipy.stats import gaussian_kde
 from scipy.spatial.distance import euclidean
 from tqdm import tqdm
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 from pandas import DataFrame, IndexSlice
 from matplotlib.axes import Axes
 
@@ -110,10 +112,69 @@ def plot_clusters(data: DataFrame, cluster_col: str, x_col: str, y_col: str,
             data[data[cluster_col] == cls][y_col],
             color=colors[i],
             label=cls if labels else None,
+            zorder=99,
             **kwargs)
         
     ax.set_xticks([])
     ax.set_yticks([])
+
+    return ax
+
+def add_clusters_centroids(ax: Axes, data: DataFrame, cluster_col: str,
+                           x_col: str, y_col: str, **kwargs: Dict[str, Any]):
+    classes = data[cluster_col].sort_values().unique()
+    colors = sns.color_palette("husl", len(classes))[::1]
+    for i, cls in enumerate(classes):
+        ax.plot(
+            data[data[cluster_col] == cls][x_col],
+            data[data[cluster_col] == cls][y_col],
+            color=colors[i],
+            zorder=0,
+            **kwargs
+        )
+    return ax
+
+def add_clusters_confidence_ellipse(ax: Axes, data: DataFrame, cluster_col: str,
+                           x_col: str, y_col: str, **kwargs: Dict[str, Any]):
+    classes = data[cluster_col].sort_values().unique()
+    colors = sns.color_palette("husl", len(classes))[::1]
+    for i, cls in enumerate(classes):
+        ax = confidence_ellipse(data[data[cluster_col] == cls][x_col],
+                                data[data[cluster_col] == cls][y_col],
+                                ax,
+                                edgecolor=colors[i],
+                                **kwargs
+                                )
+    return ax
+
+def confidence_ellipse(xvalues, yvalues, ax, n_std=1.96, facecolor='none', **kwargs):
+    if xvalues.size != yvalues.size:
+        raise ValueError("x alues and y values must be the same size.")
+  
+    cov = np.cov(xvalues.astype(float), yvalues.astype(float), rowvar=False)
+    pearson_corr = cov[0, 1] / np.sqrt(cov[0, 0] * cov[1, 1])
+    ellipse_radius_x = np.sqrt(1 + pearson_corr)
+    ellipse_radius_y = np.sqrt(1 - pearson_corr)
+    ellipse = Ellipse(
+        (0, 0), 
+        width=ellipse_radius_x * 2, 
+        height=ellipse_radius_y * 2, 
+        facecolor=facecolor, 
+        **kwargs
+        )
+    
+    scale_x = np.sqrt(cov[0, 0]) * n_std
+    mean_x = np.mean(xvalues)
+    scale_y = np.sqrt(cov[1, 1]) * n_std
+    mean_y = np.mean(yvalues)
+
+    transformation = transforms.Affine2D() \
+        .rotate_deg(45) \
+        .scale(scale_x, scale_y) \
+        .translate(mean_x, mean_y)
+    
+    ellipse.set_transform(transformation + ax.transData)
+    ax.add_patch(ellipse)
 
     return ax
 
