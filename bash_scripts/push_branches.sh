@@ -10,7 +10,7 @@ current_branch=$(git rev-parse --abbrev-ref HEAD)
 git stash push -u -m "Temporary stash for push_branches script"
 
 # For each branch, except master and dev
-for branch in $(git for-each-ref --format '%(refname:short)' refs/heads/ | grep -v -e '^master$' -e '^dev$'); do
+for branch in $(git for-each-ref --format '%(refname:short)' refs/heads/ | grep -v -e '^master$'); do
     echo "Pushing branch $branch to origin..."
 
     # Attempt to push the branch to the remote
