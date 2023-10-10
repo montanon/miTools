@@ -14,7 +14,8 @@ def execute(line, cell=None):
     '''Executes the current cell if line evaluates to True.'''
     if not eval(line):
         return
-    get_ipython().run_cell(cell)
+    global_ns = get_ipython().user_ns
+    exec(cell, global_ns)
 
 @register_line_magic
 def notify(line):
