@@ -1,6 +1,8 @@
 import re
 from typing import Iterable
 from icecream import ic
+from os import PathLike
+from typing import Dict, Any, List, Optional
 
 def iterable_chunks(iterable: Iterable, chunk_size: int):
     for i in range(0, len(iterable), chunk_size):
@@ -27,9 +29,20 @@ def find_str_line_number_in_text(text: str, substring: str):
         if substring in line:
             return idx
 
-def read_log_file(log_path):
+def read_log_file(log_path: PathLike):
     with open(log_path, 'r') as f:
         return f.read() 
     
-def dict_from_kwargs(**kwargs):
+def dict_from_kwargs(**kwargs: Dict[str, Any]):
     return {k:v for k, v in kwargs}
+
+def lcs_similarity(s1: str, s2: str):
+    matrix = [[0] * (len(s2) + 1) for _ in range(len(s1) + 1)]
+    for i in range(len(s1)):
+        for j in range(len(s2)):
+            if s1[i] == s2[j]:
+                matrix[i+1][j+1] = matrix[i][j] + 1
+            else:
+                matrix[i+1][j+1] = max(matrix[i+1][j], matrix[i][j+1])
+    lcs_length = matrix[-1][-1]
+    return lcs_length / max(len(s1), len(s2))
