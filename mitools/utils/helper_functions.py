@@ -3,6 +3,7 @@ from typing import Iterable
 from icecream import ic
 from os import PathLike
 from typing import Dict, Any, List, Optional
+from fuzzywuzzy import fuzz
 
 def iterable_chunks(iterable: Iterable, chunk_size: int):
     for i in range(0, len(iterable), chunk_size):
@@ -46,3 +47,7 @@ def lcs_similarity(s1: str, s2: str):
                 matrix[i+1][j+1] = max(matrix[i+1][j], matrix[i][j+1])
     lcs_length = matrix[-1][-1]
     return lcs_length / max(len(s1), len(s2))
+
+def fuzz_string_in_string(src_string: str , dst_string: str, threshold: Optional[int]=90):
+    similarity_score = fuzz.partial_ratio(src_string, dst_string)
+    return similarity_score > threshold
