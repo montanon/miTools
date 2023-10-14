@@ -13,3 +13,4 @@ temp
 .DS_Store
 *api_key.cfg
 *api_key.py
+env_checkpoints/*
