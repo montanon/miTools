@@ -1,4 +1,3 @@
-#!/usr/local/bin python
 import PyPDF2
 import os
 from os import PathLike
@@ -6,8 +5,8 @@ import re
 import argparse
 
 import sys
-sys.path.append("/Users/sebastian/Desktop/Montagna Inc/miTools/mitools")
-from utils import fuzz_string_in_string
+sys.path.append("/Users/sebastian/Desktop/MontagnaInc/miTools/mitools")
+from ..utils import fuzz_string_in_string
 
 PATTERN = '^([A-Za-z0-9.]+-)+[A-Za-z0-9]+.pdf$'
 

@@ -6,6 +6,10 @@ from pandas import Series, DataFrame
 from numpy import float64
 from ast import literal_eval
 
+import warnings
+from numba.core.errors import NumbaDeprecationWarning, NumbaPendingDeprecationWarning
+warnings.simplefilter('ignore', NumbaDeprecationWarning)
+warnings.simplefilter('ignore', NumbaPendingDeprecationWarning)
 from umap import UMAP
 from transformers import AutoTokenizer, AutoModel
 
