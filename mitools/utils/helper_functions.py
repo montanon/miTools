@@ -16,10 +16,11 @@ def str_is_number(string: str) -> bool:
     except ValueError:
         return False
 
-def get_numbers_from_str(string: str) -> list:
+def get_numbers_from_str(string: str, n: Optional[int]=None) -> list:
     pattern = r'(-?\d*\.?\d*(?:[eE][-+]?\d+)?)'
     values = [s for s in re.findall(pattern, string.strip()) if s and s != '-']
-    return [float(s) if s != '.' else 0 for s in values]
+    numbers = [float(s) if s != '.' else 0 for s in values]
+    return numbers[n] if n else numbers
 
 def remove_multiple_spaces(string: str) -> str:
     return re.sub(r'\s+', ' ', string)
@@ -51,3 +52,6 @@ def lcs_similarity(s1: str, s2: str):
 def fuzz_string_in_string(src_string: str , dst_string: str, threshold: Optional[int]=90):
     similarity_score = fuzz.partial_ratio(src_string, dst_string)
     return similarity_score > threshold
+
+def replace_prefix(string, prefix, replacement):
+    return re.sub(r'^' + re.escape(prefix), replacement, string)

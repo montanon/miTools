@@ -20,7 +20,7 @@ OLS_VAR_NAMES = ['Coefficient', 'Std. err.', 't', 'P>|t|', '95% Conf. Low', '95%
 
 def get_ols_data_from_log(ols_str: str):
     
-    n_obs = get_numbers_from_str(re.search(r'Number of obs += +\n* *-?\d*\,*\d*\.*\d+\n', ols_str).group(0))[-1]
+    n_obs = get_numbers_from_str(re.search(rf'Number of obs += +\n* *-?\d*\,*\d*\.*\d+\n', ols_str).group(0))[-1]
     F_stats = get_numbers_from_str(re.search(r'F\(\d+, \d+\) += +-?\d*\.*\d+\n', ols_str).group(0))[-1]
     Prob_F = get_numbers_from_str(re.search(r'Prob > F += +-?\d*\.*\d+\n', ols_str).group(0))[-1]
     R_sq = get_numbers_from_str(re.search(r'R-squared += +-?\d*\.*\d+\n', ols_str).group(0))[-1]
@@ -198,29 +198,25 @@ def add_significance(row):
         return row + "*"
     else:
         return row
-    
-def color_by_significance(var):
-    styles = []
-    for val in var:
-        try:
-            if not isinstance(val, float) and var.name[0] not in var.name[-1]:
+
+def generate_significance_color_styles(df):
+    styles = pd.DataFrame("", index=df.index, columns=df.columns)
+    for r in range(df.shape[0]):
+        for c in range(df.shape[1]):
+            val = df.iloc[r, c]
+            if isinstance(val, str) and not df.index[r][0] in df.index[r][-1]:
+                pos_value = float(val.split(' ')[0]) >= 0.0
                 if '***' in val:
-                    val_style = 'background-color: limegreen'
+                    val_style = 'background-color: limegreen; font-weight: bold;' if pos_value else 'background-color: red; font-weight: bold;'
                 elif '**' in val:
-                    val_style = 'background-color: springgreen'
+                    val_style = 'background-color: springgreen; font-weight: bold;' if pos_value else 'background-color: orangered; font-weight: bold;'
                 elif '*' in val:
-                    val_style = 'background-color: aquamarine'
+                    val_style = 'background-color: aquamarine; font-weight: bold;' if pos_value else 'background-color: salmon; font-weight: bold;'
                 else:
                     val_style = ''
             else:
                 val_style = ''
-        except Exception as e:
-            print(str(e))
-            print(np.isnan(val))
-            print(val)
-            print(type(val))
-            print(var)
-        styles.append(val_style)
+            styles.iloc[r, c] = val_style
     return styles
 
 def read_regressions_log(log):
@@ -242,7 +238,7 @@ def read_regressions_log(log):
             csardl_df = regression_data_to_df(csardl_data)
             
             dataframes.append(csardl_df)
-            csardl_df = csardl_df.style.apply(color_by_significance, axis=1)
+            csardl_df = csardl_df.style.apply(lambda _: generate_significance_color_styles, axis=None)
 
             log = log[len(regression_str)-270:]
         else:
