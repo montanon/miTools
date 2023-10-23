@@ -4,7 +4,7 @@ from typing import Union, Dict, Tuple, List, Any
 from ..utils import replace_prefix
 
 
-@dataclass
+@dataclass(froze=True)
 class OLSResults:
 
     model_stats: Dict
@@ -35,7 +35,7 @@ class OLSResults:
         assert all(v in self.conf_interval.keys() for v in self.dep_variables)
 
 
-@dataclass
+@dataclass(frozen=True)
 class CSARDLResults:
 
     model_stats: Dict
