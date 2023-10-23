@@ -23,6 +23,7 @@ class OLSResults:
     std_errs: Dict[str,float]
     t_values: Dict[str,float]
     p_values: Dict[str,float]
+    significances: Dict[str,str]
     conf_interval: Dict[str,Tuple[float,float]]
     model_params: Dict[str,Any]
     model_specification: str
@@ -32,6 +33,7 @@ class OLSResults:
         assert all(v in self.std_errs.keys() for v in self.dep_variables)
         assert all(v in self.t_values.keys() for v in self.dep_variables)
         assert all(v in self.p_values.keys() for v in self.dep_variables)
+        assert all(v in self.significances.keys() for v in self.dep_variables)
         assert all(v in self.conf_interval.keys() for v in self.dep_variables)
 
 
@@ -58,18 +60,21 @@ class CSARDLResults:
     short_run_std_errs: Dict[str,float]
     short_run_z_values: Dict[str,float]
     short_run_p_values: Dict[str,float]
+    short_run_significances: Dict[str,str]
     short_run_conf_intervals: Dict[str,Tuple[float,float]]
 
     long_run_coefficients: Dict[str,float]
     long_run_std_errs: Dict[str,float]
     long_run_z_values: Dict[str,float]
     long_run_p_values: Dict[str,float]
+    long_run_significances: Dict[str,str]
     long_run_conf_intervals: Dict[str,Tuple[float,float]]
 
     adj_term_coefficients: Dict[str,float]
     adj_term_std_errs: Dict[str,float]
     adj_term_z_values: Dict[str,float]
     adj_term_p_values: Dict[str,float]
+    adj_term_significances: Dict[str,str]
     adj_term_conf_intervals: Dict[str,Tuple[float,float]]
 
     def __post__init__(self):
@@ -77,17 +82,20 @@ class CSARDLResults:
         assert all(replace_prefix(v, 'L.', '') in self.short_run_std_errs.keys() for v in self.dep_variables)
         assert all(replace_prefix(v, 'L.', '') in self.short_run_z_values.keys() for v in self.dep_variables)
         assert all(replace_prefix(v, 'L.', '') in self.short_run_p_values.keys() for v in self.dep_variables)
+        assert all(replace_prefix(v, 'L.', '') in self.short_run_significances.keys() for v in self.dep_variables)
         assert all(replace_prefix(v, 'L.', '') in self.short_run_conf_intervals.keys() for v in self.dep_variables)
 
         assert all(replace_prefix(v, 'lr_', '') in self.long_run_coefficients.keys() for v in self.dep_variables)
         assert all(replace_prefix(v, 'lr_', '') in self.long_run_std_errs.keys() for v in self.dep_variables)
         assert all(replace_prefix(v, 'lr_', '') in self.long_run_z_values.keys() for v in self.dep_variables)
         assert all(replace_prefix(v, 'lr_', '') in self.long_run_p_values.keys() for v in self.dep_variables)
+        assert all(replace_prefix(v, 'L.', '') in self.long_run_significances.keys() for v in self.dep_variables)
         assert all(replace_prefix(v, 'lr_', '') in self.long_run_conf_intervals.keys() for v in self.dep_variables)
 
         assert all(replace_prefix(v, 'lr_', '') in self.adj_term_coefficients.keys() for v in self.dep_variables)
         assert all(replace_prefix(v, 'lr_', '') in self.adj_term_std_errs.keys() for v in self.dep_variables)
         assert all(replace_prefix(v, 'lr_', '') in self.adj_term_z_values.keys() for v in self.dep_variables)
         assert all(replace_prefix(v, 'lr_', '') in self.adj_term_p_values.keys() for v in self.dep_variables)
+        assert all(replace_prefix(v, 'L.', '') in self.adj_term_significances.keys() for v in self.dep_variables)
         assert all(replace_prefix(v, 'lr_', '') in self.adj_term_conf_intervals.keys() for v in self.dep_variables)
 
