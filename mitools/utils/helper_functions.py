@@ -52,3 +52,6 @@ def lcs_similarity(s1: str, s2: str):
 def fuzz_string_in_string(src_string: str , dst_string: str, threshold: Optional[int]=90):
     similarity_score = fuzz.partial_ratio(src_string, dst_string)
     return similarity_score > threshold
+
+def replace_prefix(string, prefix, replacement):
+    return re.sub(r'^' + re.escape(prefix), replacement, string)
