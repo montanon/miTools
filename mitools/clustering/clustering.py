@@ -11,8 +11,8 @@ from sklearn.neighbors import NearestCentroid
 from scipy.stats import gaussian_kde
 from scipy.spatial.distance import euclidean
 from tqdm import tqdm
-from typing import Optional, List, Dict, Any, Tuple
-from pandas import DataFrame, IndexSlice
+from typing import Optional, List, Dict, Any, Tuple, Union
+from pandas import DataFrame, IndexSlice, Index
 from matplotlib.axes import Axes
 
 
@@ -95,25 +95,34 @@ def plot_agglomerative_ncluster_search(silhouette_scores: List[float]):
     
     return ax
 
-def plot_clusters_evolution(dataframe: DataFrame, cluster_col: str, x_col: str, y_col: str, time_col: str, time_values: Tuple):
+def plot_clusters_evolution(dataframe: DataFrame, cluster_col: str, x_col: str, y_col: str, 
+                            time_col: str, time_values: Tuple,
+                            clusters: Optional[List[Union[str,int]]]=None):
     fig, axes = plt.subplot_mosaic([['a', 'a'], ['a', 'a'], ['b', 'c']],
                               layout='constrained',
                               figsize=(14, 14))
 
-    plot_clusters(dataframe, cluster_col, x_col, y_col, ax=axes['a'], alpha=0.75, s=50)
+    if clusters is None:
+        clusters = dataframe[cluster_col].unique()
+
+    plot_clusters(dataframe, cluster_col, x_col, y_col, labels=clusters, 
+                  ax=axes['a'], alpha=0.75, s=50)
     axes['a'].set_xlabel('')
     axes['a'].set_ylabel('')
     axes['a'].set_xticks([])
     axes['a'].set_yticks([])
     axes['a'].set_title("Historical Record of Clusters' Embeddings")
 
-    plot_clusters(
-        dataframe.loc[
+    first_period_df = dataframe.loc[
             (dataframe[time_col] < time_values[1]) & (dataframe[time_col] > time_values[0])
-        ], 
+        ].copy()
+
+    plot_clusters(
+        first_period_df, 
         cluster_col,
         x_col,
         y_col,
+        labels=clusters,
         ax=axes['b'], 
         alpha=0.75, 
         s=35)
@@ -125,12 +134,16 @@ def plot_clusters_evolution(dataframe: DataFrame, cluster_col: str, x_col: str, 
     axes['b'].set_ylabel('')
     axes['b'].set_xticks([])
     axes['b'].set_yticks([])
+    
+    second_period_df = dataframe.loc[
+        dataframe[time_col] >= time_values[1]
+    ]
     plot_clusters(
-        dataframe.loc[
-            dataframe[time_col] >= time_values[1]], 
+        second_period_df, 
         cluster_col,
         x_col, 
         y_col,
+        labels=clusters,
         ax=axes['c'], 
         alpha=0.75,
         s=35)
@@ -146,25 +159,25 @@ def plot_clusters_evolution(dataframe: DataFrame, cluster_col: str, x_col: str, 
     for handle in lgnd.legend_handles:
         handle.set_sizes([100.0])
 
-    return fig, axes
+    return axes
 
 def plot_clusters(data: DataFrame, cluster_col: str, x_col: str, y_col: str,
-                  ax: Optional[Axes]=None, labels: Optional[bool]=True, **kwargs: Dict[str, Any]):
+                  ax: Optional[Axes]=None, labels: Optional[List]=None, **kwargs: Dict[str, Any]):
     if ax is None:
         _, ax = plt.subplots(1, 1, figsize=(14, 10))
-
     if kwargs is None:
         kwargs = dict(alpha=0.75, marker='o', size=5)
-        
-    classes = data[cluster_col].sort_values().unique()
-    colors = sns.color_palette("husl", len(classes))[::1]
+    if labels is None:
+        labels = data[cluster_col].unique()
     
-    for i, cls in enumerate(classes):
+    colors = sns.color_palette("husl", len(labels))[::1]
+    
+    for i, cls in enumerate(labels):
         ax.scatter(
             data[data[cluster_col] == cls][x_col], 
             data[data[cluster_col] == cls][y_col],
             color=colors[i],
-            label=cls if labels else None,
+            label=cls if labels is not None else None,
             zorder=99,
             **kwargs)
         
@@ -175,6 +188,7 @@ def plot_clusters(data: DataFrame, cluster_col: str, x_col: str, y_col: str,
 
 def add_clusters_centroids(ax: Axes, data: DataFrame, cluster_col: str,
                            x_col: str, y_col: str, **kwargs: Dict[str, Any]):
+    
     classes = data[cluster_col].sort_values().unique()
     colors = sns.color_palette("husl", len(classes))[::1]
     for i, cls in enumerate(classes):
