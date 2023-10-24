@@ -10,7 +10,7 @@ current_branch=$(git rev-parse --abbrev-ref HEAD)
 git stash push -u -m "Temporary stash for update_branches script"
 
 # For each branch, except master
-for branch in $(git for-each-ref --format '%(refname:short)' refs/heads/ | grep -v '^master$'); do
+for branch in $(git for-each-ref --format '%(refname:short)' refs/heads/ | grep -v -e '^master$' -e '^notebooks$'); do
     echo "Checking branch $branch..."
     
     # Switch to the branch

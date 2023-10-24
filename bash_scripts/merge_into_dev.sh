@@ -14,7 +14,7 @@ git checkout dev
 git pull origin dev
 
 # For each branch, except master and dev
-for branch in $(git for-each-ref --format '%(refname:short)' refs/heads/ | grep -v -e '^master$' -e '^dev$'); do
+for branch in $(git for-each-ref --format '%(refname:short)' refs/heads/ | grep -v -e '^master$' -e '^dev$' -e '^notebooks$'); do
     echo "Merging branch $branch into dev..."
 
     # Attempt to merge the branch into dev

@@ -14,7 +14,7 @@ current_branch=$(git rev-parse --abbrev-ref HEAD)
 git stash push -u -m "Temporary stash for delete_branches script"
 
 # For each branch, except master and dev
-for branch in $(git for-each-ref --format '%(refname:short)' refs/heads/ | grep -v -e '^master$' -e '^dev$'); do
+for branch in $(git for-each-ref --format '%(refname:short)' refs/heads/ | grep -v -e '^master$' -e '^dev$' -e '^notebooks$'); do
     # Check if the branch is identical to dev
     if [ $(git rev-parse $branch) == $(git rev-parse dev) ]; then
         # Delete the branch
