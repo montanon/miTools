@@ -1,5 +1,5 @@
 import re
-from typing import Iterable
+from typing import Iterable, Pattern
 from icecream import ic
 from os import PathLike
 from typing import Dict, Any, List, Optional
@@ -53,5 +53,11 @@ def fuzz_string_in_string(src_string: str , dst_string: str, threshold: Optional
     similarity_score = fuzz.partial_ratio(src_string, dst_string)
     return similarity_score > threshold
 
-def replace_prefix(string, prefix, replacement):
+def replace_prefix(string: str, prefix: Pattern, replacement: str):
     return re.sub(r'^' + re.escape(prefix), replacement, string)
+
+def split_strings(str_list: List[str]):
+    new_list = []
+    for s in str_list:
+        new_list += re.split('(?=[A-Z])', s)
+    return new_list
