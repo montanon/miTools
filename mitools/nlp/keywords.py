@@ -11,6 +11,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.feature_extraction.text import TfidfTransformer, TfidfVectorizer
 
 import re
+import pandas as pd
 from typing import List, Optional, Tuple, Dict, Type, Iterable, Union, Literal
 from pandas import DataFrame, Series
 import matplotlib.pyplot as plt
@@ -145,6 +146,15 @@ def find_countries_in_paper(tokens: List[str], countries: List[str], demonyms: D
             if dist >= similarity_threshold:
                 mentioned_countries.append((country, _token))
     return mentioned_countries
+
+def sort_multiindex_dataframe(df: DataFrame, bottom_col: str, top_level: int=0, ascending: Optional[bool]=False):
+    top_level_values = df.columns.get_level_values(top_level).unique()
+    sorted_dfs = []
+    for top_value in top_level_values:
+        sort_key = tuple((top_value, bottom_col))
+        sorted_cluster_df = df.sort_values(by=sort_key, ascending=ascending).reset_index(drop=True)
+        sorted_dfs.append(sorted_cluster_df)
+    return pd.concat(sorted_dfs, axis=1)
 
 def plot_token_features(df: DataFrame, columns: List[str], 
                         hue: Optional[str]=None, log: Optional[bool]=True, 
