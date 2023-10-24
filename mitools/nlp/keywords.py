@@ -147,13 +147,16 @@ def find_countries_in_paper(tokens: List[str], countries: List[str], demonyms: D
                 mentioned_countries.append((country, _token))
     return mentioned_countries
 
-def sort_multiindex_dataframe(df: DataFrame, bottom_col: str, top_level: int=0, ascending: Optional[bool]=False):
+def sort_multiindex_dataframe(df: DataFrame, selected_cols: List[str], sorting_col: Optional[str]=None, top_level: int=0, bot_level=-1, ascending: Optional[bool]=False):
     top_level_values = df.columns.get_level_values(top_level).unique()
+    bot_level_values = df.columns.get_level_values(bot_level)
     sorted_dfs = []
     for top_value in top_level_values:
-        sort_key = tuple((top_value, bottom_col))
-        sorted_cluster_df = df.sort_values(by=sort_key, ascending=ascending).reset_index(drop=True)
-        sorted_dfs.append(sorted_cluster_df)
+        selected_cluster_df = df.loc[:, [(top_value, c) for c in selected_cols]]
+        if sorting_col:
+            sort_key = tuple((top_value, sorting_col))
+            selected_cluster_df = selected_cluster_df.sort_values(by=sort_key, ascending=ascending).reset_index(drop=True)
+        sorted_dfs.append(selected_cluster_df)
     return pd.concat(sorted_dfs, axis=1)
 
 def plot_token_features(df: DataFrame, columns: List[str], 
