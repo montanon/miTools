@@ -4,24 +4,32 @@ from nltk.util import ngrams
 from nltk.corpus import stopwords, wordnet
 from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import RegexpTokenizer
+from nltk.tokenize.api import StringTokenizer
+from nltk.stem.api import StemmerI
 
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.feature_extraction.text import TfidfTransformer, TfidfVectorizer
 
 import re
-from typing import List, Optional, Tuple, Dict
-from pandas import DataFrame
+from typing import List, Optional, Tuple, Dict, Type, Iterable, Union, Literal
+from pandas import DataFrame, Series
 import matplotlib.pyplot as plt
 import seaborn as sns
 from unidecode import unidecode
 
 from ..utils import lcs_similarity
 
-def split_strings(str_list: List[str]):
-    new_list = []
-    for s in str_list:
-        new_list += re.split('(?=[A-Z])', s)
-    return new_list
+
+def tag_tokens(tokens: List[str]):
+    nltk_tags = nltk.pos_tag([token.lower() for token in tokens])
+    wordnet_tags = nltk_tags_to_wordnet_tags(nltk_tags)
+    return wordnet_tags
+
+def tag_token(token: str):
+    return tag_tokens([token])
+
+def nltk_tags_to_wordnet_tags(nltk_tags):
+    return map(lambda x: (x[0], nltk_tag_to_wordnet_tag(x[1])), nltk_tags)
 
 def nltk_tag_to_wordnet_tag(nltk_tag: str):
     if nltk_tag.startswith('J'):
@@ -35,17 +43,108 @@ def nltk_tag_to_wordnet_tag(nltk_tag: str):
     else:          
         return None
     
-def lemmatize_sentence(sentence: str):
-    lemmatizer = WordNetLemmatizer()
-    nltk_tagged = nltk.pos_tag(nltk.word_tokenize(sentence.lower()))  
-    wordnet_tagged = map(lambda x: (x[0], nltk_tag_to_wordnet_tag(x[1])), nltk_tagged)
-    lemmatized_sentence = []
-    for word, tag in wordnet_tagged:
-        if tag is None:
-            lemmatized_sentence.append(word)
-        else:        
-            lemmatized_sentence.append(lemmatizer.lemmatize(word, tag))
-    return " ".join(lemmatized_sentence)
+def lemmatize_text(text: str, lemmatizer: Optional[Type[StemmerI]]=None):
+    if lemmatizer is None:
+        lemmatizer = WordNetLemmatizer()
+    tokens = nltk.word_tokenize(text.lower())
+    lemmatized_tokens = lemmatize_tokens(tokens, lemmatizer)
+    return ' '.join(lemmatized_tokens)
+
+def lemmatize_tokens(tokens: Iterable[str], lemmatizer: Optional[Type[StemmerI]]=None):
+    if lemmatizer is None:
+        lemmatizer = WordNetLemmatizer()
+    tags = tag_tokens(tokens)
+    return [lemmatizer.lemmatize(token, tag) if tag is not None else token for token, tag in tags]
+
+def lemmatize_token(token: str, lemmatizer: Optional[Type[StemmerI]]=None):
+    if lemmatizer is None:
+        lemmatizer = WordNetLemmatizer()
+    tag = tag_token(token)
+    return [lemmatizer.lemmatize(token, tag) if tag is not None else token for token, tag in tag][0]
+
+def preprocess_texts(texts: List[str], stop_words: Optional[List[str]]=None, lemmatize: Optional[bool]=False,
+                    tokenizer: Optional[Type[StringTokenizer]]=None):
+    if tokenizer is None:
+        tokenizer = RegexpTokenizer("[A-Za-z]{2,}[0-9]{,1}")
+    return [preprocess_text(text, stop_words, lemmatize, tokenizer) for text in texts]
+
+def preprocess_text(text: str, stop_words: Optional[List[str]]=None, lemmatize: Optional[bool]=False,
+                    tokenizer: Optional[Type[StringTokenizer]]=None, lemmatizer: Optional[Type[StemmerI]]=None):
+    if tokenizer is None:
+        tokenizer = RegexpTokenizer("[A-Za-z]{2,}[0-9]{,1}")
+    tokens = tokenizer.tokenize(text)
+    return preprocess_tokens(tokens, stop_words, lemmatize, lemmatizer)
+
+def preprocess_tokens(tokens: List[str], stop_words: Optional[List[str]]=None, lemmatize: Optional[bool]=False,
+                    lemmatizer: Optional[Type[StemmerI]]=None):
+    if lemmatize:
+        tokens = lemmatize_tokens(tokens, lemmatizer)
+    if stop_words:
+        tokens = [token for token in tokens if token not in stop_words]
+    return tokens
+
+def preprocess_token(token: str, stop_words: Optional[List[str]]=None, lemmatize: Optional[bool]=False,
+                    lemmatizer: Optional[Type[StemmerI]]=None):
+    if lemmatize:
+        token = lemmatize_token(token, lemmatizer)
+    if stop_words and token in stop_words:
+        return ''
+    return token
+
+def get_tfidf(words_count: DataFrame):
+    transformer = TfidfTransformer(smooth_idf=True, use_idf=True)
+    tfidf = transformer.fit_transform(words_count.values)
+    df_tfidf = DataFrame(tfidf.toarray(), columns=words_count.columns, index=words_count.index)
+    return df_tfidf
+    
+def get_bow_of_tokens(tokens: List[str], preprocess: Optional[bool]=False, stop_words: Optional[List[str]]=None):
+    tokens = tokens if not preprocess else preprocess_text(tokens, stop_words)
+    vectorizer = CountVectorizer()
+    X = vectorizer.fit_transform(tokens)
+    feature_names = vectorizer.get_feature_names_out()
+    bow = dict(zip(feature_names, X.sum(axis=0).A1))
+    bow = dict(sorted(bow.items(), key=lambda item: item[1], reverse=True))
+    return bow
+
+def get_dataframe_bow(dataframe: DataFrame, text_col: str, preprocess: Optional[bool]=False,
+                     stop_words: Optional[List[str]]=None, lemmatize: Optional[bool]=False,
+                     tokenizer: Optional[Type[StringTokenizer]]=None, lemmatizer: Optional[Type[StemmerI]]=None):
+    return dataframe[[text_col]].apply(get_bow_of_text, axis=1,
+                                       args=(preprocess, stop_words, lemmatize, tokenizer, lemmatizer)
+                                       ).apply(Series).fillna(0)
+
+def get_bow_of_text(text: Union[str,Series], preprocess: Optional[bool]=False, stop_words: Optional[List[str]]=None, 
+                    lemmatize: Optional[bool]=False, tokenizer: Optional[Type[StringTokenizer]]=None, 
+                    lemmatizer: Optional[Type[StemmerI]]=None):
+    text = list(text) if isinstance(text, str) else text
+    text = text if not preprocess else preprocess_text(text[0], stop_words, lemmatize, tokenizer, lemmatizer)
+    vectorizer = CountVectorizer()
+    X = vectorizer.fit_transform(text)
+    feature_names = vectorizer.get_feature_names_out()
+    bow = dict(zip(feature_names, X.sum(axis=0).A1))
+    bow = dict(sorted(bow.items(), key=lambda item: item[1], reverse=True))
+    return bow
+
+def preprocess_country_name(name):
+    name = unidecode(name) 
+    name = name.lower() 
+    name = re.sub(r'[^a-z\s]', '', name)  
+    return name
+
+def find_countries_in_paper(tokens: List[str], countries: List[str], demonyms: Dict[str, str],
+                            similarity_threshold: Optional[int]=0.9):
+    mentioned_countries = []
+    for token in tokens:
+        _token = token
+        if token in list(demonyms.keys()):
+            token = demonyms[token]
+        elif token == 'uk':
+            token = 'united kingdom'
+        for country in countries:
+            dist = lcs_similarity(token, country)
+            if dist >= similarity_threshold:
+                mentioned_countries.append((country, _token))
+    return mentioned_countries
 
 def plot_token_features(df: DataFrame, columns: List[str], 
                         hue: Optional[str]=None, log: Optional[bool]=True, 
@@ -62,41 +161,3 @@ def plot_token_features(df: DataFrame, columns: List[str],
         ax.set_title(f"Histogram for {var} in Papers' Text")
     plt.tight_layout()
     plt.show()
-
-def preprocess_text(text: str, stop_words: List[str]):
-    tokenizer = RegexpTokenizer("[A-Za-z]{2,}[0-9]{,1}")
-    tokens = tokenizer.tokenize(text)
-    lemmatiser = WordNetLemmatizer()
-    lemmas = [lemmatize_sentence(token) for token in tokens]
-    keywords = [lemma for lemma in lemmas if lemma not in stop_words]
-    return keywords
-
-def get_bow_of_text(tokens: List[str]):
-    vectorizer = CountVectorizer()
-    X = vectorizer.fit_transform(tokens)
-    feature_names = vectorizer.get_feature_names_out()
-    bow = dict(zip(feature_names, X.sum(axis=0).A1))
-    bow = dict(sorted(bow.items(), key=lambda item: item[1], reverse=True))
-    return bow
-
-def preprocess_country_name(name):
-    name = unidecode(name) 
-    name = name.lower() 
-    name = re.sub(r'[^a-z\s]', '', name)  
-    return name
-
-
-def find_countries_in_paper(tokens: List[str], countries: List[str], demonyms: Dict[str, str],
-                            similarity_threshold: Optional[int]=0.9):
-    mentioned_countries = []
-    for token in tokens:
-        _token = token
-        if token in list(demonyms.keys()):
-            token = demonyms[token]
-        elif token == 'uk':
-            token = 'united kingdom'
-        for country in countries:
-            dist = lcs_similarity(token, country)
-            if dist >= similarity_threshold:
-                mentioned_countries.append((country, _token))
-    return mentioned_countries
