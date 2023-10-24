@@ -95,6 +95,59 @@ def plot_agglomerative_ncluster_search(silhouette_scores: List[float]):
     
     return ax
 
+def plot_clusters_evolution(dataframe: DataFrame, cluster_col: str, x_col: str, y_col: str, time_col: str, time_values: Tuple):
+    fig, axes = plt.subplot_mosaic([['a', 'a'], ['a', 'a'], ['b', 'c']],
+                              layout='constrained',
+                              figsize=(14, 14))
+
+    plot_clusters(dataframe, cluster_col, x_col, y_col, ax=axes['a'], alpha=0.75, s=50)
+    axes['a'].set_xlabel('')
+    axes['a'].set_ylabel('')
+    axes['a'].set_xticks([])
+    axes['a'].set_yticks([])
+    axes['a'].set_title("Historical Record of Clusters' Embeddings")
+
+    plot_clusters(
+        dataframe.loc[
+            (dataframe[time_col] < time_values[1]) & (dataframe[time_col] > time_values[0])
+        ], 
+        cluster_col,
+        x_col,
+        y_col,
+        ax=axes['b'], 
+        alpha=0.75, 
+        s=35)
+    years = (dataframe.loc[(dataframe[time_col] < time_values[1]) & (dataframe[time_col] > time_values[0]), time_col]
+             .sort_values()
+             .unique()
+             .astype(np.int16))
+    axes['b'].set_xlabel(f'Before Paris Agreement, {time_values[0]} to {years[-1]}')
+    axes['b'].set_ylabel('')
+    axes['b'].set_xticks([])
+    axes['b'].set_yticks([])
+    plot_clusters(
+        dataframe.loc[
+            dataframe[time_col] >= time_values[1]], 
+        cluster_col,
+        x_col, 
+        y_col,
+        ax=axes['c'], 
+        alpha=0.75,
+        s=35)
+    years = dataframe.loc[dataframe[time_col] >= time_values[1], time_col].sort_values().unique().astype(np.int16)
+    axes['c'].set_xlabel(f'After Paris Agreement, {years[0]} to {years[-1]}')
+    axes['c'].set_ylabel('')
+    axes['c'].set_xticks([])
+    axes['c'].set_yticks([])
+
+    handles, labels = axes['c'].get_legend_handles_labels()
+    
+    lgnd = fig.legend(handles, labels, loc='center right', bbox_to_anchor=(1.2525, 0.52))
+    for handle in lgnd.legend_handles:
+        handle.set_sizes([100.0])
+
+    return fig, axes
+
 def plot_clusters(data: DataFrame, cluster_col: str, x_col: str, y_col: str,
                   ax: Optional[Axes]=None, labels: Optional[bool]=True, **kwargs: Dict[str, Any]):
     if ax is None:
