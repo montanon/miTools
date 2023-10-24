@@ -63,32 +63,32 @@ def lemmatize_token(token: str, lemmatizer: Optional[Type[StemmerI]]=None):
     tag = tag_token(token)
     return [lemmatizer.lemmatize(token, tag) if tag is not None else token for token, tag in tag][0]
 
-def preprocess_texts(texts: List[str], stop_words: Optional[List[str]]=None, lemmatize: Optional[bool]=False,
+def preprocess_texts(texts: List[str], stopwords: Optional[List[str]]=None, lemmatize: Optional[bool]=False,
                     tokenizer: Optional[Type[StringTokenizer]]=None):
     if tokenizer is None:
         tokenizer = RegexpTokenizer("[A-Za-z]{2,}[0-9]{,1}")
-    return [preprocess_text(text, stop_words, lemmatize, tokenizer) for text in texts]
+    return [preprocess_text(text, stopwords, lemmatize, tokenizer) for text in texts]
 
-def preprocess_text(text: str, stop_words: Optional[List[str]]=None, lemmatize: Optional[bool]=False,
+def preprocess_text(text: str, stopwords: Optional[List[str]]=None, lemmatize: Optional[bool]=False,
                     tokenizer: Optional[Type[StringTokenizer]]=None, lemmatizer: Optional[Type[StemmerI]]=None):
     if tokenizer is None:
         tokenizer = RegexpTokenizer("[A-Za-z]{2,}[0-9]{,1}")
     tokens = tokenizer.tokenize(text)
-    return preprocess_tokens(tokens, stop_words, lemmatize, lemmatizer)
+    return preprocess_tokens(tokens, stopwords, lemmatize, lemmatizer)
 
-def preprocess_tokens(tokens: List[str], stop_words: Optional[List[str]]=None, lemmatize: Optional[bool]=False,
+def preprocess_tokens(tokens: List[str], stopwords: Optional[List[str]]=None, lemmatize: Optional[bool]=False,
                     lemmatizer: Optional[Type[StemmerI]]=None):
     if lemmatize:
         tokens = lemmatize_tokens(tokens, lemmatizer)
-    if stop_words:
-        tokens = [token for token in tokens if token not in stop_words]
+    if stopwords:
+        tokens = [token for token in tokens if token.lower() not in stopwords]
     return tokens
 
-def preprocess_token(token: str, stop_words: Optional[List[str]]=None, lemmatize: Optional[bool]=False,
+def preprocess_token(token: str, stopwords: Optional[List[str]]=None, lemmatize: Optional[bool]=False,
                     lemmatizer: Optional[Type[StemmerI]]=None):
     if lemmatize:
         token = lemmatize_token(token, lemmatizer)
-    if stop_words and token in stop_words:
+    if stopwords and token.lower() in stopwords:
         return ''
     return token
 
@@ -98,8 +98,8 @@ def get_tfidf(words_count: DataFrame):
     df_tfidf = DataFrame(tfidf.toarray(), columns=words_count.columns, index=words_count.index)
     return df_tfidf
     
-def get_bow_of_tokens(tokens: List[str], preprocess: Optional[bool]=False, stop_words: Optional[List[str]]=None):
-    tokens = tokens if not preprocess else preprocess_text(tokens, stop_words)
+def get_bow_of_tokens(tokens: List[str], preprocess: Optional[bool]=False, stopwords: Optional[List[str]]=None):
+    tokens = tokens if not preprocess else preprocess_text(tokens, stopwords)
     vectorizer = CountVectorizer()
     X = vectorizer.fit_transform(tokens)
     feature_names = vectorizer.get_feature_names_out()
@@ -108,17 +108,17 @@ def get_bow_of_tokens(tokens: List[str], preprocess: Optional[bool]=False, stop_
     return bow
 
 def get_dataframe_bow(dataframe: DataFrame, text_col: str, preprocess: Optional[bool]=False,
-                     stop_words: Optional[List[str]]=None, lemmatize: Optional[bool]=False,
+                     stopwords: Optional[List[str]]=None, lemmatize: Optional[bool]=False,
                      tokenizer: Optional[Type[StringTokenizer]]=None, lemmatizer: Optional[Type[StemmerI]]=None):
     return dataframe[[text_col]].apply(get_bow_of_text, axis=1,
-                                       args=(preprocess, stop_words, lemmatize, tokenizer, lemmatizer)
+                                       args=(preprocess, stopwords, lemmatize, tokenizer, lemmatizer)
                                        ).apply(Series).fillna(0)
 
-def get_bow_of_text(text: Union[str,Series], preprocess: Optional[bool]=False, stop_words: Optional[List[str]]=None, 
+def get_bow_of_text(text: Union[str,Series], preprocess: Optional[bool]=False, stopwords: Optional[List[str]]=None, 
                     lemmatize: Optional[bool]=False, tokenizer: Optional[Type[StringTokenizer]]=None, 
                     lemmatizer: Optional[Type[StemmerI]]=None):
     text = list(text) if isinstance(text, str) else text
-    text = text if not preprocess else preprocess_text(text[0], stop_words, lemmatize, tokenizer, lemmatizer)
+    text = text if not preprocess else preprocess_text(text[0], stopwords, lemmatize, tokenizer, lemmatizer)
     vectorizer = CountVectorizer()
     X = vectorizer.fit_transform(text)
     feature_names = vectorizer.get_feature_names_out()
