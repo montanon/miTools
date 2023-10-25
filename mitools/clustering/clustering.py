@@ -97,7 +97,10 @@ def plot_agglomerative_ncluster_search(silhouette_scores: List[float]):
 
 def plot_clusters_evolution(dataframe: DataFrame, cluster_col: str, x_col: str, y_col: str, 
                             time_col: str, time_values: Tuple,
-                            clusters: Optional[List[Union[str,int]]]=None):
+                            clusters: Optional[List[Union[str,int]]]=None,
+                            colors: Optional[List[Tuple]]=None,
+                            plots_kwargs:  Optional[Dict[str, Dict]]=None
+                            ):
     fig, axes = plt.subplot_mosaic([['a', 'a'], ['a', 'a'], ['b', 'c']],
                               layout='constrained',
                               figsize=(14, 14))
@@ -106,7 +109,7 @@ def plot_clusters_evolution(dataframe: DataFrame, cluster_col: str, x_col: str, 
         clusters = dataframe[cluster_col].unique()
 
     plot_clusters(dataframe, cluster_col, x_col, y_col, labels=clusters, 
-                  ax=axes['a'], alpha=0.75, s=50)
+                  ax=axes['a'], colors=colors, **plots_kwargs.get('a', None))
     axes['a'].set_xlabel('')
     axes['a'].set_ylabel('')
     axes['a'].set_xticks([])
@@ -123,6 +126,7 @@ def plot_clusters_evolution(dataframe: DataFrame, cluster_col: str, x_col: str, 
         x_col,
         y_col,
         labels=clusters,
+        colors=colors,
         ax=axes['b'], 
         alpha=0.75, 
         s=35)
@@ -144,6 +148,7 @@ def plot_clusters_evolution(dataframe: DataFrame, cluster_col: str, x_col: str, 
         x_col, 
         y_col,
         labels=clusters,
+        colors=colors,
         ax=axes['c'], 
         alpha=0.75,
         s=35)
@@ -162,7 +167,8 @@ def plot_clusters_evolution(dataframe: DataFrame, cluster_col: str, x_col: str, 
     return axes
 
 def plot_clusters(data: DataFrame, cluster_col: str, x_col: str, y_col: str,
-                  ax: Optional[Axes]=None, labels: Optional[List]=None, **kwargs: Dict[str, Any]):
+                  ax: Optional[Axes]=None, labels: Optional[List]=None,
+                   colors: Optional[List[Tuple]]=None, **kwargs: Dict[str, Any]):
     if ax is None:
         _, ax = plt.subplots(1, 1, figsize=(14, 10))
     if kwargs is None:
@@ -170,7 +176,8 @@ def plot_clusters(data: DataFrame, cluster_col: str, x_col: str, y_col: str,
     if labels is None:
         labels = data[cluster_col].unique()
     
-    colors = sns.color_palette("husl", len(labels))[::1]
+    if colors is None:
+        colors = sns.color_palette("husl", len(labels))[::1]
     
     for i, cls in enumerate(labels):
         ax.scatter(
@@ -187,11 +194,15 @@ def plot_clusters(data: DataFrame, cluster_col: str, x_col: str, y_col: str,
     return ax
 
 def add_clusters_centroids(ax: Axes, data: DataFrame, cluster_col: str,
-                           x_col: str, y_col: str, **kwargs: Dict[str, Any]):
-    
-    classes = data[cluster_col].sort_values().unique()
-    colors = sns.color_palette("husl", len(classes))[::1]
-    for i, cls in enumerate(classes):
+                           x_col: str, y_col: str, colors: Optional[List[Tuple]]=None,
+                           labels: Optional[List[Tuple]]=None,
+                           **kwargs: Dict[str, Any]
+                           ):
+    if labels is None:
+        labels = data[cluster_col].unique()
+    if colors is None:
+        colors = sns.color_palette("husl", len(labels))[::1]
+    for i, cls in enumerate(labels):
         ax.plot(
             data[data[cluster_col] == cls][x_col],
             data[data[cluster_col] == cls][y_col],
@@ -202,10 +213,15 @@ def add_clusters_centroids(ax: Axes, data: DataFrame, cluster_col: str,
     return ax
 
 def add_clusters_confidence_ellipse(ax: Axes, data: DataFrame, cluster_col: str,
-                           x_col: str, y_col: str, **kwargs: Dict[str, Any]):
-    classes = data[cluster_col].sort_values().unique()
-    colors = sns.color_palette("husl", len(classes))[::1]
-    for i, cls in enumerate(classes):
+                                    x_col: str, y_col: str,
+                                    colors: Optional[List[Tuple]]=None,
+                                    labels: Optional[List[Tuple]]=None,
+                                    **kwargs: Dict[str, Any]):
+    if labels is None:
+        labels = data[cluster_col].unique()
+    if colors is None:
+        colors = sns.color_palette("husl", len(labels))[::1]
+    for i, cls in enumerate(labels):
         ax = confidence_ellipse(data[data[cluster_col] == cls][x_col],
                                 data[data[cluster_col] == cls][y_col],
                                 ax,
