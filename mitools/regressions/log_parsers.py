@@ -430,6 +430,17 @@ def process_dataframe(df, income):
     df['Income'] = income
     return df.set_index('Income', append=True)
 
+def process_logs_folder(folder: PathLike):
+    logs_paths = [f"../{folder}/{f}" for f in os.listdir(f'../{folder}') if f.endswith('.log')]
+    ols_df, csardl_df = process_logs(logs_paths)
+    return ols_df, csardl_df
+
+@parallel(n_threads=6, chunk_size=1)
+def process_logs_folder_parallel(folder):
+    if isinstance(folder, list) and len(folder) == 1:
+        folder = folder[0]
+    return process_logs_folder(folder)
+
 def mask_results(dataframe, indicator_names):
     dataframe = dataframe.reset_index()
     dataframe['Dep Var'] = dataframe['Dep Var'].map(indicator_names.to_dict()['Original Name'])
