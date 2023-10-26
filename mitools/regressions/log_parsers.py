@@ -12,14 +12,24 @@ from .regressions_data import OLSResults, CSARDLResults, RegressionData
 from typing import List, Dict, Match
 from icecream import ic
 from copy import deepcopy
+from copy import deepcopy
 
+SPLIT_PATTERN = '={2,}\n'
 SPLIT_PATTERN = '={2,}\n'
 MODEL_PATTERN = f'({SPLIT_PATTERN}(\n)+){{1}}'
 NUMBER_PATTERN = '-?\d*\.*\d+([Ee][\+\-]\d+)?'
 REGRESSION_PATTERN = f'({SPLIT_PATTERN}){{2}}(.*?)({SPLIT_PATTERN}){{1}}(.*?)({SPLIT_PATTERN}){{2}}'
+REGRESSION_PATTERN = f'({SPLIT_PATTERN}){{2}}(.*?)({SPLIT_PATTERN}){{1}}(.*?)({SPLIT_PATTERN}){{2}}'
 
 OLS_VAR_NAMES = ['Coefficient', 'Std. err.', 't', 'P>|t|', '95% Conf. Low', '95% Conf. High']
 
+def get_regression_strs_from_log(log: str):
+    regression_strs = []
+    while log:
+        match = re.search(REGRESSION_PATTERN, log, re.DOTALL)
+        regression_strs.append(match[0])
+        log = log[match.end():]
+    return regression_strs
 def get_regression_strs_from_log(log: str):
     regression_strs = []
     while log:
@@ -40,10 +50,12 @@ def get_ols_data_from_log(ols_str: str):
 
     dep_variable = re.search('Indicat(?:~\d+X|or\w+X)', coefficients_table).group(0).strip()
 
+    dep_variable = re.search('Indicat(?:~\d+X|or\w+X)', coefficients_table).group(0).strip()
+
     coefficient_rows = coefficients_table.split('\n')[3:-2]
     coefficients = get_coefficients_from_table_rows(coefficient_rows, OLS_VAR_NAMES)
     
-    indep_variables = list(coefficients.keys())\
+    indep_variables = list(coefficients.keys())
 
     model_params = {}
  
@@ -55,6 +67,7 @@ def get_ols_data_from_log(ols_str: str):
     model_specification = None    
 
     return OLSResults(
+        model_params=model_params,
         model_params=model_params,
         n_obs=n_obs,
         F_stats=F_stats,
@@ -70,6 +83,7 @@ def get_ols_data_from_log(ols_str: str):
         p_values=p_values,
         significances=significances,
         conf_interval=conf_interval,
+        model_specification=model_specification
         model_specification=model_specification
     )
 
@@ -91,6 +105,7 @@ def get_csardl_data_from_log(csardl_str):
 
     if 'No observations left' in csardl_str or 'conformability error' in csardl_str: 
         return CSARDLResults(
+            model_params={},
             model_params={},
             model_specification='No observations left or conformability error',
             n_obs=0,
@@ -115,7 +130,7 @@ def get_csardl_data_from_log(csardl_str):
             short_run_significances=None,
             short_run_conf_intervals=None,
 
-
+    
             long_run_std_errs=None,
             long_run_z_values=None,
             long_run_p_values=None,
@@ -171,6 +186,8 @@ def get_csardl_data_from_log(csardl_str):
     model_specification = re.search(r'Command: .*', csardl_str).group(0)
     model_params = {}
     model_params['lag'] = int(model_specification[-2:-1])
+    model_params = {}
+    model_params['lag'] = int(model_specification[-2:-1])
 
     short_run_std_errs=None
     short_run_z_values=None
@@ -191,6 +208,7 @@ def get_csardl_data_from_log(csardl_str):
     adj_term_conf_intervals=None
     
     return CSARDLResults(
+        model_params=model_params,
         model_params=model_params,
 
         n_obs=n_obs,
@@ -230,6 +248,51 @@ def get_csardl_data_from_log(csardl_str):
         model_specification=model_specification,
     )
 
+def dict_to_df(model_dict: Dict):
+    base_data = {
+        'n_obs': model_dict['n_obs'],
+        'n_groups': model_dict['n_groups'],
+        'obs_p_group': model_dict['obs_p_group'],
+        'F_stats': model_dict['F_stats'],
+        'Prob_F': model_dict['Prob_F'],
+        'R_sq': model_dict['R_sq'],
+        'R_sqMG': model_dict['R_sqMG'],
+        'RootMSE': model_dict['RootMSE'],
+        'CD_stats': model_dict['CD_stats'],
+        'p_val': model_dict['p_val'],
+        'lag': model_dict['lag'],
+        'model_specification': model_dict['model_specification']
+    }
+    rows = []
+    for var, stats in model_dict['short_run_coeffs'].items():
+        row = {'Variable': var, 'type': 'short_run'}
+        row.update(stats)
+        rows.append(row)
+    for var, stats in model_dict['adj_term_coeffs'].items():
+        row = {'Variable': var, 'type': 'adj_term'}
+        row.update(stats)
+        rows.append(row)
+    for var, stats in model_dict['long_run_coeffs'].items():
+        row = {'Variable': var, 'type': 'long_run'}
+        row.update(stats)
+        rows.append(row)
+    df = pd.DataFrame(rows)
+    for key, value in base_data.items():
+        df[key] = value
+        
+    df.index = pd.MultiIndex.from_product([list([model_dict['dep_var']]), [model_dict['lag']], df['type'].values])
+    relevant_cols = ['Variable', 'Coef.', 'P>|z|']
+    df = df[relevant_cols]
+    df.index.names = ['Dep Var', 'Lag', 'Time Span']
+    df = df.set_index('Variable', append=True)
+    if model_dict['indep_vars'] == 0:
+        model_dict['indep_vars'] = [str(model_dict['indep_vars'])]
+    df['Indep Var'] = [v for v in model_dict['indep_vars'] if v.find('.') == -1][0]
+    df = df.set_index('Indep Var', append=True)
+    return df
+
+
+
 def generate_significance_color_styles(df):
     styles = pd.DataFrame("", index=df.index, columns=df.columns)
     for r in range(df.shape[0]):
@@ -256,6 +319,9 @@ def extract_regression_from_log(log):
     start_of_reg = "(={2,}\n){2}"
     midd_of_reg = "(={2,}\n){1}"
     end_of_reg = "(={2,}\n){2}"
+    start_of_reg = "(={2,}\n){2}"
+    midd_of_reg = "(={2,}\n){1}"
+    end_of_reg = "(={2,}\n){2}"
 
     start_match = re.search(start_of_reg, log, re.DOTALL)
     after_start_str = log[start_match.end():]
@@ -272,6 +338,7 @@ def get_models_from_regression(regression_str):
     split = re.split('====+\n{1,}', no_borders)
     ols_str, csardl_str = split
     return ols_str, csardl_str
+
 
 
 def df_selection(df, indicators, columns, col_filters, index_filters):
@@ -444,11 +511,3 @@ def ind_var_name_replace(string, indicator_names):
         indicator_name = indicator_names.to_dict()['Original Name'][indicator]
         string = re.sub('(?<=[._])?[A-Za-z& ]*ECI', indicator_name, string)
     return string
-
-def has_duplicated_indices(df: DataFrame):
-    return df.index.duplicated().any()
-
-def print_duplicated_indices(df):
-    duplicated = df.index[df.index.duplicated()].unique()
-    for idx in duplicated:
-        print(idx)
