@@ -61,3 +61,14 @@ def split_strings(str_list: List[str]):
     for s in str_list:
         new_list += re.split('(?=[A-Z])', s)
     return new_list
+
+def add_significance(row):
+    p_value = float(row.split(' ')[1].replace('(','').replace(')',''))  
+    if p_value < 0.01:
+        return row + "***"
+    elif p_value < 0.05:
+        return row + "**"
+    elif p_value < 0.1:
+        return row + "*"
+    else:
+        return row
