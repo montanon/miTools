@@ -4,7 +4,7 @@ from typing import Union, Dict, Tuple, List, Any
 from ..utils import replace_prefix
 
 
-@dataclass(froze=True)
+@dataclass(frozen=True)
 class OLSResults:
 
     model_stats: Dict
@@ -13,11 +13,11 @@ class OLSResults:
     F_stats: Dict[Tuple[int, int],float]
     Prob_F: int
     R_sq: float
-    Adj_R_sq: float
+    AdjR_sq: float
     Root_MSE: float
 
-    indep_variable: str
-    dep_variables: List[str]
+    dep_variable: str
+    indep_variables: List[str]
 
     coefficients: Dict[str,float]
     std_errs: Dict[str,float]
@@ -29,12 +29,12 @@ class OLSResults:
     model_specification: str
 
     def __post__init__(self):
-        assert all(v in self.coefficients.keys() for v in self.dep_variables)
-        assert all(v in self.std_errs.keys() for v in self.dep_variables)
-        assert all(v in self.t_values.keys() for v in self.dep_variables)
-        assert all(v in self.p_values.keys() for v in self.dep_variables)
-        assert all(v in self.significances.keys() for v in self.dep_variables)
-        assert all(v in self.conf_interval.keys() for v in self.dep_variables)
+        assert all(v in self.coefficients.keys() for v in self.indep_variables)
+        assert all(v in self.std_errs.keys() for v in self.indep_variables)
+        assert all(v in self.t_values.keys() for v in self.indep_variables)
+        assert all(v in self.p_values.keys() for v in self.indep_variables)
+        assert all(v in self.significances.keys() for v in self.indep_variables)
+        assert all(v in self.conf_interval.keys() for v in self.indep_variables)
 
 
 @dataclass(frozen=True)
@@ -50,11 +50,11 @@ class CSARDLResults:
     R_sq: float
     R_sq_MG: float
     Root_MSE: float
-    CD_stat: float
+    CD_stats: float
     p_value: float
 
-    indep_variable: str
-    dep_variables: List[str]
+    dep_variable: str
+    indep_variables: List[str]
     
     short_run_coefficients: Dict[str,float]
     short_run_std_errs: Dict[str,float]
@@ -76,6 +76,8 @@ class CSARDLResults:
     adj_term_p_values: Dict[str,float]
     adj_term_significances: Dict[str,str]
     adj_term_conf_intervals: Dict[str,Tuple[float,float]]
+
+    model_specification: str
 
     def __post__init__(self):
         assert all(replace_prefix(v, 'L.', '') in self.short_run_coefficients.keys() for v in self.dep_variables)
