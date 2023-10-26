@@ -125,10 +125,16 @@ def get_ols_data_from_log(ols_str: str):
         Prob_F=Prob_F,
         R_sq=R_sq,
         AdjR_sq=AdjR_sq,
-        RootMSE=RootMSE,
-        dep_var=dep_var,
-        indep_vars=indep_vars,
-        coeffs=coefficients
+        Root_MSE=Root_MSE,
+        dep_variable=dep_variable,
+        indep_variables=indep_variables,
+        coefficients=coefficients,
+        std_errs=std_errs,
+        t_values=t_values,
+        p_values=p_values,
+        significances=significances,
+        conf_interval=conf_interval,
+        model_specification=model_specification
     )
 
 def get_csardl_data_from_log(csardl_str):
