@@ -9,7 +9,6 @@ init(autoreset=True)
 
 from ..utils import *
 from .regressions_data import OLSResults, CSARDLResults, RegressionData
-from .regressions_data import OLSResults, CSARDLResults, RegressionData
 from typing import List, Dict, Match
 from icecream import ic
 from copy import deepcopy
@@ -437,29 +436,51 @@ def save_dfs_to_excel(dataframes, sheet_names, path):
         for df, sheet_name in zip(dataframes, sheet_names):
             df.to_excel(writer, sheet_name=sheet_name)
 
-def process_logs(logs_paths):
+def process_logs_folder(folder: PathLike):
+    logs_paths = [f"{folder}/{f}" for f in os.listdir(f'{folder}') if f.endswith('.log')]
+    ols_df, csardl_df = process_logs(logs_paths)
+    return ols_df, csardl_df
+
+def threaded_process_logs(log_paths: List[PathLike], batch_size=4, n_threads=4):
+    if n_threads > 1:
+        parallel_function = parallel(n_threads, batch_size)(process_logs_parallel)
+        return parallel_function(log_paths)
+    else:
+        return process_logs(log_paths)
+    
+def process_logs_parallel(log_paths: List[PathLike]):
+    if isinstance(log_paths, list) and len(log_paths) == 1:
+        print('CHECK')
+        #log_paths = log_paths[0]
+    return process_logs(log_paths)
+
+def process_logs(logs_paths: List[PathLike]):
     ols_dataframes = []
     csardl_dataframes = []
     for log_path in logs_paths:
-        income, indicator, regression_strs = process_log(log_path)
-        ols_results = []
-        csardl_results = []
-        for regression_str in regression_strs:
-            ols_result, csardl_result = process_regression_str(regression_str)
-            ols_results.append(ols_result)
-            csardl_results.append(csardl_result)
-        ols_dataframes.append(process_dataframe(pd.concat(ols_results), income))
-        csardl_dataframes.append(process_dataframe(pd.concat(csardl_results), income))
+        try:
+            income, indicator, regression_strs = process_log(log_path)
+            ols_results = []
+            csardl_results = []
+            for regression_str in regression_strs:
+                ols_result, csardl_result = process_regression_str(regression_str)
+                ols_results.append(ols_result)
+                csardl_results.append(csardl_result)
+            ols_dataframes.append(process_dataframe(pd.concat(ols_results), income))
+            csardl_dataframes.append(process_dataframe(pd.concat(csardl_results), income))
+        except Exception as e:
+            print(str(e))
+            print(log_path)
     ols_dataframe = pd.concat(ols_dataframes)
     csardl_dataframe = pd.concat(csardl_dataframes)
     return ols_dataframe, csardl_dataframe
-    
+
 def process_log(log_path):
     log = read_log_file(log_path)
     income, indicator = os.path.basename(log_path.replace('log.log', '')).split('_')
     regression_strs = get_regression_strs_from_log(log)
     return income, indicator, regression_strs
-
+    
 def process_regression_str(regression_str):
     ols_str, csardl_str = get_models_from_regression(regression_str)
     ols_data = get_ols_data_from_log(ols_str)
@@ -471,17 +492,6 @@ def process_regression_str(regression_str):
 def process_dataframe(df, income):
     df['Income'] = income
     return df.set_index('Income', append=True)
-
-def process_logs_folder(folder: PathLike):
-    logs_paths = [f"{folder}/{f}" for f in os.listdir(f'{folder}') if f.endswith('.log')]
-    ols_df, csardl_df = process_logs(logs_paths)
-    return ols_df, csardl_df
-
-@parallel(n_threads=6, chunk_size=1)
-def process_logs_folder_parallel(folder):
-    if isinstance(folder, list) and len(folder) == 1:
-        folder = folder[0]
-    return process_logs_folder(folder)
 
 def mask_results(dataframe, indicator_names):
     dataframe = dataframe.reset_index()
