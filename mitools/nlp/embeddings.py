@@ -15,7 +15,7 @@ from umap import UMAP
 from transformers import AutoTokenizer, AutoModel
 
 SPECTER_EMBEDDINGS_URL = "https://model-apis.semanticscholar.org/specter/v1/invoke"
-MAX_BATCH_SIZE = 16
+MAX_BATCH_SIZE = 4
 
 
 def huggingface_specter_embed_texts(texts: Union[List[str],str], batch_size: Optional[int]=MAX_BATCH_SIZE, n_threads: Optional[int]=1):
@@ -23,7 +23,7 @@ def huggingface_specter_embed_texts(texts: Union[List[str],str], batch_size: Opt
     model = AutoModel.from_pretrained('allenai/specter')
     
     if n_threads > 1:
-        parallel_function = parallel(n_threads, batch_size)(huggingface_specter_embed_chunk)
+        parallel_function = parallel(n_threads, batch_size)(huggingface_specter_embed_texts_parallel)
         return parallel_function(texts, tokenizer, model)
     else:
         embeddings = []
