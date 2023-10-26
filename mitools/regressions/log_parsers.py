@@ -87,7 +87,6 @@ def get_ols_data_from_log(ols_str: str):
         significances=significances,
         conf_interval=conf_interval,
         model_specification=model_specification
-        model_specification=model_specification
     )
 
 def get_coefficients_from_table_rows(coefficient_rows: List[str], var_names: List[str]) -> Dict:
@@ -264,7 +263,6 @@ def dict_to_df(model_dict: Dict):
         'CD_stats': model_dict['CD_stats'],
         'p_val': model_dict['p_val'],
         'lag': model_dict['lag'],
-        'model_specification': model_dict['model_specification']
         'model_specification': model_dict['model_specification']
     }
     rows = []
@@ -490,7 +488,7 @@ def process_dataframe(df, income):
     return df.set_index('Income', append=True)
 
 def process_logs_folder(folder: PathLike):
-    logs_paths = [f"{folder}/{f}" for f in os.listdir(f'{folder}') if f.endswith('.log')]
+    logs_paths = [f"../{folder}/{f}" for f in os.listdir(f'../{folder}') if f.endswith('.log')]
     ols_df, csardl_df = process_logs(logs_paths)
     return ols_df, csardl_df
 
