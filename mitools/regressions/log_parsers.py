@@ -9,54 +9,19 @@ init(autoreset=True)
 
 from ..utils import *
 from .regressions_data import OLSResults, CSARDLResults, RegressionData
-from .regressions_data import OLSResults, CSARDLResults, RegressionData
 from typing import List, Dict, Match
 from icecream import ic
 from copy import deepcopy
+from copy import deepcopy
 
+SPLIT_PATTERN = '={2,}\n'
 SPLIT_PATTERN = '={2,}\n'
 MODEL_PATTERN = f'({SPLIT_PATTERN}(\n)+){{1}}'
 NUMBER_PATTERN = '-?\d*\.*\d+([Ee][\+\-]\d+)?'
 REGRESSION_PATTERN = f'({SPLIT_PATTERN}){{2}}(.*?)({SPLIT_PATTERN}){{1}}(.*?)({SPLIT_PATTERN}){{2}}'
+REGRESSION_PATTERN = f'({SPLIT_PATTERN}){{2}}(.*?)({SPLIT_PATTERN}){{1}}(.*?)({SPLIT_PATTERN}){{2}}'
 
 OLS_VAR_NAMES = ['Coefficient', 'Std. err.', 't', 'P>|t|', '95% Conf. Low', '95% Conf. High']
-
-
-def process_logs_folder(folder: PathLike):
-    logs_paths = [f"{folder}/{f}" for f in os.listdir(f'{folder}') if f.endswith('.log')]
-    ols_df, csardl_df = process_logs(logs_paths)
-    return ols_df, csardl_df
-
-def threaded_process_logs(logs_paths, batch_size: Optional[int]=1, n_threads: Optional[int]=1):
-    if n_threads > 1:
-        parallel_function = parallel(n_threads, batch_size)(process_logs)
-        return parallel_function(logs_paths)
-    return process_logs(logs_paths)
-
-def process_logs(logs_paths):
-    ols_dataframes = []
-    csardl_dataframes = []
-    for log_path in logs_paths:
-        income, indicator, regression_strs = process_log(log_path)
-        ols_results = []
-        csardl_results = []
-        for regression_str in regression_strs:
-            ols_result, csardl_result = process_regression_str(regression_str)
-            ols_results.append(ols_result)
-            csardl_results.append(csardl_result)
-        ols_results = remove_dataframe_duplicates(ols_results)
-        csardl_results = remove_dataframe_duplicates(csardl_results)
-        ols_dataframes.append(process_dataframe(pd.concat(ols_results), income))
-        csardl_dataframes.append(process_dataframe(pd.concat(csardl_results), income))
-    ols_dataframe = pd.concat(ols_dataframes)
-    csardl_dataframe = pd.concat(csardl_dataframes)
-    return ols_dataframe, csardl_dataframe
-
-def process_log(log_path):
-    log = read_log_file(log_path)
-    income, indicator = os.path.basename(log_path.replace('log.log', '')).split('_')
-    regression_strs = get_regression_strs_from_log(log)
-    return income, indicator, regression_strs
 
 def get_regression_strs_from_log(log: str):
     regression_strs = []
@@ -104,10 +69,12 @@ def get_ols_data_from_log(ols_str: str):
 
     dep_variable = re.search('Indicat(?:~\d+X|or\w+X)', coefficients_table).group(0).strip()
 
+    dep_variable = re.search('Indicat(?:~\d+X|or\w+X)', coefficients_table).group(0).strip()
+
     coefficient_rows = coefficients_table.split('\n')[3:-2]
     coefficients = get_coefficients_from_table_rows(coefficient_rows, OLS_VAR_NAMES)
     
-    indep_variables = list(coefficients.keys())\
+    indep_variables = list(coefficients.keys())
 
     model_params = {}
  
@@ -119,6 +86,7 @@ def get_ols_data_from_log(ols_str: str):
     model_specification = None    
 
     return OLSResults(
+        model_params=model_params,
         model_params=model_params,
         n_obs=n_obs,
         F_stats=F_stats,
@@ -137,12 +105,25 @@ def get_ols_data_from_log(ols_str: str):
         model_specification=model_specification
     )
 
+def get_coefficients_from_table_rows(coefficient_rows: List[str], var_names: List[str]) -> Dict:
+    coefficients = {}
+    for row in coefficient_rows:
+        variable = re.match(' *[A-Za-z0-9\_\~.]+ *(?=\|)', row)
+        end_of_variable = variable.end()
+        variable = variable.group(0).strip()
+        coeffs = re.findall('-?\d*\.?\d+', row[end_of_variable:])
+        coeffs = [float(c) for c in coeffs]
+        coeffs = {v: c for v, c in zip(var_names, coeffs)}
+        coefficients[variable] = coeffs
+    return coefficients
+
 def get_csardl_data_from_log(csardl_str):
 
     var_names = ['Coef.', 'Std. Err.', 'z', 'P>|z|', '95% Conf. Low', '95% Conf. High']
 
     if 'No observations left' in csardl_str or 'conformability error' in csardl_str: 
         return CSARDLResults(
+            model_params={},
             model_params={},
             model_specification='No observations left or conformability error',
             n_obs=0,
@@ -167,7 +148,6 @@ def get_csardl_data_from_log(csardl_str):
             short_run_significances=None,
             short_run_conf_intervals=None,
 
-    
             long_run_std_errs=None,
             long_run_z_values=None,
             long_run_p_values=None,
@@ -223,6 +203,8 @@ def get_csardl_data_from_log(csardl_str):
     model_specification = re.search(r'Command: .*', csardl_str).group(0)
     model_params = {}
     model_params['lag'] = int(model_specification[-2:-1])
+    model_params = {}
+    model_params['lag'] = int(model_specification[-2:-1])
 
     short_run_std_errs=None
     short_run_z_values=None
@@ -243,6 +225,7 @@ def get_csardl_data_from_log(csardl_str):
     adj_term_conf_intervals=None
     
     return CSARDLResults(
+        model_params=model_params,
         model_params=model_params,
 
         n_obs=n_obs,
@@ -296,17 +279,21 @@ def dict_to_df(model_dict: Dict):
         'p_val': model_dict['p_val'],
         'lag': model_dict['lag'],
         'model_specification': model_dict['model_specification']
+        'model_specification': model_dict['model_specification']
     }
     rows = []
     for var, stats in model_dict['short_run_coeffs'].items():
+        row = {'Variable': var, 'type': 'short_run'}
         row = {'Variable': var, 'type': 'short_run'}
         row.update(stats)
         rows.append(row)
     for var, stats in model_dict['adj_term_coeffs'].items():
         row = {'Variable': var, 'type': 'adj_term'}
+        row = {'Variable': var, 'type': 'adj_term'}
         row.update(stats)
         rows.append(row)
     for var, stats in model_dict['long_run_coeffs'].items():
+        row = {'Variable': var, 'type': 'long_run'}
         row = {'Variable': var, 'type': 'long_run'}
         row.update(stats)
         rows.append(row)
@@ -316,14 +303,17 @@ def dict_to_df(model_dict: Dict):
         
     df.index = pd.MultiIndex.from_product([list([model_dict['dep_var']]), [model_dict['lag']], df['type'].values])
     relevant_cols = ['Variable', 'Coef.', 'P>|z|']
+    relevant_cols = ['Variable', 'Coef.', 'P>|z|']
     df = df[relevant_cols]
     df.index.names = ['Dep Var', 'Lag', 'Time Span']
+    df = df.set_index('Variable', append=True)
     df = df.set_index('Variable', append=True)
     if model_dict['indep_vars'] == 0:
         model_dict['indep_vars'] = [str(model_dict['indep_vars'])]
     df['Indep Var'] = [v for v in model_dict['indep_vars'] if v.find('.') == -1][0]
     df = df.set_index('Indep Var', append=True)
     return df
+
 
 
 
@@ -346,6 +336,31 @@ def generate_significance_color_styles(df):
                 val_style = ''
             styles.iloc[r, c] = val_style
     return styles
+
+
+def extract_regression_from_log(log):
+
+    start_of_reg = "(={2,}\n){2}"
+    midd_of_reg = "(={2,}\n){1}"
+    end_of_reg = "(={2,}\n){2}"
+
+    start_match = re.search(start_of_reg, log, re.DOTALL)
+    after_start_str = log[start_match.end():]
+    middle_match = re.search(midd_of_reg, after_start_str, re.DOTALL)
+    after_middle_str = after_start_str[middle_match.end():]
+    end_match = re.search(end_of_reg, after_middle_str, re.DOTALL)
+    
+    match = log[start_match.start():start_match.end()+middle_match.end()+end_match.end()]
+
+    return match
+
+def get_models_from_regression(regression_str):
+    no_borders = re.sub('(====+\n){2,3}', '', regression_str)
+    split = re.split('====+\n{1,}', no_borders)
+    ols_str, csardl_str = split
+    return ols_str, csardl_str
+
+
 
 def df_selection(df, indicators, columns, col_filters, index_filters):
     _df = df.unstack(columns).loc[pd.IndexSlice[indicators,:]]
@@ -449,9 +464,69 @@ def save_dfs_to_excel(dataframes, sheet_names, path):
         for df, sheet_name in zip(dataframes, sheet_names):
             df.to_excel(writer, sheet_name=sheet_name)
 
+def process_logs_folder(folder: PathLike):
+    logs_paths = [f"{folder}/{f}" for f in os.listdir(f'{folder}') if f.endswith('.log')]
+    ols_df, csardl_df = process_logs(logs_paths)
+    return ols_df, csardl_df
+
+def threaded_process_logs(log_paths: List[PathLike], batch_size=4, n_threads=4):
+    if n_threads > 1:
+        parallel_function = parallel(n_threads, batch_size)(process_logs)
+        return parallel_function(log_paths)
+    else:
+        return process_logs(log_paths)
+
+def process_logs(logs_paths: List[PathLike]):
+    ols_dataframes = []
+    csardl_dataframes = []
+    for log_path in logs_paths:
+        try:
+            income, indicator, regression_strs = process_log(log_path)
+            ols_results = []
+            csardl_results = []
+            for regression_str in regression_strs:
+                ols_result, csardl_result = process_regression_str(regression_str)
+                ols_results.append(ols_result)
+                csardl_results.append(csardl_result)
+            ols_results = remove_dataframe_duplicates(ols_results)
+            csardl_results = remove_dataframe_duplicates(csardl_results)
+            ols_dataframes.append(process_dataframe(pd.concat(ols_results), income))
+            csardl_dataframes.append(process_dataframe(pd.concat(csardl_results), income))
+        except Exception as e:
+            print(str(e))
+            print(log_path)
+    ols_dataframe = pd.concat(ols_dataframes)
+    csardl_dataframe = pd.concat(csardl_dataframes)
+    return ols_dataframe, csardl_dataframe
+
+def process_log(log_path):
+    log = read_log_file(log_path)
+    income, indicator = os.path.basename(log_path.replace('log.log', '')).split('_')
+    regression_strs = get_regression_strs_from_log(log)
+    return income, indicator, regression_strs
+    
+def process_regression_str(regression_str):
+    ols_str, csardl_str = get_models_from_regression(regression_str)
+    ols_data = get_ols_data_from_log(ols_str)
+    csardl_data = get_csardl_data_from_log(csardl_str) 
+    ols_result = ols_data.to_pretty_df()
+    csardl_result = csardl_data.to_pretty_df()
+    return ols_result, csardl_result
+
 def process_dataframe(df, income):
     df['Income'] = income
     return df.set_index('Income', append=True)
+
+def process_logs_folder(folder: PathLike):
+    logs_paths = [f"../{folder}/{f}" for f in os.listdir(f'../{folder}') if f.endswith('.log')]
+    ols_df, csardl_df = process_logs(logs_paths)
+    return ols_df, csardl_df
+
+@parallel(n_threads=6, chunk_size=1)
+def process_logs_folder_parallel(folder):
+    if isinstance(folder, list) and len(folder) == 1:
+        folder = folder[0]
+    return process_logs_folder(folder)
 
 def mask_results(dataframe, indicator_names):
     dataframe = dataframe.reset_index()
@@ -475,11 +550,3 @@ def ind_var_name_replace(string, indicator_names):
         indicator_name = indicator_names.to_dict()['Original Name'][indicator]
         string = re.sub('(?<=[._])?[A-Za-z& ]*ECI', indicator_name, string)
     return string
-
-def has_duplicated_indices(df: DataFrame):
-    return df.index.duplicated().any()
-
-def print_duplicated_indices(df):
-    duplicated = df.index[df.index.duplicated()].unique()
-    for idx in duplicated:
-        print(idx)
