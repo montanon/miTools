@@ -27,13 +27,6 @@ def get_regression_strs_from_log(log: str):
         regression_strs.append(match[0])
         log = log[match.end():]
     return regression_strs
-def get_regression_strs_from_log(log: str):
-    regression_strs = []
-    while log:
-        match = re.search(REGRESSION_PATTERN, log, re.DOTALL)
-        regression_strs.append(match[0])
-        log = log[match.end():]
-    return regression_strs
 
 def get_ols_data_from_log(ols_str: str):
     
@@ -77,8 +70,7 @@ def get_ols_data_from_log(ols_str: str):
         p_values=p_values,
         significances=significances,
         conf_interval=conf_interval,
-        model_params=model_params,
-        model_specification=model_specification,
+        model_specification=model_specification
     )
 
 def get_coefficients_from_table_rows(coefficient_rows: List[str], var_names: List[str]) -> Dict:
@@ -466,7 +458,7 @@ def process_dataframe(df, income):
     return df.set_index('Income', append=True)
 
 def process_logs_folder(folder: PathLike):
-    logs_paths = [f"{folder}/{f}" for f in os.listdir(f'{folder}') if f.endswith('.log')]
+    logs_paths = [f"../{folder}/{f}" for f in os.listdir(f'../{folder}') if f.endswith('.log')]
     ols_df, csardl_df = process_logs(logs_paths)
     return ols_df, csardl_df
 
