@@ -97,7 +97,7 @@ def plot_agglomerative_ncluster_search(silhouette_scores: List[float]):
 
 def plot_clusters_evolution(dataframe: DataFrame, cluster_col: str, x_col: str, y_col: str, 
                             time_col: str, time_values: Tuple,
-                            clusters: Optional[List[Union[str,int]]]=None,
+                            labels: Optional[List[Union[str,int]]]=None,
                             colors: Optional[List[Tuple]]=None,
                             plots_kwargs:  Optional[Dict[str, Dict]]=None
                             ):
@@ -105,11 +105,13 @@ def plot_clusters_evolution(dataframe: DataFrame, cluster_col: str, x_col: str, 
                               layout='constrained',
                               figsize=(14, 14))
 
-    if clusters is None:
-        clusters = dataframe[cluster_col].unique()
+    if labels is None:
+        labels = dataframe[cluster_col].unique()
 
-    plot_clusters(dataframe, cluster_col, x_col, y_col, labels=clusters, 
-                  ax=axes['a'], colors=colors, **plots_kwargs.get('a', None))
+    plot_clusters(dataframe, cluster_col, x_col, y_col, labels=labels, 
+                  ax=axes['a'], colors=colors,
+                  **plots_kwargs.get('a', {}) if plots_kwargs is not None else {}
+                  )
     axes['a'].set_xlabel('')
     axes['a'].set_ylabel('')
     axes['a'].set_xticks([])
@@ -125,11 +127,11 @@ def plot_clusters_evolution(dataframe: DataFrame, cluster_col: str, x_col: str, 
         cluster_col,
         x_col,
         y_col,
-        labels=clusters,
+        labels=labels,
         colors=colors,
         ax=axes['b'], 
-        alpha=0.75, 
-        s=35)
+        **plots_kwargs.get('b', {}) if plots_kwargs is not None else {}
+        )
     years = (dataframe.loc[(dataframe[time_col] < time_values[1]) & (dataframe[time_col] > time_values[0]), time_col]
              .sort_values()
              .unique()
@@ -147,11 +149,11 @@ def plot_clusters_evolution(dataframe: DataFrame, cluster_col: str, x_col: str, 
         cluster_col,
         x_col, 
         y_col,
-        labels=clusters,
+        labels=labels,
         colors=colors,
         ax=axes['c'], 
-        alpha=0.75,
-        s=35)
+        **plots_kwargs.get('c', {}) if plots_kwargs is not None else {}
+        )
     years = dataframe.loc[dataframe[time_col] >= time_values[1], time_col].sort_values().unique().astype(np.int16)
     axes['c'].set_xlabel(f'After Paris Agreement, {years[0]} to {years[-1]}')
     axes['c'].set_ylabel('')
@@ -175,7 +177,6 @@ def plot_clusters(data: DataFrame, cluster_col: str, x_col: str, y_col: str,
         kwargs = dict(alpha=0.75, marker='o', size=5)
     if labels is None:
         labels = data[cluster_col].unique()
-    
     if colors is None:
         colors = sns.color_palette("husl", len(labels))[::1]
     
@@ -202,6 +203,7 @@ def add_clusters_centroids(ax: Axes, data: DataFrame, cluster_col: str,
         labels = data[cluster_col].unique()
     if colors is None:
         colors = sns.color_palette("husl", len(labels))[::1]
+
     for i, cls in enumerate(labels):
         ax.plot(
             data[data[cluster_col] == cls][x_col],
@@ -221,6 +223,7 @@ def add_clusters_confidence_ellipse(ax: Axes, data: DataFrame, cluster_col: str,
         labels = data[cluster_col].unique()
     if colors is None:
         colors = sns.color_palette("husl", len(labels))[::1]
+        
     for i, cls in enumerate(labels):
         ax = confidence_ellipse(data[data[cluster_col] == cls][x_col],
                                 data[data[cluster_col] == cls][y_col],
