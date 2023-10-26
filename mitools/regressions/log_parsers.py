@@ -279,7 +279,6 @@ def dict_to_df(model_dict: Dict):
         'p_val': model_dict['p_val'],
         'lag': model_dict['lag'],
         'model_specification': model_dict['model_specification']
-        'model_specification': model_dict['model_specification']
     }
     rows = []
     for var, stats in model_dict['short_run_coeffs'].items():
@@ -518,7 +517,7 @@ def process_dataframe(df, income):
     return df.set_index('Income', append=True)
 
 def process_logs_folder(folder: PathLike):
-    logs_paths = [f"{folder}/{f}" for f in os.listdir(f'{folder}') if f.endswith('.log')]
+    logs_paths = [f"../{folder}/{f}" for f in os.listdir(f'../{folder}') if f.endswith('.log')]
     ols_df, csardl_df = process_logs(logs_paths)
     return ols_df, csardl_df
 
