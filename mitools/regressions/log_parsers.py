@@ -9,7 +9,6 @@ init(autoreset=True)
 
 from ..utils import *
 from .regressions_data import OLSResults, CSARDLResults, RegressionData
-from .regressions_data import OLSResults, CSARDLResults, RegressionData
 from typing import List, Dict, Match
 from icecream import ic
 from copy import deepcopy
@@ -231,60 +230,6 @@ def get_csardl_data_from_log(csardl_str):
         model_specification=model_specification,
     )
 
-def dict_to_df(model_dict: Dict):
-    base_data = {
-        'n_obs': model_dict['n_obs'],
-        'n_groups': model_dict['n_groups'],
-        'obs_p_group': model_dict['obs_p_group'],
-        'F_stats': model_dict['F_stats'],
-        'Prob_F': model_dict['Prob_F'],
-        'R_sq': model_dict['R_sq'],
-        'R_sqMG': model_dict['R_sqMG'],
-        'RootMSE': model_dict['RootMSE'],
-        'CD_stats': model_dict['CD_stats'],
-        'p_val': model_dict['p_val'],
-        'lag': model_dict['lag'],
-        'model_specification': model_dict['model_specification']
-    }
-    rows = []
-    for var, stats in model_dict['short_run_coeffs'].items():
-        row = {'Variable': var, 'type': 'short_run'}
-        row.update(stats)
-        rows.append(row)
-    for var, stats in model_dict['adj_term_coeffs'].items():
-        row = {'variable': var, 'type': 'adj_term'}
-        row.update(stats)
-        rows.append(row)
-    for var, stats in model_dict['long_run_coeffs'].items():
-        row = {'variable': var, 'type': 'long_run'}
-        row.update(stats)
-        rows.append(row)
-    df = pd.DataFrame(rows)
-    for key, value in base_data.items():
-        df[key] = value
-        
-    df.index = pd.MultiIndex.from_product([list([model_dict['dep_var']]), [model_dict['lag']], df['type'].values])
-    relevant_cols = ['variable', 'Coef.', 'P>|z|']
-    df = df[relevant_cols]
-    df.index.names = ['Dep Var', 'Lag', 'Time Span']
-    df = df.set_index('variable', append=True)
-    if model_dict['indep_vars'] == 0:
-        model_dict['indep_vars'] = [str(model_dict['indep_vars'])]
-    df['Indep Var'] = [v for v in model_dict['indep_vars'] if v.find('.') == -1][0]
-    df = df.set_index('Indep Var', append=True)
-    return df
-
-def add_significance(row):
-    p_value = float(row.split(' ')[1].replace('(','').replace(')',''))  
-    if p_value < 0.01:
-        return row + "***"
-    elif p_value < 0.05:
-        return row + "**"
-    elif p_value < 0.1:
-        return row + "*"
-    else:
-        return row
-
 def generate_significance_color_styles(df):
     styles = pd.DataFrame("", index=df.index, columns=df.columns)
     for r in range(df.shape[0]):
@@ -328,12 +273,6 @@ def get_models_from_regression(regression_str):
     ols_str, csardl_str = split
     return ols_str, csardl_str
 
-def regression_data_to_df(regression_data):
-    regression_data = dict_to_df(regression_data)
-    regression_data['Result'] = regression_data['Coef.'].round(2).astype(str) + ' (' + regression_data['P>|z|'].astype(str) + ')'
-    regression_data['Result'] = regression_data['Result'].apply(lambda x: add_significance(x))
-    regression_data = regression_data[['Result']]
-    return regression_data
 
 def df_selection(df, indicators, columns, col_filters, index_filters):
     _df = df.unstack(columns).loc[pd.IndexSlice[indicators,:]]
