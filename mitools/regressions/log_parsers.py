@@ -12,31 +12,14 @@ from .regressions_data import OLSResults, CSARDLResults, RegressionData
 from typing import List, Dict, Match
 from icecream import ic
 from copy import deepcopy
-from copy import deepcopy
 
-SPLIT_PATTERN = '={2,}\n'
 SPLIT_PATTERN = '={2,}\n'
 MODEL_PATTERN = f'({SPLIT_PATTERN}(\n)+){{1}}'
 NUMBER_PATTERN = '-?\d*\.*\d+([Ee][\+\-]\d+)?'
 REGRESSION_PATTERN = f'({SPLIT_PATTERN}){{2}}(.*?)({SPLIT_PATTERN}){{1}}(.*?)({SPLIT_PATTERN}){{2}}'
-REGRESSION_PATTERN = f'({SPLIT_PATTERN}){{2}}(.*?)({SPLIT_PATTERN}){{1}}(.*?)({SPLIT_PATTERN}){{2}}'
 
 OLS_VAR_NAMES = ['Coefficient', 'Std. err.', 't', 'P>|t|', '95% Conf. Low', '95% Conf. High']
 
-def get_regression_strs_from_log(log: str):
-    regression_strs = []
-    while log:
-        match = re.search(REGRESSION_PATTERN, log, re.DOTALL)
-        regression_strs.append(match[0])
-        log = log[match.end():]
-    return regression_strs
-def get_regression_strs_from_log(log: str):
-    regression_strs = []
-    while log:
-        match = re.search(REGRESSION_PATTERN, log, re.DOTALL)
-        regression_strs.append(match[0])
-        log = log[match.end():]
-    return regression_strs
 
 def get_ols_data_from_log(ols_str: str):
     
@@ -53,7 +36,7 @@ def get_ols_data_from_log(ols_str: str):
     coefficient_rows = coefficients_table.split('\n')[3:-2]
     coefficients = get_coefficients_from_table_rows(coefficient_rows, OLS_VAR_NAMES)
     
-    indep_variables = list(coefficients.keys())
+    indep_variables = list(coefficients.keys())\
 
     model_params = {}
  
@@ -101,7 +84,6 @@ def get_csardl_data_from_log(csardl_str):
 
     if 'No observations left' in csardl_str or 'conformability error' in csardl_str: 
         return CSARDLResults(
-            model_params={},
             model_params={},
             model_specification='No observations left or conformability error',
             n_obs=0,
@@ -182,8 +164,6 @@ def get_csardl_data_from_log(csardl_str):
     model_specification = re.search(r'Command: .*', csardl_str).group(0)
     model_params = {}
     model_params['lag'] = int(model_specification[-2:-1])
-    model_params = {}
-    model_params['lag'] = int(model_specification[-2:-1])
 
     short_run_std_errs=None
     short_run_z_values=None
@@ -204,7 +184,6 @@ def get_csardl_data_from_log(csardl_str):
     adj_term_conf_intervals=None
     
     return CSARDLResults(
-        model_params=model_params,
         model_params=model_params,
 
         n_obs=n_obs,
@@ -265,11 +244,11 @@ def dict_to_df(model_dict: Dict):
         row.update(stats)
         rows.append(row)
     for var, stats in model_dict['adj_term_coeffs'].items():
-        row = {'Variable': var, 'type': 'adj_term'}
+        row = {'variable': var, 'type': 'adj_term'}
         row.update(stats)
         rows.append(row)
     for var, stats in model_dict['long_run_coeffs'].items():
-        row = {'Variable': var, 'type': 'long_run'}
+        row = {'variable': var, 'type': 'long_run'}
         row.update(stats)
         rows.append(row)
     df = pd.DataFrame(rows)
@@ -286,6 +265,7 @@ def dict_to_df(model_dict: Dict):
     df['Indep Var'] = [v for v in model_dict['indep_vars'] if v.find('.') == -1][0]
     df = df.set_index('Indep Var', append=True)
     return df
+
 
 
 
@@ -315,9 +295,6 @@ def extract_regression_from_log(log):
     start_of_reg = "(={2,}\n){2}"
     midd_of_reg = "(={2,}\n){1}"
     end_of_reg = "(={2,}\n){2}"
-    start_of_reg = "(={2,}\n){2}"
-    midd_of_reg = "(={2,}\n){1}"
-    end_of_reg = "(={2,}\n){2}"
 
     start_match = re.search(start_of_reg, log, re.DOTALL)
     after_start_str = log[start_match.end():]
@@ -335,7 +312,12 @@ def get_models_from_regression(regression_str):
     ols_str, csardl_str = split
     return ols_str, csardl_str
 
-
+def regression_data_to_df(regression_data):
+    regression_data = dict_to_df(regression_data)
+    regression_data['Result'] = regression_data['Coef.'].round(2).astype(str) + ' (' + regression_data['P>|z|'].astype(str) + ')'
+    regression_data['Result'] = regression_data['Result'].apply(lambda x: add_significance(x))
+    regression_data = regression_data[['Result']]
+    return regression_data
 
 def df_selection(df, indicators, columns, col_filters, index_filters):
     _df = df.unstack(columns).loc[pd.IndexSlice[indicators,:]]
@@ -475,7 +457,7 @@ def process_dataframe(df, income):
     return df.set_index('Income', append=True)
 
 def process_logs_folder(folder: PathLike):
-    logs_paths = [f"{folder}/{f}" for f in os.listdir(f'{folder}') if f.endswith('.log')]
+    logs_paths = [f"../{folder}/{f}" for f in os.listdir(f'../{folder}') if f.endswith('.log')]
     ols_df, csardl_df = process_logs(logs_paths)
     return ols_df, csardl_df
 
