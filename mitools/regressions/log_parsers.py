@@ -9,7 +9,6 @@ init(autoreset=True)
 
 from ..utils import *
 from .regressions_data import OLSResults, CSARDLResults, RegressionData
-from .regressions_data import OLSResults, CSARDLResults, RegressionData
 from typing import List, Dict, Match
 from icecream import ic
 from copy import deepcopy
@@ -78,7 +77,8 @@ def get_ols_data_from_log(ols_str: str):
         p_values=p_values,
         significances=significances,
         conf_interval=conf_interval,
-        model_specification=model_specification
+        model_params=model_params,
+        model_specification=model_specification,
     )
 
 def get_coefficients_from_table_rows(coefficient_rows: List[str], var_names: List[str]) -> Dict:
