@@ -9,7 +9,6 @@ init(autoreset=True)
 
 from ..utils import *
 from .regressions_data import OLSResults, CSARDLResults, RegressionData
-from .regressions_data import OLSResults, CSARDLResults, RegressionData
 from typing import List, Dict, Match
 from icecream import ic
 from copy import deepcopy
@@ -51,8 +50,6 @@ def get_ols_data_from_log(ols_str: str):
 
     dep_variable = re.search('Indicat(?:~\d+X|or\w+X)', coefficients_table).group(0).strip()
 
-    dep_variable = re.search('Indicat(?:~\d+X|or\w+X)', coefficients_table).group(0).strip()
-
     coefficient_rows = coefficients_table.split('\n')[3:-2]
     coefficients = get_coefficients_from_table_rows(coefficient_rows, OLS_VAR_NAMES)
     
@@ -68,7 +65,6 @@ def get_ols_data_from_log(ols_str: str):
     model_specification = None    
 
     return OLSResults(
-        model_params=model_params,
         model_params=model_params,
         n_obs=n_obs,
         F_stats=F_stats,
