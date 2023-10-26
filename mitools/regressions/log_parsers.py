@@ -9,6 +9,7 @@ init(autoreset=True)
 
 from ..utils import *
 from .regressions_data import OLSResults, CSARDLResults, RegressionData
+from .regressions_data import OLSResults, CSARDLResults, RegressionData
 from typing import List, Dict, Match
 from icecream import ic
 from copy import deepcopy
@@ -20,6 +21,13 @@ REGRESSION_PATTERN = f'({SPLIT_PATTERN}){{2}}(.*?)({SPLIT_PATTERN}){{1}}(.*?)({S
 
 OLS_VAR_NAMES = ['Coefficient', 'Std. err.', 't', 'P>|t|', '95% Conf. Low', '95% Conf. High']
 
+def get_regression_strs_from_log(log: str):
+    regression_strs = []
+    while log:
+        match = re.search(REGRESSION_PATTERN, log, re.DOTALL)
+        regression_strs.append(match[0])
+        log = log[match.end():]
+    return regression_strs
 
 def get_ols_data_from_log(ols_str: str):
     
@@ -457,7 +465,7 @@ def process_dataframe(df, income):
     return df.set_index('Income', append=True)
 
 def process_logs_folder(folder: PathLike):
-    logs_paths = [f"{folder}/{f}" for f in os.listdir(f'{folder}') if f.endswith('.log')]
+    logs_paths = [f"../{folder}/{f}" for f in os.listdir(f'../{folder}') if f.endswith('.log')]
     ols_df, csardl_df = process_logs(logs_paths)
     return ols_df, csardl_df
 
