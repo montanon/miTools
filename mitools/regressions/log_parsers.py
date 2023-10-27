@@ -64,13 +64,6 @@ def get_regression_strs_from_log(log: str):
         regression_strs.append(match[0])
         log = log[match.end():]
     return regression_strs
-def get_regression_strs_from_log(log: str):
-    regression_strs = []
-    while log:
-        match = re.search(REGRESSION_PATTERN, log, re.DOTALL)
-        regression_strs.append(match[0])
-        log = log[match.end():]
-    return regression_strs
 
 def process_regression_str(regression_str):
     ols_str, csardl_str = get_models_from_regression(regression_str)
