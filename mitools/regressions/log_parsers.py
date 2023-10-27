@@ -30,13 +30,6 @@ def get_regression_strs_from_log(log: str):
         regression_strs.append(match[0])
         log = log[match.end():]
     return regression_strs
-def get_regression_strs_from_log(log: str):
-    regression_strs = []
-    while log:
-        match = re.search(REGRESSION_PATTERN, log, re.DOTALL)
-        regression_strs.append(match[0])
-        log = log[match.end():]
-    return regression_strs
 
 def get_ols_data_from_log(ols_str: str):
     
@@ -401,16 +394,10 @@ def process_logs_folder(folder: PathLike):
 
 def threaded_process_logs(log_paths: List[PathLike], batch_size=4, n_threads=4):
     if n_threads > 1:
-        parallel_function = parallel(n_threads, batch_size)(process_logs_parallel)
+        parallel_function = parallel(n_threads, batch_size)(process_logs)
         return parallel_function(log_paths)
     else:
         return process_logs(log_paths)
-    
-def process_logs_parallel(log_paths: List[PathLike]):
-    if isinstance(log_paths, list) and len(log_paths) == 1:
-        print('CHECK')
-        #log_paths = log_paths[0]
-    return process_logs(log_paths)
 
 def process_logs(logs_paths: List[PathLike]):
     ols_dataframes = []
@@ -424,6 +411,8 @@ def process_logs(logs_paths: List[PathLike]):
                 ols_result, csardl_result = process_regression_str(regression_str)
                 ols_results.append(ols_result)
                 csardl_results.append(csardl_result)
+            ols_results = remove_dataframe_duplicates(ols_results)
+            csardl_results = remove_dataframe_duplicates(csardl_results)
             ols_dataframes.append(process_dataframe(pd.concat(ols_results), income))
             csardl_dataframes.append(process_dataframe(pd.concat(csardl_results), income))
         except Exception as e:
