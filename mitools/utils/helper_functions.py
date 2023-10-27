@@ -73,3 +73,10 @@ def add_significance(row):
         return row + "*"
     else:
         return row
+    
+def remove_dataframe_duplicates(dfs: List[DataFrame]):
+    unique_dfs = []
+    for i in range(len(dfs)):
+        if not any(dfs[i].equals(dfs[j]) for j in range(i+1, len(dfs))):
+            unique_dfs.append(dfs[i])
+    return unique_dfs
