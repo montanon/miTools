@@ -497,3 +497,11 @@ def ind_var_name_replace(string, indicator_names):
         indicator_name = indicator_names.to_dict()['Original Name'][indicator]
         string = re.sub('(?<=[._])?[A-Za-z& ]*ECI', indicator_name, string)
     return string
+
+def has_duplicated_indices(df: DataFrame):
+    return df.index.duplicated().any()
+
+def print_duplicated_indices(df):
+    duplicated = df.index[df.index.duplicated()].unique()
+    for idx in duplicated:
+        print(idx)
