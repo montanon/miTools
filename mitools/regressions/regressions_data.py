@@ -3,19 +3,11 @@ from abc import ABC
 from typing import Union, Dict, Tuple, List, Any
 from ..utils import replace_prefix, add_significance
 from pandas import DataFrame, MultiIndex
-from abc import ABC
+from abc import ABC, abstractmethod
 
 
 class RegressionData(ABC):
-    @abstractmethod
-    def __post_init__(self):
-        pass
-    @abstractmethod
-    def to_df(self):
-        pass
-    @abstractmethod
-    def to_pretty_df(self):
-        pass
+    pass
 
 def format_result(row):
     return f"{row.round(2)} ({row.astype(str)})"
@@ -31,7 +23,7 @@ class XTRegResults(RegressionData):
     R_sq: float
     R_sq_within: float
     R_sq_between: float
-    corr = float
+    corr: float
 
     dep_variable: str
     indep_variables: List[str]
@@ -80,7 +72,10 @@ class XTRegResults(RegressionData):
         for key, value in base_data.items():
             df[key] = value
         relevant_cols = ['Variable', self.coefficient_col, self.significance_col]
-        df = df[relevant_cols]
+        try:
+            df = df[relevant_cols]
+        except Exception:
+            df[relevant_cols] = ''
         df['Dep Var'] = self.dep_variable
         df = df.set_index('Dep Var')
         df = df.set_index('Variable', append=True)
@@ -92,11 +87,14 @@ class XTRegResults(RegressionData):
     
     def to_pretty_df(self):
         regression_data = self.to_df()
-        regression_data['Result'] = (regression_data[self.coefficient_col]
-                                    .round(2)
-                                    .astype(str) + ' (' + regression_data[self.significance_col]
-                                    .astype(str) + ')')
-        regression_data['Result'] = regression_data['Result'].apply(add_significance)
+        try:
+            regression_data['Result'] = (regression_data[self.coefficient_col]
+                                        .round(2)
+                                        .astype(str) + ' (' + regression_data[self.significance_col]
+                                        .astype(str) + ')')
+            regression_data['Result'] = regression_data['Result'].apply(add_significance)
+        except Exception:
+            regression_data['Result'] = ''
         regression_data = regression_data[['Result']]
         return regression_data
 
@@ -276,7 +274,14 @@ class CSARDLResults(RegressionData):
             
         df.index = MultiIndex.from_product([list([self.dep_variable]), [self.model_params.get('lag', None)], df['type'].values])
         relevant_cols = ['Variable', 'Coef.', 'P>|z|']
-        df = df[relevant_cols]
+        
+        try:
+            df = df[relevant_cols]
+        except Exception:
+            df['Variable'] = ''
+            df['Coef.'] = 0.0
+            df['P>|z|'] = 1.0
+
         df.index.names = ['Dep Var', 'Lag', 'Time Span']
         df = df.set_index('Variable', append=True)
         if self.indep_variables != 0:

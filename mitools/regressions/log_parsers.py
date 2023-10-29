@@ -3,83 +3,90 @@ import re
 import pandas as pd
 import numpy as np
 import time
+from os import PathLike
 
 from colorama import init, Fore
 init(autoreset=True)
 
 from ..utils import *
-from .regressions_data import OLSResults, CSARDLResults, RegressionData
-from .regressions_data import OLSResults, CSARDLResults, RegressionData
+from .regressions_data import OLSResults, CSARDLResults, RegressionData, XTRegResults
 from typing import List, Dict, Match
 from icecream import ic
 from copy import deepcopy
 
-SPLIT_PATTERN = '={2,}\n'
-MODEL_PATTERN = f'({SPLIT_PATTERN}(\n)+){{1}}'
+#SPLIT_PATTERN = '={2,}\n'
+#MODEL_PATTERN = f'({SPLIT_PATTERN}(\n)+){{1}}'
 NUMBER_PATTERN = '-?\d*\.*\d+([Ee][\+\-]\d+)?'
-REGRESSION_PATTERN = f'({SPLIT_PATTERN}){{2}}(.*?)({SPLIT_PATTERN}){{1}}(.*?)({SPLIT_PATTERN}){{2}}'
+#REGRESSION_PATTERN = f'({SPLIT_PATTERN}){{2}}(.*?)({SPLIT_PATTERN}){{1}}(.*?)({SPLIT_PATTERN}){{2}}'
+
+SPLIT_PATTERN = '''. di "=+\n> =+"\n=+\n> =+\n'''
+REGRESSION_PATTERN = f'({SPLIT_PATTERN}){{1}}(.*?)({SPLIT_PATTERN}){{1}}(.*?)({SPLIT_PATTERN}){{1}}'
 
 OLS_VAR_NAMES = ['Coefficient', 'Std. err.', 't', 'P>|t|', '95% Conf. Low', '95% Conf. High']
 XTREG_VAR_NAMES = ['Coefficient', 'std. err.', 't', 'P>|t|', '95% Conf. Low', '95% Conf. High']
 
-
+    
 def process_logs_folder(folder: PathLike):
     logs_paths = [f"{folder}/{f}" for f in os.listdir(f'{folder}') if f.endswith('.log')]
     ols_df, csardl_df = process_logs(logs_paths)
     return ols_df, csardl_df
 
-def threaded_process_logs(logs_paths, batch_size: Optional[int]=1, n_threads: Optional[int]=1):
+def threaded_process_logs(logs_paths, model_types, batch_size: Optional[int]=1, n_threads: Optional[int]=1):
     if n_threads > 1:
         parallel_function = parallel(n_threads, batch_size)(process_logs)
-        return parallel_function(logs_paths)
-    return process_logs(logs_paths)
+        return parallel_function(logs_paths, model_types)
+    return process_logs(logs_paths, model_types)
 
-def process_logs(logs_paths):
-    ols_dataframes = []
-    csardl_dataframes = []
+def process_logs(logs_paths, model_types):
+    dataframes = {k: [] for k in model_types}
     for log_path in logs_paths:
-        income, indicator, regression_strs = process_log(log_path)
-        ols_results = []
-        csardl_results = []
-        for regression_str in regression_strs:
-            ols_result, csardl_result = process_regression_str(regression_str)
-            ols_results.append(ols_result)
-            csardl_results.append(csardl_result)
-        ols_results = remove_dataframe_duplicates(ols_results)
-        csardl_results = remove_dataframe_duplicates(csardl_results)
-        ols_dataframes.append(process_dataframe(pd.concat(ols_results), income))
-        csardl_dataframes.append(process_dataframe(pd.concat(csardl_results), income))
-    ols_dataframe = pd.concat(ols_dataframes)
-    csardl_dataframe = pd.concat(csardl_dataframes)
-    return ols_dataframe, csardl_dataframe
+        income, regressions_data = process_log(log_path, model_types)
+        for model_type in model_types:
+            dataframes[model_type].append(process_dataframe(regressions_data[model_type], income))
+    for model_type in model_types:
+        dataframes[model_type] = pd.concat(remove_dataframe_duplicates(dataframes[model_type]))
+    return dataframes
 
-def process_log(log_path):
+def process_log(log_path: PathLike, model_types=['xtreg', 'csardl']):
+    income, indicator, regression_strs = load_log(log_path)
+    regressions_data = {k: [] for k in model_types}
+    for regression_str in regression_strs:
+        regression = process_regressions_str(regression_str, model_types=model_types)
+        for model_type in model_types:
+            regressions_data[model_type].append(regression[model_type])
+    for model_type in model_types:
+        regressions_data[model_type] = pd.concat(remove_dataframe_duplicates(regressions_data[model_type]))
+    return income, regressions_data
+
+def load_log(log_path):
     log = read_log_file(log_path)
     income, indicator = os.path.basename(log_path.replace('log.log', '')).split('_')
     regression_strs = get_regression_strs_from_log(log)
     return income, indicator, regression_strs
 
+def process_regressions_str(regression_str: str, model_types: List[str]) -> Dict[str,List]:
+    regressions = get_models_from_regressions_str(regression_str)
+    regressions_data = {k: [] for k in model_types}
+    for regression, model_type in zip(regressions, model_types):
+        model_data = get_model_data_from_log(regression, model_type)
+        model_data = model_data.to_pretty_df()
+        regressions_data[model_type].append(model_data)
+    for model_type in model_types:
+        regressions_data[model_type] = pd.concat(remove_dataframe_duplicates(regressions_data[model_type]))
+    return regressions_data
+
+def get_models_from_regressions_str(regression_str):
+    splits = re.split(f'({SPLIT_PATTERN}){{1}}', regression_str)
+    splits = [split for n, split in enumerate(splits) if n%2 == 0 and split not in ['\n', '']]
+    return splits
+
 def get_regression_strs_from_log(log: str):
     regression_strs = []
-    while log:
+    while len(log) > 300:
         match = re.search(REGRESSION_PATTERN, log, re.DOTALL)
         regression_strs.append(match[0])
         log = log[match.end():]
     return regression_strs
-
-def process_regression_str(regression_str):
-    ols_str, csardl_str = get_models_from_regression(regression_str)
-    ols_data = get_ols_data_from_log(ols_str)
-    csardl_data = get_csardl_data_from_log(csardl_str) 
-    ols_result = ols_data.to_pretty_df()
-    csardl_result = csardl_data.to_pretty_df()
-    return ols_result, csardl_result
-
-def get_models_from_regression(regression_str):
-    no_borders = re.sub('(====+\n){2,3}', '', regression_str)
-    split = re.split('====+\n{1,}', no_borders)
-    ols_str, csardl_str = split
-    return ols_str, csardl_str
 
 def get_coefficients_from_table_rows(coefficient_rows: List[str], var_names: List[str]) -> Dict:
     coefficients = {}
@@ -93,6 +100,16 @@ def get_coefficients_from_table_rows(coefficient_rows: List[str], var_names: Lis
         coefficients[variable] = coeffs
     return coefficients
 
+def get_model_data_from_log(regression_str, model_type):
+    if model_type == 'csardl':
+        return get_csardl_data_from_log(regression_str)
+    elif model_type == 'xtreg':
+        return get_xtreg_data_from_log(regression_str)
+    elif model_type == 'ols':
+        return ols_data_from_log(regression_str)
+    else:
+        raise NotImplementedError
+
 def get_xtreg_data_from_log(xtreg_str: str):
 
     n_obs = get_numbers_from_str(re.search(rf'Number of obs += +\n* *-?\d*\,*\d*\.*\d+\n', xtreg_str).group(0))[-1]
@@ -103,19 +120,20 @@ def get_xtreg_data_from_log(xtreg_str: str):
         n_obs_per_group = get_numbers_from_str(re.search(rf'avg *= +(({NUMBER_PATTERN})|(.))+\n', xtreg_str).group(0))[-1]
     F_stats = get_numbers_from_str(re.search(rf'F\(-?\d+, -?\d+\) += +(({NUMBER_PATTERN})|(.))+\n', xtreg_str).group(0))[-1]
     Prob_F = get_numbers_from_str(re.search(rf'Prob > F += +(({NUMBER_PATTERN})|(.))+\n', xtreg_str).group(0))[-1]
-    R_sq = get_numbers_from_str(re.search(rf'R-squared +(.*?)Overall = +(({NUMBER_PATTERN})|(.))+\n', xtreg_str).group(0))[-1]
-    R_sq_within = get_numbers_from_str(re.search(rf'R-squared +(.*?)Within = +(({NUMBER_PATTERN})|(.))+\n', xtreg_str).group(0))[-1]
-    R_sq_between = get_numbers_from_str(re.search(rf'R-squared +(.*?)Between = +(({NUMBER_PATTERN})|(.))+\n', xtreg_str).group(0))[-1]
-    corr = get_numbers_from_str(re.search(rf'corr((.*?)= +(({NUMBER_PATTERN})|(.))+\n', xtreg_str).group(0))[-1] 
+    R_sq = get_numbers_from_str(re.search(rf'Overall += +(({NUMBER_PATTERN})|(.))+\n', xtreg_str).group(0))[-1]
+    R_sq_within = get_numbers_from_str(re.search(rf'Within += +(({NUMBER_PATTERN})|(.))+\n', xtreg_str).group(0))[-1]
+    R_sq_between = get_numbers_from_str(re.search(rf'Between += +(({NUMBER_PATTERN})|(.))+\n', xtreg_str).group(0))[-1]
+    corr = get_numbers_from_str(re.search(rf'corr\((.*?)= +(({NUMBER_PATTERN})|(.))+\n', xtreg_str).group(0))[-1] 
 
-    coefficients_table = xtreg_str.split('\n\n')[1]
-    dep_variable = re.search('Indicat(?:~\d+X|or\w+X)', coefficients_table).group(0).strip()
+    coefficients_table = xtreg_str.split('\n\n')[4]
+    try:
+        dep_variable = re.search('(Indicat(?:~\d+X|or\w+X))|(ECI)', coefficients_table).group(0).strip()
+    except Exception:
+        print(coefficients_table)
 
-    coefficient_rows = coefficients_table.split('\n')[3:-2]
-    print('COEFFICIENTS ROWS: ', coefficient_rows)
+    coefficient_rows = coefficients_table.split('\n')[5:-5]
     coefficients = get_coefficients_from_table_rows(coefficient_rows, XTREG_VAR_NAMES)
-
-    print('COEFFICIENTS: ', coefficients)
+    indep_variables = list(coefficients.keys())
 
     std_errs = None
     t_values = None
@@ -129,7 +147,7 @@ def get_xtreg_data_from_log(xtreg_str: str):
     return XTRegResults(
         n_obs=n_obs,
         n_groups=n_groups,
-        n_obs_per_group=n_obs_p_group,
+        n_obs_per_group=n_obs_per_group,
         F_stats=F_stats,
         Prob_F=Prob_F,
         R_sq=R_sq,
@@ -277,9 +295,17 @@ def get_csardl_data_from_log(csardl_str):
     long_run_coefficients = get_coefficients_from_table_rows(long_run_coefficients, var_names)
     indep_variables = list(short_run_coefficients.keys())
 
-    model_specification = re.search(r'Command: .*', csardl_str).group(0)
     model_params = {}
-    model_params['lag'] = int(model_specification[-2:-1])
+    try:
+        model_params['lag'] = int(csardl_str.split('cr_lags(')[1][0])
+    except Exception:
+        model_params['lag'] = -1
+
+    try:
+        model_specification = re.search('capture noisily: ', csardl_str, re.DOTALL).group(0)
+        model_specification = model_specificaiton.split('\n(Dynamic)')[0]
+    except Exception:
+        model_specification = {}
 
     short_run_std_errs=None
     short_run_z_values=None
@@ -479,7 +505,8 @@ def ind_var_name_replace(string, indicator_names):
     search_indicator = re.search('Indic[a-z\~]+\d{1,}X', string)
     search_eci = re.search('[A-Za-z& ]*ECI', string)
     if search_indicator:
-        indicator = search_indicator.group(0).replace('~', 'or')
+        indicator = search_indicator.group(0)
+        indicator = re.sub('Indic[at]*~+r*', 'Indicator', indicator)
         indicator_name = indicator_names.to_dict()['Original Name'][indicator]
         string = re.sub('Indic[a-z\~]+\d{1,}X', indicator_name, string)
     elif search_eci:
