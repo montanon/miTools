@@ -20,6 +20,7 @@ NUMBER_PATTERN = '-?\d*\.*\d+([Ee][\+\-]\d+)?'
 REGRESSION_PATTERN = f'({SPLIT_PATTERN}){{2}}(.*?)({SPLIT_PATTERN}){{1}}(.*?)({SPLIT_PATTERN}){{2}}'
 
 OLS_VAR_NAMES = ['Coefficient', 'Std. err.', 't', 'P>|t|', '95% Conf. Low', '95% Conf. High']
+XTREG_VAR_NAMES = ['Coefficient', 'std. err.', 't', 'P>|t|', '95% Conf. Low', '95% Conf. High']
 
 
 def process_logs_folder(folder: PathLike):
@@ -91,6 +92,62 @@ def get_coefficients_from_table_rows(coefficient_rows: List[str], var_names: Lis
         coeffs = {v: c for v, c in zip(var_names, coeffs)}
         coefficients[variable] = coeffs
     return coefficients
+
+def get_xtreg_data_from_log(xtreg_str: str):
+
+    n_obs = get_numbers_from_str(re.search(rf'Number of obs += +\n* *-?\d*\,*\d*\.*\d+\n', xtreg_str).group(0))[-1]
+    n_groups = get_numbers_from_str(re.search(rf'Number of groups += +\n*(({NUMBER_PATTERN})|(.))+\n', xtreg_str).group(0))[-1]
+    try:
+        n_obs_per_group = get_numbers_from_str(re.search(r'Obs per group \(T\) += +-?\d*\.*\d+\n', xtreg_str).group(0))[-1]
+    except AttributeError:
+        n_obs_per_group = get_numbers_from_str(re.search(rf'avg *= +(({NUMBER_PATTERN})|(.))+\n', xtreg_str).group(0))[-1]
+    F_stats = get_numbers_from_str(re.search(rf'F\(-?\d+, -?\d+\) += +(({NUMBER_PATTERN})|(.))+\n', xtreg_str).group(0))[-1]
+    Prob_F = get_numbers_from_str(re.search(rf'Prob > F += +(({NUMBER_PATTERN})|(.))+\n', xtreg_str).group(0))[-1]
+    R_sq = get_numbers_from_str(re.search(rf'R-squared +(.*?)Overall = +(({NUMBER_PATTERN})|(.))+\n', xtreg_str).group(0))[-1]
+    R_sq_within = get_numbers_from_str(re.search(rf'R-squared +(.*?)Within = +(({NUMBER_PATTERN})|(.))+\n', xtreg_str).group(0))[-1]
+    R_sq_between = get_numbers_from_str(re.search(rf'R-squared +(.*?)Between = +(({NUMBER_PATTERN})|(.))+\n', xtreg_str).group(0))[-1]
+    corr = get_numbers_from_str(re.search(rf'corr((.*?)= +(({NUMBER_PATTERN})|(.))+\n', xtreg_str).group(0))[-1] 
+
+    coefficients_table = xtreg_str.split('\n\n')[1]
+    dep_variable = re.search('Indicat(?:~\d+X|or\w+X)', coefficients_table).group(0).strip()
+
+    coefficient_rows = coefficients_table.split('\n')[3:-2]
+    print('COEFFICIENTS ROWS: ', coefficient_rows)
+    coefficients = get_coefficients_from_table_rows(coefficient_rows, XTREG_VAR_NAMES)
+
+    print('COEFFICIENTS: ', coefficients)
+
+    std_errs = None
+    t_values = None
+    p_values = None
+    significances = None
+    conf_interval = None
+
+    model_params = None
+    model_specification = None
+
+    return XTRegResults(
+        n_obs=n_obs,
+        n_groups=n_groups,
+        n_obs_per_group=n_obs_p_group,
+        F_stats=F_stats,
+        Prob_F=Prob_F,
+        R_sq=R_sq,
+        R_sq_within=R_sq_within,
+        R_sq_between=R_sq_between,
+        corr=corr,
+        dep_variable=dep_variable,
+        indep_variables=indep_variables,
+        coefficients=coefficients,
+        std_errs=std_errs,
+        t_values=t_values,
+        p_values=p_values,
+        significances=significances,
+        conf_interval=conf_interval,
+        model_params=model_params,
+        model_specification=model_specification
+    )
+    
 
 def get_ols_data_from_log(ols_str: str):
     
