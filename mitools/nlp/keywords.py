@@ -12,6 +12,7 @@ from sklearn.feature_extraction.text import TfidfTransformer, TfidfVectorizer
 
 import re
 import pandas as pd
+import numpy as np
 from typing import List, Optional, Tuple, Dict, Type, Iterable, Union, Literal
 from pandas import DataFrame, Series
 import matplotlib.pyplot as plt
@@ -19,6 +20,7 @@ import seaborn as sns
 from unidecode import unidecode
 
 from ..utils import lcs_similarity
+from tqdm import tqdm
 
 
 def tag_tokens(tokens: List[str]):
@@ -132,20 +134,28 @@ def preprocess_country_name(name):
     name = re.sub(r'[^a-z\s]', '', name)  
     return name
 
-def find_countries_in_paper(tokens: List[str], countries: List[str], demonyms: Dict[str, str],
-                            similarity_threshold: Optional[int]=0.9):
-    mentioned_countries = []
-    for token in tokens:
-        _token = token
-        if token in list(demonyms.keys()):
-            token = demonyms[token]
-        elif token == 'uk':
-            token = 'united kingdom'
-        for country in countries:
-            dist = lcs_similarity(token, country)
-            if dist >= similarity_threshold:
-                mentioned_countries.append((country, _token))
-    return mentioned_countries
+def find_countries_in_dataframe(dataframe, countries, demonyms):
+    tqdm.pandas()
+    return dataframe.progress_applymap(
+        lambda x: find_countries_in_token(x, countries, demonyms) if pd.notna(x) else np.nan
+        )
+
+def find_countries_in_token(token: str, countries: List[str], demonyms: Dict[str, str], 
+                            similarity_threshold: Optional[int]=0.9) -> Tuple[str, str]:
+    mentioned_country = (None, None)
+    _token = token
+    highest_similarity = 0
+    token = demonyms.get(token, token)
+    if token == 'uk':
+        token = 'united kingdom'
+    for country in countries:
+        dist = lcs_similarity(token, country)
+        if dist >= highest_similarity:
+            highest_similarity = dist
+            mentioned_country = (country, _token)
+    if highest_similarity < similarity_threshold:
+        mentioned_country = (None, None)
+    return mentioned_country
 
 def sort_multiindex_dataframe(df: DataFrame, selected_cols: List[str], sorting_col: Optional[str]=None, top_level: int=0, bot_level=-1, ascending: Optional[bool]=False):
     top_level_values = df.columns.get_level_values(top_level).unique()
