@@ -39,20 +39,32 @@ def read_log_file(log_path: PathLike):
 def dict_from_kwargs(**kwargs: Dict[str, Any]):
     return {k:v for k, v in kwargs}
 
-def lcs_similarity(s1: str, s2: str):
-    matrix = [[0] * (len(s2) + 1) for _ in range(len(s1) + 1)]
-    for i in range(len(s1)):
-        for j in range(len(s2)):
+def lcs_similarity(s1: str, s2: str) -> float:
+    if not s1 or not s2:
+        return 0.0
+    if s1 == s2:
+        return 1.0
+    len_s1, len_s2 = len(s1), len(s2)
+    prev_row = [0] * (len_s2 + 1)
+    curr_row = [0] * (len_s2 + 1)
+    for i in range(len_s1):
+        for j in range(len_s2):
             if s1[i] == s2[j]:
-                matrix[i+1][j+1] = matrix[i][j] + 1
+                curr_row[j+1] = prev_row[j] + 1
             else:
-                matrix[i+1][j+1] = max(matrix[i+1][j], matrix[i][j+1])
-    lcs_length = matrix[-1][-1]
-    return lcs_length / max(len(s1), len(s2))
+                curr_row[j+1] = max(curr_row[j], prev_row[j+1])
+        prev_row, curr_row = curr_row, prev_row
+
+    lcs_length = prev_row[-1]
+    return lcs_length / max(len_s1, len_s2)
 
 def fuzz_string_in_string(src_string: str , dst_string: str, threshold: Optional[int]=90):
-    similarity_score = fuzz.partial_ratio(src_string, dst_string)
+    similarity_score = fuzz_ratio(src_string, dst_string)
     return similarity_score > threshold
+
+def fuzz_ratio(src_string: str , dst_string: str):
+    similarity_score = fuzz.partial_ratio(src_string, dst_string)
+    return similarity_score
 
 def replace_prefix(string: str, prefix: Pattern, replacement: str):
     return re.sub(r'^' + re.escape(prefix), replacement, string)
