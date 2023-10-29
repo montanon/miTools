@@ -385,7 +385,8 @@ def generate_significance_color_styles(df):
             styles.iloc[r, c] = val_style
     return styles
 
-def df_selection(df, indicators, columns, col_filters, index_filters):
+def df_selection(df, indicators, columns, col_filters, index_filters): 
+    df = df[~df.index.duplicated(keep='first')] 
     _df = df.unstack(columns).loc[pd.IndexSlice[indicators,:]]
     for col, values in col_filters.items():
         if values:
