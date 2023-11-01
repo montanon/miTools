@@ -32,8 +32,8 @@ def find_str_line_number_in_text(text: str, substring: str):
         if substring in line:
             return idx
 
-def read_log_file(log_path: PathLike):
-    with open(log_path, 'r') as f:
+def read_text_file(text_path: PathLike):
+    with open(text_path, 'r') as f:
         return f.read() 
     
 def dict_from_kwargs(**kwargs: Dict[str, Any]):

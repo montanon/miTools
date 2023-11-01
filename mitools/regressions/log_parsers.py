@@ -4,23 +4,19 @@ import pandas as pd
 import numpy as np
 import time
 from os import PathLike
-
-from colorama import init, Fore
-init(autoreset=True)
+import hashlib
 
 from ..utils import *
 from .regressions_data import OLSResults, CSARDLResults, RegressionData, XTRegResults
-from typing import List, Dict, Match
-from icecream import ic
-from copy import deepcopy
+from typing import List, Dict
 
 #SPLIT_PATTERN = '={2,}\n'
 #MODEL_PATTERN = f'({SPLIT_PATTERN}(\n)+){{1}}'
-NUMBER_PATTERN = '-?\d*\.*\d+([Ee][\+\-]\d+)?'
+NUMBER_PATTERN = '-?\d*\.*\d*([Ee][\+\-]\d+)?'
 #REGRESSION_PATTERN = f'({SPLIT_PATTERN}){{2}}(.*?)({SPLIT_PATTERN}){{1}}(.*?)({SPLIT_PATTERN}){{2}}'
 
-SPLIT_PATTERN = '''. di "=+\n> =+"\n=+\n> =+\n'''
-REGRESSION_PATTERN = f'({SPLIT_PATTERN}){{1}}(.*?)({SPLIT_PATTERN}){{1}}(.*?)({SPLIT_PATTERN}){{1}}'
+SPLIT_PATTERN = '''===============================================================================\n> ==========\n'''
+REGRESSION_PATTERN = f'({SPLIT_PATTERN}){{2}}(.*?)({SPLIT_PATTERN}){{2}}'#(.*?)({SPLIT_PATTERN}){{1}}'
 
 OLS_VAR_NAMES = ['Coefficient', 'Std. err.', 't', 'P>|t|', '95% Conf. Low', '95% Conf. High']
 XTREG_VAR_NAMES = ['Coefficient', 'std. err.', 't', 'P>|t|', '95% Conf. Low', '95% Conf. High']
@@ -37,53 +33,55 @@ def threaded_process_logs(logs_paths, model_types, batch_size: Optional[int]=1, 
         return parallel_function(logs_paths, model_types)
     return process_logs(logs_paths, model_types)
 
-def process_logs(logs_paths, model_types):
-    dataframes = {k: [] for k in model_types}
+def process_logs(logs_paths, split_str: Optional[str]=None):
+    dataframes = []
     for log_path in logs_paths:
-        income, regressions_data = process_log(log_path, model_types)
-        for model_type in model_types:
-            dataframes[model_type].append(process_dataframe(regressions_data[model_type], income))
-    for model_type in model_types:
-        dataframes[model_type] = pd.concat(remove_dataframe_duplicates(dataframes[model_type]))
+        print(log_path)
+        regressions_data = process_log(log_path, split_str)
+        group = regressions_data.index.get_level_values('Group').unique()[0]
+        dataframes.append(regressions_data)
+    dataframes = pd.concat(remove_dataframe_duplicates(dataframes))
     return dataframes
 
-def process_log(log_path: PathLike, model_types=['xtreg', 'csardl']):
-    income, indicator, regression_strs = load_log(log_path)
-    regressions_data = {k: [] for k in model_types}
-    for regression_str in regression_strs:
-        regression = process_regressions_str(regression_str, model_types=model_types)
-        for model_type in model_types:
-            regressions_data[model_type].append(regression[model_type])
-    for model_type in model_types:
-        regressions_data[model_type] = pd.concat(remove_dataframe_duplicates(regressions_data[model_type]))
-    return income, regressions_data
+def process_log(log_path: PathLike, split_str: Optional[str]=None):
+    log = load_log(log_path)
+    model_type, group, regression_id = get_log_data_from_path(log_path)
+    regression_strs = get_splits_from_regressions_str(log, split_str)
+    regression_data = []
+    for n, regression_str in enumerate(regression_strs):
+        regression = process_regression_str(regression_str, model_type)
+        regression['Id'] = generate_hash_from_dataframe(regression)
+        regression_data.append(regression)
+    regression_data = pd.concat(remove_dataframe_duplicates(regression_data))
+    regression_data['Group'] = group
+    regression_data['Type'] = model_type
+    regression_data = regression_data.set_index(['Group', 'Id', 'Type'], append=True)
+    return regression_data
 
-def load_log(log_path):
-    log = read_log_file(log_path)
-    income, indicator = os.path.basename(log_path.replace('log.log', '')).split('_')
-    regression_strs = get_regression_strs_from_log(log)
-    return income, indicator, regression_strs
+def load_log(log_path): return read_text_file(log_path)
 
-def process_regressions_str(regression_str: str, model_types: List[str]) -> Dict[str,List]:
-    regressions = get_models_from_regressions_str(regression_str)
-    regressions_data = {k: [] for k in model_types}
-    for regression, model_type in zip(regressions, model_types):
-        model_data = get_model_data_from_log(regression, model_type)
-        model_data = model_data.to_pretty_df()
-        regressions_data[model_type].append(model_data)
-    for model_type in model_types:
-        regressions_data[model_type] = pd.concat(remove_dataframe_duplicates(regressions_data[model_type]))
-    return regressions_data
+def get_log_data_from_path(log_path: PathLike):
+    model_type, group, regression_id = os.path.basename(log_path.replace('.log', '')).split('_')
+    return model_type, group, regression_id
 
-def get_models_from_regressions_str(regression_str):
-    splits = re.split(f'({SPLIT_PATTERN}){{1}}', regression_str)
-    splits = [split for n, split in enumerate(splits) if n%2 == 0 and split not in ['\n', '']]
+def process_regression_str(regression_str: str, model_type: str) -> Dict[str,List]:
+    regression_data = get_model_data_from_log(regression_str, model_type)
+    regression_data = regression_data.to_pretty_df()
+    return regression_data
+
+def get_splits_from_regressions_str(regression_str, split_pattern=None):
+    if split_pattern is None:
+        split_pattern = SPLIT_PATTERN
+    splits = re.split(f'({split_pattern}){{1}}', regression_str)
+    splits = [split for split in splits[1:] if split not in ['\n', '', split_pattern]]
     return splits
 
-def get_regression_strs_from_log(log: str):
+def get_regression_strs_from_log(log: str, regression_pattern=None):
+    if regression_pattern is None:
+        regression_pattern = SPLIT_PATTERN
     regression_strs = []
     while len(log) > 300:
-        match = re.search(REGRESSION_PATTERN, log, re.DOTALL)
+        match = re.search(regression_pattern, log, re.DOTALL)
         regression_strs.append(match[0])
         log = log[match.end():]
     return regression_strs
@@ -106,12 +104,11 @@ def get_model_data_from_log(regression_str, model_type):
     elif model_type == 'xtreg':
         return get_xtreg_data_from_log(regression_str)
     elif model_type == 'ols':
-        return ols_data_from_log(regression_str)
+        return get_ols_data_from_log(regression_str)
     else:
         raise NotImplementedError
 
 def get_xtreg_data_from_log(xtreg_str: str):
-
     n_obs = get_numbers_from_str(re.search(rf'Number of obs += +\n* *-?\d*\,*\d*\.*\d+\n', xtreg_str).group(0))[-1]
     n_groups = get_numbers_from_str(re.search(rf'Number of groups += +\n*(({NUMBER_PATTERN})|(.))+\n', xtreg_str).group(0))[-1]
     try:
@@ -125,13 +122,10 @@ def get_xtreg_data_from_log(xtreg_str: str):
     R_sq_between = get_numbers_from_str(re.search(rf'Between += +(({NUMBER_PATTERN})|(.))+\n', xtreg_str).group(0))[-1]
     corr = get_numbers_from_str(re.search(rf'corr\((.*?)= +(({NUMBER_PATTERN})|(.))+\n', xtreg_str).group(0))[-1] 
 
-    coefficients_table = xtreg_str.split('\n\n')[4]
-    try:
-        dep_variable = re.search('(Indicat(?:~\d+X|or\w+X))|(ECI)', coefficients_table).group(0).strip()
-    except Exception:
-        print(coefficients_table)
+    coefficients_table = xtreg_str.split('\n\n')[3]
+    dep_variable = re.search('(Indicat(?:~\d+X|or\w+X))|(ECI)', coefficients_table).group(0).strip()
 
-    coefficient_rows = coefficients_table.split('\n')[5:-5]
+    coefficient_rows = coefficients_table.split('\n')[5:-6]
     coefficients = get_coefficients_from_table_rows(coefficient_rows, XTREG_VAR_NAMES)
     indep_variables = list(coefficients.keys())
 
@@ -299,11 +293,11 @@ def get_csardl_data_from_log(csardl_str):
     try:
         model_params['lag'] = int(csardl_str.split('cr_lags(')[1][0])
     except Exception:
-        model_params['lag'] = -1
+        model_params['lag'] = 0
 
     try:
         model_specification = re.search('capture noisily: ', csardl_str, re.DOTALL).group(0)
-        model_specification = model_specificaiton.split('\n(Dynamic)')[0]
+        model_specification = model_specification.split('\n(Dynamic)')[0]
     except Exception:
         model_specification = {}
 
@@ -370,7 +364,7 @@ def generate_significance_color_styles(df):
     for r in range(df.shape[0]):
         for c in range(df.shape[1]):
             val = df.iloc[r, c]
-            if isinstance(val, str) and not df.index[r][0] in df.index[r][-1]:
+            if isinstance(val, str) and 'ECI' in df.index[r][-1]:
                 pos_value = float(val.split(' ')[0]) >= 0.0
                 if '***' in val:
                     val_style = 'background-color: limegreen; font-weight: bold;' if pos_value else 'background-color: red; font-weight: bold;'
@@ -384,10 +378,9 @@ def generate_significance_color_styles(df):
                 val_style = ''
             styles.iloc[r, c] = val_style
     return styles
-
+    
 def df_selection(df, indicators, columns, col_filters, index_filters): 
-    df = df[~df.index.duplicated(keep='first')] 
-    _df = df.unstack(columns).loc[pd.IndexSlice[indicators,:]]
+    _df = df.unstack(columns).loc[pd.IndexSlice[:,:,indicators,:]]
     for col, values in col_filters.items():
         if values:
             mask = (_df.columns.get_level_values(col).isin(values))
@@ -400,12 +393,12 @@ def df_selection(df, indicators, columns, col_filters, index_filters):
 
 def df_view(df, indicators, columns, col_filters, index_filters, col_name, row_name):
     _df = df_selection(df, indicators, columns, col_filters, index_filters)
-    _df = sort_df(_df, row_name, 0, indep_var_sorting_key)
     _df = sort_df(_df, col_name, 1, income_sorting_key)
+    _df = sort_df(_df, [row_name, 'Variable'], 0)
     _df = style_csardl_results(_df, row_name, col_name)
     return _df
 
-def sort_df(df, column, axis, key):
+def sort_df(df, column, axis, key=None):
     return df.sort_values(by=column, axis=axis, key=key)
 
 def income_sorting_key(val):
@@ -435,7 +428,7 @@ def indep_var_sorting_key(val):
         'Wood & Paper ECI': 11,
         'SECI': 12
     }
-    return pd.Index([string_value[v] for v in val], name='Indep Var')
+    return pd.Index([string_value[v] if v in string_value else 99 for v in val], name='Indep Var')
 
 def generate_styling(df, row_level, col_level):
     row_level = df.index.names.index(row_level)
@@ -488,13 +481,9 @@ def save_dfs_to_excel(dataframes, sheet_names, path):
         for df, sheet_name in zip(dataframes, sheet_names):
             df.to_excel(writer, sheet_name=sheet_name)
 
-def process_dataframe(df, income):
-    df['Income'] = income
-    return df.set_index('Income', append=True)
-
 def mask_results(dataframe, indicator_names):
     dataframe = dataframe.reset_index()
-    dataframe['Dep Var'] = dataframe['Dep Var'].map(indicator_names.to_dict()['Original Name'])
+    dataframe['Dep Var'] = dataframe['Dep Var'].apply(lambda x: ind_var_name_replace(x, indicator_names))
     dataframe['Indep Var'] = dataframe['Indep Var'].map(indicator_names.to_dict()['Original Name'])
     dataframe['Variable'] = dataframe['Variable'].apply(lambda x: ind_var_name_replace(x, indicator_names))
     if 'Lag' in dataframe.columns:
@@ -503,11 +492,11 @@ def mask_results(dataframe, indicator_names):
     return dataframe
 
 def ind_var_name_replace(string, indicator_names):
-    search_indicator = re.search('Indic[a-z\~]+\d{1,}X', string)
+    search_indicator = re.search('Indic[ator]*~?\d{1,}X', string)
     search_eci = re.search('[A-Za-z& ]*ECI', string)
     if search_indicator:
         indicator = search_indicator.group(0)
-        indicator = re.sub('Indic[at]*~+r*', 'Indicator', indicator)
+        indicator = re.sub('Indic[ato]*~+r*', 'Indicator', indicator)
         indicator_name = indicator_names.to_dict()['Original Name'][indicator]
         string = re.sub('Indic[a-z\~]+\d{1,}X', indicator_name, string)
     elif search_eci:
@@ -523,3 +512,11 @@ def print_duplicated_indices(df):
     duplicated = df.index[df.index.duplicated()].unique()
     for idx in duplicated:
         print(idx)
+
+def generate_hash_from_dataframe(df):
+    dep_var = df.index.get_level_values('Dep Var').unique()[0]
+    indep_vars = ' '.join(df.index.get_level_values('Indep Var').unique())
+    variables = ' '.join(df.index.get_level_values('Variable').unique())
+    hasher = hashlib.md5()
+    hasher.update(rf'{dep_var} {indep_vars} {variables}'.encode('utf-8'))
+    return hasher.hexdigest()[:6]
