@@ -148,7 +148,6 @@ class TestGetClustersCentroidsDistances(TestCase):
 class TestGetClustersCentroids(TestCase):
 
     def setUp(self):
-        # Mock data setup
         self.data = DataFrame({
             'x': [1, 2, 3, 4, 5],
             'y': [2, 3, 4, 5, 6]
@@ -303,4 +302,3 @@ class TestKMeansNClusterSearch(TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-    
