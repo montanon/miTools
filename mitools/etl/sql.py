@@ -43,20 +43,18 @@ def get_conn_db_folder(conn: Connection):
     return db_folder
 
 def check_if_table(conn: Connection, tablename: str):
-
     c = conn.cursor()
-
     try:
+        res = conn.cursor().execute("SELECT name FROM sqlite_master")
         c.execute(f'SELECT * FROM "{tablename}"')
         return True if c.fetchone() else False
     except OperationalError:
+        res = conn.cursor().execute("SELECT name FROM sqlite_master")
         try:
             db_folder = get_conn_db_folder(conn)
             parquet_folder = os.path.join(db_folder, 'parquet')
             table_file = os.path.join(parquet_folder, f"{tablename}.parquet")
-
             return True if os.path.exists(table_file) else False
-
         except Exception:
             return False
         
@@ -78,11 +76,12 @@ def read_sql_table(conn: Connection, tablename: str,
 def read_sql_tables(conn: Connection, tablenames: Iterable[str],
                     columns: Optional[Union[str,list,ndarray]]=None,
                     index_col: Optional[str]='index'):
-    return [read_sql_table(tablename, conn, columns, index_col) for tablename in tablenames]
+    return [read_sql_table(conn, tablename, columns, index_col) for tablename in tablenames]
 
 @suppress_user_warning
-def transfer_tables(src_db_connection: Connection, dst_db_connection: Connection,
-                    tablename: str, if_exists: Optional[str]='fail'):
+def transfer_sql_tables(src_db_connection: Connection, dst_db_connection: Connection,
+                    tablename: str, if_exists: Optional[str]='fail', 
+                    index_col: Optional[str]='index'):
     table = pd.read_sql(
-        f"SELECT * FROM {tablename};", src_db_connection, index_col='index')
+        f"SELECT * FROM {tablename};", src_db_connection, index_col=index_col)
     table.to_sql(tablename, dst_db_connection, if_exists=if_exists)
