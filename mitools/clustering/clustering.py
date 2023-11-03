@@ -303,12 +303,10 @@ def plot_clusters_growth(data: DataFrame, time_col: str, cluster_col: str):
     return ax
 
 def get_cosine_similarities(data: DataFrame, cluster_col: str):
-    def cosine_similarity_group(group):
-        return cosine_similarity(group.values)
     cosine_similarities = (data.groupby(level=cluster_col)
-                           .apply(cosine_similarity_group)
-                           .to_dict())
-    return {k: DataFrame(v) for k, v in cosine_similarities.items()}
+                           .apply(cosine_similarity)
+                   )
+    return cosine_similarities
 
 def plot_cosine_similarities(cosine_similarities: Dict[int,DataFrame], normed: Optional[bool]=False):
     fig, ax = plt.subplots(1, 1, figsize=(14, 6))
