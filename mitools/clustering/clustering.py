@@ -16,7 +16,8 @@ from sklearn.metrics.pairwise import cosine_similarity, pairwise_distances
 from sklearn.neighbors import NearestCentroid
 from tqdm import tqdm
 
-from ..exceptions import ArgumentStructureError, ArgumentTypeError, ArgumentValueError
+from ..exceptions import (ArgumentStructureError, ArgumentTypeError,
+                          ArgumentValueError)
 
 N_ELEMENTS_COL = 'N Elements'
 

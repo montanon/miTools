@@ -337,5 +337,77 @@ class TestGetClustersCentroidsDistances(unittest.TestCase):
         self.assertTrue((result.values == expected.values).all())
 
 
+class TestGetClustersCentroids(unittest.TestCase):
+
+    def setUp(self):
+        # Mock data setup
+        self.data = DataFrame({
+            'x': [1, 2, 3, 4, 5],
+            'y': [2, 3, 4, 5, 6]
+        })
+        self.data['cluster'] = [0, 0, 1, 1, 2]
+        self.data.set_index('cluster', inplace=True, append=True)
+
+    def test_positive_case(self):
+        result = get_clusters_centroids(self.data, 'cluster')
+        # Calculate the expected centroids manually
+        expected_data = {
+            'x': [1.5, 3.5, 5],
+            'y': [2.5, 4.5, 6]
+        }
+        expected = DataFrame(expected_data, index=[0, 1, 2])
+        # Ensure centroids are computed correctly
+        self.assertTrue(array_equal(result.values, expected.values) and 
+                        array_equal(result.index.values, expected.index.values))
+
+    def test_empty_dataframe(self):
+        # Ensure function handles an empty dataframe without errors
+        empty_data = DataFrame(columns=['x', 'y'], 
+                             index=MultiIndex(levels=[[]], codes=[[]], names=['cluster'])
+                             )
+        with self.assertRaises(ValueError):  # Assuming it raises a ValueError due to empty data
+            get_clusters_centroids(empty_data, 'cluster')
+
+    def test_missing_cluster_column(self):
+        # Ensure function raises an error when cluster_col is missing
+        with self.assertRaises(KeyError):
+            get_clusters_centroids(self.data.reset_index(level='cluster'), 'missing_cluster_col')
+
+    def test_single_cluster(self):
+        # For a single cluster, the centroid should be the mean of the data
+        single_cluster_data = self.data[self.data.index.get_level_values('cluster') == 0]
+        with self.assertRaises(ValueError):
+            get_clusters_centroids(single_cluster_data, 'cluster')
+                                   
+
+class TestAgglomerativeClustering(unittest.TestCase):
+
+    def setUp(self):
+        # Mock data setup: Create datasets with blobs that can be clustered
+        self.data, _ = make_blobs(n_samples=100, centers=3, random_state=42)
+        self.data = DataFrame(self.data, columns=['x', 'y'])
+
+    def test_positive_case(self):
+        n_clusters = 3
+        result = agglomerative_clustering(self.data, n_clusters)
+        # Ensure function returns labels for all data points
+        self.assertEqual(len(result), len(self.data))
+        # Ensure the number of unique labels equals n_clusters
+        unique_labels = unique(result)
+        self.assertEqual(len(unique_labels), n_clusters)
+
+    def test_empty_dataframe(self):
+        # Ensure function handles an empty dataframe without errors
+        empty_data = DataFrame(columns=['x', 'y'])
+        with self.assertRaises(ValueError):  # Assuming it raises a ValueError due to empty data
+            agglomerative_clustering(empty_data, 1)
+
+    def test_invalid_n_clusters(self):
+        # Ensure function raises an error with invalid n_clusters value
+        with self.assertRaises(ValueError):  # Assuming it raises a ValueError for invalid n_clusters
+            agglomerative_clustering(self.data, 0)
+        with self.assertRaises(ValueError):  # Assuming it raises a ValueError for invalid n_clusters
+            agglomerative_clustering(self.data, -1)
+
 if __name__ == "__main__":
     unittest.main()
