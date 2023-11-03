@@ -28,6 +28,7 @@ CLUSTER_COL_NOT_IN_INDEX_ERROR = 'DataFrame provided does not have the {cluster_
 SINGLE_GROUP_DF_ERROR = 'DataFrame provided has a single group!'
 EMPTY_DF_ERROR = 'DataFrame provided is empty!'
 
+N_ELEMENTS_COL = 'N Elements'
 
 def kmeans_ncluster_search(data: DataFrame, max_clusters: Optional[int]=25, 
                            random_state: Optional[int]=0, n_init: Optional[str]='auto'

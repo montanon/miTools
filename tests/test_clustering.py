@@ -81,38 +81,6 @@ class TestGetCosineSimilarities(TestCase):
         self.assertTrue(result.equals(expected))
 
 
-class TestDisplayClustersSize(TestCase):
-
-    def setUp(self):
-        # Mock data setup
-        self.data = DataFrame({
-            'value': [10, 20, 30, 40, 50],
-            'cluster': [0, 0, 1, 1, 2]
-        })
-
-    def test_positive_case(self):
-        result = display_clusters_size(self.data, 'cluster')
-        expected = DataFrame(
-            {N_ELEMENTS_COL: [2, 2, 1]}, 
-            index=MultiIndex.from_tuples([(0,), (1,), (2,)], names=['cluster'])
-            )
-        self.assertTrue(result.equals(expected))
-
-    def test_empty_dataframe(self):
-        # Ensure function handles an empty dataframe without errors and returns an empty dataframe
-        empty_data = DataFrame(columns=['value', 'cluster'])
-        result = display_clusters_size(empty_data, 'cluster')
-        expected = DataFrame(columns=[N_ELEMENTS_COL], 
-                             index=MultiIndex(levels=[[]], codes=[[]], names=['cluster']),
-                             ).astype(int)
-        self.assertTrue(result.equals(expected))
-
-    def test_missing_cluster_column(self):
-        # Ensure function raises an error when cluster_col is missing
-        with self.assertRaises(KeyError):
-            display_clusters_size(self.data, 'missing_cluster_col')
-
-
 class TestGetClustersCentroidsDistances(TestCase):
 
     def setUp(self):
@@ -301,6 +269,37 @@ class TestKMeansNClusterSearch(TestCase):
         with self.assertRaises(ArgumentValueError):  # Assuming it raises a ValueError for invalid max_clusters
             kmeans_ncluster_search(self.data, 1)
 
+
+class TestDisplayClustersSize(TestCase):
+
+    def setUp(self):
+        # Mock data setup
+        self.data = DataFrame({
+            'value': [10, 20, 30, 40, 50],
+            'cluster': [0, 0, 1, 1, 2]
+        })
+
+    def test_positive_case(self):
+        result = display_clusters_size(self.data, 'cluster')
+        expected = DataFrame(
+            {N_ELEMENTS_COL: [2, 2, 1]}, 
+            index=MultiIndex.from_tuples([(0,), (1,), (2,)], names=['cluster'])
+            )
+        self.assertTrue(result.equals(expected))
+
+    def test_empty_dataframe(self):
+        # Ensure function handles an empty dataframe without errors and returns an empty dataframe
+        empty_data = DataFrame(columns=['value', 'cluster'])
+        result = display_clusters_size(empty_data, 'cluster')
+        expected = DataFrame(columns=[N_ELEMENTS_COL], 
+                             index=MultiIndex(levels=[[]], codes=[[]], names=['cluster']),
+                             ).astype(int)
+        self.assertTrue(result.equals(expected))
+
+    def test_missing_cluster_column(self):
+        # Ensure function raises an error when cluster_col is missing
+        with self.assertRaises(KeyError):
+            display_clusters_size(self.data, 'missing_cluster_col')
 
 if __name__ == "__main__":
     unittest.main()
