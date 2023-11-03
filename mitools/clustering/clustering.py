@@ -15,6 +15,7 @@ from typing import Optional, List, Dict, Any, Tuple, Union
 from pandas import DataFrame, IndexSlice, Index
 from matplotlib.axes import Axes
 
+N_ELEMENTS_COL = 'N Elements'
 
 def kmeans_ncluster_search(data: DataFrame, max_clusters: Optional[int]=25, 
                            random_state: Optional[int]=0, n_init: Optional[str]='auto'):
@@ -277,7 +278,7 @@ def get_clusters_centroids_distances(centroids: DataFrame):
 
 def display_clusters_size(data: DataFrame, cluster_col: str):
     cluster_count = data[[cluster_col]].value_counts().sort_index().to_frame()
-    cluster_count.columns = ['N Elements']
+    cluster_count.columns = [N_ELEMENTS_COL]
     return cluster_count
 
 def plot_clusters_growth(data: DataFrame, time_col: str, cluster_col: str):
