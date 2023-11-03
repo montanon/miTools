@@ -266,6 +266,10 @@ def confidence_ellipse(xvalues, yvalues, ax, n_std=1.96, facecolor='none', **kwa
     return ax
 
 def get_clusters_centroids(data: DataFrame, cluster_col: str):
+    if cluster_col not in data.index.names:
+        raise KeyError(f'DataFrame provided does not have the {cluster_col} index level!')
+    if data.index.get_level_values(cluster_col).nunique() == 1:
+        raise ValueError('DataFrame provided for NearestCentroid has a single group!')
     clf = NearestCentroid()
     clf.fit(data.values, data.index.get_level_values(cluster_col).values)
     return DataFrame(clf.centroids_, columns=data.columns, 
