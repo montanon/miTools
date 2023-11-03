@@ -1,5 +1,6 @@
 from mitools.clustering import *
 import unittest
+from unittest import TestCase
 from pandas import DataFrame, Series, MultiIndex
 from sklearn.metrics.pairwise import cosine_similarity
 from numpy import array_equal, unique
@@ -7,7 +8,7 @@ from sklearn.datasets import make_blobs
 from sklearn.neighbors import NearestCentroid
 
 
-class TestGetDistancesToCentroids(unittest.TestCase):
+class TestGetDistancesToCentroids(.TestCase):
 
     def setUp(self):
         # Mock data setup
@@ -39,7 +40,7 @@ class TestGetDistancesToCentroids(unittest.TestCase):
         self.assertTrue((distances.round(8) == expected_distances.round(8)).all().all())
 
 
-class TestGetCosineSimilarities(unittest.TestCase):
+class TestGetCosineSimilarities(TestCase):
 
     def setUp(self):
         # Mock data setup
@@ -78,7 +79,7 @@ class TestGetCosineSimilarities(unittest.TestCase):
         self.assertTrue(result.equals(expected))
 
 
-class TestDisplayClustersSize(unittest.TestCase):
+class TestDisplayClustersSize(TestCase):
 
     def setUp(self):
         # Mock data setup
@@ -110,7 +111,7 @@ class TestDisplayClustersSize(unittest.TestCase):
             display_clusters_size(self.data, 'missing_cluster_col')
 
 
-class TestGetClustersCentroidsDistances(unittest.TestCase):
+class TestGetClustersCentroidsDistances(TestCase):
 
     def setUp(self):
         # Mock centroids setup
@@ -144,7 +145,7 @@ class TestGetClustersCentroidsDistances(unittest.TestCase):
         self.assertTrue((result.values == expected.values).all())
 
 
-class TestGetClustersCentroids(unittest.TestCase):
+class TestGetClustersCentroids(TestCase):
 
     def setUp(self):
         # Mock data setup
@@ -187,7 +188,7 @@ class TestGetClustersCentroids(unittest.TestCase):
             get_clusters_centroids(single_cluster_data, 'cluster')
                                    
 
-class TestAgglomerativeClustering(unittest.TestCase):
+class TestAgglomerativeClustering(TestCase):
 
     def setUp(self):
         # Mock data setup: Create datasets with blobs that can be clustered
@@ -217,7 +218,7 @@ class TestAgglomerativeClustering(unittest.TestCase):
             agglomerative_clustering(self.data, -1)
 
 
-class TestAgglomerativeNClusterSearch(unittest.TestCase):
+class TestAgglomerativeNClusterSearch(TestCase):
 
     def setUp(self):
         # Mock data setup: Create datasets with blobs
@@ -243,7 +244,7 @@ class TestAgglomerativeNClusterSearch(unittest.TestCase):
             agglomerative_ncluster_search(self.data, 1)
 
 
-class TestKMeansClustering(unittest.TestCase):
+class TestKMeansClustering(TestCase):
 
     def setUp(self):
         # Mock data setup: Create datasets with blobs that can be clustered
@@ -273,7 +274,7 @@ class TestKMeansClustering(unittest.TestCase):
             kmeans_clustering(self.data, -1)
 
 
-class TestKMeansNClusterSearch(unittest.TestCase):
+class TestKMeansNClusterSearch(TestCase):
 
     def setUp(self):
         # Mock data setup: create datasets with blobs that can be clustered
