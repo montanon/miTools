@@ -19,6 +19,10 @@ N_ELEMENTS_COL = 'N Elements'
 
 def kmeans_ncluster_search(data: DataFrame, max_clusters: Optional[int]=25, 
                            random_state: Optional[int]=0, n_init: Optional[str]='auto'):
+    if not isinstance(max_clusters, int):
+        raise ValueError('max_clusters provided must be a positive int.')
+    if max_clusters < 2:
+        raise ValueError('max_clusters must be a number above or equal to 2.')
     silhouette_scores = []
     inertia = []
     for n_clusters in tqdm(range(2, max_clusters)):
@@ -68,6 +72,10 @@ def plot_kmeans_ncluster_search(silhouette_scores: List[float], inertia: List[fl
     return ax
 
 def agglomerative_ncluster_search(data: DataFrame, max_clusters: Optional[int]=25):
+    if not isinstance(max_clusters, int):
+        raise ValueError('max_clusters provided must be a positive int.')
+    if max_clusters < 2:
+        raise ValueError('max_clusters must be a number above or equal to 2.')
     silhouette_scores = []
     for n_clusters in tqdm(range(2, max_clusters)):
         agg_clustering = AgglomerativeClustering(n_clusters=n_clusters)
