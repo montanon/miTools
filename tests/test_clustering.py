@@ -8,7 +8,7 @@ from sklearn.datasets import make_blobs
 from sklearn.neighbors import NearestCentroid
 
 
-class TestGetDistancesToCentroids(TestCase):
+class TestGetDistancesToCentroids(unittest.TestCase):
 
     def setUp(self):
         # Mock data setup
