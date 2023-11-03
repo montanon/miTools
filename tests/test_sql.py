@@ -1,11 +1,13 @@
-import unittest
-from unittest.mock import Mock, patch, MagicMock
-from unittest import TestCase
-from mitools.etl import *
 import os
-import pandas as pd
 import sqlite3
+import unittest
 import warnings
+from unittest import TestCase
+from unittest.mock import MagicMock, Mock, patch
+
+import pandas as pd
+
+from mitools.etl import *
 
 
 class TestCustomConnection(TestCase):
