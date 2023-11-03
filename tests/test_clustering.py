@@ -3,6 +3,7 @@ import unittest
 from pandas import DataFrame, Series, MultiIndex
 from sklearn.metrics.pairwise import cosine_similarity
 
+
 class TestGetDistancesToCentroids(unittest.TestCase):
 
     def setUp(self):
@@ -104,6 +105,42 @@ class TestDisplayClustersSize(unittest.TestCase):
         # Ensure function raises an error when cluster_col is missing
         with self.assertRaises(KeyError):
             display_clusters_size(self.data, 'missing_cluster_col')
+
+
+class TestGetClustersCentroidsDistances(unittest.TestCase):
+
+    def setUp(self):
+        # Mock centroids setup
+        self.centroids = DataFrame({
+            'x': [1, 0, 0],
+            'y': [0, 1, 0],
+            'z': [0, 0, 1]
+        })
+
+    def test_positive_case(self):
+        result = get_clusters_centroids_distances(self.centroids)
+        expected = DataFrame(pairwise_distances(self.centroids))
+        # Use numpy's allclose for floating point comparisons
+        self.assertTrue((result.values == expected.values).all())
+
+    def test_empty_dataframe(self):
+        # Ensure function handles an empty dataframe without errors
+        empty_data = DataFrame(columns=['x', 'y', 'z'])
+        with self.assertRaises(ValueError):
+            get_clusters_centroids_distances(empty_data)
+
+    def test_single_centroid(self):
+        # For a single centroid, the pairwise distance should be a 1x1 DataFrame with value 0
+        single_centroid_data = DataFrame({
+            'x': [1],
+            'y': [0],
+            'z': [0]
+        })
+        
+        result = get_clusters_centroids_distances(single_centroid_data)
+        expected = DataFrame([[0]])
+        self.assertTrue((result.values == expected.values).all())
+
 
 if __name__ == "__main__":
     unittest.main()
