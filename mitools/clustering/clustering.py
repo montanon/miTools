@@ -272,6 +272,8 @@ def get_clusters_centroids(data: DataFrame, cluster_col: str):
                      index=np.unique(data.index.get_level_values(cluster_col)))
 
 def get_clusters_centroids_distances(centroids: DataFrame):
+    if centroids.empty:
+        raise ValueError('DataFrame provided for pairwise distances is empty!')
     return DataFrame(
         pairwise_distances(centroids)
         )
