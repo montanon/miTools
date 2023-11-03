@@ -228,13 +228,12 @@ class TestReadSqlTables(TestCase):
             )
 
 
-class TestTransferSqlTables(unittest.TestCase):
+class TestTransferSqlTables(TestCase):
 
     def setUp(self):
         # Set up two in-memory SQLite databases
         self.src_conn = sqlite3.connect(":memory:")
         self.dst_conn = sqlite3.connect(":memory:")
-
         # Create a sample table in the source database
         self.src_conn.execute('''
             CREATE TABLE sample (
@@ -254,17 +253,13 @@ class TestTransferSqlTables(unittest.TestCase):
     def test_transfer_sql_tables(self):
         # Given
         tablename = 'sample'
-
         # Transfer table from src to dst
         transfer_sql_tables(self.src_conn, self.dst_conn, tablename, if_exists='replace', index_col=None)
-
         # Verify the data was transferred
         df_dst = pd.read_sql('SELECT * FROM sample', self.dst_conn)
-
         self.assertEqual(len(df_dst), 3)
         self.assertTrue('data' in df_dst.columns)
         self.assertTrue('index' in df_dst.columns)
-
 
 
 if __name__ == "__main__":
