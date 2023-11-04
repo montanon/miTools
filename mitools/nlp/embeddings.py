@@ -1,11 +1,9 @@
 from tqdm import tqdm
 from ..utils import iterable_chunks, parallel
 from typing import Union, List, Optional
-from .semantic_scholar_api_key import SEMANTIC_SCHOLAR_API_KEY
 from pandas import Series, DataFrame
 from numpy import float64
 from ast import literal_eval
-from multiprocessing import cpu_count
 
 import warnings
 from numba.core.errors import NumbaDeprecationWarning, NumbaPendingDeprecationWarning

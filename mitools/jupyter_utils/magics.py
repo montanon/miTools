@@ -2,6 +2,7 @@ import os
 import base64
 from IPython.core.magic import register_cell_magic, register_line_magic
 from IPython.display import HTML, display
+from IPython import get_ipython
 
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))

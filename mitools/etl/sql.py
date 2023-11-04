@@ -36,11 +36,11 @@ def get_conn_db_folder(conn: Connection):
 def check_if_table(conn: Connection, tablename: str):
     c = conn.cursor()
     try:
-        res = conn.cursor().execute("SELECT name FROM sqlite_master")
+        _ = conn.cursor().execute("SELECT name FROM sqlite_master")
         c.execute(f'SELECT * FROM "{tablename}"')
         return True if c.fetchone() else False
     except OperationalError:
-        res = conn.cursor().execute("SELECT name FROM sqlite_master")
+        _ = conn.cursor().execute("SELECT name FROM sqlite_master")
         try:
             db_folder = get_conn_db_folder(conn)
             parquet_folder = os.path.join(db_folder, 'parquet')

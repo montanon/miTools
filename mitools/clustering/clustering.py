@@ -12,7 +12,7 @@ from scipy.stats import gaussian_kde
 from scipy.spatial.distance import euclidean
 from tqdm import tqdm
 from typing import Optional, List, Dict, Any, Tuple, Union
-from pandas import DataFrame, IndexSlice, Index
+from pandas import DataFrame, IndexSlice
 from matplotlib.axes import Axes
 
 N_ELEMENTS_COL = 'N Elements'
@@ -320,7 +320,7 @@ def plot_clusters_growth(data: DataFrame, time_col: str, cluster_col: str):
 def get_cosine_similarities(data: DataFrame, cluster_col: str):
     cosine_similarities = (data.groupby(level=cluster_col)
                            .apply(cosine_similarity)
-                   )
+                           )
     return cosine_similarities
 
 def plot_cosine_similarities(cosine_similarities: Dict[int,DataFrame], normed: Optional[bool]=False):
