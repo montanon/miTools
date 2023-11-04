@@ -32,7 +32,7 @@ def tag_token(token: str):
     return tag_tokens([token])
 
 def nltk_tags_to_wordnet_tags(nltk_tags):
-    return map(lambda x: (x[0], nltk_tag_to_wordnet_tag(x[1])), nltk_tags)
+    return list(map(lambda x: (x[0], nltk_tag_to_wordnet_tag(x[1])), nltk_tags))
 
 def nltk_tag_to_wordnet_tag(nltk_tag: str):
     if nltk_tag.startswith('J'):
@@ -44,7 +44,7 @@ def nltk_tag_to_wordnet_tag(nltk_tag: str):
     elif nltk_tag.startswith('R'):
         return wordnet.ADV
     else:          
-        return None
+        return wordnet.NOUN
     
 def lemmatize_text(text: str, lemmatizer: Optional[Type[StemmerI]]=None):
     if lemmatizer is None:
