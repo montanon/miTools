@@ -1,10 +1,11 @@
 import re
-from typing import Iterable, Pattern
+from typing import Iterable, Pattern, Type
 from icecream import ic
 from os import PathLike
 from typing import Dict, Any, List, Optional
 from fuzzywuzzy import fuzz
 from pandas import DataFrame
+import numpy as np
 
 def iterable_chunks(iterable: Iterable, chunk_size: int):
     for i in range(0, len(iterable), chunk_size):
@@ -92,3 +93,24 @@ def remove_dataframe_duplicates(dfs: List[DataFrame]):
         if not any(dfs[i].equals(dfs[j]) for j in range(i+1, len(dfs))):
             unique_dfs.append(dfs[i])
     return unique_dfs
+
+def can_convert_to(items: Iterable, type: Type):
+    try:
+        return all(isinstance(type(item), type) for item in items)
+    except ValueError:
+        return False
+    
+def invert_dict(dictionary: dict) -> dict:
+    return {value: key for key, value in dictionary.items()}
+
+def iprint(iterable: Iterable, splitter: Optional[str]=''):
+    for item in iterable:
+        if splitter:
+            print(splitter*40)
+        print(item)
+        if splitter:
+            print(splitter*40)
+
+def check_symmetrical_matrix(a, rtol=1e-05, atol=1e-08):
+    return np.allclose(a, a.T, rtol=rtol, atol=atol)
+
