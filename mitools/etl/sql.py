@@ -1,11 +1,10 @@
 import os
 import pandas as pd
-import warnings
 
 from numpy import ndarray
 from sqlite3 import Connection, OperationalError
-from functools import wraps
-from typing import Callable, Iterable, Union, Optional
+from typing import Iterable, Union, Optional
+from ..utils import suppress_user_warning
     
     
 class CustomConnection(Connection):
@@ -16,14 +15,6 @@ class CustomConnection(Connection):
     @property
     def __class__(self):
         return Connection
-
-def suppress_user_warning(func: Callable):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", category=UserWarning)
-            return func(*args, **kwargs)
-    return wrapper
 
 def check_if_tables(conn: Connection, tablesnames: Iterable[str]):
     checks = []

@@ -3,6 +3,7 @@ from functools import wraps
 from multiprocessing import Pool, cpu_count
 from .helper_functions import iterable_chunks
 from tqdm import tqdm
+import warnings
 
 
 def parallel(n_threads: int, chunk_size: int):
@@ -19,3 +20,11 @@ def parallel(n_threads: int, chunk_size: int):
             return [item for sublist in results for item in sublist]
         return wrapper
     return decorator
+
+def suppress_user_warning(func: Callable):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=UserWarning)
+            return func(*args, **kwargs)
+    return wrapper
