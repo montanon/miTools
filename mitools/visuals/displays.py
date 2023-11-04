@@ -1,4 +1,5 @@
 from itertools import chain, cycle
+
 from IPython.display import display_html
 
 
