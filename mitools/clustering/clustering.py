@@ -328,7 +328,7 @@ def plot_cosine_similarities(cosine_similarities: Dict[int,DataFrame], normed: O
     
     palette = sns.color_palette('husl', len(cosine_similarities))[::-1]
     for cl, similarities in cosine_similarities.items():
-        upper_tri_vals = similarities.values[np.triu_indices(similarities.shape[0], k=1)]
+        upper_tri_vals = similarities[np.triu_indices(similarities.shape[0], k=1)]
         if not normed:
             ax = sns.histplot(upper_tri_vals, bins=30, ax=ax, alpha=0.05, stat="density", color=palette[cl], legend=False)
             ax = sns.kdeplot(upper_tri_vals, ax=ax, color=palette[cl], label=f"Cluster {cl}")

@@ -57,13 +57,13 @@ def lemmatize_tokens(tokens: Iterable[str], lemmatizer: Optional[Type[StemmerI]]
     if lemmatizer is None:
         lemmatizer = WordNetLemmatizer()
     tags = tag_tokens(tokens)
-    return [lemmatizer.lemmatize(token, tag) if tag is not None else token for token, tag in tags]
+    return [lemmatizer.lemmatize(token, tag) for token, tag in tags]
 
 def lemmatize_token(token: str, lemmatizer: Optional[Type[StemmerI]]=None):
     if lemmatizer is None:
         lemmatizer = WordNetLemmatizer()
     tag = tag_token(token)
-    return [lemmatizer.lemmatize(token, tag) if tag is not None else token for token, tag in tag][0]
+    return [lemmatizer.lemmatize(token, tag) for token, tag in tag][0]
 
 def preprocess_texts(texts: List[str], stopwords: Optional[List[str]]=None, lemmatize: Optional[bool]=False,
                     tokenizer: Optional[Type[StringTokenizer]]=None):
@@ -101,7 +101,7 @@ def get_tfidf(words_count: DataFrame):
     return df_tfidf
     
 def get_bow_of_tokens(tokens: List[str], preprocess: Optional[bool]=False, stopwords: Optional[List[str]]=None):
-    tokens = tokens if not preprocess else preprocess_text(tokens, stopwords)
+    tokens = tokens if not preprocess else preprocess_tokens(tokens, stopwords)
     vectorizer = CountVectorizer()
     X = vectorizer.fit_transform(tokens)
     feature_names = vectorizer.get_feature_names_out()
@@ -131,7 +131,7 @@ def get_bow_of_text(text: Union[str,Series], preprocess: Optional[bool]=False, s
 def preprocess_country_name(name):
     name = unidecode(name) 
     name = name.lower() 
-    name = re.sub(r'[^a-z\s]', '', name)  
+    name = re.sub(r'[^a-z\s]', ' ', name).strip()
     return name
 
 def find_countries_in_dataframe(dataframe, countries, demonyms):
@@ -142,17 +142,21 @@ def find_countries_in_dataframe(dataframe, countries, demonyms):
 
 def find_countries_in_token(token: str, countries: List[str], demonyms: Dict[str, str], 
                             similarity_threshold: Optional[int]=0.9) -> Tuple[str, str]:
-    mentioned_country = (None, None)
-    _token = token
-    highest_similarity = 0
+    special_cases = {
+        'uk': 'united kingdom'
+    }
+    original_token = token
     token = demonyms.get(token, token)
-    if token == 'uk':
-        token = 'united kingdom'
+    token = special_cases.get(token, token)
+    highest_similarity = 0
+    mentioned_country = (None, None)
     for country in countries:
         dist = lcs_similarity(token, country)
         if dist >= highest_similarity:
             highest_similarity = dist
-            mentioned_country = (country, _token)
+            mentioned_country = (country, original_token)
+            if dist == 1.0:
+                break
     if highest_similarity < similarity_threshold:
         mentioned_country = (None, None)
     return mentioned_country
