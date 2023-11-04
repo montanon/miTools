@@ -72,11 +72,10 @@ class TestContextVars(unittest.TestCase):
     _NEW2 = ContextVar("_NEW2", 1)
     self.assertEqual(_NEW2.value, 0)
 
-    code = """
-        from mitools.context import Context, ContextVar
-        with Context(VARIABLE=1):
-        _NEW3 = ContextVar("_NEW3", 0)
-        """
+    code = """\
+from mitools.context import Context, ContextVar
+with Context(VARIABLE=1):
+  _NEW3 = ContextVar("_NEW3", 0)"""
     exec(code, {})  # pylint:disable=exec-used
     # While _NEW3 was created in an outside scope it should still work the same as above.
     _NEW3 = ContextVar("_NEW3", 1)
