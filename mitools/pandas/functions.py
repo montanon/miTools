@@ -1,7 +1,7 @@
-import pandas as pd
+from typing import Iterable, Optional, Union
 
+import pandas as pd
 from pandas import DataFrame
-from typing import Union, Iterable, Optional
 
 
 def prepare_int_cols(df: DataFrame, cols: Union[Iterable[str],str], 

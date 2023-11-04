@@ -1,4 +1,5 @@
 import unittest
+
 from mitools.context import Context, ContextVar
 
 VARIABLE = ContextVar("VARIABLE", 0)

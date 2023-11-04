@@ -1,19 +1,19 @@
+from typing import Any, Dict, List, Optional, Tuple, Union
+
 import matplotlib.pyplot as plt
-from matplotlib.patches import Ellipse
 import matplotlib.transforms as transforms
 import numpy as np
 import seaborn as sns
-
-from sklearn.cluster import KMeans, AgglomerativeClustering
-from sklearn.metrics import silhouette_score
-from sklearn.metrics.pairwise import pairwise_distances, cosine_similarity
-from sklearn.neighbors import NearestCentroid
-from scipy.stats import gaussian_kde
-from scipy.spatial.distance import euclidean
-from tqdm import tqdm
-from typing import Optional, List, Dict, Any, Tuple, Union
-from pandas import DataFrame, IndexSlice
 from matplotlib.axes import Axes
+from matplotlib.patches import Ellipse
+from pandas import DataFrame, IndexSlice
+from scipy.spatial.distance import euclidean
+from scipy.stats import gaussian_kde
+from sklearn.cluster import AgglomerativeClustering, KMeans
+from sklearn.metrics import silhouette_score
+from sklearn.metrics.pairwise import cosine_similarity, pairwise_distances
+from sklearn.neighbors import NearestCentroid
+from tqdm import tqdm
 
 N_ELEMENTS_COL = 'N Elements'
 

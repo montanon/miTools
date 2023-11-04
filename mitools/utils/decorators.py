@@ -1,9 +1,11 @@
-from typing import Iterable, Callable
+import warnings
 from functools import wraps
 from multiprocessing import Pool, cpu_count
-from .helper_functions import iterable_chunks
+from typing import Callable, Iterable
+
 from tqdm import tqdm
-import warnings
+
+from .helper_functions import iterable_chunks
 
 
 def parallel(n_threads: int, chunk_size: int):

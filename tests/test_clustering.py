@@ -1,11 +1,13 @@
-from mitools.clustering import *
 import unittest
 from unittest import TestCase
-from pandas import DataFrame, Series, MultiIndex
-from sklearn.metrics.pairwise import cosine_similarity
+
 from numpy import array_equal, unique
+from pandas import DataFrame, MultiIndex, Series
 from sklearn.datasets import make_blobs
+from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.neighbors import NearestCentroid
+
+from mitools.clustering import *
 
 
 class TestGetDistancesToCentroids(TestCase):

@@ -1,6 +1,8 @@
-import pandas as pd
-import country_converter as coco
 import logging
+
+import pandas as pd
+
+import country_converter as coco
 
 coco_logger = coco.logging.getLogger()
 coco_logger.setLevel(logging.CRITICAL)

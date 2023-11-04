@@ -1,9 +1,9 @@
-import os
 import base64
+import os
+
+from IPython import get_ipython
 from IPython.core.magic import register_cell_magic, register_line_magic
 from IPython.display import HTML, display
-from IPython import get_ipython
-
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 ALARM_FOLDER = 'alarms'

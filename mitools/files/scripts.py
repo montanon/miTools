@@ -1,10 +1,11 @@
-import PyPDF2
-import os
-from os import PathLike
-import re
 import argparse
-
+import os
+import re
 import sys
+from os import PathLike
+
+import PyPDF2
+
 sys.path.append("/Users/sebastian/Desktop/MontagnaInc/miTools/mitools")
 from ..utils import fuzz_string_in_string
 

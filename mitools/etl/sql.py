@@ -1,12 +1,13 @@
 import os
-import pandas as pd
-
-from numpy import ndarray
 from sqlite3 import Connection, OperationalError
-from typing import Iterable, Union, Optional
+from typing import Iterable, Optional, Union
+
+import pandas as pd
+from numpy import ndarray
+
 from ..utils import suppress_user_warning
-    
-    
+
+
 class CustomConnection(Connection):
     def __init__(self, path, *args, **kwargs):
         super().__init__(path, *args, **kwargs)

@@ -1,13 +1,12 @@
 import os
 
-from seleniumrequests import Chrome
 from selenium import webdriver
 from selenium.webdriver.support.ui import Select
+from seleniumrequests import Chrome
 
+from .driver_checkers import *
 from .driver_finders import *
 from .driver_waiters import *
-from .driver_checkers import *
-
 
 CHROME_DRIVER = '~/WebBrowser_Drivers/chromedriver'
 DOWNLOADS_DIRECTORY = os.path.expanduser('~/Downloads')

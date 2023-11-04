@@ -1,15 +1,15 @@
 import re
-from typing import Iterable, Pattern, Type
-from icecream import ic
 from os import PathLike
-from typing import Dict, Any, List, Optional
+from typing import Any, AnyStr, Dict, Iterable, List, Optional, Pattern, Type
+
+import numpy as np
 from fuzzywuzzy import fuzz
 from pandas import DataFrame
-import numpy as np
+
 
 def iterable_chunks(iterable: Iterable, chunk_size: int):
     for i in range(0, len(iterable), chunk_size):
-        yield iterable[i : i + chunk_size]
+        yield iterable[i: i + chunk_size]
 
 def str_is_number(string: str) -> bool:
     try:
@@ -18,16 +18,16 @@ def str_is_number(string: str) -> bool:
     except ValueError:
         return False
 
-def get_numbers_from_str(string: str, n: Optional[int]=None) -> list:
+def get_numbers_from_str(string: AnyStr, n: Optional[int]=None) -> list:
     pattern = r'(-?\d*\.?\d*(?:[eE][-+]?\d+)?)'
     values = [s for s in re.findall(pattern, string.strip()) if s and s != '-']
     numbers = [float(s) if s != '.' else 0 for s in values]
     return numbers[n] if n else numbers
 
-def remove_multiple_spaces(string: str) -> str:
+def remove_multiple_spaces(string: AnyStr) -> AnyStr:
     return re.sub(r'\s+', ' ', string)
 
-def find_str_line_number_in_text(text: str, substring: str):
+def find_str_line_number_in_text(text: AnyStr, substring: AnyStr):
     lines = text.split('\n')
     for idx, line in enumerate(lines): 
         if substring in line:
@@ -37,10 +37,10 @@ def read_text_file(text_path: PathLike):
     with open(text_path, 'r') as f:
         return f.read() 
     
-def dict_from_kwargs(**kwargs: Dict[str, Any]):
+def dict_from_kwargs(**kwargs: Dict[AnyStr, Any]):
     return {k:v for k, v in kwargs}
 
-def lcs_similarity(s1: str, s2: str) -> float:
+def lcs_similarity(s1: AnyStr, s2: AnyStr) -> float:
     if not s1 or not s2:
         return 0.0
     if s1 == s2:
@@ -59,18 +59,18 @@ def lcs_similarity(s1: str, s2: str) -> float:
     lcs_length = prev_row[-1]
     return lcs_length / max(len_s1, len_s2)
 
-def fuzz_string_in_string(src_string: str , dst_string: str, threshold: Optional[int]=90):
+def fuzz_string_in_string(src_string: AnyStr, dst_string: AnyStr, threshold: Optional[int]=90):
     similarity_score = fuzz_ratio(src_string, dst_string)
     return similarity_score > threshold
 
-def fuzz_ratio(src_string: str , dst_string: str):
+def fuzz_ratio(src_string: AnyStr, dst_string: AnyStr):
     similarity_score = fuzz.partial_ratio(src_string, dst_string)
     return similarity_score
 
-def replace_prefix(string: str, prefix: Pattern, replacement: str):
+def replace_prefix(string: AnyStr, prefix: Pattern, replacement: AnyStr):
     return re.sub(r'^' + re.escape(prefix), replacement, string)
 
-def split_strings(str_list: List[str]):
+def split_strings(str_list: List[AnyStr]):
     new_list = []
     for s in str_list:
         new_list += re.split('(?=[A-Z])', s)
@@ -100,10 +100,10 @@ def can_convert_to(items: Iterable, type: Type):
     except ValueError:
         return False
     
-def invert_dict(dictionary: dict) -> dict:
+def invert_dict(dictionary: Dict) -> Dict:
     return {value: key for key, value in dictionary.items()}
 
-def iprint(iterable: Iterable, splitter: Optional[str]=''):
+def iprint(iterable: Iterable, splitter: Optional[AnyStr]=''):
     for item in iterable:
         if splitter:
             print(splitter*40)

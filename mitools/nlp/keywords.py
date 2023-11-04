@@ -1,26 +1,28 @@
+import re
+from typing import Dict, Iterable, List, Optional, Tuple, Type, Union
+
+import matplotlib.pyplot as plt
 import nltk
-from nltk import word_tokenize, sent_tokenize, FreqDist
-from nltk.util import ngrams
-from nltk.corpus import stopwords, wordnet
+import numpy as np
+import pandas as pd
+import seaborn as sns
+from nltk import FreqDist, sent_tokenize, word_tokenize
+from nltk.corpus import wordnet
 from nltk.stem import WordNetLemmatizer
+from nltk.stem.api import StemmerI
 from nltk.tokenize import RegexpTokenizer
 from nltk.tokenize.api import StringTokenizer
-from nltk.stem.api import StemmerI
-
-from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.feature_extraction.text import TfidfTransformer, TfidfVectorizer
-
-import re
-import pandas as pd
-import numpy as np
-from typing import List, Optional, Tuple, Dict, Type, Iterable, Union, Literal
+from nltk.util import ngrams
 from pandas import DataFrame, Series
-import matplotlib.pyplot as plt
-import seaborn as sns
+from sklearn.feature_extraction.text import (
+    CountVectorizer,
+    TfidfTransformer,
+    TfidfVectorizer,
+)
+from tqdm import tqdm
 from unidecode import unidecode
 
 from ..utils import lcs_similarity
-from tqdm import tqdm
 
 
 def tag_tokens(tokens: List[str]):

@@ -1,16 +1,19 @@
-from tqdm import tqdm
-from ..utils import iterable_chunks, parallel
-from typing import Union, List, Optional
-from pandas import Series, DataFrame
-from numpy import float64
-from ast import literal_eval
-
 import warnings
-from numba.core.errors import NumbaDeprecationWarning, NumbaPendingDeprecationWarning
+from ast import literal_eval
+from typing import List, Optional, Union
+
+from numba.core.errors import (NumbaDeprecationWarning,
+                               NumbaPendingDeprecationWarning)
+from numpy import float64
+from pandas import DataFrame, Series
+from tqdm import tqdm
+
+from ..utils import iterable_chunks, parallel
+
 warnings.simplefilter('ignore', NumbaDeprecationWarning)
 warnings.simplefilter('ignore', NumbaPendingDeprecationWarning)
+from transformers import AutoModel, AutoTokenizer
 from umap import UMAP
-from transformers import AutoTokenizer, AutoModel
 
 SPECTER_EMBEDDINGS_URL = "https://model-apis.semanticscholar.org/specter/v1/invoke"
 MAX_BATCH_SIZE = 4

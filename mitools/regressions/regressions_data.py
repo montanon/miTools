@@ -1,9 +1,10 @@
-from dataclasses import dataclass
-from abc import ABC
-from typing import Union, Dict, Tuple, List, Any
-from ..utils import replace_prefix, add_significance
-from pandas import DataFrame, MultiIndex
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from typing import Any, Dict, List, Tuple, Union
+
+from pandas import DataFrame, MultiIndex
+
+from ..utils import add_significance, replace_prefix
 
 
 class RegressionData(ABC):

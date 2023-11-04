@@ -1,14 +1,16 @@
+import hashlib
 import os
 import re
-import pandas as pd
-import numpy as np
 import time
 from os import PathLike
-import hashlib
+from typing import Dict, List
+
+import numpy as np
+import pandas as pd
 
 from ..utils import *
-from .regressions_data import OLSResults, CSARDLResults, RegressionData, XTRegResults
-from typing import List, Dict
+from .regressions_data import (CSARDLResults, OLSResults, RegressionData,
+                               XTRegResults)
 
 #SPLIT_PATTERN = '={2,}\n'
 #MODEL_PATTERN = f'({SPLIT_PATTERN}(\n)+){{1}}'

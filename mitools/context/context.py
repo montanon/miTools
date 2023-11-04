@@ -1,5 +1,8 @@
-import os, functools, contextlib, time
-from typing import Dict, Tuple, List, ClassVar
+import contextlib
+import functools
+import os
+import time
+from typing import ClassVar, Dict, List, Tuple
 
 ShapeType = Tuple[int, ...]
 
