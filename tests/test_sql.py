@@ -5,6 +5,7 @@ from mitools.etl import *
 import os
 import pandas as pd
 import sqlite3
+import warnings
 
 
 class TestCustomConnection(TestCase):
