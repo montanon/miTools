@@ -5,14 +5,27 @@ from unittest.mock import Mock
 import pandas as pd
 from pandas import DataFrame
 
-from mitools.nlp import (find_countries_in_dataframe, find_country_in_token,
-                         get_bow_of_tokens, get_dataframe_bow, get_tfidf,
-                         lemmatize_text, lemmatize_token, lemmatize_tokens,
-                         nltk_tag_to_wordnet_tag, nltk_tags_to_wordnet_tags,
-                         preprocess_country_name, preprocess_text,
-                         preprocess_texts, preprocess_token, preprocess_tokens,
-                         sort_multiindex_dataframe, tag_token, tag_tokens,
-                         wordnet)
+from mitools.nlp import (
+    find_countries_in_dataframe,
+    find_country_in_token,
+    get_bow_of_tokens,
+    get_dataframe_bow,
+    get_tfidf,
+    lemmatize_text,
+    lemmatize_token,
+    lemmatize_tokens,
+    nltk_tag_to_wordnet_tag,
+    nltk_tags_to_wordnet_tags,
+    preprocess_country_name,
+    preprocess_text,
+    preprocess_texts,
+    preprocess_token,
+    preprocess_tokens,
+    sort_multiindex_dataframe,
+    tag_token,
+    tag_tokens,
+    wordnet,
+)
 
 
 class TestNltkTagsToWordnetTags(TestCase):
