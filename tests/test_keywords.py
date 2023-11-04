@@ -437,5 +437,52 @@ class TestFindCountriesInDataframe(TestCase):
         })
         pd.testing.assert_frame_equal(result_df, expected_df)
 
+
+class TestSortMultiIndexDataframe(TestCase):
+
+    def setUp(self):
+        arrays = [
+            ['A', 'A', 'B', 'B'],
+            ['col1', 'col2', 'col1', 'col2'],
+        ]
+        self.df_mock = pd.DataFrame(
+            [
+                [1, 2, 3, 12],
+                [5, 6, 7, 8],
+                [9, 10, 11, 4],
+            ],
+            columns=pd.MultiIndex.from_arrays(arrays, names=('top_level', 'bot_level'))
+        )
+
+    def test_sort_multiindex_dataframe(self):
+        result_df = sort_multiindex_dataframe(self.df_mock, ['col1', 'col2'], sorting_col='col2', ascending=True)
+        arrays_sorted = [
+            ['A', 'A', 'B', 'B'],
+            ['col1', 'col2', 'col1', 'col2'],
+        ]
+        expected_df = pd.DataFrame(
+            [
+                [1, 2, 11, 4],
+                [5, 6, 7, 8],
+                [9, 10, 3, 12]
+            ],
+            columns=pd.MultiIndex.from_arrays(arrays_sorted, names=('top_level', 'bot_level'))
+        )
+        pd.testing.assert_frame_equal(result_df, expected_df)
+        result_df = sort_multiindex_dataframe(self.df_mock, ['col1', 'col2'], sorting_col='col1', ascending=False)
+        arrays_sorted = [
+            ['A', 'A', 'B', 'B'],
+            ['col1', 'col2', 'col1', 'col2'],
+        ]
+        expected_df = pd.DataFrame(
+            [
+                [9, 10, 11, 4],
+                [5, 6, 7, 8],
+                [1, 2, 3, 12]
+            ],
+            columns=pd.MultiIndex.from_arrays(arrays_sorted, names=('top_level', 'bot_level'))
+        )
+        pd.testing.assert_frame_equal(result_df, expected_df)
+
 if __name__ == '__main__':
     unittest.main()
