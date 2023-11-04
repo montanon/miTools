@@ -15,11 +15,8 @@ from nltk.tokenize import RegexpTokenizer
 from nltk.tokenize.api import StringTokenizer
 from nltk.util import ngrams
 from pandas import DataFrame, Series
-from sklearn.feature_extraction.text import (
-    CountVectorizer,
-    TfidfTransformer,
-    TfidfVectorizer,
-)
+from sklearn.feature_extraction.text import (CountVectorizer, TfidfTransformer,
+                                             TfidfVectorizer)
 from tqdm import tqdm
 from unidecode import unidecode
 
