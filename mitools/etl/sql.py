@@ -1,9 +1,11 @@
 import os
+from os import PathLike
 from sqlite3 import Connection, OperationalError
-from typing import Iterable, Optional, Union
+from typing import Iterable, List, Optional, Union
 
 import pandas as pd
 from numpy import ndarray
+from pandas import DataFrame
 
 from ..utils import suppress_user_warning
 
@@ -17,13 +19,13 @@ class CustomConnection(Connection):
     def __class__(self):
         return Connection
 
-def check_if_tables(conn: Connection, tablesnames: Iterable[str]):
+def check_if_tables(conn: Connection, tablesnames: Iterable[str]) -> List[bool]:
     checks = []
     for tablename in tablesnames:
         checks.append(check_if_table(conn, tablename))
     return checks
 
-def get_conn_db_folder(conn: Connection):
+def get_conn_db_folder(conn: Connection) -> PathLike:
 
     cursor = conn.cursor()
     cursor.execute("PRAGMA database_list;")
@@ -34,7 +36,7 @@ def get_conn_db_folder(conn: Connection):
 
     return db_folder
 
-def check_if_table(conn: Connection, tablename: str):
+def check_if_table(conn: Connection, tablename: str) -> bool:
     c = conn.cursor()
     try:
         _ = conn.cursor().execute("SELECT name FROM sqlite_master")
@@ -50,14 +52,14 @@ def check_if_table(conn: Connection, tablename: str):
         except Exception:
             return False
         
-def connect_to_sql_db(db_path: Union[str, os.PathLike], db_name: str):
+def connect_to_sql_db(db_path: Union[str, os.PathLike], db_name: str) -> Connection:
     db_path = os.path.join(db_path, db_name)
     return CustomConnection(db_path)
 
 @suppress_user_warning
 def read_sql_table(conn: Connection, tablename: str, 
                    columns: Optional[Union[str,list,ndarray]]=None, 
-                   index_col: Optional[str]='index'):
+                   index_col: Optional[str]='index') -> DataFrame:
     if columns is None:
         return pd.read_sql(f'SELECT * FROM "{tablename}"', conn, index_col=index_col)
     elif isinstance(columns, (list, ndarray)):
@@ -67,13 +69,13 @@ def read_sql_table(conn: Connection, tablename: str,
     
 def read_sql_tables(conn: Connection, tablenames: Iterable[str],
                     columns: Optional[Union[str,list,ndarray]]=None,
-                    index_col: Optional[str]='index'):
+                    index_col: Optional[str]='index') -> List[DataFrame]:
     return [read_sql_table(conn, tablename, columns, index_col) for tablename in tablenames]
 
 @suppress_user_warning
 def transfer_sql_tables(src_db_connection: Connection, dst_db_connection: Connection,
                     tablename: str, if_exists: Optional[str]='fail', 
-                    index_col: Optional[str]='index'):
+                    index_col: Optional[str]='index') -> None:
     table = pd.read_sql(
         f"SELECT * FROM {tablename};", src_db_connection, index_col=index_col)
     table.to_sql(tablename, dst_db_connection, if_exists=if_exists)
