@@ -3,6 +3,7 @@ import os
 import re
 import sys
 from os import PathLike
+from typing import Dict
 
 import PyPDF2
 
@@ -11,7 +12,7 @@ from ..utils import fuzz_string_in_string
 
 PATTERN = '^([A-Za-z0-9.]+-)+[A-Za-z0-9]+.pdf$'
 
-def extract_pdf_metadata(pdf_filename: PathLike):
+def extract_pdf_metadata(pdf_filename: PathLike) -> Dict:
     metadata = {}
     with open(pdf_filename, "rb") as file:
         pdf_reader = PyPDF2.PdfReader(file)
@@ -20,18 +21,18 @@ def extract_pdf_metadata(pdf_filename: PathLike):
             metadata[key[1:]] = doc_info[key]
     return metadata
 
-def extract_pdf_title(pdf_filename: PathLike):
+def extract_pdf_title(pdf_filename: PathLike) -> str:
     metadata = extract_pdf_metadata(pdf_filename)
     if 'Title' in metadata:
         return metadata['Title']
     else:
         raise Exception(f'{os.path.basename(pdf_filename)} has no title in metadata')
     
-def set_pdf_filename_as_title(pdf_filename: PathLike, title: str):
+def set_pdf_filename_as_title(pdf_filename: PathLike, title: str) -> None:
     title = re.sub('[:\)\(\/]*', '', title)
     os.rename(pdf_filename, os.path.join(os.path.dirname(pdf_filename), f'{title}.pdf'))
 
-def set_folder_pdf_filenames_as_title(folder: PathLike):
+def set_folder_pdf_filenames_as_title(folder: PathLike) -> None:
     pdfs = [f for f in os.listdir(folder) if f.endswith('pdf')]
     for pdf in pdfs:
         title = extract_pdf_title(pdf)
