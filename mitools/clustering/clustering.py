@@ -6,6 +6,7 @@ import numpy as np
 import seaborn as sns
 from matplotlib.axes import Axes
 from matplotlib.patches import Ellipse
+from numpy import ndarray
 from pandas import DataFrame, IndexSlice
 from scipy.spatial.distance import euclidean
 from scipy.stats import gaussian_kde
@@ -18,7 +19,8 @@ from tqdm import tqdm
 N_ELEMENTS_COL = 'N Elements'
 
 def kmeans_ncluster_search(data: DataFrame, max_clusters: Optional[int]=25, 
-                           random_state: Optional[int]=0, n_init: Optional[str]='auto'):
+                           random_state: Optional[int]=0, n_init: Optional[str]='auto'
+                           ) -> Tuple[List[float], List[float]]:
     if not isinstance(max_clusters, int):
         raise ValueError('max_clusters provided must be a positive int.')
     if max_clusters < 2:
@@ -33,12 +35,12 @@ def kmeans_ncluster_search(data: DataFrame, max_clusters: Optional[int]=25,
         inertia.append(kmeans_clustering.inertia_)
     return silhouette_scores, inertia
 
-def kmeans_clustering(data: DataFrame, n_clusters: int,
-                      random_state: Optional[int]=0, n_init: Optional[str]='auto'):
+def kmeans_clustering(data: DataFrame, n_clusters: int, random_state: Optional[int]=0, 
+                      n_init: Optional[str]='auto') -> ndarray:
     kmeans_clustering = KMeans(n_clusters=n_clusters, random_state=random_state, n_init=n_init)
     return kmeans_clustering.fit_predict(data)
 
-def plot_kmeans_ncluster_search(silhouette_scores: List[float], inertia: List[float]):
+def plot_kmeans_ncluster_search(silhouette_scores: List[float], inertia: List[float]) -> Axes:
     fig, ax = plt.subplots(nrows=2, ncols=1, figsize=(14, 10))
 
     x_values_silhouette = range(0, len(silhouette_scores))
@@ -71,7 +73,7 @@ def plot_kmeans_ncluster_search(silhouette_scores: List[float], inertia: List[fl
 
     return ax
 
-def agglomerative_ncluster_search(data: DataFrame, max_clusters: Optional[int]=25):
+def agglomerative_ncluster_search(data: DataFrame, max_clusters: Optional[int]=25) -> List[float]:
     if not isinstance(max_clusters, int):
         raise ValueError('max_clusters provided must be a positive int.')
     if max_clusters < 2:
@@ -84,11 +86,11 @@ def agglomerative_ncluster_search(data: DataFrame, max_clusters: Optional[int]=2
         silhouette_scores.append(score)
     return silhouette_scores
 
-def agglomerative_clustering(data: DataFrame, n_clusters: int):
+def agglomerative_clustering(data: DataFrame, n_clusters: int) -> ndarray:
     agg_clustering = AgglomerativeClustering(n_clusters=n_clusters)
     return agg_clustering.fit_predict(data)
 
-def plot_agglomerative_ncluster_search(silhouette_scores: List[float]):
+def plot_agglomerative_ncluster_search(silhouette_scores: List[float]) -> Axes:
     fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(14, 5))
 
     x_values_silhouette = range(0, len(silhouette_scores))
@@ -109,7 +111,7 @@ def plot_clusters_evolution(dataframe: DataFrame, cluster_col: str, x_col: str, 
                             labels: Optional[List[Union[str,int]]]=None,
                             colors: Optional[List[Tuple]]=None,
                             plots_kwargs:  Optional[Dict[str, Dict]]=None
-                            ):
+                            ) -> Axes:
     fig, axes = plt.subplot_mosaic([['a', 'a'], ['a', 'a'], ['b', 'c']],
                               layout='constrained',
                               figsize=(14, 14))
@@ -179,7 +181,7 @@ def plot_clusters_evolution(dataframe: DataFrame, cluster_col: str, x_col: str, 
 
 def plot_clusters(data: DataFrame, cluster_col: str, x_col: str, y_col: str,
                   ax: Optional[Axes]=None, labels: Optional[List]=None,
-                   colors: Optional[List[Tuple]]=None, **kwargs: Dict[str, Any]):
+                   colors: Optional[List[Tuple]]=None, **kwargs: Dict[str, Any]) -> Axes:
     if ax is None:
         _, ax = plt.subplots(1, 1, figsize=(14, 10))
     if kwargs is None:
@@ -207,7 +209,7 @@ def add_clusters_centroids(ax: Axes, data: DataFrame, cluster_col: str,
                            x_col: str, y_col: str, colors: Optional[List[Tuple]]=None,
                            labels: Optional[List[Tuple]]=None,
                            **kwargs: Dict[str, Any]
-                           ):
+                           ) -> Axes:
     if labels is None:
         labels = data[cluster_col].unique()
     if colors is None:
@@ -227,7 +229,7 @@ def add_clusters_confidence_ellipse(ax: Axes, data: DataFrame, cluster_col: str,
                                     x_col: str, y_col: str,
                                     colors: Optional[List[Tuple]]=None,
                                     labels: Optional[List[Tuple]]=None,
-                                    **kwargs: Dict[str, Any]):
+                                    **kwargs: Dict[str, Any]) -> Axes:
     if labels is None:
         labels = data[cluster_col].unique()
     if colors is None:
@@ -242,7 +244,7 @@ def add_clusters_confidence_ellipse(ax: Axes, data: DataFrame, cluster_col: str,
                                 )
     return ax
 
-def confidence_ellipse(xvalues, yvalues, ax, n_std=1.96, facecolor='none', **kwargs):
+def confidence_ellipse(xvalues, yvalues, ax, n_std=1.96, facecolor='none', **kwargs) -> Axes:
     if xvalues.size != yvalues.size:
         raise ValueError("x alues and y values must be the same size.")
   
@@ -273,7 +275,7 @@ def confidence_ellipse(xvalues, yvalues, ax, n_std=1.96, facecolor='none', **kwa
 
     return ax
 
-def get_clusters_centroids(data: DataFrame, cluster_col: str):
+def get_clusters_centroids(data: DataFrame, cluster_col: str) -> DataFrame:
     if cluster_col not in data.index.names:
         raise KeyError(f'DataFrame provided does not have the {cluster_col} index level!')
     if data.index.get_level_values(cluster_col).nunique() == 1:
@@ -283,19 +285,19 @@ def get_clusters_centroids(data: DataFrame, cluster_col: str):
     return DataFrame(clf.centroids_, columns=data.columns, 
                      index=np.unique(data.index.get_level_values(cluster_col)))
 
-def get_clusters_centroids_distances(centroids: DataFrame):
+def get_clusters_centroids_distances(centroids: DataFrame) -> DataFrame:
     if centroids.empty:
         raise ValueError('DataFrame provided for pairwise distances is empty!')
     return DataFrame(
         pairwise_distances(centroids)
         )
 
-def display_clusters_size(data: DataFrame, cluster_col: str):
+def display_clusters_size(data: DataFrame, cluster_col: str) -> DataFrame:
     cluster_count = data[[cluster_col]].value_counts().sort_index().to_frame()
     cluster_count.columns = [N_ELEMENTS_COL]
     return cluster_count
 
-def plot_clusters_growth(data: DataFrame, time_col: str, cluster_col: str):
+def plot_clusters_growth(data: DataFrame, time_col: str, cluster_col: str) -> Axes:
     clusters_count = data.groupby(time_col)[cluster_col].value_counts().to_frame().sort_index(axis=1, level=1)
 
     fig, ax = plt.subplots(1, 1, figsize=(21,7))
@@ -317,20 +319,22 @@ def plot_clusters_growth(data: DataFrame, time_col: str, cluster_col: str):
 
     return ax
 
-def get_cosine_similarities(data: DataFrame, cluster_col: str):
+def get_cosine_similarities(data: DataFrame, cluster_col: str) -> ndarray:
     cosine_similarities = (data.groupby(level=cluster_col)
                            .apply(cosine_similarity)
                            )
     return cosine_similarities
 
-def plot_cosine_similarities(cosine_similarities: Dict[int,DataFrame], normed: Optional[bool]=False):
+def plot_cosine_similarities(cosine_similarities: Dict[int,DataFrame],
+                             normed: Optional[bool]=False) -> Axes:
     fig, ax = plt.subplots(1, 1, figsize=(14, 6))
     
     palette = sns.color_palette('husl', len(cosine_similarities))[::-1]
     for cl, similarities in cosine_similarities.items():
         upper_tri_vals = similarities[np.triu_indices(similarities.shape[0], k=1)]
         if not normed:
-            ax = sns.histplot(upper_tri_vals, bins=30, ax=ax, alpha=0.05, stat="density", color=palette[cl], legend=False)
+            ax = sns.histplot(upper_tri_vals, bins=30, ax=ax, alpha=0.05, stat="density", 
+                              color=palette[cl], legend=False)
             ax = sns.kdeplot(upper_tri_vals, ax=ax, color=palette[cl], label=f"Cluster {cl}")
         else:
             kde = gaussian_kde(upper_tri_vals)
@@ -345,7 +349,7 @@ def plot_cosine_similarities(cosine_similarities: Dict[int,DataFrame], normed: O
     
     return ax
 
-def get_distances_to_centroids(data: DataFrame, centroids: DataFrame, cluster_col: str):
+def get_distances_to_centroids(data: DataFrame, centroids: DataFrame, cluster_col: str) -> DataFrame:
     distances = []
     label_pos = data.index.names.index(cluster_col)
     for idx, values in data.iterrows():
@@ -357,7 +361,7 @@ def get_distances_to_centroids(data: DataFrame, centroids: DataFrame, cluster_co
     distances.index = data.index.get_level_values(1)
     return distances.sort_index()
 
-def plot_distances_to_centroids(distances: DataFrame, cluster_col: str):
+def plot_distances_to_centroids(distances: DataFrame, cluster_col: str) -> Axes:
     fig, ax = plt.subplots(1, 1, figsize=(14, 6))
 
     palette = sns.color_palette('husl', len(distances.index.unique()))[::1]
