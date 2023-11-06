@@ -16,3 +16,4 @@ temp
 env_checkpoints/*
 */.ipynb_checkpoints/*
 *checkpoint.ipynb
+*.csv
