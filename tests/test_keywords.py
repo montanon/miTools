@@ -5,27 +5,14 @@ from unittest.mock import Mock
 import pandas as pd
 from pandas import DataFrame
 
-from mitools.nlp import (
-    find_countries_in_dataframe,
-    find_countries_in_token,
-    get_bow_of_tokens,
-    get_dataframe_bow,
-    get_tfidf,
-    lemmatize_text,
-    lemmatize_token,
-    lemmatize_tokens,
-    nltk_tag_to_wordnet_tag,
-    nltk_tags_to_wordnet_tags,
-    preprocess_country_name,
-    preprocess_text,
-    preprocess_texts,
-    preprocess_token,
-    preprocess_tokens,
-    sort_multiindex_dataframe,
-    tag_token,
-    tag_tokens,
-    wordnet,
-)
+from mitools.nlp import (find_countries_in_dataframe, find_country_in_token,
+                         get_bow_of_tokens, get_dataframe_bow, get_tfidf,
+                         lemmatize_text, lemmatize_token, lemmatize_tokens,
+                         nltk_tag_to_wordnet_tag, nltk_tags_to_wordnet_tags,
+                         preprocess_country_name, preprocess_text,
+                         preprocess_texts, preprocess_token, preprocess_tokens,
+                         sort_multiindex_dataframe, tag_token, tag_tokens,
+                         wordnet)
 
 
 class TestNltkTagsToWordnetTags(TestCase):
@@ -423,19 +410,19 @@ class TestFindCountriesInToken(TestCase):
         }
 
     def test_exact_country_name(self):
-        self.assertEqual(find_countries_in_token('canada', self.countries, self.demonyms), ('canada', 'canada'))
+        self.assertEqual(find_country_in_token('canada', self.countries, self.demonyms), ('canada', 'canada'))
 
     def test_demonym(self):
-        self.assertEqual(find_countries_in_token('british', self.countries, self.demonyms), ('united kingdom', 'british'))
+        self.assertEqual(find_country_in_token('british', self.countries, self.demonyms), ('united kingdom', 'british'))
 
     def test_special_cases(self):
-        self.assertEqual(find_countries_in_token('uk', self.countries, self.demonyms), ('united kingdom', 'uk'))
+        self.assertEqual(find_country_in_token('uk', self.countries, self.demonyms), ('united kingdom', 'uk'))
 
     def test_below_similarity_threshold(self):
-        self.assertEqual(find_countries_in_token('united st', self.countries, self.demonyms), (None, None))
+        self.assertEqual(find_country_in_token('united st', self.countries, self.demonyms), (None, None))
 
     def test_no_relation(self):
-        self.assertEqual(find_countries_in_token('apple', self.countries, self.demonyms), (None, None))
+        self.assertEqual(find_country_in_token('apple', self.countries, self.demonyms), (None, None))
 
 
 class TestFindCountriesInDataframe(TestCase):
