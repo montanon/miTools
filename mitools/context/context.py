@@ -2,12 +2,13 @@ import contextlib
 import functools
 import os
 import time
-from typing import ClassVar, Dict, List, Tuple
+from typing import ClassVar, Dict, List, Optional, Tuple, TypeVar
 
 ShapeType = Tuple[int, ...]
+T = TypeVar('T')
 
 @functools.lru_cache(maxsize=None)
-def getenv(key, default=0): return type(default)(os.getenv(key, default))
+def getenv(key: str, default: Optional[T]=0) -> T: return type(default)(os.getenv(key, default))
 
 class Context(contextlib.ContextDecorator):
   stack: ClassVar[List[Dict[str, int]]] = [{}]
