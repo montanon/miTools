@@ -6,7 +6,8 @@ from pandas.api.types import is_numeric_dtype
 
 # Assuming the provided function is imported or defined here
 from mitools.economic_complexity.columns import *
-from mitools.exceptions.custom_exceptions import ArgumentKeyError, ArgumentTypeError
+from mitools.exceptions.custom_exceptions import (ArgumentKeyError,
+                                                  ArgumentTypeError)
 
 
 class TestTransformColumns(unittest.TestCase):
@@ -54,7 +55,7 @@ class TestVariationColumns(unittest.TestCase):
         iterables = [['CountryA', 'CountryB'], ['Indicator1', 'Indicator2']]
         columns = MultiIndex.from_product(iterables, names=['Country', 'Indicator'])
         self.data = DataFrame(
-            [[i + j for j in range(6)] for i in range(26)],
+            [[float(i + j) for j in range(4)] for i in range(26)],
             index=index,
             columns=columns
         )
@@ -64,26 +65,33 @@ class TestVariationColumns(unittest.TestCase):
         t = 1
         result = variation_columns(self.data, ['Indicator1'], t, pct=False)
         expected_change_name = GROWTH_COLUMN_NAME.format(t)
-        self.assertTrue(expected_change_name in result.columns.get_level_values(1))
-
+        self.assertTrue('Indicator1' + expected_change_name in result.columns.get_level_values(-1))
         # Test the correctness of calculations
-        original_values = self.data.loc[:, ('CountryA', 'Indicator1')]
+        old_value = ('CountryA', 'Indicator1')
+        new_value = ('CountryA', f'Indicator1{expected_change_name}')
+        original_values = self.data.loc[:, [old_value]]
         shifted_values = original_values.shift(t)
         expected_values = original_values - shifted_values
-        testing.assert_series_equal(result[('CountryA', f'Indicator1{expected_change_name}')], expected_values)
+        new_tuples = [(new_value if old == old_value else old) for old in expected_values.columns]
+        expected_values.columns = MultiIndex.from_tuples(new_tuples, names=expected_values.columns.names)
+        testing.assert_frame_equal(result[[new_value]], expected_values)
 
     def test_percentage_variation(self):
         # Test the function with percentage variation
         t = 1
-        result = variation_columns(self.data, ['Indicator1'], t, pct=True)
+        result = variation_columns(self.data, ['Indicator1'], t, pct=True).copy(deep=True)
         expected_change_name = GROWTH_PCT_COLUMN_NAME.format(t)
-        self.assertTrue(expected_change_name in result.columns.get_level_values(1))
-
+        self.assertTrue(f"Indicator1{expected_change_name}" in result.columns.get_level_values(1))
         # Test the correctness of calculations
-        original_values = self.data.loc[:, ('CountryA', 'Indicator1')]
+        old_values = [('CountryA', 'Indicator1'), ('CountryB', 'Indicator1')]
+        new_values = [('CountryA', f'Indicator1{expected_change_name}'),
+                       ('CountryB', f'Indicator1{expected_change_name}')]
+        original_values = self.data.loc[:, IndexSlice[:, 'Indicator1']]
         shifted_values = original_values.shift(t)
-        expected_values = ((original_values - shifted_values) / shifted_values) * 100
-        testing.assert_series_equal(result[('CountryA', f'Indicator1{expected_change_name}')], expected_values)
+        variation_cols = original_values - shifted_values
+        expected_values = (variation_cols / original_values) * 100.0
+        expected_values.columns = MultiIndex.from_tuples(new_values, names=expected_values.columns.names)
+        testing.assert_frame_equal(result, expected_values)
 
 
 
