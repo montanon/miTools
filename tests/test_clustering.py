@@ -198,7 +198,7 @@ class TestAgglomerativeClustering(TestCase):
 
     def test_positive_case(self):
         n_clusters = 3
-        result = agglomerative_clustering(self.data, n_clusters)
+        result = agglomerative_clustering(self.data, n_clusters).labels_
         # Ensure function returns labels for all data points
         self.assertEqual(len(result), len(self.data))
         # Ensure the number of unique labels equals n_clusters
@@ -254,7 +254,7 @@ class TestKMeansClustering(TestCase):
 
     def test_positive_case(self):
         n_clusters = 3
-        result = kmeans_clustering(self.data, n_clusters)
+        result = kmeans_clustering(self.data, n_clusters).labels_
         # Ensure function returns labels for all data points
         self.assertEqual(len(result), len(self.data))
         # Ensure the number of unique labels equals n_clusters
