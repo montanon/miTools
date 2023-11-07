@@ -14,26 +14,19 @@ class CustomConnection(Connection):
     def __init__(self, path, *args, **kwargs):
         super().__init__(path, *args, **kwargs)
         self.path = path
-
     @property
     def __class__(self):
         return Connection
 
 def check_if_tables(conn: Connection, tablesnames: Iterable[str]) -> List[bool]:
-    checks = []
-    for tablename in tablesnames:
-        checks.append(check_if_table(conn, tablename))
-    return checks
+    return [check_if_table(conn, tablename) for tablename in tablesnames]
 
 def get_conn_db_folder(conn: Connection) -> PathLike:
-
     cursor = conn.cursor()
     cursor.execute("PRAGMA database_list;")
     result = cursor.fetchone()
     db_path = result[2]
-
     db_folder = os.path.dirname(db_path)
-
     return db_folder
 
 def check_if_table(conn: Connection, tablename: str) -> bool:
