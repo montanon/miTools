@@ -35,8 +35,7 @@ def variation_columns(dataframe: DataFrame, columns_names: List[str], t: int,
     selected_columns = dataframe.loc[:, IndexSlice[:, columns_names]]
     shifted_columns = selected_columns.shift(t)
     variation_columns = selected_columns - shifted_columns
-    if pct:
-        variation_columns = (variation_columns / selected_columns) * 100
+    variation_columns = (variation_columns / selected_columns) * 100 if pct else variation_columns
     growth_name = GROWTH_PCT_COLUMN_NAME.format(t) if pct else GROWTH_COLUMN_NAME.format(t)
     variation_columns.columns = MultiIndex.from_tuples(
         [(col_0, f'{col_1}{growth_name}') if col_1 in columns_names else (col_0, col_1) 
