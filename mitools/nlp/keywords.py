@@ -8,7 +8,7 @@ import pandas as pd
 import seaborn as sns
 from matplotlib.axes import Axes
 from nltk import FreqDist, sent_tokenize, word_tokenize
-from nltk.corpus import wordnet
+from nltk.corpus import stopwords, wordnet
 from nltk.stem import WordNetLemmatizer
 from nltk.stem.api import StemmerI
 from nltk.tokenize import RegexpTokenizer
@@ -38,16 +38,13 @@ def nltk_tags_to_wordnet_tags(nltk_tags: List[Tuple[str,str]]) -> List[Tuple[str
     return list(map(lambda x: (x[0], nltk_tag_to_wordnet_tag(x[1])), nltk_tags))
 
 def nltk_tag_to_wordnet_tag(nltk_tag: str) -> str:
-    if nltk_tag.startswith('J'):
-        return wordnet.ADJ
-    elif nltk_tag.startswith('V'):
-        return wordnet.VERB
-    elif nltk_tag.startswith('N'):
-        return wordnet.NOUN
-    elif nltk_tag.startswith('R'):
-        return wordnet.ADV
-    else:          
-        return wordnet.NOUN
+    tag_dict = {
+        'J': wordnet.ADJ,
+        'V': wordnet.VERB,
+        'N': wordnet.NOUN,
+        'R': wordnet.ADV
+    }
+    return tag_dict.get(nltk_tag[0], wordnet.NOUN)
     
 def lemmatize_text(text: str, lemmatizer: Optional[Type[StemmerI]]=None) -> str:
     if lemmatizer is None:
@@ -140,6 +137,16 @@ def preprocess_country_name(country_name: str) -> str:
     country_name = re.sub(r'[^a-z\s]', ' ', country_name).strip()
     return country_name
 
+def find_cities_in_texts(df: DataFrame, pattern: List[str]) -> DataFrame:
+    matches = (df['text'].str
+               .extractall(pattern))
+    mentioned_cities = pd.DataFrame(index=matches.index.get_level_values(0).unique(), columns=['cities'])
+    for idx, g in matches.reset_index()[['index', 0]].groupby('index'):
+        mentioned_cities.loc[idx, 'cities'] = g[0].values.tolist()
+    mentioned_cities = mentioned_cities['cities'].apply(pd.Series)
+    mentioned_cities = mentioned_cities.sort_index()
+    return mentioned_cities
+
 def find_countries_in_dataframe(dataframe: DataFrame, countries: List[str], demonyms: Dict[str,str]) -> DataFrame:
     tqdm.pandas()
     return dataframe.progress_applymap(
@@ -182,14 +189,14 @@ def sort_multiindex_dataframe(df: DataFrame, selected_cols: List[str], sorting_c
 
 def plot_token_features(df: DataFrame, columns: List[str], 
                         hue: Optional[str]=None, log: Optional[bool]=True, 
-                        ncols: Optional[int]=2,
+                        ncols: Optional[int]=2, bins: Optional[int]=30,
                         figsize: Optional[Tuple]=(4,4)) -> Axes:
     nrows = (len(columns) + 1) // ncols
     fig, axes = plt.subplots(nrows, ncols, figsize=(figsize[0]*nrows, figsize[1]*ncols))
 
     for n, var in enumerate(columns):
         ax = axes[n//ncols, n%ncols]
-        sns.histplot(data=df, x=var, hue=None, bins=30, kde=False, ax=ax)
+        sns.histplot(data=df, x=var, hue=None, bins=bins, kde=False, ax=ax)
         if log:
             ax.set_yscale("log")
         ax.set_title(f"Histogram for {var} in Papers' Text")
