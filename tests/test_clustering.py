@@ -132,7 +132,7 @@ class TestGetClustersCentroidsDistances(TestCase):
     def test_empty_dataframe(self):
         # Ensure function handles an empty dataframe without errors
         empty_data = DataFrame(columns=['x', 'y', 'z'])
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ArgumentStructureError):
             get_clusters_centroids_distances(empty_data)
 
     def test_single_centroid(self):
@@ -185,7 +185,7 @@ class TestGetClustersCentroids(TestCase):
     def test_single_cluster(self):
         # For a single cluster, the centroid should be the mean of the data
         single_cluster_data = self.data[self.data.index.get_level_values('cluster') == 0]
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ArgumentStructureError):
             get_clusters_centroids(single_cluster_data, 'cluster')
                                    
 
@@ -241,7 +241,7 @@ class TestAgglomerativeNClusterSearch(TestCase):
 
     def test_invalid_max_clusters(self):
         # Ensure function raises an error with invalid max_clusters value
-        with self.assertRaises(ValueError):  # Assuming it raises a ValueError for invalid max_clusters
+        with self.assertRaises(ArgumentValueError):  # Assuming it raises a ValueError for invalid max_clusters
             agglomerative_ncluster_search(self.data, 1)
 
 
@@ -298,7 +298,7 @@ class TestKMeansNClusterSearch(TestCase):
 
     def test_invalid_max_clusters(self):
         # Ensure function raises an error with invalid max_clusters value
-        with self.assertRaises(ValueError):  # Assuming it raises a ValueError for invalid max_clusters
+        with self.assertRaises(ArgumentValueError):  # Assuming it raises a ValueError for invalid max_clusters
             kmeans_ncluster_search(self.data, 1)
 
 

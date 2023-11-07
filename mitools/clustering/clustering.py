@@ -16,15 +16,26 @@ from sklearn.metrics.pairwise import cosine_similarity, pairwise_distances
 from sklearn.neighbors import NearestCentroid
 from tqdm import tqdm
 
+from ..exceptions import (ArgumentStructureError, ArgumentTypeError,
+                          ArgumentValueError)
+
 N_ELEMENTS_COL = 'N Elements'
+
+MAX_CLUSTERS_TYPE_ERROR = 'max_clusters provided must be a positive int larger than 2.'
+MAX_CLUSTERS_VALUE_ERROR = 'max_clusters must be a number larger or equal than 2.'
+X_Y_SIZE_ERROR = "x values and y values must be the same size."
+CLUSTER_COL_NOT_IN_INDEX_ERROR = 'DataFrame provided does not have the {cluster_col} index level!'
+SINGLE_GROUP_DF_ERROR = 'DataFrame provided has a single group!'
+EMPTY_DF_ERROR = 'DataFrame provided is empty!'
+
 
 def kmeans_ncluster_search(data: DataFrame, max_clusters: Optional[int]=25, 
                            random_state: Optional[int]=0, n_init: Optional[str]='auto'
                            ) -> Tuple[List[float], List[float]]:
     if not isinstance(max_clusters, int):
-        raise ValueError('max_clusters provided must be a positive int.')
+        raise ArgumentTypeError(MAX_CLUSTERS_TYPE_ERROR)
     if max_clusters < 2:
-        raise ValueError('max_clusters must be a number above or equal to 2.')
+        raise ArgumentValueError(MAX_CLUSTERS_VALUE_ERROR)
     silhouette_scores = []
     inertia = []
     for n_clusters in tqdm(range(2, max_clusters)):
@@ -39,6 +50,58 @@ def kmeans_clustering(data: DataFrame, n_clusters: int, random_state: Optional[i
                       n_init: Optional[str]='auto') -> ndarray:
     kmeans_clustering = KMeans(n_clusters=n_clusters, random_state=random_state, n_init=n_init)
     return kmeans_clustering.fit_predict(data)
+
+def agglomerative_ncluster_search(data: DataFrame, max_clusters: Optional[int]=25) -> List[float]:
+    if not isinstance(max_clusters, int):
+        raise ArgumentTypeError(MAX_CLUSTERS_TYPE_ERROR)
+    if max_clusters < 2:
+        raise ArgumentValueError(MAX_CLUSTERS_VALUE_ERROR)
+    silhouette_scores = []
+    for n_clusters in tqdm(range(2, max_clusters)):
+        agg_clustering = AgglomerativeClustering(n_clusters=n_clusters)
+        agg_clustering.fit_predict(data)
+        score = silhouette_score(data, agg_clustering.labels_)
+        silhouette_scores.append(score)
+    return silhouette_scores
+
+def agglomerative_clustering(data: DataFrame, n_clusters: int) -> ndarray:
+    agg_clustering = AgglomerativeClustering(n_clusters=n_clusters)
+    return agg_clustering.fit_predict(data)
+
+def get_clusters_centroids(data: DataFrame, cluster_col: str) -> DataFrame:
+    if cluster_col not in data.index.names:
+        raise KeyError(f"{CLUSTER_COL_NOT_IN_INDEX_ERROR}")
+    if data.index.get_level_values(cluster_col).nunique() == 1:
+        raise ArgumentStructureError(SINGLE_GROUP_DF_ERROR)
+    clf = NearestCentroid()
+    clf.fit(data.values, data.index.get_level_values(cluster_col).values)
+    return DataFrame(clf.centroids_, columns=data.columns, 
+                     index=np.unique(data.index.get_level_values(cluster_col)))
+
+def get_clusters_centroids_distances(centroids: DataFrame) -> DataFrame:
+    if centroids.empty:
+        raise ArgumentStructureError(EMPTY_DF_ERROR)
+    return DataFrame(
+        pairwise_distances(centroids)
+        )
+
+def get_cosine_similarities(data: DataFrame, cluster_col: str) -> ndarray:
+    cosine_similarities = (data.groupby(level=cluster_col)
+                           .apply(cosine_similarity)
+                           )
+    return cosine_similarities
+
+def get_distances_to_centroids(data: DataFrame, centroids: DataFrame, cluster_col: str) -> DataFrame:
+    distances = []
+    label_pos = data.index.names.index(cluster_col)
+    for idx, values in data.iterrows():
+        cluster = idx[label_pos]
+        centroid = centroids.loc[cluster]
+        distance = euclidean(values, centroid)
+        distances.append(distance)
+    distances = DataFrame(distances)
+    distances.index = data.index.get_level_values(1)
+    return distances.sort_index()
 
 def plot_kmeans_ncluster_search(silhouette_scores: List[float], inertia: List[float]) -> Axes:
     fig, ax = plt.subplots(nrows=2, ncols=1, figsize=(14, 10))
@@ -73,22 +136,6 @@ def plot_kmeans_ncluster_search(silhouette_scores: List[float], inertia: List[fl
 
     return ax
 
-def agglomerative_ncluster_search(data: DataFrame, max_clusters: Optional[int]=25) -> List[float]:
-    if not isinstance(max_clusters, int):
-        raise ValueError('max_clusters provided must be a positive int.')
-    if max_clusters < 2:
-        raise ValueError('max_clusters must be a number above or equal to 2.')
-    silhouette_scores = []
-    for n_clusters in tqdm(range(2, max_clusters)):
-        agg_clustering = AgglomerativeClustering(n_clusters=n_clusters)
-        agg_clustering.fit_predict(data)
-        score = silhouette_score(data, agg_clustering.labels_)
-        silhouette_scores.append(score)
-    return silhouette_scores
-
-def agglomerative_clustering(data: DataFrame, n_clusters: int) -> ndarray:
-    agg_clustering = AgglomerativeClustering(n_clusters=n_clusters)
-    return agg_clustering.fit_predict(data)
 
 def plot_agglomerative_ncluster_search(silhouette_scores: List[float]) -> Axes:
     fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(14, 5))
@@ -246,7 +293,7 @@ def add_clusters_confidence_ellipse(ax: Axes, data: DataFrame, cluster_col: str,
 
 def confidence_ellipse(xvalues, yvalues, ax, n_std=1.96, facecolor='none', **kwargs) -> Axes:
     if xvalues.size != yvalues.size:
-        raise ValueError("x alues and y values must be the same size.")
+        raise ArgumentStructureError(X_Y_SIZE_ERROR)
   
     cov = np.cov(xvalues.astype(float), yvalues.astype(float), rowvar=False)
     pearson_corr = cov[0, 1] / np.sqrt(cov[0, 0] * cov[1, 1])
@@ -275,23 +322,6 @@ def confidence_ellipse(xvalues, yvalues, ax, n_std=1.96, facecolor='none', **kwa
 
     return ax
 
-def get_clusters_centroids(data: DataFrame, cluster_col: str) -> DataFrame:
-    if cluster_col not in data.index.names:
-        raise KeyError(f'DataFrame provided does not have the {cluster_col} index level!')
-    if data.index.get_level_values(cluster_col).nunique() == 1:
-        raise ValueError('DataFrame provided for NearestCentroid has a single group!')
-    clf = NearestCentroid()
-    clf.fit(data.values, data.index.get_level_values(cluster_col).values)
-    return DataFrame(clf.centroids_, columns=data.columns, 
-                     index=np.unique(data.index.get_level_values(cluster_col)))
-
-def get_clusters_centroids_distances(centroids: DataFrame) -> DataFrame:
-    if centroids.empty:
-        raise ValueError('DataFrame provided for pairwise distances is empty!')
-    return DataFrame(
-        pairwise_distances(centroids)
-        )
-
 def display_clusters_size(data: DataFrame, cluster_col: str) -> DataFrame:
     cluster_count = data[[cluster_col]].value_counts().sort_index().to_frame()
     cluster_count.columns = [N_ELEMENTS_COL]
@@ -319,12 +349,6 @@ def plot_clusters_growth(data: DataFrame, time_col: str, cluster_col: str) -> Ax
 
     return ax
 
-def get_cosine_similarities(data: DataFrame, cluster_col: str) -> ndarray:
-    cosine_similarities = (data.groupby(level=cluster_col)
-                           .apply(cosine_similarity)
-                           )
-    return cosine_similarities
-
 def plot_cosine_similarities(cosine_similarities: Dict[int,DataFrame],
                              normed: Optional[bool]=False) -> Axes:
     fig, ax = plt.subplots(1, 1, figsize=(14, 6))
@@ -348,18 +372,6 @@ def plot_cosine_similarities(cosine_similarities: Dict[int,DataFrame],
     ax.legend()
     
     return ax
-
-def get_distances_to_centroids(data: DataFrame, centroids: DataFrame, cluster_col: str) -> DataFrame:
-    distances = []
-    label_pos = data.index.names.index(cluster_col)
-    for idx, values in data.iterrows():
-        cluster = idx[label_pos]
-        centroid = centroids.loc[cluster]
-        distance = euclidean(values, centroid)
-        distances.append(distance)
-    distances = DataFrame(distances)
-    distances.index = data.index.get_level_values(1)
-    return distances.sort_index()
 
 def plot_distances_to_centroids(distances: DataFrame, cluster_col: str) -> Axes:
     fig, ax = plt.subplots(1, 1, figsize=(14, 6))
