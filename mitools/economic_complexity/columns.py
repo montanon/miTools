@@ -6,7 +6,7 @@ from ..exceptions.custom_exceptions import ArgumentKeyError, ArgumentTypeError
 
 GROWTH_COLUMN_NAME = '_growth_{:d}'
 GROWTH_PCT_COLUMN_NAME = '_growth%_{:d}'
-SHIFTED_COLUMN_NAME = '{}_in_{}_years'
+SHIFTED_COLUMN_NAME = '{}_shifted_by_{}'
 
 INVALID_COLUMN_ERROR = 'One or more of {} are not in DataFrame.'
 INVALID_TRANSFORMATION_ERROR = 'Transformation {} provided is not Callable.'
