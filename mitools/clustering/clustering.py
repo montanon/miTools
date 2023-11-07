@@ -16,8 +16,7 @@ from sklearn.metrics.pairwise import cosine_similarity, pairwise_distances
 from sklearn.neighbors import NearestCentroid
 from tqdm import tqdm
 
-from ..exceptions import (ArgumentStructureError, ArgumentTypeError,
-                          ArgumentValueError)
+from ..exceptions import ArgumentStructureError, ArgumentTypeError, ArgumentValueError
 
 N_ELEMENTS_COL = 'N Elements'
 
@@ -39,17 +38,17 @@ def kmeans_ncluster_search(data: DataFrame, max_clusters: Optional[int]=25,
     silhouette_scores = []
     inertia = []
     for n_clusters in tqdm(range(2, max_clusters)):
-        kmeans_clustering = KMeans(n_clusters=n_clusters, random_state=random_state, n_init=n_init)
-        kmeans_clustering.fit_predict(data)
-        score = silhouette_score(data, kmeans_clustering.labels_)
+        kmeans_clusters = kmeans_clustering(data, n_clusters, random_state, n_init)
+        score = silhouette_score(data, kmeans_clusters.labels_)
         silhouette_scores.append(score)
-        inertia.append(kmeans_clustering.inertia_)
+        inertia.append(kmeans_clusters.inertia_)
     return silhouette_scores, inertia
 
 def kmeans_clustering(data: DataFrame, n_clusters: int, random_state: Optional[int]=0, 
                       n_init: Optional[str]='auto') -> ndarray:
     kmeans_clustering = KMeans(n_clusters=n_clusters, random_state=random_state, n_init=n_init)
-    return kmeans_clustering.fit_predict(data)
+    kmeans_clustering.fit_predict(data)
+    return kmeans_clustering
 
 def agglomerative_ncluster_search(data: DataFrame, max_clusters: Optional[int]=25) -> List[float]:
     if not isinstance(max_clusters, int):
@@ -58,15 +57,15 @@ def agglomerative_ncluster_search(data: DataFrame, max_clusters: Optional[int]=2
         raise ArgumentValueError(MAX_CLUSTERS_VALUE_ERROR)
     silhouette_scores = []
     for n_clusters in tqdm(range(2, max_clusters)):
-        agg_clustering = AgglomerativeClustering(n_clusters=n_clusters)
-        agg_clustering.fit_predict(data)
+        agg_clustering = agglomerative_clustering(data, n_clusters)
         score = silhouette_score(data, agg_clustering.labels_)
         silhouette_scores.append(score)
     return silhouette_scores
 
 def agglomerative_clustering(data: DataFrame, n_clusters: int) -> ndarray:
     agg_clustering = AgglomerativeClustering(n_clusters=n_clusters)
-    return agg_clustering.fit_predict(data)
+    agg_clustering.fit_predict(data)
+    return agg_clustering
 
 def get_clusters_centroids(data: DataFrame, cluster_col: str) -> DataFrame:
     if cluster_col not in data.index.names:
@@ -135,7 +134,6 @@ def plot_kmeans_ncluster_search(silhouette_scores: List[float], inertia: List[fl
     plt.tight_layout()
 
     return ax
-
 
 def plot_agglomerative_ncluster_search(silhouette_scores: List[float]) -> Axes:
     fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(14, 5))
