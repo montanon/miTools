@@ -1,16 +1,16 @@
 
 
-class ArgumentTypeError(Exception):
+class ArgumentTypeError(TypeError):
     def __init__(self, message):
         self.message = message
         super().__init__(self.message)
 
-class ArgumentKeyError(Exception):
+class ArgumentKeyError(KeyError):
     def __init__(self, message):
         self.message = message
         super().__init__(self.message)
 
-class ArgumentValueError(Exception):
+class ArgumentValueError(ValueError):
     def __init__(self, message):
         self.message = message
         super().__init__(self.message)
