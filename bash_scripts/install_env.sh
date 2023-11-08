@@ -152,10 +152,10 @@ test_python_module unidecode
 python -m pip install countryinfo
 test_python_module countryinfo
 
-conda install -c conda-forge fastparquet
+conda install -c conda-forge fastparquet -y
 test_python_module fastparquet
 
-conda install -c conda-forge pyarrow
+conda install -c conda-forge pyarrow -y
 test_python_module pyarrow
 
 echo $MITOOLS
