@@ -168,4 +168,7 @@ cd "$original_path"
 conda install -c conda-forge ploomber -y
 test_python_module ploomber
 
+$PYTHON_PATH -m pip install soorgeon
+test_python_module soorgeon
+
 ipython kernel install --user --name=$env
