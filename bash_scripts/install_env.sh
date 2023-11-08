@@ -106,7 +106,7 @@ test_python_module pybind11
 
 
 original_path=$(pwd)
-sudo rm -rf ~/.racplusplus/RACplusplus
+sudo rm -rf ~/.racplusplus
 sudo rm -rf ~/.racplusplus/RACplusplus/_skbuild
 sudo rm -rf ~/.racplusplus && mkdir ~/.racplusplus && cd ~/.racplusplus
 git clone git@github.com:porterehunley/RACplusplus.git
@@ -126,10 +126,11 @@ test_python_module skbuild
 $PYTHON_PATH setup.py install
 mkdir build && cd build && sudo rm -rf * # Clean out the build directory
 conda install -c conda-forge ninja
-NINJA=$(which ninja)
-CC=$(which gcc)
-CXX=$(which g++)
-cmake -G Ninja -DCMAKE_MAKE_PROGRAM=$(NINJA) -DCMAKE_C_COMPILER=$(CC) -DCMAKE_CXX_COMPILER=$(CXX) ..
+export CC=$(which gcc)
+export CXX=$(which g++)
+C_COMPILER="$(which clang)"
+CXX_COMPILER="$(which clang++)"
+cmake -G Ninja -DCMAKE_MAKE_PROGRAM=$(which ninja) -DCMAKE_C_COMPILER=$(CC) -DCMAKE_CXX_COMPILER=$(CXX) ..
 ninja
 cd ..
 echo PWD:$(pwd)
@@ -143,16 +144,18 @@ conda install -c conda-forge numba -y
 test_python_module numba
 
 conda install -c conda-forge umap-learn -y
-test_python_module umap-learn
+test_python_module umap
 
 conda install -c conda-forge Unidecode -y
 test_python_module unidecode
 
-python -m pip install countryinfo -y
+python -m pip install countryinfo
 test_python_module countryinfo
 
-cd $MITOOLS
-PYTHON_PATH -m pip install -e .
+echo $MITOOLS
+cd "$MITOOLS"
+echo PWD$(pwd)
+$PYTHON_PATH -m pip install -e .
 test_python_module mitools
 cd "$original_path"
 
