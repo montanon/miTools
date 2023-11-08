@@ -2,11 +2,14 @@ from typing import Iterable, List, Optional, Union
 
 import pandas as pd
 from pandas import DataFrame
+from pandas._libs.tslibs.parsing import DateParseError
 from tqdm import tqdm
 
-from ..exceptions.custom_exceptions import ArgumentTypeError
+from ..exceptions.custom_exceptions import (ArgumentTypeError,
+                                            ArgumentValueError)
 
 INT_COL_ERROR = 'Value or values in any of columns={} cannnot be converted into int.'
+NON_DATE_COL_ERROR = 'Column {} has values that cannot be converted to datetime objects.'
 
 
 def prepare_int_cols(df: DataFrame, cols: Union[Iterable[str],str], 
@@ -26,7 +29,10 @@ def prepare_str_cols(df: DataFrame, cols: Union[Iterable[str],str]) -> DataFrame
     return df
 
 def prepare_date_cols(df: DataFrame, cols: Union[Iterable[str],str]) -> DataFrame:
-    df[cols] = df[cols].apply(pd.to_datetime)
+    try:
+        df[cols] = df[cols].apply(pd.to_datetime)
+    except (ValueError, DateParseError):
+        raise ArgumentValueError(NON_DATE_COL_ERROR)
     return df
 
 def prepare_bool_cols(df: DataFrame, cols: Union[Iterable[str],str]) -> DataFrame:

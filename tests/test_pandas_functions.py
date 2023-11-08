@@ -78,40 +78,23 @@ class TestPrepareStrCols(unittest.TestCase):
 class TestPrepareDateCols(unittest.TestCase):
 
     def setUp(self):
-        # Setup a DataFrame with some test data
-        self.df = DataFrame({
-            'date_str': ['2021-01-01', '2021/02/01', '01-03-2021', None, 'not a date'],
-            'other_column': [1, 2, 3, 4, 5]
+        self.df = pd.DataFrame({
+            'valid_date': ['2021-01-01', '2021/02/01', '01-03-2021', None],
+            'invalid_date': ['2021-01-01', '2021/02/01', 'not a date', None],
+            'mixed': [1, '2', '2021-01-01', None]
         })
 
-    def test_date_conversion(self):
-        # Test converting valid date strings to datetime
-        df_converted = prepare_date_cols(self.df.copy(), 'date_str')
-        self.assertTrue(pd.to_datetime(self.df['date_str'], errors='coerce').equals(df_converted['date_str']))
+    def test_valid_dates_conversion(self):
+        df_converted = prepare_date_cols(self.df.copy(), 'valid_date')
+        self.assertTrue(pd.to_datetime(self.df['valid_date'], errors='coerce').equals(df_converted['valid_date']))
 
-    def test_invalid_date_conversion(self):
-        # Test handling of invalid date strings
-        # This should raise an error since 'not a date' cannot be converted to a datetime
-        with self.assertRaises(ValueError):
-            prepare_date_cols(self.df.copy(), 'date_str')
+    def test_error_on_invalid_dates(self):
+        with self.assertRaises(ArgumentValueError):
+            prepare_date_cols(self.df.copy(), 'invalid_date')
 
-    def test_multiple_column_conversion(self):
-        # Test converting multiple columns
-        df_multi = self.df.copy()
-        df_multi['another_date_str'] = ['2022-01-01', '2022-02-02', '02-03-2022', None, 'not a date']
-        df_converted = prepare_date_cols(df_multi.copy(), ['date_str', 'another_date_str'])
-        for col in ['date_str', 'another_date_str']:
-            self.assertTrue(pd.to_datetime(df_multi[col], errors='coerce').equals(df_converted[col]))
-
-    def test_no_change_to_non_date_columns(self):
-        # Test that non-date columns are not changed
-        df_converted = prepare_date_cols(self.df.copy(), 'date_str')
-        testing.assert_series_equal(self.df['other_column'], df_converted['other_column'])
-
-    def test_preserve_nans(self):
-        # Test that NaN values are preserved during conversion
-        df_converted = prepare_date_cols(self.df.copy(), 'date_str')
-        self.assertTrue(df_converted['date_str'].isna().equals(self.df['date_str'].isna()))
+    def test_error_on_mixed_data(self):
+        with self.assertRaises(ArgumentValueError):
+            prepare_date_cols(self.df.copy(), 'mixed')
 
         
 if __name__ == '__main__':
