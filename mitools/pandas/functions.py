@@ -1,12 +1,12 @@
 from typing import Iterable, List, Optional, Union
 
+from tqdm import tqdm
+
 import pandas as pd
 from pandas import DataFrame
 from pandas._libs.tslibs.parsing import DateParseError
-from tqdm import tqdm
 
-from ..exceptions.custom_exceptions import (ArgumentTypeError,
-                                            ArgumentValueError)
+from ..exceptions.custom_exceptions import ArgumentTypeError, ArgumentValueError
 
 INT_COL_ERROR = 'Value or values in any of columns={} cannnot be converted into int.'
 NON_DATE_COL_ERROR = 'Column {} has values that cannot be converted to datetime objects.'
