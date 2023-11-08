@@ -152,6 +152,12 @@ test_python_module unidecode
 python -m pip install countryinfo
 test_python_module countryinfo
 
+conda install -c conda-forge fastparquet
+test_python_module fastparquet
+
+conda install -c conda-forge pyarrow
+test_python_module pyarrow
+
 echo $MITOOLS
 cd "$MITOOLS"
 echo PWD$(pwd)
