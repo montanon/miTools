@@ -85,8 +85,12 @@ class TestPrepareDateCols(unittest.TestCase):
         })
 
     def test_valid_dates_conversion(self):
-        df_converted = prepare_date_cols(self.df.copy(), 'valid_date')
-        self.assertTrue(pd.to_datetime(self.df['valid_date'], errors='coerce').equals(df_converted['valid_date']))
+        valid_col = ['valid_date']
+        df_converted = prepare_date_cols(self.df.copy(), valid_col)
+        expected_df =  self.df.copy(deep=True)
+        expected_df[valid_col] = expected_df[valid_col].apply(pd.to_datetime)
+        testing.assert_frame_equal(pd.to_datetime(self.df, errors='coerce')[['valid_date']],
+                                   df_converted[['valid_date']])
 
     def test_error_on_invalid_dates(self):
         with self.assertRaises(ArgumentValueError):
