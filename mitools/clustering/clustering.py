@@ -30,7 +30,7 @@ EMPTY_DF_ERROR = 'DataFrame provided is empty!'
 N_ELEMENTS_COL = 'N Elements'
 
 def kmeans_ncluster_search(data: DataFrame, max_clusters: Optional[int]=25, 
-                           random_state: Optional[int]=0, n_init: Optional[str]='auto'
+                           random_state: Optional[int]=0, n_init: Optional[int]=10,
                            ) -> Tuple[List[float], List[float]]:
     if not isinstance(max_clusters, int):
         raise ArgumentTypeError(MAX_CLUSTERS_TYPE_ERROR)
@@ -46,7 +46,11 @@ def kmeans_ncluster_search(data: DataFrame, max_clusters: Optional[int]=25,
     return silhouette_scores, inertia
 
 def kmeans_clustering(data: DataFrame, n_clusters: int, random_state: Optional[int]=0, 
-                      n_init: Optional[str]='auto') -> ndarray:
+                      n_init: Optional[int]=10) -> ndarray:
+    if not isinstance(n_clusters, int):
+        raise ArgumentTypeError(MAX_CLUSTERS_TYPE_ERROR)
+    if n_clusters < 2:
+        raise ArgumentValueError(MAX_CLUSTERS_VALUE_ERROR)
     kmeans_clustering = KMeans(n_clusters=n_clusters, random_state=random_state, n_init=n_init)
     kmeans_clustering.fit_predict(data)
     return kmeans_clustering
