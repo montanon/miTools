@@ -74,6 +74,28 @@ class TestPrepareStrCols(unittest.TestCase):
         result_df = prepare_str_cols(df_copy, [])
         testing.assert_frame_equal(df_copy, result_df)
 
+
+class TestPrepareDateCols(unittest.TestCase):
+
+    def setUp(self):
+        self.df = pd.DataFrame({
+            'valid_date': ['2021-01-01', '2021/02/01', '01-03-2021', None],
+            'invalid_date': ['2021-01-01', '2021/02/01', 'not a date', None],
+            'mixed': [1, '2', '2021-01-01', None]
+        })
+
+    def test_valid_dates_conversion(self):
+        df_converted = prepare_date_cols(self.df.copy(), 'valid_date')
+        self.assertTrue(pd.to_datetime(self.df['valid_date'], errors='coerce').equals(df_converted['valid_date']))
+
+    def test_error_on_invalid_dates(self):
+        with self.assertRaises(ArgumentValueError):
+            prepare_date_cols(self.df.copy(), 'invalid_date')
+
+    def test_error_on_mixed_data(self):
+        with self.assertRaises(ArgumentValueError):
+            prepare_date_cols(self.df.copy(), 'mixed')
+
         
 if __name__ == '__main__':
     unittest.main()
