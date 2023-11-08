@@ -132,7 +132,7 @@ class TestGetClustersCentroidsDistances(TestCase):
     def test_empty_dataframe(self):
         # Ensure function handles an empty dataframe without errors
         empty_data = DataFrame(columns=['x', 'y', 'z'])
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ArgumentStructureError):
             get_clusters_centroids_distances(empty_data)
 
     def test_single_centroid(self):
@@ -186,7 +186,7 @@ class TestGetClustersCentroids(TestCase):
     def test_single_cluster(self):
         # For a single cluster, the centroid should be the mean of the data
         single_cluster_data = self.data[self.data.index.get_level_values('cluster') == 0]
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ArgumentStructureError):
             get_clusters_centroids(single_cluster_data, 'cluster')
                                    
 
@@ -199,7 +199,7 @@ class TestAgglomerativeClustering(TestCase):
 
     def test_positive_case(self):
         n_clusters = 3
-        result = agglomerative_clustering(self.data, n_clusters)
+        result = agglomerative_clustering(self.data, n_clusters).labels_
         # Ensure function returns labels for all data points
         self.assertEqual(len(result), len(self.data))
         # Ensure the number of unique labels equals n_clusters
@@ -255,7 +255,7 @@ class TestKMeansClustering(TestCase):
 
     def test_positive_case(self):
         n_clusters = 3
-        result = kmeans_clustering(self.data, n_clusters)
+        result = kmeans_clustering(self.data, n_clusters).labels_
         # Ensure function returns labels for all data points
         self.assertEqual(len(result), len(self.data))
         # Ensure the number of unique labels equals n_clusters
