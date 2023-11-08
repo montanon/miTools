@@ -5,6 +5,8 @@ set -Eeo pipefail
 
 env=tools
 
+echo $MITOOLS
+
 # Function to print errors in red and exit
 print_error() {
     local last_command_exit_code=$?
@@ -124,11 +126,10 @@ test_python_module skbuild
 $PYTHON_PATH setup.py install
 mkdir build && cd build && sudo rm -rf * # Clean out the build directory
 conda install -c conda-forge ninja
-C_COMPILER=$(which clang)
-CXX_COMPILER=$(which clang++)
-export CC=$(which gcc)
-export CXX=$(which g++)
-cmake -G Ninja -DCMAKE_MAKE_PROGRAM=$(which ninja) -DCMAKE_C_COMPILER=$(CC) -DCMAKE_CXX_COMPILER=$(CXX) ..
+NINJA=$(which ninja)
+CC=$(which gcc)
+CXX=$(which g++)
+cmake -G Ninja -DCMAKE_MAKE_PROGRAM=$(NINJA) -DCMAKE_C_COMPILER=$(CC) -DCMAKE_CXX_COMPILER=$(CXX) ..
 ninja
 cd ..
 echo PWD:$(pwd)
@@ -137,6 +138,23 @@ test_python_module racplusplus
 cd "$original_path"
 
 $PYTHON_PATH -m pip install xlsxwriter country_converter pycountry
+
+conda install -c conda-forge numba -y
+test_python_module numba
+
+conda install -c conda-forge umap-learn -y
+test_python_module umap-learn
+
+conda install -c conda-forge Unidecode -y
+test_python_module unidecode
+
+python -m pip install countryinfo -y
+test_python_module countryinfo
+
+cd $MITOOLS
+PYTHON_PATH -m pip install -e .
+test_python_module mitools
+cd "$original_path"
 
 conda install -c conda-forge ploomber -y
 test_python_module ploomber
