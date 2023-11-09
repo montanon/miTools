@@ -1,16 +1,8 @@
+import itertools
 import re
 from os import PathLike
-from typing import (
-    Any,
-    Dict,
-    Generator,
-    Iterable,
-    List,
-    Optional,
-    Pattern,
-    Type,
-    TypeVar,
-)
+from typing import (Any, Dict, Generator, Iterable, List, Optional, Pattern,
+                    Type, TypeVar, Union)
 
 import numpy as np
 from fuzzywuzzy import fuzz
@@ -18,6 +10,18 @@ from numpy import ndarray
 from pandas import DataFrame, Series
 
 T = TypeVar('T')
+COLOR_CODES = {
+    'red': '\033[91m',
+    'green': '\033[92m',
+    'yellow': '\033[93m',
+    'blue': '\033[94m',
+    'magenta': '\033[95m',
+    'cyan': '\033[96m',
+    'reset': '\033[0m'  # Reset to default color
+}
+# Define a cycle of colors
+color_cycler = itertools.cycle(COLOR_CODES.keys() - {'reset'})
+
 
 def iterable_chunks(iterable: Iterable[T], chunk_size: int) -> Generator[Iterable[T], None, None]:
     if not isinstance(iterable, (str, list, tuple, bytes)):
@@ -117,13 +121,27 @@ def can_convert_to(items: Iterable, type: Type) -> bool:
 def invert_dict(dictionary: Dict) -> Dict:
     return {value: key for key, value in dictionary.items()}
 
-def iprint(iterable: Iterable, splitter: Optional[str]=''):
+def iprint(iterable: Union[Iterable,str], splitter: Optional[str] = '', c: Optional[str] = ''):
+    if not hasattr(iprint, 'color_cycler'):
+        iprint.color_cycler = itertools.cycle(COLOR_CODES.keys() - {'reset'})
+    color_code = COLOR_CODES.get(c, '')  # Get the ANSI escape code for the specified color
+    if c == 'cycler':
+        color_code = COLOR_CODES[next(iprint.color_cycler)]
+    else:
+        color_code = COLOR_CODES.get(c, '')  # Get the ANSI escape code for the specified color
+    if isinstance(iterable, str):
+        iterable = [iterable]
+    elif not isinstance(iterable, Iterable):
+        iterable = [repr(iterable)]
     for item in iterable:
         if splitter:
-            print(splitter*40)
-        print(item)
+            print(splitter * 40)
+        if color_code:
+            print(f"{color_code}{item}{COLOR_CODES['reset']}")
+        else:
+            print(item)
         if splitter:
-            print(splitter*40)
-
+            print(splitter * 40)
+            
 def check_symmetrical_matrix(a: ndarray, rtol: Optional[float]=1e-05, atol: Optional[float]=1e-08) -> bool:
     return np.allclose(a, a.T, rtol=rtol, atol=atol)
