@@ -38,6 +38,8 @@ class ContextVar:
 # * Can't be overwritten after it is defined
 # * Needs to be updated through context
 DEBUG = ContextVar("DEBUG", 0) # DEBUG levels could be similar to logging.debug levels.
+DISPLAY = ContextVar("DISPLAY", 0)
+ASSERT = ContextVar("ASSERT", 0)
 
 class Timing(contextlib.ContextDecorator):
   def __init__(self, prefix="", on_exit=None, enabled=True): self.prefix, self.on_exit, self.enabled = prefix, on_exit, enabled
