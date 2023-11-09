@@ -1,6 +1,7 @@
 import os
 import unittest
 
+from mitools.context import DEBUG
 from mitools.notebooks import *
 
 
@@ -64,8 +65,20 @@ class TestNotebookCreation(unittest.TestCase):
         self.assertIsNone(cell.execution_count)
         self.assertEqual(cell.cell_id, cell_id)
 
+    def test_create_notebook_cell(self):
+        cell_type = "markdown"
+        execution_count = None
+        cell_id = "3fb49960"
+        cell_metadata = {}
+        outputs = []
+        source = []
+        cell = create_notebook_cell(cell_type, execution_count, cell_id, cell_metadata, outputs, source)
+        self.assertEqual(cell.cell_type, cell_type)
+        self.assertIsNone(cell.execution_count)
+        self.assertEqual(cell.cell_id, cell_id)
+
     def test_create_notebook(self):
-        cells = [create_notebook_cell("code", None, "3fb49960", {}, [], [])]
+        cells = [create_notebook_cell("code", None, "5feceb66ffc86f38", {}, [], [])]
         mode = create_code_mirror_mode("ipython", 3)
         language_info = create_language_info(
             codemirror_mode=mode,
@@ -83,6 +96,26 @@ class TestNotebookCreation(unittest.TestCase):
         self.assertEqual(nb.nbformat, 4)
         self.assertEqual(nb.nbformat_minor, 5)
 
+    def test_notebook_section_with_markdown_first(self):
+        # Create a MarkdownCell and a NotebookCell
+        markdown_cell = create_notebook_cell(cell_type='markdown', execution_count=None, metadata={}, outputs={}, source=["# Markdown Content"], cell_id="1")
+        code_cell = create_notebook_cell(cell_type='code', execution_count=None, metadata={}, outputs=[], source=["print('Hello World')"], cell_id="2")
+        # Create a list of cells with the MarkdownCell first
+        cells = NotebookCells(cells=[markdown_cell, code_cell])
+        # Create a NotebookSection
+        section = NotebookSection(cells=cells)
+        # Check that the first cell is a MarkdownCell
+        self.assertIsInstance(section.cells[0], MarkdownCell)
+
+    def test_notebook_section_with_no_markdown_first(self):
+        # Create a NotebookCell
+        code_cell = create_notebook_cell(cell_type='code', execution_count=None, metadata={}, outputs=[], source=["print('Hello World')"], cell_id="1")
+        # Create a list of cells with the NotebookCell first (no MarkdownCell)
+        cells = [code_cell]
+        # Attempt to create a NotebookSection and expect an error
+        with self.assertRaises(ValueError):
+            NotebookSection(cells=cells)
+
 class TestNotebookSaving(unittest.TestCase):
 
     def test_save_notebook_as_ipynb(self):
@@ -99,15 +132,14 @@ class TestNotebookSaving(unittest.TestCase):
         self.assertEqual(content['nbformat'], 4)
         self.assertEqual(content['nbformat_minor'], 5)
         # Clean up the test file
-        os.remove(test_filename)
-
-class TestNotebookSaving(unittest.TestCase):
+        if not DEBUG:
+            os.remove(test_filename)
 
     def test_save_notebook_with_multiple_cells_as_ipynb(self):
         # Prepare notebook cells
         cells = [
-            create_notebook_cell("code", None, "3fb49960", {}, [], []),
-            create_notebook_cell("markdown", None, "4ec49961", {}, [], ["# Header"]),
+            create_notebook_cell("markdown", None, "", {}, [], []),
+            create_notebook_cell("markdown", None, "", {}, [], ["# Header"]),
             # Add more cells as needed
         ]
         # Create the rest of the notebook structure
@@ -126,9 +158,10 @@ class TestNotebookSaving(unittest.TestCase):
         # Check if the cell contents are correct
         for cell_data, cell_obj in zip(content['cells'], cells):
             self.assertEqual(cell_data['cell_type'], cell_obj.cell_type)
-            self.assertEqual(cell_data['cell_id'], cell_obj.cell_id)
+            self.assertNotEqual(cell_data['cell_id'], cell_obj.cell_id)
         # Clean up the test file
-        os.remove(test_filename)
+        if not DEBUG:
+            os.remove(test_filename)
 
 class TestCellTypes(unittest.TestCase):
 
@@ -147,6 +180,58 @@ class TestCellTypes(unittest.TestCase):
     def test_invalid_code_cell_type(self):
         with self.assertRaises(ValueError):
             CodeCell(cell_type='markdown', metadata={}, source=["print('Hello, world!')"], cell_id="1234abcd")
+
+
+class TestClearNotebookOutput(unittest.TestCase):
+
+    def setUp(self):
+        cells = NotebookCells([
+            create_notebook_cell("markdown", None, "", {}, [], ["## Tile"]),
+            create_notebook_cell("code", None, "", {}, [], ["## Code"]),
+            create_notebook_cell("markdown", None, "", {}, [], ["## Tile"]),
+        ])
+        notebook = create_notebook(cells, recreate_notebook_structure().metadata, 4, 5)
+        # Define a filename for the test
+        self.test_filename = 'test_notebook.ipynb'
+        # Save the notebook to a file
+        save_notebook_as_ipynb(notebook, self.test_filename)
+
+    def test_clear_notebook_output(self):
+        # Define the paths for the test notebook and the cleaned notebook
+        clean_notebook_path = 'clean_test_notebook.ipynb'
+        # Assume test_notebook_path has a notebook with outputs
+        # Now call the function to clear the outputs
+        clear_notebook_output(self.test_filename, clean_notebook_path)
+        # Load the cleaned notebook to check if outputs have been cleared
+        with open(clean_notebook_path, 'r', encoding='utf-8') as f:
+            clean_nb = nbformat.read(f, as_version=4)
+        # Check all cells to ensure outputs are cleared
+        for cell in clean_nb.cells:
+            if 'outputs' in cell:
+                self.assertEqual(cell['outputs'], [])
+        # Clean up the test file
+        if not DEBUG:
+            os.remove( self.test_filename)
+            os.remove(clean_notebook_path)
+
+
+class TestNotebookCellFactory(unittest.TestCase):
+
+    def test_create_code_cell(self):
+        code_cell = NotebookCellFactory.create_cell('code', source=["print('Hello, World!')"])
+        self.assertIsInstance(code_cell, CodeCell)
+        self.assertEqual(code_cell.source, ["print('Hello, World!')"])
+
+    def test_create_markdown_cell(self):
+        markdown_cell = NotebookCellFactory.create_cell('markdown', source=["# Header"])
+        self.assertIsInstance(markdown_cell, MarkdownCell)
+        self.assertEqual(markdown_cell.source, ["# Header"])
+
+    def test_create_default_cell(self):
+        # Assuming 'text' is not a recognized cell type, it should default to NotebookCell
+        default_cell = NotebookCellFactory.create_cell('text', source=["Text content"])
+        self.assertIsInstance(default_cell, NotebookCell)
+        self.assertEqual(default_cell.source, ["Text content"])
 
 
 if __name__ == '__main__':
