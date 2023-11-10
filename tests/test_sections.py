@@ -5,10 +5,15 @@ import unittest
 import pandas as pd
 
 from mitools.exceptions.custom_exceptions import ArgumentKeyError
-from mitools.notebooks import (FULL_TEXT_COLUMN, create_full_text_column, etl,
-                               filter_text_rows_by_pattern,
-                               merge_csvs_into_dataframe, read_and_concat_csvs,
-                               rename_columns)
+from mitools.notebooks import (
+    FULL_TEXT_COLUMN,
+    create_full_text_column,
+    etl,
+    filter_text_rows_by_pattern,
+    merge_csvs_into_dataframe,
+    read_and_concat_csvs,
+    rename_columns,
+)
 
 
 class TestReadAndConcatCSVs(unittest.TestCase):
@@ -119,7 +124,7 @@ class TestRenameColumns(unittest.TestCase):
         self.assertListEqual(list(result_df.columns), ['X', 'Y', 'Z'])
 
     def test_invalid_keys(self):
-        columns_map = {'A': 'X', 'D': 'Y'}
+        columns_map = {'A': 'X', 'D': 'A'}
         with self.assertRaises(ArgumentKeyError):
             rename_columns(self.df, columns_map)
 

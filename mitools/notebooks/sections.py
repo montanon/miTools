@@ -71,9 +71,9 @@ def rename_columns(dataframe: DataFrame, columns_map: RenameColumnsMap,
     if inverse_map:
         columns_map = {v: k for k, v in columns_map.items() if v is not None}
     unique_names = len(set(columns_map.values())) == len(columns_map)
-    all_in_dataframe = all([c in dataframe.columns for c in columns_map.keys()])
+    #all_in_dataframe = all([c in dataframe.columns for c in columns_map.keys()])
     no_preexisting_names = all(val not in dataframe.columns for val in columns_map.values())    
-    if not all([unique_names, all_in_dataframe, no_preexisting_names]):
+    if not all([unique_names, no_preexisting_names]):
         raise ArgumentKeyError(INVALID_COLUMN_ERROR.format(columns_map.keys()))
     return dataframe.rename(columns=columns_map)
         
