@@ -1,15 +1,14 @@
 import os
+import re
 import unittest
 
 import pandas as pd
 
 from mitools.exceptions.custom_exceptions import ArgumentKeyError
-from mitools.notebooks import (
-    FULL_TEXT_COLUMN,
-    create_full_text_column,
-    read_and_concat_csvs,
-    rename_columns,
-)
+from mitools.notebooks import (FULL_TEXT_COLUMN, create_full_text_column,
+                               filter_text_rows_by_pattern,
+                               merge_csvs_into_dataframe, read_and_concat_csvs,
+                               rename_columns)
 
 
 class TestReadAndConcatCSVs(unittest.TestCase):
@@ -143,6 +142,98 @@ class TestRenameColumns(unittest.TestCase):
         columns_map = {'X': 'A', 'Y': None, 'Z': 'C'}
         result_df = rename_columns(self.df, columns_map, inverse_map=True)
         self.assertListEqual(list(result_df.columns), ['X', 'B', 'Z'])
+
+
+class TestFilterTextRowsByPattern(unittest.TestCase):
+
+    def setUp(self):
+        self.dataframe = pd.DataFrame({
+            'text_column': ['Hello World', 'hello world', 'HELLO WORLD', 'goodbye']
+        })
+
+    def test_valid_pattern(self):
+        pattern = 'hello'
+        result = filter_text_rows_by_pattern(self.dataframe, 'text_column', pattern)
+        self.assertEqual(len(result), 3)  # 'Hello World' and 'hello world'
+
+    def test_case_sensitive(self):
+        pattern = 'hello'
+        result = filter_text_rows_by_pattern(self.dataframe, 'text_column', pattern, case=True)
+        self.assertEqual(len(result), 1)  # Only 'hello world'
+
+    def test_non_existent_column(self):
+        pattern = 'hello'
+        with self.assertRaises(ArgumentKeyError):
+            filter_text_rows_by_pattern(self.dataframe, 'nonexistent_column', pattern)
+
+    def test_empty_dataframe(self):
+        empty_df = pd.DataFrame()
+        pattern = 'hello'
+        with self.assertRaises(ArgumentKeyError):
+            filter_text_rows_by_pattern(empty_df, 'text_column', pattern)
+
+    def test_empty_dataframe(self):
+        empty_df = pd.DataFrame(columns=['text_column'])
+        pattern = 'hello'
+        result = filter_text_rows_by_pattern(empty_df, 'text_column', pattern)
+        pd.testing.assert_frame_equal(empty_df, result)
+
+    def test_special_regex_pattern(self):
+        pattern = '^H[a-z]+o\sWorld$'
+        result = filter_text_rows_by_pattern(self.dataframe, 'text_column', pattern, case=True)
+        self.assertEqual(len(result), 1)  # 'Hello World'
+
+    def test_special_regex_pattern(self):
+        pattern = '^h[a-z]+o\sworld$'
+        result = filter_text_rows_by_pattern(self.dataframe, 'text_column', pattern, case=False)
+        self.assertEqual(len(result), 3)  # 'Hello World'
+
+
+class TestMergeCSVsIntoDataFrame(unittest.TestCase):
+    
+    def setUp(self):
+        # Setup code to create test CSV files and directories if needed
+        self.test_folder = "test_csv_data"
+        os.makedirs(self.test_folder, exist_ok=True)
+        df1 = pd.DataFrame({'A': [1, 2], 'B': [3, 4]})
+        df2 = pd.DataFrame({'A': [2, 5], 'B': [4, 8]})
+        df1.to_csv(os.path.join(self.test_folder, "file1.csv"))
+        df2.to_csv(os.path.join(self.test_folder, "file2.csv"))
+
+    def tearDown(self):
+        # Teardown code to remove test files and directories after tests
+        for file in os.listdir(self.test_folder):
+            os.remove(os.path.join(self.test_folder, file))
+        os.rmdir(self.test_folder)
+
+    def test_multiple_csv_files(self):
+        result = merge_csvs_into_dataframe(self.test_folder)
+        self.assertEqual(len(result), 3)  # Expect 3 unique rows
+
+    def test_single_csv_file(self):
+        single_file_folder = "single_csv_test"
+        os.makedirs(single_file_folder, exist_ok=True)
+        df = pd.DataFrame({'C': [1, 2], 'D': [3, 4]})
+        df.to_csv(os.path.join(single_file_folder, "file.csv"))
+        result = merge_csvs_into_dataframe(single_file_folder)
+        self.assertEqual(len(result), 2)  # Two rows from the single file
+        for file in os.listdir(single_file_folder):
+            os.remove(os.path.join(single_file_folder, file))
+        os.rmdir(single_file_folder)
+
+    def test_empty_folder(self):
+        empty_folder = "empty_csv_test"
+        os.makedirs(empty_folder, exist_ok=True)
+        with self.assertRaises(ValueError):  # Assuming it raises ValueError on empty input
+            merge_csvs_into_dataframe(empty_folder)
+        os.rmdir(empty_folder)
+
+    def test_non_csv_files(self):
+        # Create a non-CSV file in the test folder
+        with open(os.path.join(self.test_folder, "not_a_csv.txt"), 'w') as file:
+            file.write("This is not a CSV file.")
+        result = merge_csvs_into_dataframe(self.test_folder)
+        self.assertEqual(len(result), 3)  # Expect 3 unique rows from CSVs only
 
 
 if __name__ == '__main__':
