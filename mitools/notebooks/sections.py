@@ -78,6 +78,8 @@ def rename_columns(dataframe: DataFrame, columns_map: RenameColumnsMap,
         
 def filter_text_rows_by_pattern(dataframe: DataFrame, filter_col: str, pattern: Pattern, 
                                 case: Optional[bool]=False) -> DataFrame:
+    if filter_col not in dataframe.columns:
+        raise ArgumentKeyError(INVALID_COLUMN_ERROR.format(filter_col))
     condition = dataframe[filter_col]
     condition = condition.str.contains(pattern, case=case, regex=True)
     return dataframe[condition]
