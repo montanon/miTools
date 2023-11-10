@@ -8,6 +8,7 @@ from pandas import DataFrame
 
 from ..context import DISPLAY
 from ..exceptions.custom_exceptions import ArgumentKeyError
+from ..utils import iprint
 from .objects import NotebookSection
 
 FULL_TEXT_COLUMN = 'full_text'
@@ -91,26 +92,12 @@ def merge_csvs_into_dataframe(csvs_folder: PathLike) -> DataFrame:
             )
     return dataframe
 
-
-
-inputs = {
-    'project': 'Urban Climate Paper',
-    'articles_csv_path': 'lens_articles.csv',
-    'csvs_folder': ''
-
-}
-
-pattern = '((?=.*urban)|(?=.*city))'
-
-def etl(articles_csv_path, csvs_folder, pattern, columns_map, filter_col, df_path, recalculate):
+def etl(df_path, csvs_folder, columns_map, text_columns, pattern, filter_col, recalculate):
     if not os.path.exists(df_path) or recalculate:
         dataframe = merge_csvs_into_dataframe(csvs_folder)
-        dataframe = rename_columns(dataframe, columns_map, inverse_map=True)
-        dataframe =  create_full_text_column(dataframe, ['Title', 'Abstract'])
-        dataframe[
-            f'filtered_{filter_col}'
-            ] = filter_text_rows_by_pattern(dataframe, filter_col, pattern)
-        dataframe = dataframe.loc[dataframe[f'filtered_{filter_col}'] == False]
+        dataframe = rename_columns(dataframe, columns_map)
+        dataframe = create_full_text_column(dataframe, text_columns)
+        dataframe = filter_text_rows_by_pattern(dataframe, filter_col, pattern)
         dataframe.to_parquet(df_path)
     else:
         dataframe = pd.read_parquet(df_path)

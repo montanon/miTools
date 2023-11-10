@@ -5,7 +5,7 @@ import unittest
 import pandas as pd
 
 from mitools.exceptions.custom_exceptions import ArgumentKeyError
-from mitools.notebooks import (FULL_TEXT_COLUMN, create_full_text_column,
+from mitools.notebooks import (FULL_TEXT_COLUMN, create_full_text_column, etl,
                                filter_text_rows_by_pattern,
                                merge_csvs_into_dataframe, read_and_concat_csvs,
                                rename_columns)
@@ -235,6 +235,39 @@ class TestMergeCSVsIntoDataFrame(unittest.TestCase):
         result = merge_csvs_into_dataframe(self.test_folder)
         self.assertEqual(len(result), 3)  # Expect 3 unique rows from CSVs only
 
+
+class TestETL(unittest.TestCase):
+    def setUp(self):
+        # Setup for ETL test
+        self.test_csv_folder = "test_csv_folder"
+        os.makedirs(self.test_csv_folder, exist_ok=True)
+        df1 = pd.DataFrame({'A': ['Hello', 'Bye'], 'B': ['World', 'Moon']}).reset_index()
+        df2 = pd.DataFrame({'A': ['Good', 'Bad'], 'B': ['Day', 'Night']}).reset_index()
+        df1.to_csv(os.path.join(self.test_csv_folder, "file1.csv"), index=False)
+        df2.to_csv(os.path.join(self.test_csv_folder, "file2.csv"), index=False)
+
+        self.df_path = "test_output.parquet"
+        self.columns_map = {'A': 'Greeting', 'B': 'Object'}
+        self.text_columns = ['Greeting', 'Object']
+        self.pattern = 'Hello'
+        self.filter_col = 'Greeting'
+        self.recalculate = True
+
+    def tearDown(self):
+        # Clean up test files and folders
+        for file in os.listdir(self.test_csv_folder):
+            os.remove(os.path.join(self.test_csv_folder, file))
+        os.rmdir(self.test_csv_folder)
+        if os.path.exists(self.df_path):
+            os.remove(self.df_path)
+
+    def test_full_etl_process(self):
+        result = etl(self.df_path, self.test_csv_folder, self.columns_map, 
+                     self.text_columns, self.pattern, self.filter_col, self.recalculate)
+        print(result)
+        expected_rows = 1  # Assuming only 'Hello World' matches the pattern
+        self.assertEqual(len(result), expected_rows)
+        self.assertTrue(all(col in result.columns for col in self.text_columns))
 
 if __name__ == '__main__':
     unittest.main()
