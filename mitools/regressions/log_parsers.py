@@ -7,10 +7,10 @@ from typing import Dict, List
 
 import numpy as np
 import pandas as pd
+from fuzzywuzzy import process
 
 from ..utils import *
-from .regressions_data import (CSARDLResults, OLSResults, RegressionData,
-                               XTRegResults)
+from .regressions_data import CSARDLResults, OLSResults, RegressionData, XTRegResults
 
 #SPLIT_PATTERN = '={2,}\n'
 #MODEL_PATTERN = f'({SPLIT_PATTERN}(\n)+){{1}}'
@@ -47,7 +47,7 @@ def process_logs(logs_paths, split_str: Optional[str]=None):
 
 def process_log(log_path: PathLike, split_str: Optional[str]=None):
     log = load_log(log_path)
-    model_type, group, regression_id = get_log_data_from_path(log_path)
+    tag, model_type, group, regression_id = get_log_data_from_path(log_path)
     regression_strs = get_splits_from_regressions_str(log, split_str)
     regression_data = []
     for n, regression_str in enumerate(regression_strs):
@@ -63,8 +63,8 @@ def process_log(log_path: PathLike, split_str: Optional[str]=None):
 def load_log(log_path): return read_text_file(log_path)
 
 def get_log_data_from_path(log_path: PathLike):
-    model_type, group, regression_id = os.path.basename(log_path.replace('.log', '')).split('_')
-    return model_type, group, regression_id
+    tag, model_type, group, regression_id = os.path.basename(log_path.replace('.log', '')).split('_')
+    return tag, model_type, group, regression_id
 
 def process_regression_str(regression_str: str, model_type: str) -> Dict[str,List]:
     regression_data = get_model_data_from_log(regression_str, model_type)
@@ -124,8 +124,18 @@ def get_xtreg_data_from_log(xtreg_str: str):
     R_sq_between = get_numbers_from_str(re.search(rf'Between += +(({NUMBER_PATTERN})|(.))+\n', xtreg_str).group(0))[-1]
     corr = get_numbers_from_str(re.search(rf'corr\((.*?)= +(({NUMBER_PATTERN})|(.))+\n', xtreg_str).group(0))[-1] 
 
-    coefficients_table = xtreg_str.split('\n\n')[3]
-    dep_variable = re.search('(Indicat(?:~\d+X|or\w+X))|(ECI)', coefficients_table).group(0).strip()
+    if 30 > xtreg_str.find('note: ') > -1:
+        coefficients_table = xtreg_str.split('\n\n')[4]
+        print('COEFFICIETNS TABLES: \n', coefficients_table)
+    else:
+        coefficients_table = xtreg_str.split('\n\n')[3]
+    try:
+        print('Dep vAriable: ', coefficients_table)
+        dep_variable = re.search('(Indicat(?:~\d+X|or\w+X))|(ECI)', coefficients_table).group(0).strip()
+    except Exception:
+        print('ERRROR:')
+        print(xtreg_str)
+        raise Exception
 
     coefficient_rows = coefficients_table.split('\n')[5:-6]
     coefficients = get_coefficients_from_table_rows(coefficient_rows, XTREG_VAR_NAMES)
@@ -366,7 +376,7 @@ def generate_significance_color_styles(df):
     for r in range(df.shape[0]):
         for c in range(df.shape[1]):
             val = df.iloc[r, c]
-            if isinstance(val, str) and 'ECI' in df.index[r][-1]:
+            if isinstance(val, str) and 'ECI' in df.index[r][-1] or 'SCP' in df.index[r][-1] or 'SCI' in df.index[r][-1] or 'PSEV' in df.index[r][-1]:
                 pos_value = float(val.split(' ')[0]) >= 0.0
                 if '***' in val:
                     val_style = 'background-color: limegreen; font-weight: bold;' if pos_value else 'background-color: red; font-weight: bold;'
@@ -393,8 +403,15 @@ def df_selection(df, indicators, columns, col_filters, index_filters):
             _df = _df.loc[mask, :]
     return _df
 
-def df_view(df, indicators, columns, col_filters, index_filters, col_name, row_name):
+def get_ids_with_containing_string(df, text_column, substring, id_col):
+    filtered_df = df[df.index.get_level_values(text_column).str.contains(substring)]
+    unique_ids = filtered_df.index.get_level_values(id_col).unique()
+    return unique_ids
+
+def df_view(df, indicators, columns, col_filters, index_filters, eci_col, col_name, row_name):
     _df = df_selection(df, indicators, columns, col_filters, index_filters)
+    eci_ids = get_ids_with_containing_string(_df, 'Variable', eci_col, 'Id')
+    _df = _df.loc[_df.index.get_level_values('Id').isin(eci_ids), :]
     _df = sort_df(_df, col_name, 1, income_sorting_key)
     _df = sort_df(_df, [row_name, 'Variable'], 0)
     _df = style_csardl_results(_df, row_name, col_name)
@@ -485,17 +502,37 @@ def save_dfs_to_excel(dataframes, sheet_names, path):
 
 def mask_results(dataframe, indicator_names):
     dataframe = dataframe.reset_index()
+    dataframe['Variable'] = dataframe['Variable'].apply(lambda x: ind_var_name_replace(x, indicator_names))
     dataframe['Dep Var'] = dataframe['Dep Var'].apply(lambda x: ind_var_name_replace(x, indicator_names))
     dataframe['Indep Var'] = dataframe['Indep Var'].map(indicator_names.to_dict()['Original Name'])
-    dataframe['Variable'] = dataframe['Variable'].apply(lambda x: ind_var_name_replace(x, indicator_names))
     if 'Lag' in dataframe.columns:
         dataframe['Lag'] = dataframe['Lag'].astype(str) + '-year Lag'
     dataframe = dataframe.set_index([c for c in dataframe.columns if c != 'Result'])
     return dataframe
 
 def ind_var_name_replace(string, indicator_names):
+    ind_mapping = {
+        'PetChe~SSECI': 'PetCheNonSSECI',
+        'TexWea~SSECI': 'TexWeaAppSSECI',
+        'PetChe~nSECI': 'PetCheNonSECI',
+        'TexWea~pSECI': 'TexWeaAppSECI',
+        'PetChe~NSECI': 'PetCheNonNSECI',
+        'TexWea~NSECI': 'TexWeaAppNSECI',
+        'PetCheN~NSCI': 'PetCheNonNSCI',
+        'TexWeaA~NSCI': 'TexWeaAppNSCI',
+        'PetCheN~SSCI': 'PetCheNonSSCI',
+        'TexWeaA~SSCI': 'TexWeaAppSSCI',
+        'PetCheN~SSCP': 'PetCheNonSSCP',
+        'TexWeaA~SSCP': 'TexWeaAppSSCP',
+        'PetCheNonP~V': 'PetCheNonPSEV',
+        'TexWeaAppP~V': 'TexWeaAppPSEV',
+
+    }
+    if string in ind_mapping:
+        indicator_name = indicator_names.to_dict()['Original Name'][ind_mapping[string]]
+        return indicator_name
     search_indicator = re.search('Indic[ator]*~?\d{1,}X', string)
-    search_eci = re.search('[A-Za-z& ]*ECI', string)
+    search_eci = re.search('[A-Za-z& ]*(SECI|ECI|SCI|SCP|PSEV)', string)
     if search_indicator:
         indicator = search_indicator.group(0)
         indicator = re.sub('Indic[ato]*~+r*', 'Indicator', indicator)
@@ -504,7 +541,9 @@ def ind_var_name_replace(string, indicator_names):
     elif search_eci:
         indicator = search_eci.group(0)
         indicator_name = indicator_names.to_dict()['Original Name'][indicator]
-        string = re.sub('(?<=[._])?[A-Za-z& ]*ECI', indicator_name, string)
+        string = re.sub('(?<=[._])?[A-Za-z& ]*(SECI|ECI|SCI|SCP|PSEV)', indicator_name, string)
+        if string.find('~') > -1:
+            print(string)
     return string
 
 def has_duplicated_indices(df: DataFrame):
