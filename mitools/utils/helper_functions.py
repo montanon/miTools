@@ -145,3 +145,7 @@ def iprint(iterable: Union[Iterable,str], splitter: Optional[str] = '', c: Optio
             
 def check_symmetrical_matrix(a: ndarray, rtol: Optional[float]=1e-05, atol: Optional[float]=1e-08) -> bool:
     return np.allclose(a, a.T, rtol=rtol, atol=atol)
+
+def remove_chars(input_string: str, chars_to_remove: str) -> str:
+    remove_set = set(chars_to_remove)
+    return ''.join(char for char in input_string if char not in remove_set)
