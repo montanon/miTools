@@ -74,13 +74,22 @@ test_python_module matplotlib
 test_python_module cv2
 test_python_module torch
 test_python_module torchvision
+$PYTHON_PATH -c "import torch; print(torch.backends.mps.is_available()); print(torch.backends.mps.is_built())"
 test_python_module jupyter
 test_python_module ipywidgets
+
+#conda install -c apple tensorflow-deps -y
+$PYTHON_PATH -m pip install tensorflow
+$PYTHON_PATH -m pip install tensorflow-metal
+test_python_module tensorflow
+$PYTHON_PATH -c "import tensorflow as tf; print('Num GPUs Available: ', len(tf.config.experimental.list_physical_devices('GPU')))"
 
 conda install -c conda-forge tokenizers=0.11.3 -y
 test_python_module tokenizers
 
-$PYTHON_PATH -m pip install transformers
+#$PYTHON_PATH -m pip install transformers
+$PYTHON_PATH -m pip install git+https://github.com/huggingface/transformers
+#conda install -c huggingface transformers -y
 test_python_module transformers
 $PYTHON_PATH -c "from transformers import pipeline; print(pipeline('sentiment-analysis')('I love you'))"
 
@@ -88,7 +97,8 @@ conda install -c conda-forge scikit-learn nltk -y
 test_python_module sklearn
 test_python_module nltk
 
-conda install -c conda-forge spacy -y
+$PYTHON_PATH -m pip install spacy
+#conda install -c conda-forge spacy -y
 $PYTHON_PATH -m spacy download en_core_web_sm
 $PYTHON_PATH -m spacy download es_core_news_sm
 test_python_module spacy
@@ -167,5 +177,14 @@ cd "$original_path"
 
 conda install -c conda-forge ploomber -y
 test_python_module ploomber
+
+conda install -c conda-forge pyvis -y
+test_python_module pyvis
+
+conda install -c conda-forge plotly -y
+test_python_module plotly
+
+conda install -c conda-forge linearmodels
+test_pytohn_module linearmodels
 
 ipython kernel install --user --name=$env
