@@ -183,6 +183,7 @@ test_python_module pyvis
 
 conda install -c conda-forge plotly -y
 test_python_module plotly
+$PYTHON_PATH -m pip install -U kaleido
 
 conda install -c conda-forge linearmodels
 test_pytohn_module linearmodels
