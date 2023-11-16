@@ -134,8 +134,8 @@ def preprocess_country_name(country_name: str) -> str:
     country_name = re.sub(r'[^a-z\s]', ' ', country_name).strip()
     return country_name
 
-def find_cities_in_texts(df: DataFrame, pattern: List[str]) -> DataFrame:
-    matches = (df['text'].str
+def find_cities_in_texts(df: DataFrame, pattern: List[str], text_col: str) -> DataFrame:
+    matches = (df[text_col].str
                .extractall(pattern))
     mentioned_cities = pd.DataFrame(index=df.index.get_level_values(0).unique(), columns=['cities'])
     for idx, g in matches.reset_index()[['match', 0]].groupby('match'):
