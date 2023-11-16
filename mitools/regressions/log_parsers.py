@@ -10,12 +10,11 @@ import pandas as pd
 from fuzzywuzzy import process
 
 from ..utils import *
-from .regressions_data import (CSARDLResults, OLSResults, RegressionData,
-                               XTRegResults)
+from .regressions_data import CSARDLResults, OLSResults, RegressionData, XTRegResults
 
 #SPLIT_PATTERN = '={2,}\n'
 #MODEL_PATTERN = f'({SPLIT_PATTERN}(\n)+){{1}}'
-NUMBER_PATTERN = '-?\d*\.*\d*([Ee][\+\-]\d+)?'
+NUMBER_PATTERN = '-?\d*\.?\d+(?:[Ee][\+\-]?\d+)?'#'-?\d*\.*\d*([Ee][\+\-]\d+)?'
 #REGRESSION_PATTERN = f'({SPLIT_PATTERN}){{2}}(.*?)({SPLIT_PATTERN}){{1}}(.*?)({SPLIT_PATTERN}){{2}}'
 
 SPLIT_PATTERN = '''===============================================================================\n> ==========\n'''
@@ -95,8 +94,12 @@ def get_coefficients_from_table_rows(coefficient_rows: List[str], var_names: Lis
         variable = re.match(' *[A-Za-z0-9\_\~.]+ *(?=\|)', row)
         end_of_variable = variable.end()
         variable = variable.group(0).strip()
-        coeffs = re.findall('-?\d*\.?\d+', row[end_of_variable:])
-        coeffs = [float(c) for c in coeffs]
+        if not '(omitted)' in row[end_of_variable:]:
+            coeffs = re.findall(NUMBER_PATTERN, row[end_of_variable:])
+            _coeffs = coeffs
+            coeffs = [float(c) if c != '.' else 0.0  for c in coeffs]
+        else:
+            coeffs = [0, 9999, 0, 1.0, 0, 0]
         coeffs = {v: c for v, c in zip(var_names, coeffs)}
         coefficients[variable] = coeffs
     return coefficients
@@ -125,18 +128,12 @@ def get_xtreg_data_from_log(xtreg_str: str):
     R_sq_between = get_numbers_from_str(re.search(rf'Between += +(({NUMBER_PATTERN})|(.))+\n', xtreg_str).group(0))[-1]
     corr = get_numbers_from_str(re.search(rf'corr\((.*?)= +(({NUMBER_PATTERN})|(.))+\n', xtreg_str).group(0))[-1] 
 
-    if 30 > xtreg_str.find('note: ') > -1:
-        coefficients_table = xtreg_str.split('\n\n')[4]
-        print('COEFFICIETNS TABLES: \n', coefficients_table)
-    else:
-        coefficients_table = xtreg_str.split('\n\n')[3]
-    try:
-        print('Dep vAriable: ', coefficients_table)
-        dep_variable = re.search('(Indicat(?:~\d+X|or\w+X))|(ECI)', coefficients_table).group(0).strip()
-    except Exception:
-        print('ERRROR:')
-        print(xtreg_str)
-        raise Exception
+    if xtreg_str.startswith('note:'):
+        xtreg_str = '\n'.join(xtreg_str.split('\n')[1:])
+
+    coefficients_table = xtreg_str.split('\n\n')[3]
+    dep_variable = re.search('(Indicat(?:~\d+X|or\w+X))|(ECI)', coefficients_table).group(0).strip()
+
 
     coefficient_rows = coefficients_table.split('\n')[5:-6]
     coefficients = get_coefficients_from_table_rows(coefficient_rows, XTREG_VAR_NAMES)
@@ -506,6 +503,7 @@ def mask_results(dataframe, indicator_names):
     dataframe['Variable'] = dataframe['Variable'].apply(lambda x: ind_var_name_replace(x, indicator_names))
     dataframe['Dep Var'] = dataframe['Dep Var'].apply(lambda x: ind_var_name_replace(x, indicator_names))
     dataframe['Indep Var'] = dataframe['Indep Var'].map(indicator_names.to_dict()['Original Name'])
+    dataframe['Variable'] = dataframe['Variable'].apply(lambda x: ind_var_name_replace(x, indicator_names))
     if 'Lag' in dataframe.columns:
         dataframe['Lag'] = dataframe['Lag'].astype(str) + '-year Lag'
     dataframe = dataframe.set_index([c for c in dataframe.columns if c != 'Result'])
