@@ -175,9 +175,6 @@ $PYTHON_PATH -m pip install -e .
 test_python_module mitools
 cd "$original_path"
 
-conda install -c conda-forge ploomber -y
-test_python_module ploomber
-
 conda install -c conda-forge pyvis -y
 test_python_module pyvis
 
@@ -186,6 +183,8 @@ test_python_module plotly
 $PYTHON_PATH -m pip install -U kaleido
 
 conda install -c conda-forge linearmodels
-test_pytohn_module linearmodels
+test_python_module linearmodels
 
 ipython kernel install --user --name=$env
+
+conda env export > ".envs/${env}.yml"
