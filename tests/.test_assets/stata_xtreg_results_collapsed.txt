@@ -1,0 +1,41 @@
+
+Fixed-effects (within) regression               Number of obs     =      2,257
+Group variable: id                              Number of groups  =        114
+
+R-squared:                                      Obs per group:
+     Within  = 1.0000                                         min =          1
+     Between = 1.0000                                         avg =       19.8
+     Overall = 1.0000                                         max =         26
+
+                                                F(0, 113)         =          .
+corr(u_i, Xb) = 0.7837                          Prob > F          =          .
+
+                                   (Std. err. adjusted for 114 clusters in id)
+------------------------------------------------------------------------------
+             |               Robust
+Indicat~325X | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+     AgrSSCI |  -8.65e-17          .        .       .            .           .
+     FisSSCI |   5.12e-17          .        .       .            .           .
+  FooBevSSCI |  -2.27e-17          .        .       .            .           .
+     MacSSCI |   6.59e-18          .        .       .            .           .
+  MetProSSCI |  -3.70e-17          .        .       .            .           .
+  MinQuaSSCI |   2.72e-18          .        .       .            .           .
+  OthManSSCI |   6.66e-17          .        .       .            .           .
+PetCheN~SSCI |  -6.51e-17          .        .       .            .           .
+TexWeaA~SSCI |   3.78e-17          .        .       .            .           .
+  TraEquSSCI |  -1.34e-17          .        .       .            .           .
+  WooPapSSCI |  -1.22e-17          .        .       .            .           .
+Indicat~114X |   1.34e-17          .        .       .            .           .
+Indicat~327X |  -2.19e-16          .        .       .            .           .
+Indicat~325X |          1          .        .       .            .           .
+Indicat~116X |   1.53e-17          .        .       .            .           .
+Indicat~358X |  -3.60e-17          .        .       .            .           .
+Indicat~323X |  -8.43e-19          .        .       .            .           .
+Indicat~319X |  -2.60e-17          .        .       .            .           .
+       _cons |   4.44e-16          .        .       .            .           .
+-------------+----------------------------------------------------------------
+     sigma_u |  5.684e-16
+     sigma_e |          0
+         rho |          1   (fraction of variance due to u_i)
+------------------------------------------------------------------------------
