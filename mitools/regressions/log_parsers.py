@@ -10,7 +10,8 @@ import pandas as pd
 from fuzzywuzzy import process
 
 from ..utils import *
-from .regressions_data import CSARDLResults, OLSResults, RegressionData, XTRegResults
+from .regressions_data import (CSARDLResults, OLSResults, RegressionData,
+                               XTRegResults)
 
 #SPLIT_PATTERN = '={2,}\n'
 #MODEL_PATTERN = f'({SPLIT_PATTERN}(\n)+){{1}}'
@@ -532,7 +533,7 @@ def ind_var_name_replace(string, indicator_names):
         indicator_name = indicator_names.to_dict()['Original Name'][ind_mapping[string]]
         return indicator_name
     search_indicator = re.search('Indic[ator]*~?\d{1,}X', string)
-    search_eci = re.search('[A-Za-z& ]*(SECI|ECI|SCI|SCP|PSEV)', string)
+    search_eci = re.search('[A-Za-z& \-,]*(SECI|ECI|SCI|SCP|PSEV)', string)
     if search_indicator:
         indicator = search_indicator.group(0)
         indicator = re.sub('Indic[ato]*~+r*', 'Indicator', indicator)
@@ -540,7 +541,14 @@ def ind_var_name_replace(string, indicator_names):
         string = re.sub('Indic[a-z\~]+\d{1,}X', indicator_name, string)
     elif search_eci:
         indicator = search_eci.group(0)
-        indicator_name = indicator_names.to_dict()['Original Name'][indicator]
+        indicators_dict = indicator_names.to_dict()['Original Name']
+        if indicator not in indicators_dict.values() and indicator in indicators_dict.keys():
+            indicator_name = indicators_dict[indicator]
+        elif indicator in indicators_dict.values():
+            indicator_name = indicator
+        else:
+            print(indicator, search_eci, string)
+            raise Exception
         string = re.sub('(?<=[._])?[A-Za-z& ]*(SECI|ECI|SCI|SCP|PSEV)', indicator_name, string)
         if string.find('~') > -1:
             print(string)
