@@ -137,8 +137,8 @@ def preprocess_country_name(country_name: str) -> str:
 def find_cities_in_texts(df: DataFrame, pattern: List[str]) -> DataFrame:
     matches = (df['text'].str
                .extractall(pattern))
-    mentioned_cities = pd.DataFrame(index=matches.index.get_level_values(0).unique(), columns=['cities'])
-    for idx, g in matches.reset_index()[['index', 0]].groupby('index'):
+    mentioned_cities = pd.DataFrame(index=df.index.get_level_values(0).unique(), columns=['cities'])
+    for idx, g in matches.reset_index()[['match', 0]].groupby('match'):
         mentioned_cities.loc[idx, 'cities'] = g[0].values.tolist()
     mentioned_cities = mentioned_cities['cities'].apply(pd.Series)
     mentioned_cities = mentioned_cities.sort_index()
