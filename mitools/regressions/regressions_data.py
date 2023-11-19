@@ -90,7 +90,7 @@ class XTRegResults(RegressionData):
         regression_data = self.to_df()
         try:
             regression_data['Result'] = (regression_data[self.coefficient_col]
-                                        .round(2)
+                                        .round(3)
                                         .astype(str) + ' (' + regression_data[self.significance_col]
                                         .astype(str) + ')')
             regression_data['Result'] = regression_data['Result'].apply(add_significance)
