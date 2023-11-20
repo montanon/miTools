@@ -185,6 +185,9 @@ $PYTHON_PATH -m pip install -U kaleido
 conda install -c conda-forge linearmodels
 test_python_module linearmodels
 
+conda install -c conda-forge selenium
+test_python_module selenium
+
 ipython kernel install --user --name=$env
 
 conda env export > ".envs/${env}.yml"
