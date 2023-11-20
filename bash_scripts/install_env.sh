@@ -3,10 +3,6 @@
 # Exit on error, uninitialized variable, or error in pipeline
 set -Eeo pipefail
 
-env=tools
-
-echo $MITOOLS
-
 # Function to print errors in red and exit
 print_error() {
     local last_command_exit_code=$?
@@ -43,6 +39,10 @@ test_python_module() {
         $PYTHON_PATH -c "$test_command" && print_success "Successfully tested $module_name" || print_error "Testing of $module_name failed"
     fi
 }
+
+env=tools
+original_path=$(pwd)
+echo $MITOOLS
 
 source /opt/homebrew/Caskroom/miniconda/base/etc/profile.d/conda.sh
 if [[ "$CONDA_DEFAULT_ENV" == "$env" ]]; then
@@ -97,58 +97,11 @@ conda install -c conda-forge scikit-learn nltk -y
 test_python_module sklearn
 test_python_module nltk
 
-$PYTHON_PATH -m pip install spacy
-#conda install -c conda-forge spacy -y
-$PYTHON_PATH -m spacy download en_core_web_sm
-$PYTHON_PATH -m spacy download es_core_news_sm
-test_python_module spacy
-
 conda install -c conda-forge fuzzywuzzy tqdm pdfminer pdfminer.six lxml -y
 test_python_module fuzzywuzzy
 test_python_module tqdm
 test_python_module pdfminer
 test_python_module lxml
-
-conda install -c conda-forge ninja -y
-
-$PYTHON_PATH -m pip install pybind11
-test_python_module pybind11
-
-
-original_path=$(pwd)
-sudo rm -rf ~/.racplusplus
-sudo rm -rf ~/.racplusplus/RACplusplus/_skbuild
-sudo rm -rf ~/.racplusplus && mkdir ~/.racplusplus && cd ~/.racplusplus
-git clone git@github.com:porterehunley/RACplusplus.git
-cd RACplusplus
-
-# Commented out: `#$PYTHON_PATH -m pip install pybind11` from ./dependencies_mac.sh
-# Avoid package managing conflict errors by `sudo pip`
-sed -i.bak '/$PYTHON_PATH -m pip install pybind11/s/^/#/' ./dependencies_mac.sh
-
-sudo chmod +x ./dependencies_mac.sh
-sudo ./dependencies_mac.sh
-
-PYTHON_PATH=$(which python)
-$PYTHON_PATH -m pip install scikit-build
-test_python_module skbuild
-
-$PYTHON_PATH setup.py install
-mkdir build && cd build && sudo rm -rf * # Clean out the build directory
-conda install -c conda-forge ninja
-export CC=$(which gcc)
-export CXX=$(which g++)
-C_COMPILER="$(which clang)"
-CXX_COMPILER="$(which clang++)"
-cmake -G Ninja -DCMAKE_MAKE_PROGRAM=$(which ninja) -DCMAKE_C_COMPILER=$(CC) -DCMAKE_CXX_COMPILER=$(CXX) ..
-ninja
-cd ..
-echo PWD:$(pwd)
-$PYTHON_PATH -m pip install .
-test_python_module racplusplus
-cd "$original_path"
-
-$PYTHON_PATH -m pip install xlsxwriter country_converter pycountry
 
 conda install -c conda-forge numba -y
 test_python_module numba
@@ -168,25 +121,65 @@ test_python_module fastparquet
 conda install -c conda-forge pyarrow -y
 test_python_module pyarrow
 
+conda install -c conda-forge pyvis -y
+test_python_module pyvis
+
+conda install -c conda-forge plotly -y
+test_python_module plotly
+
+conda install -c conda-forge ninja -y
+
+conda install -c conda-forge linearmodels -y
+test_python_module linearmodels
+
+conda install -c conda-forge selenium -y
+test_python_module selenium
+
+conda install -c conda-forge scikit-build -y
+test_python_module skbuild
+
+conda install -c conda-forge pybind11 -y
+test_python_module pybind11
+
+sudo rm -rf ~/.racplusplus
+sudo rm -rf ~/.racplusplus/RACplusplus/_skbuild
+sudo rm -rf ~/.racplusplus && mkdir ~/.racplusplus && cd ~/.racplusplus
+git clone git@github.com:porterehunley/RACplusplus.git
+cd RACplusplus
+# Commented out: `#$PYTHON_PATH -m pip install pybind11` from ./dependencies_mac.sh
+# Avoid package managing conflict errors by `sudo pip`
+sed -i.bak '/$PYTHON_PATH -m pip install pybind11/s/^/#/' ./dependencies_mac.sh
+sudo chmod +x ./dependencies_mac.sh
+sudo ./dependencies_mac.sh
+$PYTHON_PATH setup.py install
+mkdir build && cd build && sudo rm -rf * # Clean out the build directory
+export CC=$(which gcc)
+export CXX=$(which g++)
+C_COMPILER="$(which clang)"
+CXX_COMPILER="$(which clang++)"
+cmake -G Ninja -DCMAKE_MAKE_PROGRAM=$(which ninja) -DCMAKE_C_COMPILER=$(CC) -DCMAKE_CXX_COMPILER=$(CXX) ..
+ninja
+cd ..
+echo PWD:$(pwd)
+$PYTHON_PATH -m pip install .
+test_python_module racplusplus
+cd "$original_path"
+
+$PYTHON_PATH -m pip install xlsxwriter country_converter pycountry
+
+$PYTHON_PATH -m pip install spacy
+$PYTHON_PATH -m spacy download en_core_web_sm
+$PYTHON_PATH -m spacy download es_core_news_sm
+test_python_module spacy
+
+$PYTHON_PATH -m pip install -U kaleido
+
 echo $MITOOLS
 cd "$MITOOLS"
 echo PWD$(pwd)
 $PYTHON_PATH -m pip install -e .
 test_python_module mitools
 cd "$original_path"
-
-conda install -c conda-forge pyvis -y
-test_python_module pyvis
-
-conda install -c conda-forge plotly -y
-test_python_module plotly
-$PYTHON_PATH -m pip install -U kaleido
-
-conda install -c conda-forge linearmodels
-test_python_module linearmodels
-
-conda install -c conda-forge selenium
-test_python_module selenium
 
 ipython kernel install --user --name=$env
 
