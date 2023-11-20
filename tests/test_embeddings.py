@@ -15,37 +15,30 @@ class TestHuggingfaceSpecterEmbedTexts(unittest.TestCase):
 
     def test_single_thread(self):
         texts = ["sample text 1", "sample text 2"]
-        embeddings = huggingface_specter_embed_texts(texts, batch_size=1, n_threads=1)
-        # Assuming embeddings are list of lists/tensors, checking basic structure
-        self.assertEqual(len(embeddings), 2)
-
-    def test_multiple_thread(self):
-        texts = ["sample text 1", "sample text 2"]
-        embeddings = huggingface_specter_embed_texts(texts, batch_size=1, n_threads=2)
+        embeddings = huggingface_specter_embed_texts(texts, batch_size=1)
         # Assuming embeddings are list of lists/tensors, checking basic structure
         self.assertEqual(len(embeddings), 2)
 
     def test_multiple_batch(self):
-        texts = ["sample text 1", "sample text 2"]
-        embeddings = huggingface_specter_embed_texts(texts, batch_size=2, n_threads=2)
+        _batch_size = 4
+        texts = [f"sample text {n}" for n in range(1,_batch_size+1)] 
+        embeddings = huggingface_specter_embed_texts(texts, batch_size=_batch_size)
         # Assuming embeddings are list of lists/tensors, checking basic structure
-        self.assertEqual(len(embeddings), 2)
+        self.assertEqual(len(embeddings), _batch_size)
 
 
 class TestHuggingfaceSpecterEmbedChunk(unittest.TestCase):
 
     def setUp(self):
+        device = 'mps' if torch.backends.mps.is_available() else 'cpu'
         self.tokenizer = AutoTokenizer.from_pretrained('allenai/specter')
-        self.model = AutoModel.from_pretrained('allenai/specter')
-        os.environ['TOKENIZERS_PARALLELISM'] = 'true'
-
-    def tearDown(self):
-        del os.environ['TOKENIZERS_PARALLELISM']
+        self.model = AutoModel.from_pretrained('allenai/specter').to(device)
 
     def test_embed_chunk(self):
-        chunk = ["sample text 1", "sample text 2"]
+        _batch_size = 4
+        chunk = [f"sample text {n}" for n in range(1,_batch_size+1)]
         embeddings = huggingface_specter_embed_chunk(chunk, self.tokenizer, self.model)
-        self.assertEqual(len(embeddings), 2)
+        self.assertEqual(len(embeddings), _batch_size)
 
 
 class TestEmbeddingsColToFrame(unittest.TestCase):
