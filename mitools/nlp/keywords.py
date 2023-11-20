@@ -184,6 +184,9 @@ def sort_multiindex_dataframe(df: DataFrame, selected_cols: List[str], sorting_c
         sorted_dfs.append(selected_cluster_df)
     return pd.concat(sorted_dfs, axis=1)
 
+def strings_to_group_patterns(strings: List[str], union: str) -> str:
+    return union.join([f"(?=.*{s.lower()})" for s in strings])
+
 def plot_token_features(df: DataFrame, columns: List[str], 
                         hue: Optional[str]=None, log: Optional[bool]=True, 
                         ncols: Optional[int]=2, bins: Optional[int]=30,
