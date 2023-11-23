@@ -1,8 +1,19 @@
 import itertools
+import pickle
 import re
 from os import PathLike
-from typing import (Any, Dict, Generator, Iterable, List, Optional, Pattern,
-                    Type, TypeVar, Union)
+from typing import (
+    Any,
+    Dict,
+    Generator,
+    Iterable,
+    List,
+    Optional,
+    Pattern,
+    Type,
+    TypeVar,
+    Union,
+)
 
 import numpy as np
 from fuzzywuzzy import fuzz
@@ -149,3 +160,15 @@ def check_symmetrical_matrix(a: ndarray, rtol: Optional[float]=1e-05, atol: Opti
 def remove_chars(input_string: str, chars_to_remove: str) -> str:
     remove_set = set(chars_to_remove)
     return ''.join(char for char in input_string if char not in remove_set)
+
+def store_pkl_object(obj, filename):
+    with open(filename, 'wb') as output_file:  
+        pickle.dump(obj, output_file)
+
+def load_pkl_object(filename):
+    with open(filename, 'rb') as input_file:  
+        obj = pickle.load(input_file)
+        return obj
+
+def unpack_list_of_lists(list_of_lists: List[List]) -> List:
+    return [item for sub_list in list_of_lists for item in sub_list]
