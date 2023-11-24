@@ -4,8 +4,19 @@ import pickle
 import re
 import sys
 from os import PathLike
-from typing import (Any, Dict, Generator, Iterable, List, Optional, Pattern,
-                    Tuple, Type, TypeVar, Union)
+from typing import (
+    Any,
+    Dict,
+    Generator,
+    Iterable,
+    List,
+    Optional,
+    Pattern,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+)
 
 import numpy as np
 import openpyxl
