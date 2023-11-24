@@ -2,8 +2,18 @@ import itertools
 import pickle
 import re
 from os import PathLike
-from typing import (Any, Dict, Generator, Iterable, List, Optional, Pattern,
-                    Type, TypeVar, Union)
+from typing import (
+    Any,
+    Dict,
+    Generator,
+    Iterable,
+    List,
+    Optional,
+    Pattern,
+    Type,
+    TypeVar,
+    Union,
+)
 
 import numpy as np
 from fuzzywuzzy import fuzz
@@ -163,7 +173,7 @@ def load_pkl_object(filename):
 def unpack_list_of_lists(list_of_lists: List[List]) -> List:
     return [item for sub_list in list_of_lists for item in sub_list]
 
-def stretch_string(string: str, length=60):
+def stretch_string(string: str, length: Optional[int]=60) -> str:
     string = ' '.join(string.split())
     if len(string) > length:
         index = length
