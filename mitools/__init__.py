@@ -22,7 +22,8 @@ import pandas as pd
 from tqdm import tqdm
 
 from mitools import clustering as clustering
-from mitools import etl, jupyter_utils, nlp, utils
+from mitools import economic_complexity as ec
+from mitools import etl, jupyter_utils, nlp
 from mitools import notebooks as nb
 from mitools import pandas as pdf
 from mitools.country_converter import cc
