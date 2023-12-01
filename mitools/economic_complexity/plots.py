@@ -40,7 +40,7 @@ def plot_country_sector_distributions_evolution(data, country, years, colors, va
                                   title=f'{year}-{country}-{sector}', 
                                   ax=ax)
             else:
-                plot_value_distribution(plot_data.query(f"Sector == '{sector}' and Year == {year}"), basket, 
+                plot_value_distribution(plot_data.query(f"Sector == '{sector}' and RCA >= 1.0 and Year == {year}"), basket, 
                                         bins=30, 
                                         n=7, 
                                         color=colors[sector], 
@@ -66,7 +66,7 @@ def plot_country_sector_distributions_by_year(data, country, year, colors, value
             ax = axes[nrow, ncol]
             sector = sectors[sector_idx]
             products = []
-            for idx, row in plot_data.query(f"Sector == '{sector}' and RCA >= 1.0").iterrows():
+            for idx, row in plot_data.query(f"Sector == '{sector}' and RCA >= 1.0 and Year == {year}").iterrows():
                 products.append(Product(name=row['HS6'], code=row['HS6'], pci=row['PCI'], value=row['Trade Value']))
             basket = ProductsBasket(products)
             if not value:
@@ -77,9 +77,9 @@ def plot_country_sector_distributions_by_year(data, country, year, colors, value
                                   title=f'{year}-{country}-{sector}', 
                                   ax=ax)
             else:
-                plot_value_distribution(plot_data.query(f"Sector == '{sector}'"), basket, 
+                plot_value_distribution(plot_data.query(f"Sector == '{sector}' and RCA >= 1.0 and Year == {year}"), basket, 
                                         bins=30, 
-                                        n=7, 
+                                        n=4, 
                                         color=colors[sector], 
                                         title=f'{year}-{country}-{sector}', 
                                         ax=ax, 
@@ -134,7 +134,8 @@ def generate_random_products(num_products):
             existing_names.add(name)
     return products
 
-def plot_value_distribution(data, basket, n=10, bins=100, color=None, title=None, ax=None, info=True, quantiles=True, major_exports=True, kde=False, bin_step=0.001, line_kws=None, **kwargs):
+def plot_value_distribution(data, basket, n=10, bins=100, color=None, title=None, ax=None, info=True, quantiles=True, 
+                            major_exports=True, kde=False, weighted_mean=True, bin_step=0.001, line_kws=None, **kwargs):
     data = data.copy(deep=True).reset_index()
     data['Trade Value'] = data['Trade Value'] * 1e-6
     data = data[[c for c in data.columns if c not in [ 'Year',
@@ -172,14 +173,14 @@ def plot_value_distribution(data, basket, n=10, bins=100, color=None, title=None
         # Add text for statistics
         stats_text = f'Mean: {mean_val:.3f}\nStd: {std_val:.3f}\nMin: {min_val:.3f}\nMax: {max_val:.3f}'
         ax.text(0.95, 0.95, stats_text, transform=ax.transAxes, 
-                 verticalalignment='top', horizontalalignment='right')
+                 verticalalignment='top', horizontalalignment='right', fontsize=16)
     if quantiles:
         y_text_position = ax.get_ylim()[0] - (ax.get_ylim()[1] - ax.get_ylim()[0]) * 0.075  # 5% below the x-axis
         quantile_products = basket.products_closest_to_quantiles(n)
         for product in quantile_products:
             ax.axvline(x=product.pci, linestyle='--', color='gray', zorder=0, alpha=0.85)
-            ax.text(product.pci, y_text_position, product.name,
-            rotation=45, fontsize=12, horizontalalignment='right', verticalalignment='top')
+            ax.text(product.pci, y_text_position, stretch_string(product.name, 35),
+            rotation=45, fontsize=16, horizontalalignment='right', verticalalignment='top')
 
     if major_exports:
         x_min, x_max = ax.get_xlim()
@@ -187,7 +188,7 @@ def plot_value_distribution(data, basket, n=10, bins=100, color=None, title=None
         if not scatter_plot:
             top_exports = agg_bins['Trade Value'].nlargest(2)
         else:
-            top_exports = data.nlargest(3, 'Trade Value')
+            top_exports = data.nlargest(2, 'Trade Value')
         if not scatter_plot:
             if top_exports.iloc[0]*0.5 > top_exports.iloc[1]:
                 top_exports = top_exports.iloc[[0]]
@@ -201,13 +202,20 @@ def plot_value_distribution(data, basket, n=10, bins=100, color=None, title=None
                 product = top_exports.loc[n]
             product_name = product['HS6']
             product_value = product['Trade Value']
-            product_pct = round(100 * (product_value / trade_value) , 2)
-            product_name = f"{stretch_string(product_name, 30)} \n"
+            product_pct = round(100 * (product_value / trade_value), 2)
+            product_name = f"{stretch_string(product_name, 40)} \n"
             if not scatter_plot:
                 product_name += f"[{product_pct}% of {total_products} products]"
             h_al = 'right' if pci_value > x_mean else 'left'
             ax.text(pci_value, trade_value, product_name,
                 rotation=0, fontsize=12, horizontalalignment=h_al, verticalalignment='bottom', zorder=10)
+            
+    if weighted_mean:
+        weighted_value = sum(product.pci * product.value for product in basket.products)
+        weighted_value /= sum(product.value for product in basket.products)
+        ax.axvline(x=weighted_value, linestyle='--', linewidth=5.0, color='green', zorder=10, alpha=0.75)
+        ax.text(weighted_value*1.1, ax.get_ylim()[1]*0.55, f"SECI={round(weighted_value, 3)}", fontsize=24, zorder=99, 
+                verticalalignment='bottom', horizontalalignment='left', color='green', alpha=0.75)
             
     # Final plot adjustments
     if title:

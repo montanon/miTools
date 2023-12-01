@@ -59,11 +59,9 @@ class ProductsBasket:
         return len(self.products)
 
     def get_quantiles(self, n):
-        pcis = sorted(product.pci for product in self.products)
+        pcis = [product.pci for product in self.products]
         if pcis:
-            quantiles = [np.percentile(pcis, i * 100 / n) for i in range(1, n)]
-            quantiles.insert(0, pcis[0])
-            quantiles.append(pcis[-1])
+            quantiles = [np.percentile(pcis, i * 100.0 / n) for i in range(n + 1)]
         else:
             quantiles = []
         return quantiles
