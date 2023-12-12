@@ -26,5 +26,6 @@ from mitools import economic_complexity as ec
 from mitools import etl, jupyter_utils, nlp
 from mitools import notebooks as nb
 from mitools import pandas as pdf
+from mitools import regressions as reg
 from mitools.country_converter import cc
 from mitools.utils import iprint
