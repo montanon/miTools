@@ -181,6 +181,8 @@ $PYTHON_PATH -m pip install -e .
 test_python_module mitools
 cd "$original_path"
 
+$PYTHON_PATH -m pip install stata_setup
+
 ipython kernel install --user --name=$env
 
 conda env export > ".envs/${env}.yml"
