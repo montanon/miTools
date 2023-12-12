@@ -97,7 +97,7 @@ def get_coefficients_from_table_rows(coefficient_rows: List[str], var_names: Lis
         if not '(omitted)' in row[end_of_variable:]:
             coeffs = re.findall(NUMBER_PATTERN, row[end_of_variable:])
             _coeffs = coeffs
-            coeffs = [float(c) if c != '.' else 0.0  for c in coeffs]
+            coeffs = [float(c) if c != '.' else 0.0 for c in coeffs]
         else:
             coeffs = [0, 9999, 0, 1.0, 0, 0]
         coeffs = {v: c for v, c in zip(var_names, coeffs)}
@@ -133,7 +133,6 @@ def get_xtreg_data_from_log(xtreg_str: str):
 
     coefficients_table = xtreg_str.split('\n\n')[3]
     dep_variable = re.search('(Indicat(?:~\d+X|or\w+X))|(ECI)', coefficients_table).group(0).strip()
-
 
     coefficient_rows = coefficients_table.split('\n')[5:-6]
     coefficients = get_coefficients_from_table_rows(coefficient_rows, XTREG_VAR_NAMES)
@@ -412,6 +411,8 @@ def df_view(df, indicators, columns, col_filters, index_filters, eci_col, col_na
     _df = _df.loc[_df.index.get_level_values('Id').isin(eci_ids), :]
     _df = sort_df(_df, col_name, 1, income_sorting_key)
     _df = sort_df(_df, [row_name, 'Variable'], 0)
+    sorted_ids = _df.reset_index().groupby('Id')['Variable'].count().sort_values(axis=0, ascending=True).index
+    _df = _df.loc[sorted_ids, :]
     _df = style_csardl_results(_df, row_name, col_name)
     return _df
 
@@ -525,13 +526,17 @@ def ind_var_name_replace(string, indicator_names):
         'TexWeaA~SSCP': 'TexWeaAppSSCP',
         'PetCheNonP~V': 'PetCheNonPSEV',
         'TexWeaAppP~V': 'TexWeaAppPSEV',
+        'PetChe~SASCI': 'PetCheNonSASCI',
+        'TexWea~SASCI': 'TexWeaAppSASCI',
+        'PetChe~NASCI': 'PetCheNonNASCI',
+        'TexWea~NASCI': 'TexWeaAppNASCI'
 
     }
     if string in ind_mapping:
         indicator_name = indicator_names.to_dict()['Original Name'][ind_mapping[string]]
         return indicator_name
     search_indicator = re.search('Indic[ator]*~?\d{1,}X', string)
-    search_eci = re.search('[A-Za-z& \-,]*(SECI|ECI|SCI|SCP|PSEV)', string)
+    search_eci = re.search('[A-Za-z& \-,]*(ASCI|SECI|ECI|SCI|SCP|PSEV)', string)
     if search_indicator:
         indicator = search_indicator.group(0)
         indicator = re.sub('Indic[ato]*~+r*', 'Indicator', indicator)
@@ -547,7 +552,7 @@ def ind_var_name_replace(string, indicator_names):
         else:
             print(indicator, search_eci, string)
             raise Exception
-        string = re.sub('(?<=[._])?[A-Za-z& ]*(SECI|ECI|SCI|SCP|PSEV)', indicator_name, string)
+        string = re.sub('(?<=[._])?[A-Za-z& ]*(ASCI|SECI|ECI|SCI|SCP|PSEV)', indicator_name, string)
         if string.find('~') > -1:
             print(string)
     return string
