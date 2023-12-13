@@ -174,6 +174,8 @@ test_python_module spacy
 
 $PYTHON_PATH -m pip install -U kaleido
 
+$PYTHON_PATH -m pip install coverage
+
 echo $MITOOLS
 cd "$MITOOLS"
 echo PWD$(pwd)
