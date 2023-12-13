@@ -16,7 +16,8 @@ from sklearn.metrics.pairwise import cosine_similarity, pairwise_distances
 from sklearn.neighbors import NearestCentroid
 from tqdm import tqdm
 
-from ..exceptions import ArgumentStructureError, ArgumentTypeError, ArgumentValueError
+from ..exceptions import (ArgumentStructureError, ArgumentTypeError,
+                          ArgumentValueError)
 
 N_ELEMENTS_COL = 'N Elements'
 
@@ -330,7 +331,8 @@ def display_clusters_size(data: DataFrame, cluster_col: str) -> DataFrame:
     cluster_count.columns = [N_ELEMENTS_COL]
     return cluster_count
 
-def plot_clusters_growth(data: DataFrame, time_col: str, cluster_col: str) -> Axes:
+def plot_clusters_growth(data: DataFrame, time_col: str, cluster_col: str, 
+                         colors: Optional[List[Tuple]]=None) -> Axes:
     clusters_count = data.groupby(time_col)[cluster_col].value_counts().to_frame().sort_index(axis=1, level=1)
 
     fig, ax = plt.subplots(1, 1, figsize=(21,7))
@@ -338,13 +340,14 @@ def plot_clusters_growth(data: DataFrame, time_col: str, cluster_col: str) -> Ax
     clusters = clusters_count.index.get_level_values(1).unique().sort_values()
     times = clusters_count.index.get_level_values(0).unique().sort_values()
 
-    colors = sns.color_palette("husl", len(clusters))
+    if colors is None:
+        colors = sns.color_palette("husl", len(clusters))
 
     for cl in clusters:
         cluster_papers = clusters_count.loc[IndexSlice[:, cl], :]
         cluster_papers.index = cluster_papers.index.droplevel(1)
         cluster_papers = cluster_papers.reindex(times, fill_value=0)
-        ax.plot(times[:-1], cluster_papers['count'][:-1], c=colors[cl])
+        ax.plot(cluster_papers.index[:-1], cluster_papers['count'].values[:-1], c=colors[cl])
 
     ax.set_title('Cluster Size Evolution')
     ax.set_ylabel('N° Elements')
@@ -353,21 +356,23 @@ def plot_clusters_growth(data: DataFrame, time_col: str, cluster_col: str) -> Ax
     return ax
 
 def plot_cosine_similarities(cosine_similarities: Dict[int,DataFrame],
-                             normed: Optional[bool]=False) -> Axes:
+                             normed: Optional[bool]=False, 
+                             colors: Optional[List[Tuple]]=None) -> Axes:
     fig, ax = plt.subplots(1, 1, figsize=(14, 6))
     
-    palette = sns.color_palette('husl', len(cosine_similarities))[::-1]
+    if colors is None:
+        colors = sns.color_palette('husl', len(cosine_similarities))[::-1]
     for cl, similarities in cosine_similarities.items():
         upper_tri_vals = similarities[np.triu_indices(similarities.shape[0], k=1)]
         if not normed:
             ax = sns.histplot(upper_tri_vals, bins=30, ax=ax, alpha=0.05, stat="density", 
-                              color=palette[cl], legend=False)
-            ax = sns.kdeplot(upper_tri_vals, ax=ax, color=palette[cl], label=f"Cluster {cl}")
+                              color=colors[cl], legend=False)
+            ax = sns.kdeplot(upper_tri_vals, ax=ax, color=colors[cl], label=f"Cluster {cl}")
         else:
             kde = gaussian_kde(upper_tri_vals)
             x_vals = np.linspace(min(upper_tri_vals), max(upper_tri_vals), 1000)
             y_vals = kde(x_vals) / max(kde(x_vals))
-            ax.plot(x_vals, y_vals, alpha=1.0, label=f"Cluster {cl}", color=palette[cl])
+            ax.plot(x_vals, y_vals, alpha=1.0, label=f"Cluster {cl}", color=colors[cl])
 
     ax.set_title('Distributions of Cosine Similarities per Cluster')
     ax.set_xlabel('Cosine Similarity')
@@ -376,16 +381,17 @@ def plot_cosine_similarities(cosine_similarities: Dict[int,DataFrame],
     
     return ax
 
-def plot_distances_to_centroids(distances: DataFrame, cluster_col: str) -> Axes:
+def plot_distances_to_centroids(distances: DataFrame, cluster_col: str,
+                                colors: Optional[List[Tuple]]=None) -> Axes:
     fig, ax = plt.subplots(1, 1, figsize=(14, 6))
-
-    palette = sns.color_palette('husl', len(distances.index.unique()))[::1]
+    if colors is None:
+        colors = sns.color_palette('husl', len(distances.index.unique()))[::1]
     for cl, distances in distances.groupby(cluster_col):
         distances = distances[0].values
         kde = gaussian_kde(distances)
         x_vals = np.linspace(min(distances), max(distances), 1000)
         y_vals = kde(x_vals) / max(kde(x_vals))
-        ax.plot(x_vals, y_vals, alpha=1.0, label=f"Cluster {cl}", color=palette[cl])
+        ax.plot(x_vals, y_vals, alpha=1.0, label=f"Cluster {cl}", color=colors[cl])
 
     ax.set_title('Standardized Distribution of Distances to Centroid of Embeddings by Cluster')
     ax.set_xlabel('Distance to Centroid')
