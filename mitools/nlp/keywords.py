@@ -157,6 +157,21 @@ def get_ngram_count(df: DataFrame, text_col: str, id_col: str, tokenizer: Option
     ngrams_count = ngrams_count[ngrams_count.sum(axis=0).sort_values(ascending=False).index]
     return ngrams_count
 
+def plot_ngrams_count(grams: DataFrame, n_grams: Optional[Union[int, float]]=20) -> Axes:
+    counts = grams.sum()
+    if n_grams is not None:
+        if isinstance(n_grams, float):
+            n_grams = int(len(counts)*n_grams)
+        counts = counts.iloc[:n_grams]
+    grams_n = len(counts.index[0].split(' '))
+    _mapping = {1: "Uni", 2:"Bi", 3:"Tri", 4:"Four"}
+    fig, ax = plt.subplots(figsize=(12,8))
+    sns.barplot(x=counts.values, y=counts.index, ax=ax)
+    ax.set_title(f"{_mapping[grams_n]}-Grams Frequency")
+    ax.set_ylabel(f"{_mapping[grams_n]}-Grams")
+    ax.set_xlabel('Frequency')
+    return ax
+
 def get_bow_of_text(text: Union[str,Series], preprocess: Optional[bool]=False, stop_words: Optional[List[str]]=None, 
                     lemmatize: Optional[bool]=False, tokenizer: Optional[Type[StringTokenizer]]=None, 
                     lemmatizer: Optional[Type[StemmerI]]=None) -> Dict[str,int]:
