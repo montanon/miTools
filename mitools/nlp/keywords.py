@@ -114,10 +114,25 @@ def get_bow_of_tokens(tokens: List[str], preprocess: Optional[bool]=False,
 def get_dataframe_bow(dataframe: DataFrame, text_col: str, preprocess: Optional[bool]=False,
                      stopwords: Optional[List[str]]=None, lemmatize: Optional[bool]=False,
                      tokenizer: Optional[Type[StringTokenizer]]=None, lemmatizer: Optional[Type[StemmerI]]=None
-                    ) -> DataFrame:
+                      ) -> DataFrame:
     return dataframe[[text_col]].apply(get_bow_of_text, axis=1,
                                        args=(preprocess, stopwords, lemmatize, tokenizer, lemmatizer)
-                                       ).apply(Series).fillna(0)
+                                       ).apply(Series).fillna(0.0)
+
+def get_dataframe_bow_chunks(dataframe: DataFrame, text_col: str, preprocess: Optional[bool]=False,
+                      stopwords: Optional[List[str]]=None, lemmatize: Optional[bool]=False,
+                      tokenizer: Optional[Type[StringTokenizer]]=None, lemmatizer: Optional[Type[StemmerI]]=None,
+                      chunk_size: Optional[int]=2_000,
+                      words_per_paper: Optional[int]=None
+                             ) -> DataFrame:
+    def process_chunk(chunk: DataFrame) -> DataFrame:
+        return chunk[[text_col]].apply(get_bow_of_text, axis=1,
+                           args=(preprocess, stopwords, lemmatize, tokenizer, lemmatizer)
+                           ).apply(Series)
+    num_chunks = (dataframe.shape[0] + chunk_size - 1) // chunk_size
+    chunks = (dataframe.iloc[i:i+chunk_size, :] for i in range(0, dataframe.shape[0], chunk_size))
+    processed_chunks = [process_chunk(chunk) for chunk in tqdm(chunks, total=num_chunks, desc="Processing Chunks")]
+    return pd.concat(processed_chunks, ignore_index=True).fillna(0.0)
 
 def get_bow_of_text(text: Union[str,Series], preprocess: Optional[bool]=False, stopwords: Optional[List[str]]=None, 
                     lemmatize: Optional[bool]=False, tokenizer: Optional[Type[StringTokenizer]]=None, 
