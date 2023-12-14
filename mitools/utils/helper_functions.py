@@ -1,6 +1,7 @@
 import itertools
 import pickle
 import re
+import sys
 from os import PathLike
 from typing import (
     Any,
@@ -10,6 +11,7 @@ from typing import (
     List,
     Optional,
     Pattern,
+    Tuple,
     Type,
     TypeVar,
     Union,
@@ -19,6 +21,7 @@ import numpy as np
 import openpyxl
 from fuzzywuzzy import fuzz
 from numpy import ndarray
+from openpyxl.worksheet.worksheet import Worksheet
 from pandas import DataFrame, Series
 
 T = TypeVar('T')
@@ -187,7 +190,7 @@ def stretch_string(string: str, length: Optional[int]=60) -> str:
     else:
         return string
     
-def auto_adjust_columns_width(sheet):
+def auto_adjust_columns_width(sheet: Worksheet) -> None:
     for column in sheet.columns:
         max_length = 0
         column = [cell for cell in column if cell.value]  # Filter out None values
@@ -199,3 +202,17 @@ def auto_adjust_columns_width(sheet):
                 pass
         adjusted_width = (max_length + 1)  # Adding a little extra width
         sheet.column_dimensions[openpyxl.utils.get_column_letter(column[0].column)].width = adjusted_width
+
+def display_env_variables(env_vars: List[Tuple[str, Any]], threshold_mb: float) -> DataFrame:
+    large_vars = []
+    for name, value in env_vars:
+        size_mb = sys.getsizeof(value) / (1024**2)
+        if size_mb > threshold_mb:
+            info = f"Type: {type(value).__name__}, ID: {id(value)}"
+            if hasattr(value, '__doc__'):
+                doc = str(value.__doc__).split('\n')[0]
+                info += f", Doc: {doc[:50]}..."
+            large_vars.append((name, size_mb, info))
+    df = DataFrame(large_vars, columns=['Variable', 'Size (MB)', 'Info'])
+    df.sort_values(by='Size (MB)', ascending=False, inplace=True)
+    return df
