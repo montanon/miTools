@@ -65,33 +65,33 @@ def lemmatize_token(token: str, lemmatizer: Optional[Type[StemmerI]]=None) -> st
     tag = tag_token(token)
     return [lemmatizer.lemmatize(token, tag) for token, tag in tag][0]
 
-def preprocess_texts(texts: List[str], stopwords: Optional[List[str]]=None, lemmatize: Optional[bool]=False,
+def preprocess_texts(texts: List[str], stop_words: Optional[List[str]]=None, lemmatize: Optional[bool]=False,
                     tokenizer: Optional[Type[StringTokenizer]]=None) -> List[str]:
     if tokenizer is None:
         tokenizer = RegexpTokenizer("[A-Za-z]{2,}[0-9]{,1}")
-    return [preprocess_text(text, stopwords, lemmatize, tokenizer) for text in texts]
+    return [preprocess_text(text, stop_words, lemmatize, tokenizer) for text in texts]
 
-def preprocess_text(text: str, stopwords: Optional[List[str]]=None, lemmatize: Optional[bool]=False,
+def preprocess_text(text: str, stop_words: Optional[List[str]]=None, lemmatize: Optional[bool]=False,
                     tokenizer: Optional[Type[StringTokenizer]]=None, lemmatizer: Optional[Type[StemmerI]]=None
                     ) -> List[str]:
     if tokenizer is None:
         tokenizer = RegexpTokenizer("[A-Za-z]{2,}[0-9]{,1}")
     tokens = tokenizer.tokenize(text)
-    return preprocess_tokens(tokens, stopwords, lemmatize, lemmatizer)
+    return preprocess_tokens(tokens, stop_words, lemmatize, lemmatizer)
 
-def preprocess_tokens(tokens: List[str], stopwords: Optional[List[str]]=None, lemmatize: Optional[bool]=False,
+def preprocess_tokens(tokens: List[str], stop_words: Optional[List[str]]=None, lemmatize: Optional[bool]=False,
                     lemmatizer: Optional[Type[StemmerI]]=None) -> List[str]:
     if lemmatize:
         tokens = lemmatize_tokens(tokens, lemmatizer)
-    if stopwords:
-        tokens = [token for token in tokens if token.lower() not in stopwords]
+    if stop_words:
+        tokens = [token for token in tokens if token.lower() not in stop_words]
     return tokens
 
-def preprocess_token(token: str, stopwords: Optional[List[str]]=None, lemmatize: Optional[bool]=False,
+def preprocess_token(token: str, stop_words: Optional[List[str]]=None, lemmatize: Optional[bool]=False,
                     lemmatizer: Optional[Type[StemmerI]]=None) -> str:
     if lemmatize:
         token = lemmatize_token(token, lemmatizer)
-    if stopwords and token.lower() in stopwords:
+    if stop_words and token.lower() in stop_words:
         return ''
     return token
 
@@ -102,8 +102,8 @@ def get_tfidf(words_count: DataFrame) -> DataFrame:
     return df_tfidf
     
 def get_bow_of_tokens(tokens: List[str], preprocess: Optional[bool]=False, 
-                      stopwords: Optional[List[str]]=None) -> Dict[str,int]:
-    tokens = tokens if not preprocess else preprocess_tokens(tokens, stopwords)
+                      stop_words: Optional[List[str]]=None) -> Dict[str,int]:
+    tokens = tokens if not preprocess else preprocess_tokens(tokens, stop_words)
     vectorizer = CountVectorizer()
     X = vectorizer.fit_transform(tokens)
     feature_names = vectorizer.get_feature_names_out()
@@ -112,33 +112,56 @@ def get_bow_of_tokens(tokens: List[str], preprocess: Optional[bool]=False,
     return bow
 
 def get_dataframe_bow(dataframe: DataFrame, text_col: str, preprocess: Optional[bool]=False,
-                     stopwords: Optional[List[str]]=None, lemmatize: Optional[bool]=False,
+                     stop_words: Optional[List[str]]=None, lemmatize: Optional[bool]=False,
                      tokenizer: Optional[Type[StringTokenizer]]=None, lemmatizer: Optional[Type[StemmerI]]=None
                       ) -> DataFrame:
     return dataframe[[text_col]].apply(get_bow_of_text, axis=1,
-                                       args=(preprocess, stopwords, lemmatize, tokenizer, lemmatizer)
+                                       args=(preprocess, stop_words, lemmatize, tokenizer, lemmatizer)
                                        ).apply(Series).fillna(0.0)
 
 def get_dataframe_bow_chunks(dataframe: DataFrame, text_col: str, preprocess: Optional[bool]=False,
-                      stopwords: Optional[List[str]]=None, lemmatize: Optional[bool]=False,
+                      stop_words: Optional[List[str]]=None, lemmatize: Optional[bool]=False,
                       tokenizer: Optional[Type[StringTokenizer]]=None, lemmatizer: Optional[Type[StemmerI]]=None,
                       chunk_size: Optional[int]=2_000,
                       words_per_paper: Optional[int]=None
                              ) -> DataFrame:
     def process_chunk(chunk: DataFrame) -> DataFrame:
         return chunk[[text_col]].apply(get_bow_of_text, axis=1,
-                           args=(preprocess, stopwords, lemmatize, tokenizer, lemmatizer)
+                           args=(preprocess, stop_words, lemmatize, tokenizer, lemmatizer)
                            ).apply(Series)
     num_chunks = (dataframe.shape[0] + chunk_size - 1) // chunk_size
     chunks = (dataframe.iloc[i:i+chunk_size, :] for i in range(0, dataframe.shape[0], chunk_size))
     processed_chunks = [process_chunk(chunk) for chunk in tqdm(chunks, total=num_chunks, desc="Processing Chunks")]
     return pd.concat(processed_chunks, ignore_index=True).fillna(0.0)
 
-def get_bow_of_text(text: Union[str,Series], preprocess: Optional[bool]=False, stopwords: Optional[List[str]]=None, 
+def get_ngram_count(df: DataFrame, text_col: str, id_col: str, tokenizer: Optional[Type[StringTokenizer]]=None, 
+                    stop_words: Optional[List[str]]=None, ngram_range: Optional[Tuple[int, int]]=(1,1),
+                    max_features: Optional[int]=None, 
+                    max_df: Optional[Union[int, float]]=1.0, 
+                    min_df: Optional[Union[int, float]]=1
+                    ) -> DataFrame:
+    if tokenizer is None:
+        tokenizer = RegexpTokenizer("[A-Za-z]{2,}[0-9]{,1}")
+    ngrams_counter = CountVectorizer(ngram_range=ngram_range, 
+                                     stop_words=stop_words,
+                                     max_features=max_features,
+                                     max_df=max_df,
+                                     min_df=min_df,
+                                     tokenizer=lambda x: tokenizer.tokenize(x)
+                                     )
+    ngrams_count = ngrams_counter.fit_transform(df[text_col].values).toarray()
+    ngrams_count = pd.DataFrame(ngrams_count, 
+                                columns=ngrams_counter.get_feature_names_out(),
+                                index=df[id_col]
+                                )
+    ngrams_count = ngrams_count[ngrams_count.sum(axis=0).sort_values(ascending=False).index]
+    return ngrams_count
+
+def get_bow_of_text(text: Union[str,Series], preprocess: Optional[bool]=False, stop_words: Optional[List[str]]=None, 
                     lemmatize: Optional[bool]=False, tokenizer: Optional[Type[StringTokenizer]]=None, 
                     lemmatizer: Optional[Type[StemmerI]]=None) -> Dict[str,int]:
     text = list(text) if isinstance(text, str) else text
-    text = text if not preprocess else preprocess_text(text[0], stopwords, lemmatize, tokenizer, lemmatizer)
+    text = text if not preprocess else preprocess_text(text[0], stop_words, lemmatize, tokenizer, lemmatizer)
     vectorizer = CountVectorizer()
     X = vectorizer.fit_transform(text)
     feature_names = vectorizer.get_feature_names_out()
