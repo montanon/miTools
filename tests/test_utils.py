@@ -1,10 +1,12 @@
+import sys
 import unittest
 from typing import List, Optional
 
 import numpy as np
 import pandas as pd
 
-from mitools.utils import BitArray, remove_chars, stretch_string
+from mitools.utils import (BitArray, display_env_variables, remove_chars,
+                           stretch_string)
 
 
 class TestRemoveChars(unittest.TestCase):
@@ -80,6 +82,42 @@ class TestStretchString(unittest.TestCase):
     def test_long_word(self):
         self.assertEqual(stretch_string("Supercalifragilisticexpialidocious", 10),
                          "Supercalif\nragilistic\nexpialidoc\nious")
+        
+class TestDisplayLargeVariables(unittest.TestCase):
+
+    def setUp(self):
+        self.env_vars = [
+            ('small_int', 1),
+            ('large_list', list(range(10000))),
+            ('string', 'hello world'),
+            ('large_dict', {i: i for i in range(1000)})
+        ]
+
+    def test_no_large_variables(self):
+        threshold_mb = sys.getsizeof(self.env_vars[1][1]) / (1024**2) + 1
+        df = display_env_variables(self.env_vars, threshold_mb)
+        self.assertTrue(df.empty)
+
+    def test_large_variables(self):
+        threshold_mb = 0
+        df = display_env_variables(self.env_vars, threshold_mb)
+        self.assertFalse(df.empty)
+        self.assertTrue(all(df['Size (MB)'] > threshold_mb))
+
+    def test_different_data_types(self):
+        threshold_mb = 0
+        df = display_env_variables(self.env_vars, threshold_mb)
+        self.assertIn('large_list', df['Variable'].values)
+        self.assertIn('large_dict', df['Variable'].values)
+
+    def test_edge_cases(self):
+        # Empty env_vars
+        df_empty = display_env_variables([], 0)
+        self.assertTrue(df_empty.empty)
+
+        # Extremely high threshold
+        df_high_threshold = display_env_variables(self.env_vars, 1000000)
+        self.assertTrue(df_high_threshold.empty)
 
 
 if __name__ == '__main__':
