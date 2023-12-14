@@ -83,7 +83,7 @@ class TestStretchString(unittest.TestCase):
         self.assertEqual(stretch_string("Supercalifragilisticexpialidocious", 10),
                          "Supercalif\nragilistic\nexpialidoc\nious")
         
-class TestDisplayLargeVariables(unittest.TestCase):
+class TestDisplayEnvVariables(unittest.TestCase):
 
     def setUp(self):
         self.env_vars = [
