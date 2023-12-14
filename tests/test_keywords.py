@@ -6,11 +6,13 @@ import pandas as pd
 from pandas import DataFrame
 
 from mitools.nlp import (
+    RegexpTokenizer,
     find_countries_in_dataframe,
     find_country_in_token,
     get_bow_of_tokens,
     get_dataframe_bow,
     get_dataframe_bow_chunks,
+    get_ngram_count,
     get_tfidf,
     lemmatize_text,
     lemmatize_token,
@@ -185,9 +187,9 @@ class TestPreprocessText(TestCase):
 
     def test_stopword_removal(self):
         text = "This is a sample text."
-        stopwords = ["this", "is", "a"]
+        stop_words = ["this", "is", "a"]
         expected_tokens = ["sample", "text"]
-        self.assertEqual(preprocess_text(text, stopwords=stopwords), expected_tokens)
+        self.assertEqual(preprocess_text(text, stop_words=stop_words), expected_tokens)
 
     def test_lemmatization(self):
         text = "I runs fast"
@@ -217,9 +219,9 @@ class TestPreprocessTexts(TestCase):
 
     def test_batch_stopword_removal(self):
         texts = ["This is a test.", "Another example."]
-        stopwords = ["this", "is", "a", "another"]
+        stop_words = ["this", "is", "a", "another"]
         expected_results = [["test"], ["example"]]
-        self.assertEqual(preprocess_texts(texts, stopwords=stopwords), expected_results)
+        self.assertEqual(preprocess_texts(texts, stop_words=stop_words), expected_results)
 
     def test_batch_lemmatization(self):
         texts = ["I runs fast", "She plays guitar"]
@@ -245,18 +247,18 @@ class TestPreprocessToken(TestCase):
 
     def test_stopword_removal(self):
         token = "an"
-        stopwords = ["an"]
-        self.assertEqual(preprocess_token(token, stopwords=stopwords), "")
+        stop_words = ["an"]
+        self.assertEqual(preprocess_token(token, stop_words=stop_words), "")
 
     def test_case_insensitivity(self):
         token = "An"
-        stopwords = ["an"]
-        self.assertEqual(preprocess_token(token, stopwords=stopwords), "")
+        stop_words = ["an"]
+        self.assertEqual(preprocess_token(token, stop_words=stop_words), "")
 
     def test_no_lemmatize_no_stopword(self):
         token = "running"
-        stopwords = ["run"]
-        self.assertEqual(preprocess_token(token, stopwords=stopwords), "running")
+        stop_words = ["run"]
+        self.assertEqual(preprocess_token(token, stop_words=stop_words), "running")
 
     def test_empty_token(self):
         token = ""
@@ -283,15 +285,15 @@ class TestPreprocessTokens(TestCase):
 
     def test_stopword_removal(self):
         tokens = ["This", "is", "a", "test"]
-        stopwords = ["this", "is", "a"]
+        stop_words = ["this", "is", "a"]
         expected_tokens = ["test"]
-        self.assertEqual(preprocess_tokens(tokens, stopwords=stopwords), expected_tokens)
+        self.assertEqual(preprocess_tokens(tokens, stop_words=stop_words), expected_tokens)
 
     def test_lemmatize_and_stopword_removal(self):
         tokens = ["This", "is", "running"]
-        stopwords = ["this", "is", 'be']
+        stop_words = ["this", "is", 'be']
         expected_tokens = ["run"]
-        self.assertEqual(preprocess_tokens(tokens, stopwords=stopwords, lemmatize=True), expected_tokens)
+        self.assertEqual(preprocess_tokens(tokens, stop_words=stop_words, lemmatize=True), expected_tokens)
 
     def test_empty_tokens(self):
         tokens = []
@@ -348,9 +350,9 @@ class TestGetBowOfTokens(TestCase):
 
     def test_stopwords(self):
         tokens = ["apple", "banana", "cherry", "banana"]
-        stopwords = ["banana"]
+        stop_words = ["banana"]
         expected_bow = {'apple': 1, 'cherry': 1}
-        self.assertEqual(get_bow_of_tokens(tokens, preprocess=True, stopwords=stopwords), expected_bow)
+        self.assertEqual(get_bow_of_tokens(tokens, preprocess=True, stop_words=stop_words), expected_bow)
 
     def test_sorted_output(self):
         tokens = ["apple", "banana", "cherry", "banana", "cherry", "cherry"]
@@ -387,8 +389,8 @@ class TestGetDataframeBow(TestCase):
         self.assertNotIn('This', bow_df.columns)
     
     def test_stopwords(self):
-        stopwords = ['this', 'is', 'a', 'another', 'yet']
-        bow_df = get_dataframe_bow(self.df, 'text', preprocess=True, stopwords=stopwords)
+        stop_words = ['this', 'is', 'a', 'another', 'yet']
+        bow_df = get_dataframe_bow(self.df, 'text', preprocess=True, stop_words=stop_words)
         self.assertNotIn('this', bow_df.columns)
         self.assertNotIn('is', bow_df.columns)
 
@@ -416,8 +418,8 @@ class TestGetDataframeBowChunks(TestCase):
         self.assertNotIn('This', bow_df.columns)
     
     def test_stopwords(self):
-        stopwords = ['this', 'is', 'a', 'another', 'yet']
-        bow_df = get_dataframe_bow_chunks(self.df, 'text', preprocess=True, stopwords=stopwords)
+        stop_words = ['this', 'is', 'a', 'another', 'yet']
+        bow_df = get_dataframe_bow_chunks(self.df, 'text', preprocess=True, stop_words=stop_words)
         self.assertNotIn('this', bow_df.columns)
         self.assertNotIn('is', bow_df.columns)
 
@@ -434,6 +436,50 @@ class TestGetDataframeBowChunks(TestCase):
         bow_df = get_dataframe_bow_chunks(small_df, 'text')
         self.assertEqual(len(bow_df), 1)
         self.assertIn('small', bow_df.columns)
+
+class TestGetNgramCount(unittest.TestCase):
+
+    def setUp(self):
+        # Sample DataFrame setup
+        self.df = pd.DataFrame({
+            'text': ['This is a test', 'Another test text', 'More text data'],
+            'text_id': [1, 2, 3]
+        })
+        self.text_col = 'text'
+        self.id_col = 'text_id'
+
+    def test_basic_functionality(self):
+        result = get_ngram_count(self.df, self.text_col, self.id_col)
+        self.assertIsInstance(result, pd.DataFrame)
+        self.assertEqual(result.shape[1], 7)  # 7 unique words in the sample data
+        self.assertEqual(len(result), 3)      # 3 rows corresponding to 3 ids
+
+    def test_different_ngram_range(self):
+        result = get_ngram_count(self.df, self.text_col, self.id_col, ngram_range=(2, 2))
+        # Assuming bigrams are correctly formed, e.g., 'this is', but not 'is a' because of default tokenizer
+        self.assertTrue('this is' in result.columns and 'another test' in result.columns)
+
+    def test_with_custom_tokenizer(self):
+        custom_tokenizer = RegexpTokenizer("[A-Za-z]{4,}")
+        result = get_ngram_count(self.df, self.text_col, self.id_col, tokenizer=custom_tokenizer)
+        # Expecting words with 4 or more letters only
+        self.assertTrue('this' in result.columns and 'test' in result.columns)
+        self.assertFalse('is' in result.columns or 'a' in result.columns)
+
+    def test_with_stop_words(self):
+        stop_words = ['is', 'a']
+        result = get_ngram_count(self.df, self.text_col, self.id_col, stop_words=stop_words)
+        # 'is' and 'a' should not be in the columns
+        self.assertFalse('is' in result.columns or 'a' in result.columns)
+
+    def test_with_max_features(self):
+        result = get_ngram_count(self.df, self.text_col, self.id_col, max_features=2)
+        # Only 2 features (most frequent) should be returned
+        self.assertEqual(result.shape[1], 2)
+
+    def test_error_handling(self):
+        with self.assertRaises(KeyError):
+            get_ngram_count(self.df, 'wrong_col', self.id_col)
 
 
 class TestPreprocessCountryName(unittest.TestCase):
