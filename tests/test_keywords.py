@@ -10,6 +10,7 @@ from mitools.nlp import (
     find_country_in_token,
     get_bow_of_tokens,
     get_dataframe_bow,
+    get_dataframe_bow_chunks,
     get_tfidf,
     lemmatize_text,
     lemmatize_token,
@@ -390,6 +391,49 @@ class TestGetDataframeBow(TestCase):
         bow_df = get_dataframe_bow(self.df, 'text', preprocess=True, stopwords=stopwords)
         self.assertNotIn('this', bow_df.columns)
         self.assertNotIn('is', bow_df.columns)
+
+
+class TestGetDataframeBowChunks(TestCase):
+
+    def setUp(self):
+        self.data = {
+            'text': ['This is a sample text.', 'Another sample text here.', 'Yet another text sample.']
+        }
+        self.df = pd.DataFrame(self.data)
+
+    def test_basic_functionality(self):
+        bow_df = get_dataframe_bow_chunks(self.df, 'text')
+        self.assertIn('sample', bow_df.columns)
+        self.assertEqual(bow_df['sample'].iloc[0], 1)
+        self.assertEqual(bow_df['sample'].iloc[1], 1)
+        self.assertEqual(bow_df['sample'].iloc[2], 1)
+        self.assertEqual(bow_df['this'].iloc[0], 1)
+        self.assertEqual(bow_df['this'].iloc[1], 0)
+
+    def test_preprocess(self):
+        bow_df = get_dataframe_bow_chunks(self.df, 'text', preprocess=True)
+        self.assertIn('sample', bow_df.columns)
+        self.assertNotIn('This', bow_df.columns)
+    
+    def test_stopwords(self):
+        stopwords = ['this', 'is', 'a', 'another', 'yet']
+        bow_df = get_dataframe_bow_chunks(self.df, 'text', preprocess=True, stopwords=stopwords)
+        self.assertNotIn('this', bow_df.columns)
+        self.assertNotIn('is', bow_df.columns)
+
+    def test_chunk_processing(self):
+        large_data = {'text': ['Text sample.'] * 5_000}  # More than 2 chunks
+        large_df = pd.DataFrame(large_data)
+        bow_df = get_dataframe_bow_chunks(large_df, 'text', chunk_size=2_500)
+        self.assertEqual(len(bow_df), 5_000)
+        self.assertEqual(bow_df['sample'].sum(), 5_000)
+
+    def test_small_dataframe(self):
+        small_data = {'text': ['Small dataset.']}
+        small_df = pd.DataFrame(small_data)
+        bow_df = get_dataframe_bow_chunks(small_df, 'text')
+        self.assertEqual(len(bow_df), 1)
+        self.assertIn('small', bow_df.columns)
 
 
 class TestPreprocessCountryName(unittest.TestCase):
