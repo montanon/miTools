@@ -17,3 +17,5 @@ env_checkpoints/*
 */.ipynb_checkpoints/*
 *checkpoint.ipynb
 *.csv
+.coverage
+coverage_report.txt
