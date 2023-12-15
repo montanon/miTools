@@ -10,7 +10,9 @@ from mitools.nlp import (
     find_countries_in_dataframe,
     find_country_in_token,
     get_bow_of_tokens,
+    get_cluster_ngrams,
     get_clustered_dataframe_tokens,
+    get_clusters_ngrams,
     get_dataframe_bow,
     get_dataframe_bow_chunks,
     get_dataframe_tokens,
@@ -563,6 +565,105 @@ class TestGetClusteredDataFrameTokens(unittest.TestCase):
             get_clustered_dataframe_tokens(self.df, 'text_col', 'nonexistent_text_id', 'cluster')
         with self.assertRaises(KeyError):
             get_clustered_dataframe_tokens(self.df, 'text_col', 'text_id', 'nonexistent_cluster')
+
+
+class TestGetClustersNgrams(unittest.TestCase):
+
+    def setUp(self):
+        self.sample_data = pd.DataFrame({
+            'text_id': [1, 2, 3, 4],
+            'text': ['apple banana Apple banana melon', 
+                     'apple banana melon apple orange', 
+                     'apple banana durian melon banana apple apple', 
+                     'orange banana raspberry'],
+            'cluster_id': [1, 1, 2, 2]
+        })
+
+    def test_normal_operation(self):
+        result = get_clusters_ngrams(self.sample_data, 'text', 'text_id', 'cluster_id', 2)
+        self.assertIsInstance(result, pd.DataFrame)
+        self.assertTrue(isinstance(result.columns, pd.MultiIndex))
+
+    def test_empty_data(self):
+        empty_data = pd.DataFrame(columns=['text_id', 'text', 'cluster_id'])
+        with self.assertRaises(ValueError):
+            get_clusters_ngrams(empty_data, 'text', 'text_id', 'cluster_id', 2)
+
+    def test_stop_words(self):
+        stop_words = ['melon']
+        result = get_clusters_ngrams(self.sample_data, 'text', 'text_id', 'cluster_id', 2, stop_words=stop_words)
+        self.assertNotIn('melon', result.iloc[:, 0])
+
+    def test_ngram_range(self):
+        ngram_range = (1, 3)
+        result = get_clusters_ngrams(self.sample_data, 'text', 'text_id', 'cluster_id', 2, ngram_range=ngram_range)
+        # Check if n-grams within specified range are present
+        self.assertIn(2, [len(col[0].split()) for col in result.columns])
+        # Check if n-grams outside specified range are present
+        self.assertNotIn(3, [len(col[0].split()) for col in result.columns])
+
+    def test_lowercase_true(self):
+        result = get_clusters_ngrams(self.sample_data, 'text', 'text_id', 'cluster_id', 2, lowercase=True)
+        all_lower = all(x.islower() for x in result[('Cluster 1', '1-Gram', 'Gram')])
+        self.assertTrue(all_lower)
+    
+    def test_lowercase_false(self):
+        result = get_clusters_ngrams(self.sample_data, 'text', 'text_id', 'cluster_id', 2, lowercase=False)
+        all_lower = all(x.islower() for x in result[('Cluster 1', '1-Gram', 'Gram')])
+        self.assertFalse(all_lower)
+
+    def test_invalid_input(self):
+        with self.assertRaises(ValueError):
+            get_clusters_ngrams(self.sample_data, 'text', 'text_id', 'cluster_id', -1)
+
+
+class TestGetClusterNgrams(unittest.TestCase):
+
+    def setUp(self):
+        self.sample_data = pd.DataFrame({
+            'text_id': [1, 2, 3],
+            'text': ['apple banana', 'apple', 'banana apple apple pear melon']
+        })
+
+    def test_normal_operation(self):
+        result = get_cluster_ngrams(self.sample_data, 'text', 'text_id', 1, 2)
+        self.assertIsInstance(result, pd.DataFrame)
+        self.assertIn(('Cluster 1', '2-Gram', 'Gram'), result.columns)
+        self.assertIn(('Cluster 1', '2-Gram', 'Frequency'), result.columns)
+
+    def test_max_features(self):
+        result = get_cluster_ngrams(self.sample_data, 'text', 'text_id', 1, 2, max_features=1)
+        self.assertEqual(len(result), 1)
+
+    def test_stop_words(self):
+        stop_words = ['apple']
+        result = get_cluster_ngrams(self.sample_data, 'text', 'text_id', 1, 2, stop_words=stop_words)
+        self.assertNotIn('apple', result[('Cluster 1', '2-Gram', 'Gram')].values)
+
+    def test_frequency_false(self):
+        result = get_cluster_ngrams(self.sample_data, 'text', 'text_id', 1, 2, frequency=False)
+        self.assertIn(('Cluster 1', '2-Gram', 'Count'), result.columns)
+        all_ints = all([isinstance(v, int) for v in result[('Cluster 1', '2-Gram', 'Count')]])
+        self.assertTrue(all_ints)
+
+    def test_lowercase_true(self):
+        result = get_cluster_ngrams(self.sample_data, 'text', 'text_id', 1, 2, lowercase=True)
+        all_lower = all(x.islower() for x in result[('Cluster 1', '2-Gram', 'Gram')].values)
+        self.assertTrue(all_lower)
+
+    def test_lowercase_true(self):
+        result = get_cluster_ngrams(self.sample_data, 'text', 'text_id', 1, 2, lowercase=False)
+        all_lower = all(x.islower() for x in result[('Cluster 1', '2-Gram', 'Gram')].values)
+        self.assertFalse(all_lower)
+
+    def test_empty_data(self):
+        empty_data = pd.DataFrame(columns=['text_id', 'text'])
+        with self.assertRaises(ValueError):
+            get_cluster_ngrams(empty_data, 'text', 'text_id', 1, 2)
+
+    def test_str_cluster(self):
+        result = get_cluster_ngrams(self.sample_data, 'text', 'text_id', "string", 2)
+        self.assertIn(('Cluster string', '2-Gram', 'Gram'), result.columns)
 
 
 class TestPreprocessCountryName(unittest.TestCase):

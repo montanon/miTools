@@ -149,7 +149,8 @@ def get_ngram_count(df: DataFrame, text_col: str, id_col: str, tokenizer: Option
                                      max_df=max_df,
                                      min_df=min_df,
                                      lowercase=lowercase,
-                                     tokenizer=lambda x: tokenizer.tokenize(x)
+                                     tokenizer=lambda x: tokenizer.tokenize(x),
+                                     token_pattern=None
                                      )
     ngrams_count = ngrams_counter.fit_transform(df[text_col].values).toarray()
     ngrams_count = pd.DataFrame(ngrams_count, 
@@ -174,20 +175,20 @@ def plot_ngrams_count(grams: DataFrame, n_grams: Optional[Union[int, float]]=20)
     ax.set_xlabel('Frequency')
     return ax
 
-def get_dataframe_tokens(df: DataFrame, text_col: str, text_id: str, stop_words: Optional[List[str]]=None, 
+def get_dataframe_tokens(df: DataFrame, text_col: str, id_col: str, stop_words: Optional[List[str]]=None, 
                          tokenizer: Optional[Type[StringTokenizer]]=None, lowercase: Optional[bool]=True) -> DataFrame:
     if tokenizer is None:
         tokenizer = RegexpTokenizer("[A-Za-z]{2,}[0-9]{,1}")
     df_tokens = df[text_col].apply(tokenizer.tokenize)
-    df_tokens.index = df[text_id]
+    df_tokens.index = df[id_col]
     if lowercase:
         df_tokens = df_tokens.apply(lambda tokens: [t.lower() for t in tokens])
     if stop_words is not None:
         df_tokens = df_tokens.apply(lambda tokens: [t for t in tokens if t not in stop_words])
     max_len = df_tokens.apply(len).max()
     tokens_df = pd.DataFrame({
-        text_id: pd.Series(tokens).reindex(range(max_len))
-        for text_id, tokens in df_tokens.items()
+        id_col: pd.Series(tokens).reindex(range(max_len))
+        for id_col, tokens in df_tokens.items()
     })
     return tokens_df
 
@@ -200,12 +201,60 @@ def get_clustered_dataframe_tokens(df: DataFrame, text_col: str, id_col: str, cl
     df_tokens.columns = pd.MultiIndex.from_tuples(list(zip(cluster_columns, df_tokens.columns)))
     return df_tokens
 
+def get_clusters_ngrams(df: DataFrame, text_col: str, id_col: str, 
+                        cluster_col: str, max_features: int, 
+                        stop_words: Optional[List[str]]=None, 
+                        ngram_range: Optional[Tuple[int, int]]=(1,5),
+                        frequency: Optional[bool]=True,
+                        lowercase: Optional[bool]=False) -> DataFrame:
+    clusters_ngrams = []
+    for cluster in tqdm(df[cluster_col].unique(), desc="Processing clusters"):
+        cluster_texts_ids = df.query(f"{cluster_col} == @cluster")[id_col]
+        cluster_texts = df[df[id_col].isin(cluster_texts_ids)]
+        for gram_n in range(*ngram_range):
+            cluster_ngrams = get_cluster_ngrams(cluster_texts=cluster_texts, 
+                                                    text_col=text_col, 
+                                                    id_col=id_col, 
+                                                    cluster=cluster, 
+                                                    stop_words=stop_words, 
+                                                    max_features=max_features, 
+                                                    gram_n=gram_n,
+                                                    frequency=frequency,
+                                                    lowercase=lowercase
+                                                )
+            clusters_ngrams.append(cluster_ngrams)
+    clusters_ngrams_frequency_df = pd.concat(clusters_ngrams, axis=1)
+    clusters_ngrams_frequency_df.columns = pd.MultiIndex.from_tuples(clusters_ngrams_frequency_df.columns)
+    return clusters_ngrams_frequency_df
+
+def get_cluster_ngrams(cluster_texts: pd.DataFrame, text_col: str, id_col: str, cluster: Union[str,int], 
+                       gram_n: int, max_features: Optional[int]=None,
+                       stop_words: Optional[List[str]]=None,
+                       frequency: Optional[bool]=True,
+                       lowercase: Optional[bool]=False) -> pd.DataFrame:
+        cluster_grams = get_ngram_count(cluster_texts, 
+                                        text_col=text_col, 
+                                        id_col=id_col, 
+                                        stop_words=stop_words, 
+                                        ngram_range=(gram_n, gram_n),
+                                        max_features=max_features
+                                        )
+        cluster_grams = cluster_grams.sum()
+        if frequency:
+            cluster_grams /= cluster_grams.sum()
+        cluster_grams = cluster_grams.sort_values(ascending=False).to_frame().reset_index()
+        sub_cols = ['Gram', 'Frequency'] if frequency else ['Gram', 'Count']
+        cluster_grams.columns = [(f"Cluster {cluster}", f"{gram_n}-Gram", col) for col in sub_cols]
+        if not lowercase:
+            cluster_grams.iloc[:, 0] = cluster_grams.iloc[:, 0].apply(lambda x: x.title())
+        return cluster_grams
+
 def get_bow_of_text(text: Union[str,Series], preprocess: Optional[bool]=False, stop_words: Optional[List[str]]=None, 
                     lemmatize: Optional[bool]=False, tokenizer: Optional[Type[StringTokenizer]]=None, 
                     lemmatizer: Optional[Type[StemmerI]]=None) -> Dict[str,int]:
     text = list(text) if isinstance(text, str) else text
     text = text if not preprocess else preprocess_text(text[0], stop_words, lemmatize, tokenizer, lemmatizer)
-    vectorizer = CountVectorizer()
+    vectorizer = CountVectorizer() 
     X = vectorizer.fit_transform(text)
     feature_names = vectorizer.get_feature_names_out()
     bow = dict(zip(feature_names, X.sum(axis=0).A1))
