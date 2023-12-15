@@ -10,6 +10,7 @@ from mitools.nlp import (
     find_countries_in_dataframe,
     find_country_in_token,
     get_bow_of_tokens,
+    get_clustered_dataframe_tokens,
     get_dataframe_bow,
     get_dataframe_bow_chunks,
     get_dataframe_tokens,
@@ -520,6 +521,42 @@ class TestGetDataFrameTokens(unittest.TestCase):
         df = DataFrame({'text_id': [], 'text': []})
         result = get_dataframe_tokens(df, 'text', 'text_id')
         self.assertTrue(result.empty)
+
+
+class TestGetClusteredDataFrameTokens(unittest.TestCase):
+
+    def setUp(self):
+        self.df = pd.DataFrame({
+            'text_id': [1, 2, 3],
+            'text': ['Sample text 1', 'Sample text 2', 'Sample text 3'],
+            'cluster': [0, 1, 0]
+        })
+
+    def test_typical_case(self):
+        # Test with typical data
+        result = get_clustered_dataframe_tokens(self.df, 'text', 'text_id', 'cluster')
+        self.assertIsInstance(result, pd.DataFrame)
+        self.assertTrue(isinstance(result.columns, pd.MultiIndex))
+        # Check if MultiIndex is correctly formatted
+        self.assertTrue(all(c in ['Cluster 0', 'Cluster 1'] for c in result.columns.get_level_values(0)[:2]))
+        self.assertTrue(all(c in [2, 3] for c in result.columns.get_level_values(1)[1:]))
+        # Check if the number of texts matches
+        self.assertEqual(result.shape[1], self.df.shape[0])
+
+    def test_empty_dataframe(self):
+        # Test with an empty DataFrame
+        empty_df = pd.DataFrame()
+        with self.assertRaises(KeyError):
+            get_clustered_dataframe_tokens(empty_df, 'text', 'text_id', 'cluster')
+
+    def test_missing_columns(self):
+        # Test with missing columns
+        with self.assertRaises(KeyError):
+            get_clustered_dataframe_tokens(self.df, 'nonexistent_text_col', 'text_id', 'cluster')
+        with self.assertRaises(KeyError):
+            get_clustered_dataframe_tokens(self.df, 'text_col', 'nonexistent_text_id', 'cluster')
+        with self.assertRaises(KeyError):
+            get_clustered_dataframe_tokens(self.df, 'text_col', 'text_id', 'nonexistent_cluster')
 
 
 class TestPreprocessCountryName(unittest.TestCase):

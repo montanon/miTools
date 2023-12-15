@@ -191,6 +191,15 @@ def get_dataframe_tokens(df: DataFrame, text_col: str, text_id: str, stop_words:
     })
     return tokens_df
 
+def get_clustered_dataframe_tokens(df: DataFrame, text_col: str, id_col: str, cluster_col: str) -> DataFrame:
+    df_tokens = get_dataframe_tokens(df, text_col, id_col)
+    papers_clusters = df.set_index(id_col)[cluster_col]
+    cluster_columns = {cl: f"Cluster {cl}" for cl in papers_clusters.unique()}
+    mapped_clusters = papers_clusters.map(cluster_columns)
+    cluster_columns = df_tokens.columns.map(mapped_clusters)
+    df_tokens.columns = pd.MultiIndex.from_tuples(list(zip(cluster_columns, df_tokens.columns)))
+    return df_tokens
+
 def get_bow_of_text(text: Union[str,Series], preprocess: Optional[bool]=False, stop_words: Optional[List[str]]=None, 
                     lemmatize: Optional[bool]=False, tokenizer: Optional[Type[StringTokenizer]]=None, 
                     lemmatizer: Optional[Type[StemmerI]]=None) -> Dict[str,int]:
