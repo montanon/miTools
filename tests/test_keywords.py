@@ -474,6 +474,12 @@ class TestGetNgramCount(unittest.TestCase):
         # 'is' and 'a' should not be in the columns
         self.assertFalse('is' in result.columns or 'a' in result.columns)
 
+    def test_with_no_stop_words(self):
+        stop_words = None
+        result = get_ngram_count(self.df, self.text_col, self.id_col, stop_words=stop_words)
+        # 'is' and 'a' should be in the columns
+        self.assertTrue('is' in result.columns or 'a' in result.columns)
+
     def test_with_max_features(self):
         result = get_ngram_count(self.df, self.text_col, self.id_col, max_features=2)
         # Only 2 features (most frequent) should be returned
