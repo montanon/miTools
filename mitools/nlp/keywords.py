@@ -172,6 +172,23 @@ def plot_ngrams_count(grams: DataFrame, n_grams: Optional[Union[int, float]]=20)
     ax.set_xlabel('Frequency')
     return ax
 
+def get_dataframe_tokens(df: DataFrame, text_col: str, text_id: str, stop_words: Optional[List[str]]=None, 
+                         tokenizer: Optional[Type[StringTokenizer]]=None, lower: Optional[bool]=True) -> DataFrame:
+    if tokenizer is None:
+        tokenizer = RegexpTokenizer("[A-Za-z]{2,}[0-9]{,1}")
+    df_tokens = df[text_col].apply(tokenizer.tokenize)
+    df_tokens.index = df[text_id]
+    if lower:
+        df_tokens = df_tokens.apply(lambda tokens: [t.lower() for t in tokens])
+    if stop_words is not None:
+        df_tokens = df_tokens.apply(lambda tokens: [t for t in tokens if t not in stop_words])
+    max_len = df_tokens.apply(len).max()
+    tokens_df = pd.DataFrame({
+        text_id: pd.Series(tokens).reindex(range(max_len))
+        for text_id, tokens in df_tokens.items()
+    })
+    return tokens_df
+
 def get_bow_of_text(text: Union[str,Series], preprocess: Optional[bool]=False, stop_words: Optional[List[str]]=None, 
                     lemmatize: Optional[bool]=False, tokenizer: Optional[Type[StringTokenizer]]=None, 
                     lemmatizer: Optional[Type[StemmerI]]=None) -> Dict[str,int]:

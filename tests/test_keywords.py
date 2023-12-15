@@ -12,6 +12,7 @@ from mitools.nlp import (
     get_bow_of_tokens,
     get_dataframe_bow,
     get_dataframe_bow_chunks,
+    get_dataframe_tokens,
     get_ngram_count,
     get_tfidf,
     lemmatize_text,
@@ -480,6 +481,40 @@ class TestGetNgramCount(unittest.TestCase):
     def test_error_handling(self):
         with self.assertRaises(KeyError):
             get_ngram_count(self.df, 'wrong_col', self.id_col)
+
+
+class TestGetDataFrameTokens(unittest.TestCase):
+
+    def test_basic_functionality(self):
+        df = DataFrame({'text_id': [1, 2], 'text': ['Hello World', 'Sample Text']})
+        result = get_dataframe_tokens(df, 'text', 'text_id')
+        self.assertEqual(list(result.columns), [1, 2])
+        self.assertEqual(result.iloc[0, 0], 'hello')
+
+    def test_stop_words_removal(self):
+        df = DataFrame({'text_id': [1], 'text': ['hello world']})
+        result = get_dataframe_tokens(df, 'text', 'text_id', stop_words=['world'])
+        self.assertNotIn('world', result[1])
+
+    def test_custom_tokenizer(self):
+        # Define a simple custom tokenizer for the test
+        class CustomTokenizer:
+            def tokenize(self, text):
+                return text.split()
+
+        df = DataFrame({'text_id': [1], 'text': ['hello world']})
+        result = get_dataframe_tokens(df, 'text', 'text_id', tokenizer=CustomTokenizer())
+        self.assertEqual(result.iloc[0, 0], 'hello')
+
+    def test_lowercasing(self):
+        df = DataFrame({'text_id': [1], 'text': ['Hello World']})
+        result = get_dataframe_tokens(df, 'text', 'text_id', lower=False)
+        self.assertEqual(result.iloc[0, 0], 'Hello')
+
+    def test_empty_dataframe(self):
+        df = DataFrame({'text_id': [], 'text': []})
+        result = get_dataframe_tokens(df, 'text', 'text_id')
+        self.assertTrue(result.empty)
 
 
 class TestPreprocessCountryName(unittest.TestCase):
