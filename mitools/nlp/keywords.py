@@ -138,7 +138,8 @@ def get_ngram_count(df: DataFrame, text_col: str, id_col: str, tokenizer: Option
                     stop_words: Optional[List[str]]=None, ngram_range: Optional[Tuple[int, int]]=(1,1),
                     max_features: Optional[int]=None, 
                     max_df: Optional[Union[int, float]]=1.0, 
-                    min_df: Optional[Union[int, float]]=1
+                    min_df: Optional[Union[int, float]]=1,
+                    lowercase: Optional[bool]=True
                     ) -> DataFrame:
     if tokenizer is None:
         tokenizer = RegexpTokenizer("[A-Za-z]{2,}[0-9]{,1}")
@@ -147,6 +148,7 @@ def get_ngram_count(df: DataFrame, text_col: str, id_col: str, tokenizer: Option
                                      max_features=max_features,
                                      max_df=max_df,
                                      min_df=min_df,
+                                     lowercase=lowercase,
                                      tokenizer=lambda x: tokenizer.tokenize(x)
                                      )
     ngrams_count = ngrams_counter.fit_transform(df[text_col].values).toarray()
@@ -173,12 +175,12 @@ def plot_ngrams_count(grams: DataFrame, n_grams: Optional[Union[int, float]]=20)
     return ax
 
 def get_dataframe_tokens(df: DataFrame, text_col: str, text_id: str, stop_words: Optional[List[str]]=None, 
-                         tokenizer: Optional[Type[StringTokenizer]]=None, lower: Optional[bool]=True) -> DataFrame:
+                         tokenizer: Optional[Type[StringTokenizer]]=None, lowercase: Optional[bool]=True) -> DataFrame:
     if tokenizer is None:
         tokenizer = RegexpTokenizer("[A-Za-z]{2,}[0-9]{,1}")
     df_tokens = df[text_col].apply(tokenizer.tokenize)
     df_tokens.index = df[text_id]
-    if lower:
+    if lowercase:
         df_tokens = df_tokens.apply(lambda tokens: [t.lower() for t in tokens])
     if stop_words is not None:
         df_tokens = df_tokens.apply(lambda tokens: [t for t in tokens if t not in stop_words])

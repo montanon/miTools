@@ -478,6 +478,11 @@ class TestGetNgramCount(unittest.TestCase):
         # Only 2 features (most frequent) should be returned
         self.assertEqual(result.shape[1], 2)
 
+    def test_lowercasing(self):
+        result = get_ngram_count(self.df, self.text_col, self.id_col, ngram_range=(2, 2), lowercase=False)
+        # Assuming bigrams are correctly formed, e.g., 'this is', but not 'is a' because of default tokenizer
+        self.assertTrue('This is' in result.columns and 'Another test' in result.columns)
+
     def test_error_handling(self):
         with self.assertRaises(KeyError):
             get_ngram_count(self.df, 'wrong_col', self.id_col)
@@ -508,7 +513,7 @@ class TestGetDataFrameTokens(unittest.TestCase):
 
     def test_lowercasing(self):
         df = DataFrame({'text_id': [1], 'text': ['Hello World']})
-        result = get_dataframe_tokens(df, 'text', 'text_id', lower=False)
+        result = get_dataframe_tokens(df, 'text', 'text_id', lowercase=False)
         self.assertEqual(result.iloc[0, 0], 'Hello')
 
     def test_empty_dataframe(self):
