@@ -1,10 +1,12 @@
 import re
 from typing import AnyStr, Dict, Iterable, List, Optional, Tuple, Type, Union
 
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import nltk
 import numpy as np
 import pandas as pd
+import plotly.graph_objects as go
 import seaborn as sns
 from matplotlib.axes import Axes
 from nltk import FreqDist, sent_tokenize, word_tokenize
@@ -15,11 +17,8 @@ from nltk.tokenize import RegexpTokenizer
 from nltk.tokenize.api import StringTokenizer
 from nltk.util import ngrams
 from pandas import DataFrame, Series
-from sklearn.feature_extraction.text import (
-    CountVectorizer,
-    TfidfTransformer,
-    TfidfVectorizer,
-)
+from sklearn.feature_extraction.text import (CountVectorizer, TfidfTransformer,
+                                             TfidfVectorizer)
 from tqdm import tqdm
 from unidecode import unidecode
 
@@ -141,7 +140,7 @@ def get_ngram_count(df: DataFrame, text_col: str, id_col: str, tokenizer: Option
                     min_df: Optional[Union[int, float]]=1,
                     lowercase: Optional[bool]=True
                     ) -> DataFrame:
-    if tokenizer is None:
+    if tokenizer is None: 
         tokenizer = RegexpTokenizer("[A-Za-z]{2,}[0-9]{,1}")
     ngrams_counter = CountVectorizer(ngram_range=ngram_range, 
                                      stop_words=stop_words,
@@ -160,16 +159,42 @@ def get_ngram_count(df: DataFrame, text_col: str, id_col: str, tokenizer: Option
     ngrams_count = ngrams_count[ngrams_count.sum(axis=0).sort_values(ascending=False).index]
     return ngrams_count
 
-def plot_ngrams_count(grams: DataFrame, n_grams: Optional[Union[int, float]]=20) -> Axes:
-    counts = grams.sum()
+def plot_clusters_ngrams(clusters_ngrams: DataFrame, n_gram: int, ncols: int, n_grams: Optional[int]=20,
+                         figsize: Optional[Tuple[int, int]]=(6, 6), ax: Optional[Axes]=None
+                         ) -> Axes:
+    n_gram = clusters_ngrams.columns.get_level_values(1).unique()[n_gram-1]
+    clusters = clusters_ngrams.columns.get_level_values(0).unique()
+    nrows = len(clusters) // ncols
+    if len(clusters) % ncols != 0: 
+        nrows += 1
+    fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(figsize[0]*ncols, figsize[1]*nrows))
+    for cluster, ax in zip(clusters, axes.flat):
+        cluster_ngram_frequency = clusters_ngrams[pd.IndexSlice[cluster, n_gram]].set_index('Gram')
+        ax = plot_ngrams_count(cluster_ngram_frequency, n_grams=n_grams, ax=ax)
+        ax.set_title(cluster)
+    fig.tight_layout()
+    return ax
+
+def plot_ngrams(grams: DataFrame, n_grams: Optional[Union[int, float]]=20, 
+                ax: Optional[Axes]=None) -> Axes:
+    grams_count = grams.sum()
+    return plot_ngrams_count(grams_count=grams_count, n_grams=n_grams, ax=ax)
+
+def plot_ngrams_count(grams_count: DataFrame, n_grams: Optional[Union[int, float]]=20, 
+                      ax: Optional[Axes]=None) -> Axes:
+    if isinstance(grams_count, Series):
+        grams_count = grams_count.sort_values(ascending=False)
+    elif isinstance(grams_count, DataFrame) and len(grams_count.columns) == 1:
+        grams_count = grams_count.iloc[:, 0].sort_values(ascending=False)
     if n_grams is not None:
         if isinstance(n_grams, float):
-            n_grams = int(len(counts)*n_grams)
-        counts = counts.iloc[:n_grams]
-    grams_n = len(counts.index[0].split(' '))
+            n_grams = int(len(grams_count)*n_grams)
+        grams_count = grams_count.iloc[:n_grams]
+    grams_n = len(grams_count.index[0].split(' '))
     _mapping = {1: "Uni", 2:"Bi", 3:"Tri", 4:"Four"}
-    fig, ax = plt.subplots(figsize=(12,8))
-    sns.barplot(x=counts.values, y=counts.index, ax=ax)
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(12,8))
+    sns.barplot(x=grams_count.values, y=grams_count.index, ax=ax)
     ax.set_title(f"{_mapping[grams_n]}-Grams Frequency")
     ax.set_ylabel(f"{_mapping[grams_n]}-Grams")
     ax.set_xlabel('Frequency')
@@ -337,3 +362,82 @@ def plot_token_features(df: DataFrame, columns: List[str],
     plt.show()
 
     return axes
+
+def sankey_plot_clusters_ngrams(clusters_ngrams, n_gram, min_ngram: Optional[int]=0, max_ngram: Optional[int]=20):
+
+    n_gram = clusters_ngrams.columns.get_level_values(1).unique()[n_gram-1]
+    clusters_ngram = clusters_ngrams.loc[:, pd.IndexSlice[:,n_gram,:]]
+    common_ngrams = [g.droplevel([0, 1], axis=1) for n, g in clusters_ngram.groupby(level=[0, 1], axis=1)]
+    common_ngrams = pd.concat(common_ngrams, axis=0)
+    common_ngrams = common_ngrams.groupby('Gram').sum().sort_values(by='Frequency', ascending=False)
+
+    sources_labels = clusters_ngrams.columns.get_level_values(0).unique()
+    targets_labels = common_ngrams.index[min_ngram:max_ngram].tolist()
+
+    labels = [*sources_labels, *targets_labels]
+    labels_ids = {label: n for n, label in enumerate(labels)}
+
+    x_pos, y_pos = gen_clusters_ngrams_sankey_positions(labels, sources_labels)
+
+    sankey_nodes = {
+        'label': labels,
+        'x': x_pos,
+        'y': y_pos,
+        'pad': 5,
+        'thickness': 20
+    }
+
+    labels_colors = gen_clusters_ngrams_sankey_colors(sources_labels, targets_labels)
+    nodes_colors = [labels_colors[l] for l in labels]
+    nodes_colors = [f"rgba({c[0]},{c[1]},{c[2]},{c[3]})" for c in nodes_colors]
+
+    sources, targets, values = gen_clusters_ngrams_sankey_links(clusters_ngram, labels_ids, sources_labels, targets_labels)
+
+    sankey_links = {
+        'source': sources,
+        'target': targets,
+        'value': values,
+    }
+            
+    reverse_labels_ids = {value: key for key, value in labels_ids.items()}       
+    links_colors = [labels_colors[reverse_labels_ids.get(label)] for label in targets]
+    links_colors = [f"rgba({c[0]},{c[1]},{c[2]},{0.5})" for c in links_colors]
+
+    sankey_data = go.Sankey(link=sankey_links, node=sankey_nodes, arrangement='snap')
+    fig = go.Figure(sankey_data)
+    fig.update_layout(width=1000, height=900, font_size=16)
+    fig.update_traces(node_color=nodes_colors, link_color=links_colors)
+    fig = go.Figure(sankey_data)
+    fig.update_layout(width=1000, height=900, font_size=16)
+    fig.update_traces(node_color=nodes_colors, link_color=links_colors)
+
+    return fig
+
+def gen_clusters_ngrams_sankey_positions(labels, sources_labels):
+    x_pos = [0.0 for _ in sources_labels] + [1.0 for _ in labels[len(sources_labels):]]
+    y_pos = list(np.linspace(0.0, 1.0, len(sources_labels))) + list(np.linspace(0.0, 1.0, len(labels) - len(sources_labels)))
+    return [max(min(v, 0.999), 0.001) for v in x_pos], [max(min(v, 0.999), 0.001) for v in y_pos]
+
+def gen_clusters_ngrams_sankey_colors(sources_labels, targets_labels):
+    sources_colors = sns.color_palette("Paired")
+    sorted_colors = {cluster: sources_colors[i] for i, cluster in zip([1, 0, 7, 6, 3, 2, 5], sources_labels)}
+    sources_colors = {w: [*c, 1.0] for w, c in sorted_colors.items()}
+
+    spectral_colors = mpl.colormaps.get_cmap("Spectral_r")
+    targets_colors = spectral_colors(np.linspace(0, 1, len(targets_labels)))
+    targets_colors = {w: [*c, 0.5] for w, c in zip(targets_labels, targets_colors)}
+
+    return {**targets_colors, **sources_colors}
+
+def gen_clusters_ngrams_sankey_links(clusters_ngram, labels_ids, sources_labels, targets_labels):
+    sources, targets, values = [], [], []
+    for label, source_id in labels_ids.items():
+        if label in sources_labels:
+            flows = clusters_ngram.loc[:, pd.IndexSlice[label, :]]
+            for index, flow in flows.iterrows():
+                gram, value = flow.values
+                if gram in targets_labels and value > 0.0:
+                    sources.append(source_id)
+                    targets.append(labels_ids[gram])
+                    values.append(value * 100)
+    return sources, targets, values
