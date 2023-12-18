@@ -1,5 +1,5 @@
 import unittest
-from typing import Dict, List
+from typing import Dict, List, Tuple
 from unittest import TestCase
 from unittest.mock import Mock
 
@@ -11,6 +11,7 @@ from mitools.nlp import (
     find_countries_in_dataframe,
     find_country_in_token,
     gen_clusters_ngrams_sankey_colors,
+    gen_clusters_ngrams_sankey_positions,
     get_bow_of_tokens,
     get_cluster_ngrams,
     get_clustered_dataframe_tokens,
@@ -699,6 +700,44 @@ class TestGenClustersNgramsSankeyColors(unittest.TestCase):
         self.assertIn('a', result)
         self.assertIn('x', result)
         self.assertIn('y', result)
+
+
+class TestGenClustersNgramsSankeyPositions(unittest.TestCase):
+
+    def test_return_type(self):
+        result = gen_clusters_ngrams_sankey_positions(['a', 'b'], len(['a']))
+        self.assertIsInstance(result, Tuple)
+
+    def test_length_of_output(self):
+        labels = ['a', 'b', 'c']
+        sources = ['a']
+        result = gen_clusters_ngrams_sankey_positions(labels, len(sources))
+        self.assertEqual(len(result[0]), len(labels))
+        self.assertEqual(len(result[1]), len(labels))
+
+    def test_x_and_y_positions(self):
+        labels = ['a', 'b', 'c']
+        sources = ['a']
+        x_expected = [0.001, 0.999, 0.999]
+        y_expected = [0.001, 0.001, 0.999]
+        result = gen_clusters_ngrams_sankey_positions(labels, len(sources))
+        self.assertEqual(result[0], x_expected)
+        self.assertEqual(result[1], y_expected)
+
+    def test_value_range(self):
+        labels = ['a', 'b', 'c']
+        sources = ['a']
+        result = gen_clusters_ngrams_sankey_positions(labels, len(sources))
+        all_values = result[0] + result[1]
+        self.assertTrue(all(0.001 <= v <= 0.999 for v in all_values))
+
+    def test_empty_input(self):
+        with self.assertRaises(ValueError):
+            gen_clusters_ngrams_sankey_positions([], 1)
+
+    def test_single_element_input(self):
+        result = gen_clusters_ngrams_sankey_positions(['a'], 1)
+        self.assertEqual(result, ([0.001], [0.001]))
 
 
 class TestPreprocessCountryName(unittest.TestCase):
