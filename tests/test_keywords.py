@@ -1,4 +1,5 @@
 import unittest
+from typing import Dict, List
 from unittest import TestCase
 from unittest.mock import Mock
 
@@ -9,6 +10,7 @@ from mitools.nlp import (
     RegexpTokenizer,
     find_countries_in_dataframe,
     find_country_in_token,
+    gen_clusters_ngrams_sankey_colors,
     get_bow_of_tokens,
     get_cluster_ngrams,
     get_clustered_dataframe_tokens,
@@ -651,7 +653,7 @@ class TestGetClusterNgrams(unittest.TestCase):
         all_lower = all(x.islower() for x in result[('Cluster 1', '2-Gram', 'Gram')].values)
         self.assertTrue(all_lower)
 
-    def test_lowercase_true(self):
+    def test_lowercase_false(self):
         result = get_cluster_ngrams(self.sample_data, 'text', 'text_id', 1, 2, lowercase=False)
         all_lower = all(x.islower() for x in result[('Cluster 1', '2-Gram', 'Gram')].values)
         self.assertFalse(all_lower)
@@ -664,6 +666,39 @@ class TestGetClusterNgrams(unittest.TestCase):
     def test_str_cluster(self):
         result = get_cluster_ngrams(self.sample_data, 'text', 'text_id', "string", 2)
         self.assertIn(('Cluster string', '2-Gram', 'Gram'), result.columns)
+
+
+class TestGenClustersNgramsSankeyColors(unittest.TestCase):
+
+    def test_return_type(self):
+        result = gen_clusters_ngrams_sankey_colors(['a', 'b'], ['x', 'y'])
+        self.assertIsInstance(result, Dict)
+
+    def test_structure_of_return_value(self):
+        result = gen_clusters_ngrams_sankey_colors(['a', 'b'], ['x', 'y'])
+        for key, value in result.items():
+            self.assertIsInstance(key, str)
+            self.assertIsInstance(value, List)
+            self.assertEqual(len(value), 4)
+            for color_component in value:
+                self.assertIsInstance(color_component, float)
+
+    def test_specific_input(self):
+        sources = ['a', 'b']
+        targets = ['x', 'y']
+        result = gen_clusters_ngrams_sankey_colors(sources, targets)
+        for key in [*sources, *targets]:
+            self.assertIn(key, result)
+
+    def test_empty_input(self):
+        result = gen_clusters_ngrams_sankey_colors([], [])
+        self.assertEqual(result, {})
+
+    def test_different_input(self):
+        result = gen_clusters_ngrams_sankey_colors(['a'], ['x', 'y'])
+        self.assertIn('a', result)
+        self.assertIn('x', result)
+        self.assertIn('y', result)
 
 
 class TestPreprocessCountryName(unittest.TestCase):

@@ -425,13 +425,13 @@ def gen_clusters_ngrams_sankey_positions(labels: List[str], sources_labels: List
     return [max(min(v, 0.999), 0.001) for v in x_pos], [max(min(v, 0.999), 0.001) for v in y_pos]
 
 def gen_clusters_ngrams_sankey_colors(sources_labels: List[str], targets_labels: List[str]
-                                      ) -> Dict[str, Tuple[int, int, int, int]]:
+                                      ) -> Dict[str, List[int]]:
     sources_colors = sns.color_palette("Paired")
     sorted_colors = {cluster: sources_colors[i] for i, cluster in zip([1, 0, 7, 6, 3, 2, 5], sources_labels)}
     sources_colors = {w: [*c, 1.0] for w, c in sorted_colors.items()}
     spectral_colors = mpl.colormaps.get_cmap("Spectral_r")
     targets_colors = spectral_colors(np.linspace(0, 1, len(targets_labels)))
-    targets_colors = {w: [*c, 0.5] for w, c in zip(targets_labels, targets_colors)}
+    targets_colors = {w: list(c) for w, c in zip(targets_labels, targets_colors)}
     return {**targets_colors, **sources_colors}
 
 def gen_clusters_ngrams_sankey_links(clusters_ngram: DataFrame, labels_ids: Dict[str, str], sources_labels: List[str], 
