@@ -373,7 +373,7 @@ def sankey_plot_clusters_ngrams(clusters_ngrams: DataFrame, n_gram: int, min_ngr
     targets_labels = common_ngrams.index[min_ngram:max_ngram].tolist()
     labels = [*sources_labels, *targets_labels]
     labels_ids = {label: n for n, label in enumerate(labels)}
-    x_pos, y_pos = gen_clusters_ngrams_sankey_positions(labels, sources_labels)
+    x_pos, y_pos = gen_clusters_ngrams_sankey_positions(labels, len(sources_labels))
     sankey_nodes = {
         'label': labels,
         'x': x_pos,
@@ -417,11 +417,11 @@ def gen_clusters_ngrams_sankey_links_colors(labels_ids: Dict[str, str], targets:
     links_colors = [f"rgba({c[0]},{c[1]},{c[2]},{0.5})" for c in links_colors]
     return links_colors
 
-def gen_clusters_ngrams_sankey_positions(labels: List[str], sources_labels: List[str]
+def gen_clusters_ngrams_sankey_positions(labels: List[str], n_sources: int
                                          ) -> Tuple[List[float], List[float]]:
-    x_pos = [0.0 for _ in sources_labels] + [1.0 for _ in labels[len(sources_labels):]]
-    y_pos = list(np.linspace(0.0, 1.0, len(sources_labels))
-                 ) + list(np.linspace(0.0, 1.0, len(labels) - len(sources_labels)))
+    x_pos = [0.0 for _ in range(n_sources)] + [1.0 for _ in labels[n_sources:]]
+    y_pos = list(np.linspace(0.0, 1.0, n_sources)
+                 ) + list(np.linspace(0.0, 1.0, len(labels) - n_sources))
     return [max(min(v, 0.999), 0.001) for v in x_pos], [max(min(v, 0.999), 0.001) for v in y_pos]
 
 def gen_clusters_ngrams_sankey_colors(sources_labels: List[str], targets_labels: List[str]
