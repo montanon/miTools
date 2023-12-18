@@ -11,6 +11,7 @@ from mitools.nlp import (
     find_countries_in_dataframe,
     find_country_in_token,
     gen_clusters_ngrams_sankey_colors,
+    gen_clusters_ngrams_sankey_links_colors,
     gen_clusters_ngrams_sankey_positions,
     get_bow_of_tokens,
     get_cluster_ngrams,
@@ -738,6 +739,41 @@ class TestGenClustersNgramsSankeyPositions(unittest.TestCase):
     def test_single_element_input(self):
         result = gen_clusters_ngrams_sankey_positions(['a'], 1)
         self.assertEqual(result, ([0.001], [0.001]))
+
+
+class TestGenClustersNgramsSankeyLinksColors(unittest.TestCase):
+
+    def test_return_type(self):
+        result = gen_clusters_ngrams_sankey_links_colors({}, [], {})
+        self.assertIsInstance(result, List)
+
+    def test_return_format(self):
+        labels_ids = {'a': '1'}
+        targets = ['1']
+        labels_colors = {'a': (255, 0, 0)}
+        result = gen_clusters_ngrams_sankey_links_colors(labels_ids, targets, labels_colors)
+        for color in result:
+            self.assertIsInstance(color, str)
+            self.assertRegex(color, r'rgba\(\d+,\d+,\d+,[\d\.]+\)')
+    
+    def test_correct_color_transformation(self):
+        labels_ids = {'a': '1', 'b': '2'}
+        targets = ['1', '2']
+        labels_colors = {'a': (255, 0, 0), 'b': (0, 255, 0)}
+        result = gen_clusters_ngrams_sankey_links_colors(labels_ids, targets, labels_colors)
+        expected_colors = ['rgba(255,0,0,0.5)', 'rgba(0,255,0,0.5)']
+        self.assertEqual(result, expected_colors)
+
+    def test_handling_unknown_labels(self):
+        labels_ids = {'a': '1'}
+        targets = ['1', 'unknown']
+        labels_colors = {'a': (255, 0, 0)}
+        with self.assertRaises(KeyError):
+            gen_clusters_ngrams_sankey_links_colors(labels_ids, targets, labels_colors)
+
+    def test_empty_input(self):
+        result = gen_clusters_ngrams_sankey_links_colors({}, [], {})
+        self.assertEqual(result, [])
 
 
 class TestPreprocessCountryName(unittest.TestCase):
