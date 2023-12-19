@@ -253,6 +253,63 @@ def get_clusters_ngrams(df: DataFrame, text_col: str, id_col: str,
     clusters_ngrams_frequency_df.columns = pd.MultiIndex.from_tuples(clusters_ngrams_frequency_df.columns)
     return clusters_ngrams_frequency_df
 
+def get_clusters_texts_ngrams(df: DataFrame, text_col: str, id_col: str, 
+                        cluster_col: str, max_features: int, 
+                        stop_words: Optional[List[str]]=None, 
+                        ngram_range: Optional[Tuple[int, int]]=(1,5),
+                        frequency: Optional[bool]=True,
+                        lowercase: Optional[bool]=False) -> DataFrame:
+    clusters_ngrams = []
+    for cluster in tqdm(df[cluster_col].unique(), desc="Processing clusters"):
+        cluster_texts_ids = df.query(f"{cluster_col} == @cluster")[id_col]
+        cluster_texts = df[df[id_col].isin(cluster_texts_ids)]
+        for gram_n in range(*ngram_range):
+            cluster_ngrams = get_cluster_text_ngrams(cluster_texts=cluster_texts, 
+                                                    text_col=text_col, 
+                                                    id_col=id_col, 
+                                                    cluster=cluster, 
+                                                    stop_words=stop_words, 
+                                                    max_features=max_features, 
+                                                    gram_n=gram_n,
+                                                    frequency=frequency,
+                                                    lowercase=lowercase
+                                                     )
+            clusters_ngrams.append(cluster_ngrams)
+    clusters_ngrams_frequency_df = pd.concat(clusters_ngrams, axis=1)
+    return clusters_ngrams_frequency_df.sort_index(axis=1)
+
+def get_cluster_text_ngrams(cluster_texts: pd.DataFrame, text_col: str, id_col: str, cluster: Union[str,int], 
+                       gram_n: int, max_features: Optional[int]=None,
+                       stop_words: Optional[List[str]]=None,
+                       frequency: Optional[bool]=True,
+                       lowercase: Optional[bool]=False) -> pd.DataFrame:
+        cluster_ngrams = get_ngram_count(cluster_texts, 
+                                         text_col=text_col, 
+                                         id_col=id_col, 
+                                         stop_words=stop_words, 
+                                         ngram_range=(gram_n, gram_n),
+                                         max_features=max_features
+                                         )      
+        if frequency:
+            cluster_ngrams /= cluster_ngrams.sum()
+        cluster_ngrams = cluster_ngrams.reset_index()
+        transformed_cluster_ngrams = cluster_ngrams.melt(id_vars=[id_col], var_name='Gram', value_name='__count__')
+        transformed_cluster_ngrams = transformed_cluster_ngrams.pivot(index='Gram', columns=id_col, values='__count__')
+        cluster_ngrams = [text_grams.reset_index()
+                                 .sort_values(text_id, ascending=False)
+                                 .reset_index(drop=True)
+                                 for text_id, text_grams in transformed_cluster_ngrams.groupby(id_col, axis=1)]
+        cluster_ngrams = pd.concat(cluster_ngrams, axis=1)
+        cluster_ngrams.columns = pd.MultiIndex.from_product([
+            [f"Cluster {cluster}"],
+            transformed_cluster_ngrams.columns.values,
+            [f'{gram_n}-Gram'],
+            ['Gram', 'Frequency' if frequency else 'Count']
+        ])
+        if not lowercase:
+            cluster_ngrams.iloc[:, 0::2] = cluster_ngrams.iloc[:, 0::2].apply(lambda x: [v.title() for v in x])
+        return cluster_ngrams
+
 def get_cluster_ngrams(cluster_texts: pd.DataFrame, text_col: str, id_col: str, cluster: Union[str,int], 
                        gram_n: int, max_features: Optional[int]=None,
                        stop_words: Optional[List[str]]=None,
