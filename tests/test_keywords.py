@@ -497,6 +497,9 @@ class TestGetNgramCount(unittest.TestCase):
         # Assuming bigrams are correctly formed, e.g., 'this is', but not 'is a' because of default tokenizer
         self.assertTrue('This is' in result.columns and 'Another test' in result.columns)
 
+    def test_frequency(self):
+        pass
+
     def test_error_handling(self):
         with self.assertRaises(KeyError):
             get_ngram_count(self.df, 'wrong_col', self.id_col)
