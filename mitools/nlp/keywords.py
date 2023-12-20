@@ -136,6 +136,7 @@ def get_dataframe_bow_chunks(dataframe: DataFrame, text_col: str, preprocess: Op
 
 def get_ngram_count(df: DataFrame, text_col: str, id_col: str, tokenizer: Optional[Type[StringTokenizer]]=None, 
                     stop_words: Optional[List[str]]=None, ngram_range: Optional[Tuple[int, int]]=(1,1),
+                    frequency: Optional[bool]=False,
                     max_features: Optional[int]=None, 
                     max_df: Optional[Union[int, float]]=1.0, 
                     min_df: Optional[Union[int, float]]=1,
@@ -158,6 +159,8 @@ def get_ngram_count(df: DataFrame, text_col: str, id_col: str, tokenizer: Option
                                 index=df[id_col]
                                 )
     ngrams_count = ngrams_count[ngrams_count.sum(axis=0).sort_values(ascending=False).index]
+    if frequency:
+            ngrams_count /= ngrams_count.sum(axis=0)
     return ngrams_count
 
 def plot_clusters_ngrams(clusters_ngrams: DataFrame, n_gram: int, ncols: int, n_grams: Optional[int]=20,
@@ -288,10 +291,9 @@ def get_cluster_text_ngrams(cluster_texts: pd.DataFrame, text_col: str, id_col: 
                                          id_col=id_col, 
                                          stop_words=stop_words, 
                                          ngram_range=(gram_n, gram_n),
-                                         max_features=max_features
+                                         max_features=max_features,
+                                         frequency=frequency
                                          )      
-        if frequency:
-            cluster_ngrams /= cluster_ngrams.sum()
         cluster_ngrams = cluster_ngrams.reset_index()
         transformed_cluster_ngrams = cluster_ngrams.melt(id_vars=[id_col], var_name='Gram', value_name='__count__')
         transformed_cluster_ngrams = transformed_cluster_ngrams.pivot(index='Gram', columns=id_col, values='__count__')
@@ -320,7 +322,8 @@ def get_cluster_ngrams(cluster_texts: pd.DataFrame, text_col: str, id_col: str, 
                                         id_col=id_col, 
                                         stop_words=stop_words, 
                                         ngram_range=(gram_n, gram_n),
-                                        max_features=max_features
+                                        max_features=max_features,
+                                        frequency=False
                                         )
         cluster_grams = cluster_grams.sum()
         if frequency:
