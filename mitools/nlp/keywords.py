@@ -23,6 +23,7 @@ from sklearn.feature_extraction.text import (CountVectorizer, TfidfTransformer,
 from tqdm import tqdm
 from unidecode import unidecode
 
+from ..pandas import idxslice
 from ..utils import lcs_similarity
 
 
@@ -134,33 +135,53 @@ def get_dataframe_bow_chunks(dataframe: DataFrame, text_col: str, preprocess: Op
     processed_chunks = [process_chunk(chunk) for chunk in tqdm(chunks, total=num_chunks, desc="Processing Chunks")]
     return pd.concat(processed_chunks, ignore_index=True).fillna(0.0)
 
+def merge_into_dataframe_index(df: DataFrame, df_to_merge: DataFrame, 
+                               shared_index: str, new_index: str) -> DataFrame:
+    merged_df = (df.reset_index()
+                 .merge(df_to_merge[[shared_index, new_index]], 
+                        left_on=shared_index, 
+                        right_on=shared_index
+                        )
+                 .set_index([new_index, shared_index])
+                 .sort_index()
+                 )
+    return merged_df
+
 def get_ngram_count(df: DataFrame, text_col: str, id_col: str, tokenizer: Optional[Type[StringTokenizer]]=None, 
                     stop_words: Optional[List[str]]=None, ngram_range: Optional[Tuple[int, int]]=(1,1),
+                    lemmatize: Optional[bool]=False,
                     frequency: Optional[bool]=False,
                     max_features: Optional[int]=None, 
                     max_df: Optional[Union[int, float]]=1.0, 
                     min_df: Optional[Union[int, float]]=1,
-                    lowercase: Optional[bool]=True
+                    lowercase: Optional[bool]=True,
+                    tfidf: Optional[bool]=False
                     ) -> DataFrame:
     if tokenizer is None: 
         tokenizer = RegexpTokenizer("[A-Za-z]{2,}[0-9]{,1}")
-    ngrams_counter = CountVectorizer(ngram_range=ngram_range, 
-                                     stop_words=stop_words,
+    def tokenization(text):
+        if not lemmatize:
+            return tokenizer.tokenize(text)
+        return lemmatize_tokens([t for t in tokenizer.tokenize(text) if t not in stop_words])
+    Vectorizer = CountVectorizer if not tfidf else TfidfVectorizer
+    ngrams_counter = Vectorizer(ngram_range=ngram_range, 
+                                     stop_words=stop_words if not lemmatize else None,
                                      max_features=max_features,
                                      max_df=max_df,
                                      min_df=min_df,
                                      lowercase=lowercase,
-                                     tokenizer=lambda x: tokenizer.tokenize(x),
+                                     tokenizer=tokenization,
                                      token_pattern=None
-                                     )
+                                )
     ngrams_count = ngrams_counter.fit_transform(df[text_col].values).toarray()
     ngrams_count = pd.DataFrame(ngrams_count, 
                                 columns=ngrams_counter.get_feature_names_out(),
                                 index=df[id_col]
                                 )
     ngrams_count = ngrams_count[ngrams_count.sum(axis=0).sort_values(ascending=False).index]
-    if frequency:
-            ngrams_count /= ngrams_count.sum(axis=0)
+    if frequency and not tfidf:
+            ngrams_count = ngrams_count.div(ngrams_count
+            .sum(axis=1), axis=0)
     return ngrams_count
 
 def plot_clusters_ngrams(clusters_ngrams: DataFrame, n_gram: int, ncols: int, n_grams: Optional[int]=20,
@@ -168,12 +189,15 @@ def plot_clusters_ngrams(clusters_ngrams: DataFrame, n_gram: int, ncols: int, n_
                          ) -> Axes:
     n_gram = clusters_ngrams.columns.get_level_values(1).unique()[n_gram-1]
     clusters = clusters_ngrams.columns.get_level_values(0).unique()
+    clusters_ngrams = clusters_ngrams.sort_index(axis=1)
     nrows = len(clusters) // ncols
     if len(clusters) % ncols != 0: 
         nrows += 1
     fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(figsize[0]*ncols, figsize[1]*nrows))
     for cluster, ax in zip(clusters, axes.flat):
-        cluster_ngram_frequency = clusters_ngrams[pd.IndexSlice[cluster, n_gram]].set_index('Gram')
+        cluster_ngram_frequency = clusters_ngrams.loc[:, [
+            (cluster, n_gram, c) for c in clusters_ngrams.columns.get_level_values(-1).unique()
+            ]].droplevel([0, 1], axis=1).set_index('Gram')
         ax = plot_ngrams_count(cluster_ngram_frequency, n_grams=n_grams, ax=ax)
         ax.set_title(cluster)
     fig.tight_layout()
@@ -399,9 +423,30 @@ def sort_multiindex_dataframe(df: DataFrame, selected_cols: List[str], sorting_c
         selected_cluster_df = df.loc[:, [(top_value, c) for c in selected_cols]]
         if sorting_col:
             sort_key = tuple((top_value, sorting_col))
-            selected_cluster_df = selected_cluster_df.sort_values(by=sort_key, ascending=ascending).reset_index(drop=True)
+            selected_cluster_df = (selected_cluster_df.sort_values(by=sort_key, ascending=ascending)
+                                   .reset_index(drop=True))
         sorted_dfs.append(selected_cluster_df)
     return pd.concat(sorted_dfs, axis=1)
+
+def normalize_dataframe_column(dataframe: DataFrame, column: str) -> DataFrame:
+    dataframe[column] = dataframe[column].divide(dataframe[column].sum())
+    return dataframe
+
+def process_subgroups(group: DataFrame, group_col: str, count_col: str) -> DataFrame:
+    sub_group = group.groupby([group_col], axis=0, as_index=False).sum()
+    sub_group = sub_group.sort_values(by=count_col, ascending=False).reset_index(drop=True)
+    return normalize_dataframe_column(sub_group, count_col)
+
+def process_group(group: DataFrame, year_range_col: str, gram_n_col: str, text_id: str):
+    group = pd.concat([
+        g.droplevel(text_id, axis=1) for _, g in group.groupby([year_range_col, text_id], axis=1)
+        ], axis=0)
+    groups = [process_subgroups(
+        sub_g, 
+        (y_range, gram_n, 'Gram'), 
+        (y_range, gram_n, 'Count')
+        ) for (y_range, gram_n), sub_g in group.groupby([year_range_col, gram_n_col], axis=1)]
+    return pd.concat(groups, axis=1)
 
 def strings_to_group_patterns(strings: List[str], union: str) -> str:
     return union.join([f"(?=.*{s.lower()})" for s in strings])
@@ -418,6 +463,26 @@ def plot_token_features(df: DataFrame, columns: List[str],
         if log:
             ax.set_yscale("log")
         ax.set_title(f"Histogram for {var} in Papers' Text")
+    plt.tight_layout()
+    plt.show()
+    return axes
+
+def plot_token_filtered_features(df: DataFrame, columns: List[str], 
+                        hue: Optional[str]=None, log: Optional[bool]=True, 
+                        ncols: Optional[int]=2, bins_amnt: Optional[int]=30,
+                        figsize: Optional[Tuple]=(4,4)) -> Axes:
+    nrows = (len(columns) + 1) // ncols
+    fig, axes = plt.subplots(nrows, ncols, figsize=(figsize[0]*nrows, figsize[1]*ncols))
+    for n, var in enumerate(columns):
+        ax = axes[n//ncols, n%ncols]
+        col_min = df[var].min()
+        col_max = df[var].max()
+        bins = np.linspace(col_min, col_max, bins_amnt)
+        ax = sns.histplot(data=df, x=var, hue=None, bins=bins, kde=False, ax=ax, color='red')
+        sns.histplot(data=df.loc[~df['tokens_filter']], x=var, hue=None, bins=bins, kde=False, ax=ax, color='blue')
+        if log:
+            ax.set_yscale("log")
+        ax.set_title(f"Histogram for Filtered {var} in Papers' Text")
     plt.tight_layout()
     plt.show()
     return axes
@@ -465,7 +530,7 @@ def sankey_plot_clusters_ngrams(clusters_ngrams: DataFrame, n_gram: int, min_ngr
 
 def gen_clusters_ngrams_sankey_nodes_colors(labels: List[str], labels_colors: Dict[str, Tuple[int, int, int, int]]
                                             ) -> List[str]:
-    nodes_colors = [labels_colors[l] for l in labels]
+    nodes_colors = [labels_colors[label] for label in labels]
     nodes_colors = [f"rgba({c[0]},{c[1]},{c[2]},{c[3]})" for c in nodes_colors]
     return nodes_colors
 
@@ -486,8 +551,10 @@ def gen_clusters_ngrams_sankey_positions(labels: List[str], n_sources: int
 
 def gen_clusters_ngrams_sankey_colors(sources_labels: List[str], targets_labels: List[str]
                                       ) -> Dict[str, List[int]]:
-    sources_colors = sns.color_palette("Paired")
-    sorted_colors = {cluster: sources_colors[i] for i, cluster in zip([1, 0, 7, 6, 3, 2, 5], sources_labels)}
+    sources_colors = [(193, 193, 193)] + sns.color_palette("Paired")
+    sorted_colors = {cluster: sources_colors[i] for i, cluster in zip(
+        [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], sources_labels
+        )}
     sources_colors = {w: [*c, 1.0] for w, c in sorted_colors.items()}
     spectral_colors = mpl.colormaps.get_cmap("Spectral_r")
     targets_colors = spectral_colors(np.linspace(0, 1, len(targets_labels)))
@@ -507,3 +574,159 @@ def gen_clusters_ngrams_sankey_links(clusters_ngram: DataFrame, labels_ids: Dict
                     targets.append(labels_ids[gram])
                     values.append(value * 100)
     return sources, targets, values
+
+def get_yearly_ranges_ngram(yearly_ranges_ngrams: DataFrame, n_gram: str, max_ngram: int) -> DataFrame:
+    yearly_ranges_ngram = yearly_ranges_ngrams.loc[:, idxslice(yearly_ranges_ngrams, 'n-gram', n_gram, axis=1)]
+    yearly_ranges_ngram = yearly_ranges_ngram.iloc[:max_ngram, :]
+    return yearly_ranges_ngram
+
+def create_grams_data(yearly_ranges_ngram: DataFrame, n_periods: int, max_ngram: int) -> DataFrame:
+    grams_data = []
+    for time_range, time_ngrams in yearly_ranges_ngram.groupby('year_range', axis=1):
+        range_grams = time_ngrams.iloc[:, [0]]
+        range_grams.columns = range_grams.columns.droplevel([0, 1])
+        range_grams['period'] = time_range
+        grams_data.append(range_grams)
+    grams_data = pd.concat(grams_data, axis=0).reset_index(drop=True)
+    grams_data['x_pos'] = [pos for pos in range(n_periods) for _ in range(max_ngram)]
+    grams_data['y_pos'] = [pos for _ in range(n_periods) for pos in range(max_ngram)]
+    return grams_data
+
+def update_out_sources(grams_data: DataFrame, periods: List, max_ngram: int) -> DataFrame:
+    out_sources = {period: False for period in periods[:-1]}
+    for n, period in enumerate(periods[:-1]):
+        next_period = periods[n+1] if n != len(periods) -1 else None
+        if not out_sources[period]:
+            period_grams = grams_data.loc[grams_data['period'] == period, 'Gram']
+            next_comparison = next_period and (
+                ~period_grams.isin(grams_data.loc[grams_data['period'] == next_period, 'Gram'])
+                ).any()
+            current_comparison = period and (
+                ~period_grams.isin(grams_data.loc[grams_data['period'] == period, 'Gram'])
+                ).any()
+            out_sources[period] = next_comparison or current_comparison
+    out_x_pos = [(n + 1 - 0.5) if source else None for n, source in enumerate(out_sources.values())]
+    out_y_pos = [max(grams_data['y_pos']) + 3 if source else None for source in out_sources.values()]
+    out_data = pd.DataFrame({
+        'Gram': ['' for _ in out_x_pos],
+        'period': list(out_sources.keys()),
+        'x_pos': out_x_pos,
+        'y_pos': out_y_pos,
+    }).dropna()
+    grams_data = pd.concat([grams_data, out_data], axis=0).reset_index(drop=True)
+    return grams_data
+
+def update_periods_links(yearly_ranges_ngram: DataFrame, grams_data: DataFrame, 
+                         periods: List, n_gram: str) -> DataFrame:
+    sources, targets, values = {k: [] for k in periods}, {k: [] for k in periods}, {k: [] for k in periods}
+    for n, period in enumerate(periods):
+        period_grams = yearly_ranges_ngram[period]
+        if n != len(periods) - 1:
+            next_period = periods[n+1]
+            next_grams = yearly_ranges_ngram[next_period]
+            for _, (gram, value) in period_grams.iterrows():
+                sources[period].append(gram)
+                values[period].append(value)
+                if gram in next_grams[(n_gram, 'Gram')].values:
+                    targets[period].append(gram)
+                else:
+                    targets[period].append('')
+        if n != 0:
+            previous_period = periods[n-1]
+            previous_grams = yearly_ranges_ngram[previous_period]
+            for _, (gram, value) in period_grams.iterrows():
+                if gram not in previous_grams[(n_gram, 'Gram')].values:
+                    sources[previous_period].append('')
+                    targets[previous_period].append(gram)
+                    values[previous_period].append(value)
+    periods_links = []
+    for period in sources:
+        period_links = pd.DataFrame({
+            'sources': sources[period],
+            'targets': targets[period],
+            'values': values[period]
+        })
+        period_links['period'] = period
+        periods_links.append(period_links)
+    periods_links = pd.concat(periods_links).reset_index(drop=True)
+    periods_links['sources_id'] = np.nan
+    periods_links['targets_id'] = np.nan
+    for n, (source, target, value, period, source_id, targets_id) in periods_links.iterrows():
+        source_index = grams_data.loc[(grams_data['Gram'] == source) & (grams_data['period'] == period)].index.values[0]
+        if target != '':
+            next_period = periods[periods.get_loc(period) + 1]
+            gram_is_target = (grams_data['Gram'] == target)
+            target_index = grams_data.loc[gram_is_target & (grams_data['period'] == next_period)].index.values[0]
+        elif target != ' ':
+            gram_is_target = (grams_data['Gram'] == target)
+            target_index = grams_data.loc[gram_is_target & (grams_data['period'] == period)].index.values[0]
+        else:
+            pass
+        periods_links.at[n, 'sources_id'] = source_index
+        periods_links.at[n, 'targets_id'] = target_index
+    return periods_links
+
+def update_grams_data(grams_data: DataFrame) -> DataFrame:
+    grams_data['x_pos'] = grams_data['x_pos'] / grams_data['x_pos'].max()
+    grams_data['x_pos'] = grams_data['x_pos'].clip(0.001, 0.999)
+    grams_data['y_pos'] = grams_data['y_pos'] / grams_data['y_pos'].max()
+    grams_data['y_pos'] = grams_data['y_pos'].clip(0.001, 0.999)
+    return grams_data
+
+def create_sankey_data(periods_links: DataFrame, grams_data: DataFrame, periods: List, 
+                       width: Optional[int]=1500, height: Optional[int]=500) -> Sankey:
+    sankey_nodes = {
+        'label': grams_data['Gram'].values.tolist(),
+        'x': grams_data['x_pos'].values.tolist(),
+        'y': grams_data['y_pos'].values.tolist(),
+        'pad': 20,
+        'thickness': 20
+    }
+    sankey_links = {
+        'source': periods_links['sources_id'].values.tolist(),
+        'target': periods_links['targets_id'].values.tolist(),
+        'value': periods_links['values'].values.tolist(),
+    }
+    label_names = sorted(list(set(grams_data['Gram'].values.tolist())))
+    colors = mpl.colormaps["Spectral_r"](np.linspace(0, 1, len(label_names)))
+    labels_colors = {w: c for w, c in zip(label_names, colors)}
+    PLAIN_GRAY_COLOR = [192/255, 192/255, 192/255, 1.]
+    labels_colors[''] = np.array(PLAIN_GRAY_COLOR)
+    nodes_colors = [labels_colors[l] for l in grams_data['Gram']]
+    nodes_colors = [f"rgba({c[0]},{c[1]},{c[2]},{c[3]})" for c in nodes_colors]
+    color_sources = periods_links.copy(True)
+    color_sources['color_labels'] = color_sources.apply(
+        lambda x: x['sources'] if x['sources'] != '' else x['targets'], axis=1
+        )
+    links_colors = [labels_colors[l] for l in color_sources['color_labels']]
+    links_colors = [f"rgba({c[0]},{c[1]},{c[2]},{0.5})" for c in links_colors]
+    sankey_data = go.Sankey(link=sankey_links, node=sankey_nodes, arrangement='fixed')
+    fig = go.Figure(sankey_data)
+    fig.update_traces(node_color=nodes_colors, link_color=links_colors)
+    period_labels = [f"{'-'.join(period[1:-1].split(', '))}" for period in periods]
+    for i, label in enumerate(period_labels):
+        x = i / (len(period_labels) - 1)
+        fig.add_annotation(dict(
+            font=dict(color="black", size=14, family="Helvetica, sans-serif"), 
+            x=x, 
+            y=1.1, 
+            showarrow=False, 
+            text=f'<b>{label}</b>')
+            )
+    fig.update_layout(width=width, height=height, font_size=12)
+    return fig
+
+def evolution_sankey_plot_clusters_ngrams(yearly_ranges_ngrams: DataFrame, n_gram: int, max_ngram: int, 
+                                          year_range_level: str, 
+                                          width: Optional[int]=1500, 
+                                          height: Optional[int]=500) -> Sankey:
+    periods = yearly_ranges_ngrams.columns.get_level_values(year_range_level).unique()
+    n_periods = len(periods)
+    n_gram = yearly_ranges_ngrams.columns.get_level_values('n-gram').unique()[n_gram-1]
+    yearly_ranges_ngram = get_yearly_ranges_ngram(yearly_ranges_ngrams, n_gram, max_ngram)
+    grams_data = create_grams_data(yearly_ranges_ngram, n_periods, max_ngram)
+    grams_data = update_out_sources(grams_data, periods, max_ngram)
+    periods_links = update_periods_links(yearly_ranges_ngram, grams_data, periods, n_gram)
+    grams_data = update_grams_data(grams_data)
+    fig = create_sankey_data(periods_links, grams_data, periods, width=width, height=height)
+    return fig
