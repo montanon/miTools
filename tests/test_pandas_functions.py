@@ -8,6 +8,7 @@ from pandas import DataFrame, Series, testing
 from mitools.exceptions.custom_exceptions import ArgumentTypeError
 from mitools.pandas.functions import (
     ArgumentValueError,
+    load_level_destructured_dataframe,
     prepare_date_cols,
     prepare_int_cols,
     prepare_str_cols,
@@ -141,6 +142,40 @@ class TestStoreDataframeByLevel(unittest.TestCase):
         self.assertTrue(Path('test0_sub.parquet').exists())
         self.assertTrue(Path('test1_sub.parquet').exists())
         self.assertTrue(Path('test2_sub.parquet').exists())
+
+
+class TestLoadLevelDestructuredDataframe(unittest.TestCase):
+    def setUp(self):
+        self.df = pd.DataFrame({
+            ('A', 'a'): [1, 2, 3],
+            ('B', 'b'): [4, 5, 6],
+            ('C', 'c'): [7, 8, 9]
+        })
+        self.df.columns = pd.MultiIndex.from_tuples(self.df.columns)
+        self.base_path = 'test.parquet'
+        store_dataframe_by_level(self.df, self.base_path, 0)
+
+    def tearDown(self):
+        # Clean up any created files
+        for path in Path('.').glob('test*_sub.parquet'):
+            os.remove(path)
+
+    def test_invalid_base_path(self):
+        with self.assertRaises(ValueError):
+            load_level_destructured_dataframe(123, 0)
+
+    def test_invalid_level(self):
+        with self.assertRaises(ValueError):
+            load_level_destructured_dataframe(self.base_path, 'invalid')
+
+    def test_no_files_found(self):
+        with self.assertRaises(FileNotFoundError):
+            load_level_destructured_dataframe('nonexistent.parquet', 0)
+
+    def test_valid_inputs(self):
+        df = load_level_destructured_dataframe(self.base_path, 0)
+        self.assertTrue(isinstance(df, pd.DataFrame))
+        self.assertEqual(df.shape, self.df.shape)
 
 
 if __name__ == '__main__':
