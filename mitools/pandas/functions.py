@@ -1,6 +1,6 @@
 from os import PathLike
 from pathlib import Path
-from typing import Iterable, List, Optional, Union
+from typing import Any, Iterable, List, Optional, Union
 
 import pandas as pd
 from pandas import DataFrame
@@ -130,3 +130,16 @@ def load_level_destructured_dataframe(base_path: Union[str, PathLike], level: Un
     df = [pd.read_parquet(file) for file in parquet_files]
     df = pd.concat(df, axis=1)
     return df
+
+def idxslice(df: DataFrame, level: Union[int, str], value: Union[List[Any], Any], axis: int) -> pd.IndexSlice:
+    if axis not in [0, 1]:
+        raise ValueError('axis must be 0 for index or 1 for columns')
+    value = [value] if not isinstance(value, list) else value
+    multiidx = df.index if axis == 0 else df.columns
+    if isinstance(level, str):
+        if level not in multiidx.names:
+            raise ValueError('level is not in the axis index provided')
+        level = multiidx.names.index(level)
+    slices = [slice(None)] * multiidx.nlevels
+    slices[level] = value
+    return pd.IndexSlice[tuple(slices)]
