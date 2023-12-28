@@ -6,20 +6,22 @@ from typing import Callable, Iterable, List, Optional, Tuple, Union
 
 import pandas as pd
 import torch
+from adapters import AutoAdapterModel
 from nltk.tokenize.api import StringTokenizer
 from numba.core.errors import (NumbaDeprecationWarning,
                                NumbaPendingDeprecationWarning)
 from numpy import float64, ndarray
 from pandas import DataFrame, Series
 from tqdm import tqdm
+from transformers import AutoModel, AutoTokenizer
+from umap import UMAP
 
 from ..etl import CustomConnection
 from ..utils import iterable_chunks
 
 warnings.simplefilter('ignore', NumbaDeprecationWarning)
 warnings.simplefilter('ignore', NumbaPendingDeprecationWarning)
-from transformers import AutoModel, AutoTokenizer
-from umap import UMAP
+
 
 SPECTER_EMBEDDINGS_URL = "https://model-apis.semanticscholar.org/specter/v1/invoke"
 MAX_BATCH_SIZE = 16
@@ -37,8 +39,10 @@ def huggingface_specter_embed_texts_and_store(ids: Union[List[str],str], texts: 
         texts = [texts]
     assert len(ids) == len(texts), 'Ids and Texts len doesnt match'
     device = 'mps' if torch.backends.mps.is_available() else 'cpu'
-    tokenizer = AutoTokenizer.from_pretrained('allenai/specter')
-    model = AutoModel.from_pretrained('allenai/specter').to(device)
+    tokenizer = AutoTokenizer.from_pretrained('allenai/specter2_base')
+    model = AutoAdapterModel.from_pretrained('allenai/specter2_base')
+    model.load_adapter("allenai/specter2_classification", source="hf", load_as="classification", set_active=True)
+    model = model.to(device)
     for chunk in iterable_chunks(list(zip(ids, texts)), batch_size):
         texts_chunk = [c[1] for c in chunk]
         ids_chunk = [c[0] for c in chunk]
