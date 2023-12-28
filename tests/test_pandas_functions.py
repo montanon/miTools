@@ -8,6 +8,7 @@ from pandas import DataFrame, Series, testing
 from mitools.exceptions.custom_exceptions import ArgumentTypeError
 from mitools.pandas.functions import (
     ArgumentValueError,
+    idxslice,
     load_level_destructured_dataframe,
     prepare_date_cols,
     prepare_int_cols,
@@ -176,6 +177,35 @@ class TestLoadLevelDestructuredDataframe(unittest.TestCase):
         df = load_level_destructured_dataframe(self.base_path, 0)
         self.assertTrue(isinstance(df, pd.DataFrame))
         self.assertEqual(df.shape, self.df.shape)
+
+
+class TestIdxSlice(unittest.TestCase):
+    def setUp(self):
+        self.df = pd.DataFrame({
+            ('A', 'a'): [1, 2, 3],
+            ('B', 'b'): [4, 5, 6],
+            ('C', 'c'): [7, 8, 9]
+        })
+        self.df.columns = pd.MultiIndex.from_tuples(self.df.columns)
+        self.df.columns.names = ['level_0', 'level_1']
+
+    def test_invalid_axis(self):
+        with self.assertRaises(ValueError):
+            idxslice(self.df, 0, 'A', 2)
+
+    def test_invalid_level(self):
+        with self.assertRaises(ValueError):
+            idxslice(self.df, 'D', 'A', 1)
+
+    def test_valid_inputs(self):
+        result = idxslice(self.df, 'level_0', 'A', 1)
+        self.assertEqual(result, pd.IndexSlice[['A'], :])
+        result = idxslice(self.df, 0, 'A', 1)
+        self.assertEqual(result, pd.IndexSlice[['A'], :])
+        result = idxslice(self.df, 'level_1', 'b', 1)
+        self.assertEqual(result, pd.IndexSlice[:, ['b']])
+        result = idxslice(self.df, 1, 'b', 1)
+        self.assertEqual(result, pd.IndexSlice[:, ['b']])
 
 
 if __name__ == '__main__':
