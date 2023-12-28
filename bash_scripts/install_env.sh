@@ -185,6 +185,8 @@ cd "$original_path"
 
 $PYTHON_PATH -m pip install stata_setup
 
+$PYTHON_PATH -m pip install adapters
+
 ipython kernel install --user --name=$env
 
 conda env export > ".envs/${env}.yml"
