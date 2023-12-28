@@ -1,3 +1,5 @@
+from os import PathLike
+from pathlib import Path
 from typing import Iterable, List, Optional, Union
 
 import pandas as pd
@@ -94,3 +96,29 @@ def melt_dataframe(_dataframe: DataFrame, value_col: str, entities: Iterable, gr
         value_name=value_col
         )
     return melted_df
+
+def store_dataframe_by_level(df: DataFrame, base_path: Union[str, PathLike], level: Union[str, int]) -> None:
+    if not isinstance(df, DataFrame): 
+        raise Exception("Error: df is not a pandas DataFrame.")
+    if not isinstance(base_path, (str, PathLike)):
+        raise Exception("Error: base_path is not a string or a PathLike object.")
+    if not isinstance(level, (int, str)):
+        raise Exception("Error: level is not an integer.")
+    if isinstance(level, int) and (level < 0 or level >= df.columns.nlevels):
+        raise Exception(f"Error: level {level} is not a valid level for the DataFrame.")
+    if isinstance(level, str) and level not in df.columns.names:
+        raise Exception(f"Error: level {level} is not a valid level for the DataFrame.")
+    level_values = df.columns.get_level_values(level).unique()
+    for n, value in enumerate(level_values):
+        if value not in df.columns.get_level_values(level):
+            raise Exception(f"Error: value {value} is not in level {level} of the DataFrame.")
+        sub_df = df.xs(value, axis=1, level=level, drop_level=False)
+        sub_path = Path(str(base_path).replace('.parquet', f"{n}_sub.parquet"))
+        sub_df.to_parquet(sub_path)
+
+def load_level_destructured_dataframe(base_path: PathLike, level: int) -> pd.DataFrame:
+    base_dir, base_filename = base_path.parent, base_path.stem
+    parquet_files = list(base_dir.glob(f"{base_filename}*_sub.parquet"))
+    df = [pd.read_parquet(file) for file in parquet_files]
+    df = pd.concat(df, axis=1)
+    return df

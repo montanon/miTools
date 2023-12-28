@@ -1,9 +1,18 @@
+import os
 import unittest
+from pathlib import Path
 
+import pandas as pd
 from pandas import DataFrame, Series, testing
 
 from mitools.exceptions.custom_exceptions import ArgumentTypeError
-from mitools.pandas.functions import *
+from mitools.pandas.functions import (
+    ArgumentValueError,
+    prepare_date_cols,
+    prepare_int_cols,
+    prepare_str_cols,
+    store_dataframe_by_level,
+)
 
 
 class TestPrepareIntCols(unittest.TestCase):
@@ -41,7 +50,7 @@ class TestPrepareStrCols(unittest.TestCase):
 
     def setUp(self):
         # Create a sample DataFrame
-        self.sample_data = pd.DataFrame({
+        self.sample_data = DataFrame({
             'A': [1, 2, 3],
             'B': [4.5, 5.5, 6.5],
             'C': ['x', 'y', 'z'],
@@ -78,7 +87,7 @@ class TestPrepareStrCols(unittest.TestCase):
 class TestPrepareDateCols(unittest.TestCase):
 
     def setUp(self):
-        self.df = pd.DataFrame({
+        self.df = DataFrame({
             'valid_date': ['2021-01-01', '2021/02/01', '01-03-2021', None],
             'invalid_date': ['2021-01-01', '2021/02/01', 'not a date', None],
             'mixed': [1, '2', '2021-01-01', None]
@@ -100,6 +109,39 @@ class TestPrepareDateCols(unittest.TestCase):
         with self.assertRaises(ArgumentValueError):
             prepare_date_cols(self.df.copy(), 'mixed')
 
-        
+
+class TestStoreDataframeByLevel(unittest.TestCase):
+    def setUp(self):
+        self.df = DataFrame({
+            ('A', 'a'): [1, 2, 3],
+            ('B', 'b'): [4, 5, 6],
+            ('C', 'c'): [7, 8, 9]
+        })
+        self.base_path = 'test.parquet'
+
+    def tearDown(self):
+        # Clean up any created files
+        for path in Path('.').glob('test*_sub.parquet'):
+            os.remove(path)
+
+    def test_invalid_df(self):
+        with self.assertRaises(Exception):
+            store_dataframe_by_level('invalid', self.base_path, 0)
+
+    def test_invalid_base_path(self):
+        with self.assertRaises(Exception):
+            store_dataframe_by_level(self.df, 123, 0)
+
+    def test_invalid_level(self):
+        with self.assertRaises(Exception):
+            store_dataframe_by_level(self.df, self.base_path, 'invalid')
+
+    def test_valid_inputs(self):
+        store_dataframe_by_level(self.df, self.base_path, 0)
+        self.assertTrue(Path('test0_sub.parquet').exists())
+        self.assertTrue(Path('test1_sub.parquet').exists())
+        self.assertTrue(Path('test2_sub.parquet').exists())
+
+
 if __name__ == '__main__':
     unittest.main()
