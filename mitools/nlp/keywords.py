@@ -384,7 +384,7 @@ def find_cities_in_texts(df: DataFrame, pattern: List[str], text_col: str) -> Da
     for idx, g in matches.reset_index()[['match', 0]].groupby('match'):
         mentioned_cities.loc[idx, 'cities'] = g[0].values.tolist()
     mentioned_cities = mentioned_cities['cities'].apply(pd.Series)
-    mentioned_cities = mentioned_cities.sort_index()
+    #mentioned_cities = mentioned_cities.sort_index()
     return mentioned_cities
 
 def find_countries_in_dataframe(dataframe: DataFrame, countries: List[str], demonyms: Dict[str,str]) -> DataFrame:
