@@ -1,4 +1,5 @@
 import itertools
+import json
 import pickle
 import re
 import sys
@@ -207,3 +208,6 @@ def display_env_variables(env_vars: List[Tuple[str, Any]], threshold_mb: float) 
     df = DataFrame(large_vars, columns=['Variable', 'Size (MB)', 'Info'])
     df.sort_values(by='Size (MB)', ascending=False, inplace=True)
     return df
+
+def pretty_dict_str(dictionary: Dict) -> str:
+    return json.dumps(dictionary, indent=4, sort_keys=True)
