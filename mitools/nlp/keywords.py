@@ -726,7 +726,10 @@ def evolution_sankey_plot_clusters_ngrams(yearly_ranges_ngrams: DataFrame, n_gra
     periods = yearly_ranges_ngrams.columns.get_level_values(year_range_level).unique()
     n_periods = len(periods)
     n_gram = yearly_ranges_ngrams.columns.get_level_values('n-gram').unique()[n_gram-1]
-    yearly_ranges_ngram = get_yearly_ranges_ngram(yearly_ranges_ngrams, n_gram, max_ngram)
+    yearly_ranges_ngram = get_yearly_ranges_ngram(yearly_ranges_ngrams, n_gram, max_ngram).fillna(0.0).replace(0.0, 1e-5)
+    count_columns = [col for col in yearly_ranges_ngram.columns if col[-1] == 'Count']
+    for col in count_columns:
+        yearly_ranges_ngram[col] = yearly_ranges_ngram[col] / yearly_ranges_ngram[col].sum()
     grams_data = create_grams_data(yearly_ranges_ngram, n_periods, max_ngram)
     grams_data = update_out_sources(grams_data, periods, max_ngram)
     periods_links = update_periods_links(yearly_ranges_ngram, grams_data, periods, n_gram)
