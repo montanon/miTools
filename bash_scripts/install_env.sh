@@ -184,6 +184,7 @@ test_python_module mitools
 cd "$original_path"
 
 $PYTHON_PATH -m pip install stata_setup
+$PYTHON_PATH -m pip install pystata
 
 $PYTHON_PATH -m pip install adapters
 
