@@ -112,9 +112,8 @@ class TestProject(unittest.TestCase):
         # Check the __repr__ and __str__ methods for correct format
         expected_repr = f"Project({self.test_dir}, {self.project_name}, {self.version})"
         self.assertEqual(repr(self.project), expected_repr)
-
-        expected_str = (f"Project {self.project_name}: \n Current Version:{self.version},\nRoot: {self.test_dir},\n" +
-                        f"Folder: {self.project.folder},Versions: {self.project.versions}\n)")
+        expected_str = (f"Project {self.project.name}\n\nCurrent Version: {self.project.version},\nRoot: {self.project.root},\n" +
+            f"Folder: {self.project.folder},\nVersions: {self.project.versions}\n")
         self.assertEqual(str(self.project), expected_str)
 
     def test_update_info(self):

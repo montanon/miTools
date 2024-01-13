@@ -115,7 +115,7 @@ class Project:
 
     def __str__(self) -> str:
         return f"Project {self.name}\n\nCurrent Version: {self.version},\nRoot: {self.root},\n" + \
-            f"Folder: {self.folder},Versions: {self.versions}\n"
+            f"Folder: {self.folder},\nVersions: {self.versions}\n"
     
     def update_info(self) -> None:
         self.versions = self.get_all_versions()
