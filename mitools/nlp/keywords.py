@@ -554,7 +554,7 @@ def gen_clusters_ngrams_sankey_positions(labels: List[str], n_sources: int
 
 def gen_clusters_ngrams_sankey_colors(sources_labels: List[str], targets_labels: List[str]
                                       ) -> Dict[str, List[int]]:
-    sources_colors = [(193, 193, 193)] + sns.color_palette("Paired")
+    sources_colors = [(193/255.0, 193/255.0, 193/255.0)] + sns.color_palette("Paired")
     sorted_colors = {cluster: sources_colors[i] for i, cluster in zip(
         [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], sources_labels
         )}
@@ -693,7 +693,7 @@ def create_sankey_data(periods_links: DataFrame, grams_data: DataFrame, periods:
     label_names = sorted(list(set(grams_data['Gram'].values.tolist())))
     colors = mpl.colormaps["Spectral_r"](np.linspace(0, 1, len(label_names)))
     labels_colors = {w: c for w, c in zip(label_names, colors)}
-    PLAIN_GRAY_COLOR = [192/255, 192/255, 192/255, 1.]
+    PLAIN_GRAY_COLOR = [193/255.0, 193/255.0, 193/255.0, 1.]
     labels_colors[''] = np.array(PLAIN_GRAY_COLOR)
     nodes_colors = [labels_colors[l] for l in grams_data['Gram']]
     nodes_colors = [f"rgba({c[0]},{c[1]},{c[2]},{c[3]})" for c in nodes_colors]
