@@ -1,16 +1,27 @@
+import shutil
 import sys
+import tempfile
 import unittest
-from typing import List, Optional
+from pathlib import Path
 from unittest.mock import mock_open, patch
 
-import numpy as np
-import pandas as pd
+from treelib import Tree
 
-from mitools.utils import (BitArray, dict_from_kwargs, display_env_variables,
-                           find_str_line_number_in_text, get_numbers_from_str,
-                           iterable_chunks, lcs_similarity, read_text_file,
-                           remove_chars, remove_multiple_spaces, str_is_number,
-                           stretch_string)
+from mitools.utils import (
+    BitArray,
+    build_dir_tree,
+    dict_from_kwargs,
+    display_env_variables,
+    find_str_line_number_in_text,
+    get_numbers_from_str,
+    iterable_chunks,
+    lcs_similarity,
+    read_text_file,
+    remove_chars,
+    remove_multiple_spaces,
+    str_is_number,
+    stretch_string,
+)
 
 
 class TestIterableChunks(unittest.TestCase):
@@ -273,6 +284,24 @@ class TestDisplayEnvVariables(unittest.TestCase):
         df = display_env_variables(self.env_vars, threshold_mb)
         self.assertIn('large_list', df['Variable'].values)
         self.assertIn('large_dict', df['Variable'].values)
+
+class TestBuildDirTree(unittest.TestCase):
+    def setUp(self):
+        self.test_dir = Path(tempfile.mkdtemp())
+        self.sub_dir = self.test_dir / 'sub_dir'
+        self.sub_dir.mkdir()
+        (self.sub_dir / 'file.txt').touch()
+        self.tree = Tree()
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir)
+
+    def test_build_dir_tree(self):
+        tree = build_dir_tree(self.test_dir, self.tree)
+        self.assertEqual(len(tree.all_nodes()), len(self.tree.all_nodes()))
+        self.assertTrue(any(node.tag == 'sub_dir' for node in tree.all_nodes()))
+        self.assertTrue(any(node.tag == 'file.txt' for node in tree.all_nodes()))
+
 
 if __name__ == '__main__':
     unittest.main()

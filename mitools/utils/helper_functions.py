@@ -24,6 +24,7 @@ from fuzzywuzzy import fuzz
 from numpy import ndarray
 from openpyxl.worksheet.worksheet import Worksheet
 from pandas import DataFrame, Series
+from treelib import Tree
 
 T = TypeVar('T')
 COLOR_CODES = {
@@ -222,3 +223,17 @@ def display_env_variables(env_vars: List[Tuple[str, Any]], threshold_mb: float) 
 
 def pretty_dict_str(dictionary: Dict) -> str:
     return json.dumps(dictionary, indent=4, sort_keys=True)
+
+def build_dir_tree(directory: PathLike, tree: Optional[Tree]=None, parent: Optional[PathLike]=None) -> Tree:
+    if tree is None:
+        tree = Tree()
+        tree.create_node(directory.name, str(directory))
+        parent = str(directory)
+    for item in sorted(directory.iterdir()):
+        node_id = str(item)
+        if item.is_dir():
+            tree.create_node(item.name, node_id, parent=parent)
+            build_dir_tree(item, tree, parent=node_id)
+        else:
+            tree.create_node(item.name, node_id, parent=parent)
+    return tree

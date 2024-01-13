@@ -188,6 +188,8 @@ $PYTHON_PATH -m pip install pystata
 
 $PYTHON_PATH -m pip install adapters
 
+$PYTHON_PATH -m pip install treelib
+
 ipython kernel install --user --name=$env
 
 conda env export > ".envs/${env}.yml"
