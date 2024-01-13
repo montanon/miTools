@@ -176,13 +176,6 @@ $PYTHON_PATH -m pip install -U kaleido
 
 $PYTHON_PATH -m pip install coverage
 
-echo $MITOOLS
-cd "$MITOOLS"
-echo PWD$(pwd)
-$PYTHON_PATH -m pip install -e .
-test_python_module mitools
-cd "$original_path"
-
 $PYTHON_PATH -m pip install stata_setup
 $PYTHON_PATH -m pip install pystata
 
@@ -192,7 +185,14 @@ $PYTHON_PATH -m pip install treelib
 treelib_path=$($PYTHON_PATH -m pip show treelib | grep -E '^Location: ' | awk '{print $2}')
 treelib_path=$treelib_path/treelib/tree.py
 sed -i '' 's/print(self._reader.encode("utf-8"))/print(self._reader)/g' $treelib_path
+test_python_module treelib
 
+echo $MITOOLS
+cd "$MITOOLS"
+echo PWD$(pwd)
+$PYTHON_PATH -m pip install -e .
+test_python_module mitools
+cd "$original_path"
 
 ipython kernel install --user --name=$env
 
