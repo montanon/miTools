@@ -189,6 +189,10 @@ $PYTHON_PATH -m pip install pystata
 $PYTHON_PATH -m pip install adapters
 
 $PYTHON_PATH -m pip install treelib
+treelib_path=$($PYTHON_PATH -m pip show treelib | grep -E '^Location: ' | awk '{print $2}')
+treelib_path=$treelib_path/treelib/tree.py
+sed -i '' 's/print(self._reader.encode("utf-8"))/print(self._reader)/g' $treelib_path
+
 
 ipython kernel install --user --name=$env
 
