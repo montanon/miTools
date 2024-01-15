@@ -108,13 +108,16 @@ class TestProject(unittest.TestCase):
         self.assertEqual(loaded_project.version, self.project.version)
         self.assertEqual(loaded_project.versions, self.project.versions)
 
-    def test_repr_and_str_methods(self):
-        # Check the __repr__ and __str__ methods for correct format
+    def test_repr_method(self):
+        # Check the __repr__ method for correct format
         expected_repr = f"Project({self.test_dir}, {self.project_name}, {self.version})"
-        self.assertEqual(repr(self.project), expected_repr)
+        self.assertEqual(self.project.__repr__(), expected_repr)
+
+    def test_str_method(self):
+        # Check the __str__ method for correct format
         expected_str = (f"Project {self.project.name}\n\nCurrent Version: {self.project.version},\nRoot: {self.project.root},\n" +
             f"Folder: {self.project.folder},\nVersions: {self.project.versions}\n")
-        self.assertEqual(str(self.project), expected_str)
+        self.assertEqual(self.project.__str__(), expected_str)
 
     def test_update_info(self):
         # Check if versions and subfolders are correctly updated
