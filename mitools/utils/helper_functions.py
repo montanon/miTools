@@ -111,7 +111,7 @@ def split_strings(str_list: List[str]) -> List[str]:
     new_list = []
     for s in str_list:
         new_list += re.split('(?=[A-Z])', s)
-    return new_list
+    return [s for s in new_list if s]
 
 def add_significance(row: Series) -> Series:
     p_value = float(row.split(' ')[1].replace('(','').replace(')',''))  
