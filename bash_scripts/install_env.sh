@@ -67,6 +67,7 @@ fi
 PYTHON_PATH=$(which python)
 
 conda install -c conda-forge seaborn numpy pandas matplotlib opencv pytorch torchvision jupyter ipywidgets jupyterlab_widgets openpyxl -y
+conda remove jupyterlab -y
 test_python_module seaborn
 test_python_module numpy
 test_python_module pandas
