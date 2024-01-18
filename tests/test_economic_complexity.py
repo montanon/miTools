@@ -1,13 +1,13 @@
 import unittest
 
-from mitools.economic_complexity import StringConverter
+from mitools.economic_complexity import StringMapper
 
 
 class TestStringConverter(unittest.TestCase):
     
     def setUp(self):
         self.relations = {'pretty1': 'ugly1', 'pretty2': 'ugly2'}
-        self.converter = StringConverter(self.relations)
+        self.converter = StringMapper(self.relations)
 
     def test_add_relation(self):
         self.converter.add_relation('pretty3', 'ugly3')
@@ -15,7 +15,7 @@ class TestStringConverter(unittest.TestCase):
         self.assertEqual(self.converter.uglify_str('pretty3'), 'ugly3')
 
     def test_add_relation_case_insensitive(self):
-        converter = StringConverter(self.relations, case_sensitive=False)
+        converter = StringMapper(self.relations, case_sensitive=False)
         converter.add_relation('Pretty4', 'Ugly4')
         self.assertEqual(converter.prettify_str('ugly4'), 'pretty4')
         self.assertEqual(converter.uglify_str('pretty4'), 'ugly4')

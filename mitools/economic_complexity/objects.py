@@ -75,7 +75,7 @@ class ProductsBasket:
         return closest_products
 
 
-class StringConverter:
+class StringMapper:
 
     def __init__(self, relations: Dict[str,str], case_sensitive: Optional[bool]=True):
         self.case_sensitive = case_sensitive
