@@ -116,3 +116,30 @@ class StringMapper:
     def uglify_strs(self, pretty_strs: List[str]) -> List[str]:
         return [self.uglify_str(pretty_str) for pretty_str in pretty_strs]
     
+    def remap_str(self, string):
+        if (not self.case_sensitive and (string.lower() in self.pretty_to_ugly or string.lower() in self.ugly_to_pretty)) \
+                or (string in self.pretty_to_ugly or string in self.ugly_to_pretty):
+            if string in self.pretty_to_ugly or (not self.case_sensitive and string.lower() in self.pretty_to_ugly):
+                return self.uglify_str(string)
+            else:
+                return self.prettify_str(string)
+        else:
+            raise ValueError(f"String '{string}' is not mapped")
+        
+    def remap_strs(self, strings: List[str]) -> List[str]:
+        if all(self.is_pretty(string) for string in strings):
+            return [self.uglify_str(string) for string in strings]
+        elif all(self.is_ugly(string) for string in strings):
+            return [self.prettify_str(string) for string in strings]
+        else:
+            raise ValueError("All strings must be either pretty or ugly before remapping")
+    
+    def is_pretty(self, string: str) -> bool:
+        if not self.case_sensitive:
+            string = string.lower()
+        return string in self.pretty_to_ugly
+
+    def is_ugly(self, string: str) -> bool:
+        if not self.case_sensitive:
+            string = string.lower()
+        return string in self.ugly_to_pretty
