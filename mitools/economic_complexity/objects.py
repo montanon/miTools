@@ -1,6 +1,6 @@
 import statistics
 from dataclasses import dataclass
-from typing import List
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -73,3 +73,46 @@ class ProductsBasket:
             closest_product = min(self.products, key=lambda product: abs(product.pci - quantile))
             closest_products.append(closest_product)
         return closest_products
+
+
+class StringConverter:
+
+    def __init__(self, relations: Dict[str,str], case_sensitive: Optional[bool]=True):
+        self.case_sensitive = case_sensitive
+        self.pretty_to_ugly = {}
+        self.ugly_to_pretty = {}
+        for pretty, ugly in relations.items():
+            self.add_relation(pretty, ugly)
+
+    def validate_relation(self, pretty: str, ugly: str) -> (str, str):
+        if not self.case_sensitive:
+            pretty, ugly = pretty.lower(), ugly.lower()
+        if pretty in self.pretty_to_ugly or ugly in self.ugly_to_pretty:
+            raise ValueError(f"Non-bijective mapping with pretty or ugly string found: {pretty} {ugly}")
+        return pretty, ugly
+    
+    def add_relation(self, pretty: str, ugly: str) -> None:
+        pretty, ugly = self.validate_relation(pretty, ugly)
+        self.pretty_to_ugly[pretty] = ugly
+        self.ugly_to_pretty[ugly] = pretty
+
+    def prettify_str(self, ugly_str: str) -> str:
+        if not self.case_sensitive:
+            ugly_str = ugly_str.lower()
+        if ugly_str not in self.ugly_to_pretty:
+            raise ValueError(f"No pretty string found for '{ugly_str}'")
+        return self.ugly_to_pretty[ugly_str]
+    
+    def prettify_strs(self, ugly_strs: str) -> List[str]:
+        return [self.prettify_str(ugly_str) for ugly_str in ugly_strs]
+    
+    def uglify_str(self, pretty_str: str) -> str:
+        if not self.case_sensitive:
+            pretty_str = pretty_str.lower()
+        if pretty_str not in self.pretty_to_ugly:
+            raise ValueError(f"No ugly string found for '{pretty_str}'")
+        return self.pretty_to_ugly[pretty_str]
+    
+    def uglify_strs(self, pretty_strs: List[str]) -> List[str]:
+        return [self.uglify_str(pretty_str) for pretty_str in pretty_strs]
+    
