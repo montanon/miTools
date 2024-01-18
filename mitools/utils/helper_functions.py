@@ -10,6 +10,7 @@ from typing import (
     List,
     Optional,
     Pattern,
+    Tuple,
     Type,
     TypeVar,
     Union,
@@ -107,11 +108,11 @@ def split_strings(str_list: List[str]) -> List[str]:
 
 def add_significance(row: Series) -> Series:
     p_value = float(row.split(' ')[1].replace('(','').replace(')',''))  
-    if p_value < 0.01:
+    if p_value < 0.001:
         return row + "***"
-    elif p_value < 0.05:
+    elif p_value < 0.01:
         return row + "**"
-    elif p_value < 0.1:
+    elif p_value < 0.05:
         return row + "*"
     else:
         return row
@@ -185,3 +186,50 @@ def stretch_string(string: str, length: Optional[int]=60) -> str:
             return string[:length] + "\n" + stretch_string(string[length:], length)
     else:
         return string
+    
+def auto_adjust_columns_width(sheet: Worksheet) -> None:
+    for column in sheet.columns:
+        max_length = 0
+        column = [cell for cell in column if cell.value]  # Filter out None values
+        for cell in column:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except Exception:
+                pass
+        adjusted_width = (max_length + 1)  # Adding a little extra width
+        sheet.column_dimensions[openpyxl.utils.get_column_letter(column[0].column)].width = adjusted_width
+
+def display_env_variables(env_vars: List[Tuple[str, Any]], threshold_mb: float) -> DataFrame:
+    large_vars = []
+    for name, value in env_vars:
+        size_mb = sys.getsizeof(value) / (1024**2)
+        if size_mb > threshold_mb:
+            info = f"Type: {type(value).__name__}, ID: {id(value)}"
+            if hasattr(value, '__doc__'):
+                doc = str(value.__doc__).split('\n')[0]
+                info += f", Doc: {doc[:50]}..."
+            large_vars.append((name, size_mb, info))
+    df = DataFrame(large_vars, columns=['Variable', 'Size (MB)', 'Info'])
+    df.sort_values(by='Size (MB)', ascending=False, inplace=True)
+    return df
+
+def pretty_dict_str(dictionary: Dict) -> str:
+    return json.dumps(dictionary, indent=4, sort_keys=True)
+
+def build_dir_tree(directory: PathLike, tree: Optional[Tree]=None, parent: Optional[PathLike]=None) -> Tree:
+    if tree is None:
+        tree = Tree()
+        tree.create_node(directory.name, str(directory))
+        parent = str(directory)
+    for item in sorted(directory.iterdir()):
+        node_id = str(item)
+        if item.is_dir():
+            tree.create_node(item.name, node_id, parent=parent)
+            build_dir_tree(item, tree, parent=node_id)
+        else:
+            tree.create_node(item.name, node_id, parent=parent)
+    return tree
+
+def clean_str(string: str, pattern: Optional[str], sub_char: Optional[str]='') -> str:
+    return re.sub(rf'{pattern}', sub_char, string)
