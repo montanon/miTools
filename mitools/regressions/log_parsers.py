@@ -3,13 +3,20 @@ import os
 import re
 import time
 from os import PathLike
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import numpy as np
 import pandas as pd
 from fuzzywuzzy import process
+from pandas import DataFrame
 
-from ..utils import *
+from ..utils import (
+    find_str_line_number_in_text,
+    get_numbers_from_str,
+    parallel,
+    read_text_file,
+    remove_dataframe_duplicates,
+)
 from .regressions_data import CSARDLResults, OLSResults, RegressionData, XTRegResults
 
 #SPLIT_PATTERN = '={2,}\n'
@@ -88,16 +95,16 @@ def get_regression_strs_from_log(log: str, regression_pattern=None):
         log = log[match.end():]
     return regression_strs
 
-def get_coefficients_from_table_rows(coefficient_rows: List[str], var_names: List[str]) -> Dict:
+def get_coefficients_from_table_rows(coefficient_rows, var_names):
     coefficients = {}
     for row in coefficient_rows:
         variable = re.match(' *[A-Za-z0-9\_\~.]+ *(?=\|)', row)
         end_of_variable = variable.end()
         variable = variable.group(0).strip()
-        if not '(omitted)' in row[end_of_variable:]:
-            coeffs = re.findall(NUMBER_PATTERN, row[end_of_variable:])
-            _coeffs = coeffs
-            coeffs = [float(c) if c != '.' else 0.0  for c in coeffs]
+        row_coeffs = row[end_of_variable:].replace(' . ', ' 0.0 ')
+        if '(omitted)' not in row_coeffs:
+            coeffs = re.findall(NUMBER_PATTERN, row_coeffs)
+            coeffs = [float(c) if c != '.' else 0.0 for c in coeffs]
         else:
             coeffs = [0, 9999, 0, 1.0, 0, 0]
         coeffs = {v: c for v, c in zip(var_names, coeffs)}
@@ -107,14 +114,16 @@ def get_coefficients_from_table_rows(coefficient_rows: List[str], var_names: Lis
 def get_model_data_from_log(regression_str, model_type):
     if model_type == 'csardl':
         return get_csardl_data_from_log(regression_str)
-    elif model_type == 'xtreg':
-        return get_xtreg_data_from_log(regression_str)
+    elif model_type == 'fe':
+        return get_xtreg_fe_data_from_log(regression_str)
+    elif model_type == 'fe-te':
+        return get_xtreg_fe_te_data_from_log(regression_str)
     elif model_type == 'ols':
         return get_ols_data_from_log(regression_str)
     else:
         raise NotImplementedError
 
-def get_xtreg_data_from_log(xtreg_str: str):
+def get_xtreg_fe_data_from_log(xtreg_str: str):
     n_obs = get_numbers_from_str(re.search(rf'Number of obs += +\n* *-?\d*\,*\d*\.*\d+\n', xtreg_str).group(0))[-1]
     n_groups = get_numbers_from_str(re.search(rf'Number of groups += +\n*(({NUMBER_PATTERN})|(.))+\n', xtreg_str).group(0))[-1]
     try:
@@ -134,10 +143,18 @@ def get_xtreg_data_from_log(xtreg_str: str):
     coefficients_table = xtreg_str.split('\n\n')[3]
     dep_variable = re.search('(Indicat(?:~\d+X|or\w+X))|(ECI)', coefficients_table).group(0).strip()
 
-
-    coefficient_rows = coefficients_table.split('\n')[5:-6]
+    coefficients_pattern = re.compile(r'(^\s*\w+\s*)|(^Indi[a-zX~0-9]*)\|.*[-+]?[0-9]*\.?[0-9]+(e[-+]?[0-9]+)?|(\s*\.\s*)+$')
+    coefficient_rows = [line for line in coefficients_table.split('--------+')[1].split('\n') if coefficients_pattern.match(line)]
+    
     coefficients = get_coefficients_from_table_rows(coefficient_rows, XTREG_VAR_NAMES)
     indep_variables = list(coefficients.keys())
+
+    if coefficients_table.find('.        .       .            .           .') > -1:
+        from mitools.dev import store_var
+        store_var('xtreg_str', xtreg_str)
+        store_var('coefficients_table', coefficients_table)
+        store_var('coefficient_rows', coefficient_rows)
+        store_var('coefficients', coefficients)
 
     std_errs = None
     t_values = None
@@ -169,6 +186,14 @@ def get_xtreg_data_from_log(xtreg_str: str):
         model_params=model_params,
         model_specification=model_specification
     )
+
+def get_xtreg_fe_te_data_from_log(xtreg_str: str):
+    xtreg_str, timed_effects = xtreg_str.split('        Year |\n')
+    xtreg_results = get_xtreg_fe_data_from_log(xtreg_str)
+
+    # TODO: extract timed effects
+
+    return xtreg_results
     
 
 def get_ols_data_from_log(ols_str: str):
@@ -412,6 +437,8 @@ def df_view(df, indicators, columns, col_filters, index_filters, eci_col, col_na
     _df = _df.loc[_df.index.get_level_values('Id').isin(eci_ids), :]
     _df = sort_df(_df, col_name, 1, income_sorting_key)
     _df = sort_df(_df, [row_name, 'Variable'], 0)
+    sorted_ids = _df.reset_index().groupby('Id')['Variable'].count().sort_values(axis=0, ascending=True).index
+    _df = _df.loc[sorted_ids, :]
     _df = style_csardl_results(_df, row_name, col_name)
     return _df
 
@@ -525,13 +552,17 @@ def ind_var_name_replace(string, indicator_names):
         'TexWeaA~SSCP': 'TexWeaAppSSCP',
         'PetCheNonP~V': 'PetCheNonPSEV',
         'TexWeaAppP~V': 'TexWeaAppPSEV',
+        'PetChe~SASCI': 'PetCheNonSASCI',
+        'TexWea~SASCI': 'TexWeaAppSASCI',
+        'PetChe~NASCI': 'PetCheNonNASCI',
+        'TexWea~NASCI': 'TexWeaAppNASCI'
 
     }
     if string in ind_mapping:
         indicator_name = indicator_names.to_dict()['Original Name'][ind_mapping[string]]
         return indicator_name
     search_indicator = re.search('Indic[ator]*~?\d{1,}X', string)
-    search_eci = re.search('[A-Za-z& \-,]*(SECI|ECI|SCI|SCP|PSEV)', string)
+    search_eci = re.search('[A-Za-z& \-,]*(ASCI|SECI|ECI|SCI|SCP|PSEV)', string)
     if search_indicator:
         indicator = search_indicator.group(0)
         indicator = re.sub('Indic[ato]*~+r*', 'Indicator', indicator)
@@ -547,7 +578,7 @@ def ind_var_name_replace(string, indicator_names):
         else:
             print(indicator, search_eci, string)
             raise Exception
-        string = re.sub('(?<=[._])?[A-Za-z& ]*(SECI|ECI|SCI|SCP|PSEV)', indicator_name, string)
+        string = re.sub('(?<=[._])?[A-Za-z& ]*(ASCI|SECI|ECI|SCI|SCP|PSEV)', indicator_name, string)
         if string.find('~') > -1:
             print(string)
     return string

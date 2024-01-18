@@ -67,6 +67,7 @@ fi
 PYTHON_PATH=$(which python)
 
 conda install -c conda-forge seaborn numpy pandas matplotlib opencv pytorch torchvision jupyter ipywidgets jupyterlab_widgets openpyxl -y
+conda remove jupyterlab -y
 test_python_module seaborn
 test_python_module numpy
 test_python_module pandas
@@ -173,6 +174,19 @@ $PYTHON_PATH -m spacy download es_core_news_sm
 test_python_module spacy
 
 $PYTHON_PATH -m pip install -U kaleido
+
+$PYTHON_PATH -m pip install coverage
+
+$PYTHON_PATH -m pip install stata_setup
+$PYTHON_PATH -m pip install pystata
+
+$PYTHON_PATH -m pip install adapters
+
+$PYTHON_PATH -m pip install treelib
+treelib_path=$($PYTHON_PATH -m pip show treelib | grep -E '^Location: ' | awk '{print $2}')
+treelib_path=$treelib_path/treelib/tree.py
+sed -i '' 's/print(self._reader.encode("utf-8"))/print(self._reader)/g' $treelib_path
+test_python_module treelib
 
 echo $MITOOLS
 cd "$MITOOLS"

@@ -89,13 +89,14 @@ def merge_csvs_into_dataframe(csvs_folder: PathLike) -> DataFrame:
     dataframe = (read_and_concat_csvs(csvs_folder)
                     .drop_duplicates()
                     .reset_index(drop=True)
-            )
+                 )
     return dataframe
 
 def etl(df_path, csvs_folder, columns_map, text_columns, pattern, filter_col, recalculate):
     if not os.path.exists(df_path) or recalculate:
         dataframe = merge_csvs_into_dataframe(csvs_folder)
-        dataframe = rename_columns(dataframe, columns_map)
+        if columns_map:
+            dataframe = rename_columns(dataframe, columns_map)
         dataframe = create_full_text_column(dataframe, text_columns)
         dataframe = filter_text_rows_by_pattern(dataframe, filter_col, pattern)
         dataframe.to_parquet(df_path)

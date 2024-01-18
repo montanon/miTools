@@ -1,6 +1,8 @@
 import itertools
+import json
 import pickle
 import re
+import sys
 from os import PathLike
 from typing import (
     Any,
@@ -17,9 +19,12 @@ from typing import (
 )
 
 import numpy as np
+import openpyxl
 from fuzzywuzzy import fuzz
 from numpy import ndarray
+from openpyxl.worksheet.worksheet import Worksheet
 from pandas import DataFrame, Series
+from treelib import Tree
 
 T = TypeVar('T')
 COLOR_CODES = {
@@ -66,27 +71,29 @@ def find_str_line_number_in_text(text: str, substring: str) -> int:
 def read_text_file(text_path: PathLike) -> str:
     with open(text_path, 'r') as f:
         return f.read() 
-    
+
 def dict_from_kwargs(**kwargs: Dict[str, Any]) -> Dict:
-    return {k:v for k, v in kwargs}
+    return kwargs
 
 def lcs_similarity(s1: str, s2: str) -> float:
     if not s1 or not s2:
         return 0.0
-    if s1 == s2:
-        return 1.0
+    if s1 in s2 or s2 in s1:
+        return min(len(s1), len(s2)) / max(len(s1), len(s2))
     len_s1, len_s2 = len(s1), len(s2)
-    prev_row = [0] * (len_s2 + 1)
+    if len_s1 < len_s2:
+        s1, s2, len_s1, len_s2 = s2, s1, len_s2, len_s1
     curr_row = [0] * (len_s2 + 1)
     for i in range(len_s1):
+        prev_val = curr_row[0]
         for j in range(len_s2):
+            temp = curr_row[j+1]
             if s1[i] == s2[j]:
-                curr_row[j+1] = prev_row[j] + 1
+                curr_row[j+1] = prev_val + 1
             else:
-                curr_row[j+1] = max(curr_row[j], prev_row[j+1])
-        prev_row, curr_row = curr_row, prev_row
-
-    lcs_length = prev_row[-1]
+                curr_row[j+1] = max(curr_row[j], curr_row[j+1])
+            prev_val = temp
+    lcs_length = curr_row[-1]
     return lcs_length / max(len_s1, len_s2)
 
 def fuzz_string_in_string(src_string: str, dst_string: str, threshold: Optional[int]=90) -> bool:
@@ -104,7 +111,7 @@ def split_strings(str_list: List[str]) -> List[str]:
     new_list = []
     for s in str_list:
         new_list += re.split('(?=[A-Z])', s)
-    return new_list
+    return [s for s in new_list if s]
 
 def add_significance(row: Series) -> Series:
     p_value = float(row.split(' ')[1].replace('(','').replace(')',''))  

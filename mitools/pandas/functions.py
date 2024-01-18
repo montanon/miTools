@@ -1,4 +1,6 @@
-from typing import Iterable, List, Optional, Union
+from os import PathLike
+from pathlib import Path
+from typing import Any, Iterable, List, Optional, Union
 
 import pandas as pd
 from pandas import DataFrame
@@ -94,3 +96,50 @@ def melt_dataframe(_dataframe: DataFrame, value_col: str, entities: Iterable, gr
         value_name=value_col
         )
     return melted_df
+
+def store_dataframe_by_level(df: DataFrame, base_path: Union[str, PathLike], level: Union[str, int]) -> None:
+    if not isinstance(df, DataFrame): 
+        raise Exception("Error: df is not a pandas DataFrame.")
+    if not isinstance(base_path, (str, PathLike)):
+        raise ValueError("Error: base_path is not a string or a PathLike object.")
+    if not isinstance(level, (int, str)):
+        raise ValueError("Error: level is not an integer.")
+    if isinstance(level, int) and (level < 0 or level >= df.columns.nlevels):
+        raise ValueError(f"Error: level {level} is not a valid level for the DataFrame.")
+    if isinstance(level, str) and level not in df.columns.names:
+        raise ValueError(f"Error: level {level} is not a valid level for the DataFrame.")
+    level_values = df.columns.get_level_values(level).unique()
+    for n, value in enumerate(level_values):
+        if value not in df.columns.get_level_values(level):
+            raise ValueError(f"Error: value {value} is not in level {level} of the DataFrame.")
+        sub_df = df.xs(value, axis=1, level=level, drop_level=False)
+        sub_path = Path(str(base_path).replace('.parquet', f"{n}_sub.parquet"))
+        sub_df.to_parquet(sub_path)
+
+def load_level_destructured_dataframe(base_path: Union[str, PathLike], level: Union[str, int]) -> DataFrame:
+    if not isinstance(base_path, (str, PathLike)):
+        raise ValueError("base_path must be a string or a PathLike object.")
+    if not isinstance(level, int):
+        raise ValueError("level must be an integer.")
+    if isinstance(base_path, str): 
+        base_path = Path(base_path)
+    base_dir, base_filename = base_path.parent, base_path.stem
+    parquet_files = list(base_dir.glob(f"{base_filename}*_sub.parquet"))
+    if not parquet_files:
+        raise FileNotFoundError(f"No parquet files found in {base_dir} with prefix {base_filename}.")
+    df = [pd.read_parquet(file) for file in parquet_files]
+    df = pd.concat(df, axis=1)
+    return df
+
+def idxslice(df: DataFrame, level: Union[int, str], value: Union[List[Any], Any], axis: int) -> pd.IndexSlice:
+    if axis not in [0, 1]:
+        raise ValueError('axis must be 0 for index or 1 for columns')
+    value = [value] if not isinstance(value, list) else value
+    multiidx = df.index if axis == 0 else df.columns
+    if isinstance(level, str):
+        if level not in multiidx.names:
+            raise ValueError('level is not in the axis index provided')
+        level = multiidx.names.index(level)
+    slices = [slice(None)] * multiidx.nlevels
+    slices[level] = value
+    return pd.IndexSlice[tuple(slices)]

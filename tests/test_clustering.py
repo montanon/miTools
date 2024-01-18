@@ -174,7 +174,7 @@ class TestGetClustersCentroids(TestCase):
         # Ensure function handles an empty dataframe without errors
         empty_data = DataFrame(columns=['x', 'y'], 
                              index=MultiIndex(levels=[[]], codes=[[]], names=['cluster'])
-                             )
+                               )
         with self.assertRaises(ValueError):  # Assuming it raises a ValueError due to empty data
             get_clusters_centroids(empty_data, 'cluster')
 

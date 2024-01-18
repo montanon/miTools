@@ -1,4 +1,6 @@
+import os
 import unittest
+from typing import Dict, List, Tuple
 from unittest import TestCase
 from unittest.mock import Mock
 
@@ -6,10 +8,22 @@ import pandas as pd
 from pandas import DataFrame
 
 from mitools.nlp import (
+    RegexpTokenizer,
+    StopwordsManager,
     find_countries_in_dataframe,
     find_country_in_token,
+    gen_clusters_ngrams_sankey_colors,
+    gen_clusters_ngrams_sankey_links_colors,
+    gen_clusters_ngrams_sankey_nodes_colors,
+    gen_clusters_ngrams_sankey_positions,
     get_bow_of_tokens,
+    get_cluster_ngrams,
+    get_clustered_dataframe_tokens,
+    get_clusters_ngrams,
     get_dataframe_bow,
+    get_dataframe_bow_chunks,
+    get_dataframe_tokens,
+    get_ngram_count,
     get_tfidf,
     lemmatize_text,
     lemmatize_token,
@@ -184,9 +198,9 @@ class TestPreprocessText(TestCase):
 
     def test_stopword_removal(self):
         text = "This is a sample text."
-        stopwords = ["this", "is", "a"]
+        stop_words = ["this", "is", "a"]
         expected_tokens = ["sample", "text"]
-        self.assertEqual(preprocess_text(text, stopwords=stopwords), expected_tokens)
+        self.assertEqual(preprocess_text(text, stop_words=stop_words), expected_tokens)
 
     def test_lemmatization(self):
         text = "I runs fast"
@@ -216,9 +230,9 @@ class TestPreprocessTexts(TestCase):
 
     def test_batch_stopword_removal(self):
         texts = ["This is a test.", "Another example."]
-        stopwords = ["this", "is", "a", "another"]
+        stop_words = ["this", "is", "a", "another"]
         expected_results = [["test"], ["example"]]
-        self.assertEqual(preprocess_texts(texts, stopwords=stopwords), expected_results)
+        self.assertEqual(preprocess_texts(texts, stop_words=stop_words), expected_results)
 
     def test_batch_lemmatization(self):
         texts = ["I runs fast", "She plays guitar"]
@@ -244,18 +258,18 @@ class TestPreprocessToken(TestCase):
 
     def test_stopword_removal(self):
         token = "an"
-        stopwords = ["an"]
-        self.assertEqual(preprocess_token(token, stopwords=stopwords), "")
+        stop_words = ["an"]
+        self.assertEqual(preprocess_token(token, stop_words=stop_words), "")
 
     def test_case_insensitivity(self):
         token = "An"
-        stopwords = ["an"]
-        self.assertEqual(preprocess_token(token, stopwords=stopwords), "")
+        stop_words = ["an"]
+        self.assertEqual(preprocess_token(token, stop_words=stop_words), "")
 
     def test_no_lemmatize_no_stopword(self):
         token = "running"
-        stopwords = ["run"]
-        self.assertEqual(preprocess_token(token, stopwords=stopwords), "running")
+        stop_words = ["run"]
+        self.assertEqual(preprocess_token(token, stop_words=stop_words), "running")
 
     def test_empty_token(self):
         token = ""
@@ -282,15 +296,15 @@ class TestPreprocessTokens(TestCase):
 
     def test_stopword_removal(self):
         tokens = ["This", "is", "a", "test"]
-        stopwords = ["this", "is", "a"]
+        stop_words = ["this", "is", "a"]
         expected_tokens = ["test"]
-        self.assertEqual(preprocess_tokens(tokens, stopwords=stopwords), expected_tokens)
+        self.assertEqual(preprocess_tokens(tokens, stop_words=stop_words), expected_tokens)
 
     def test_lemmatize_and_stopword_removal(self):
         tokens = ["This", "is", "running"]
-        stopwords = ["this", "is", 'be']
+        stop_words = ["this", "is", 'be']
         expected_tokens = ["run"]
-        self.assertEqual(preprocess_tokens(tokens, stopwords=stopwords, lemmatize=True), expected_tokens)
+        self.assertEqual(preprocess_tokens(tokens, stop_words=stop_words, lemmatize=True), expected_tokens)
 
     def test_empty_tokens(self):
         tokens = []
@@ -347,9 +361,9 @@ class TestGetBowOfTokens(TestCase):
 
     def test_stopwords(self):
         tokens = ["apple", "banana", "cherry", "banana"]
-        stopwords = ["banana"]
+        stop_words = ["banana"]
         expected_bow = {'apple': 1, 'cherry': 1}
-        self.assertEqual(get_bow_of_tokens(tokens, preprocess=True, stopwords=stopwords), expected_bow)
+        self.assertEqual(get_bow_of_tokens(tokens, preprocess=True, stop_words=stop_words), expected_bow)
 
     def test_sorted_output(self):
         tokens = ["apple", "banana", "cherry", "banana", "cherry", "cherry"]
@@ -386,10 +400,418 @@ class TestGetDataframeBow(TestCase):
         self.assertNotIn('This', bow_df.columns)
     
     def test_stopwords(self):
-        stopwords = ['this', 'is', 'a', 'another', 'yet']
-        bow_df = get_dataframe_bow(self.df, 'text', preprocess=True, stopwords=stopwords)
+        stop_words = ['this', 'is', 'a', 'another', 'yet']
+        bow_df = get_dataframe_bow(self.df, 'text', preprocess=True, stop_words=stop_words)
         self.assertNotIn('this', bow_df.columns)
         self.assertNotIn('is', bow_df.columns)
+
+
+class TestGetDataframeBowChunks(TestCase):
+
+    def setUp(self):
+        self.data = {
+            'text': ['This is a sample text.', 'Another sample text here.', 'Yet another text sample.']
+        }
+        self.df = pd.DataFrame(self.data)
+
+    def test_basic_functionality(self):
+        bow_df = get_dataframe_bow_chunks(self.df, 'text')
+        self.assertIn('sample', bow_df.columns)
+        self.assertEqual(bow_df['sample'].iloc[0], 1)
+        self.assertEqual(bow_df['sample'].iloc[1], 1)
+        self.assertEqual(bow_df['sample'].iloc[2], 1)
+        self.assertEqual(bow_df['this'].iloc[0], 1)
+        self.assertEqual(bow_df['this'].iloc[1], 0)
+
+    def test_preprocess(self):
+        bow_df = get_dataframe_bow_chunks(self.df, 'text', preprocess=True)
+        self.assertIn('sample', bow_df.columns)
+        self.assertNotIn('This', bow_df.columns)
+    
+    def test_stopwords(self):
+        stop_words = ['this', 'is', 'a', 'another', 'yet']
+        bow_df = get_dataframe_bow_chunks(self.df, 'text', preprocess=True, stop_words=stop_words)
+        self.assertNotIn('this', bow_df.columns)
+        self.assertNotIn('is', bow_df.columns)
+
+    def test_chunk_processing(self):
+        large_data = {'text': ['Text sample.'] * 5_000}  # More than 2 chunks
+        large_df = pd.DataFrame(large_data)
+        bow_df = get_dataframe_bow_chunks(large_df, 'text', chunk_size=2_500)
+        self.assertEqual(len(bow_df), 5_000)
+        self.assertEqual(bow_df['sample'].sum(), 5_000)
+
+    def test_small_dataframe(self):
+        small_data = {'text': ['Small dataset.']}
+        small_df = pd.DataFrame(small_data)
+        bow_df = get_dataframe_bow_chunks(small_df, 'text')
+        self.assertEqual(len(bow_df), 1)
+        self.assertIn('small', bow_df.columns)
+
+class TestGetNgramCount(unittest.TestCase):
+
+    def setUp(self):
+        # Sample DataFrame setup
+        self.df = pd.DataFrame({
+            'text': ['This is a test', 'Another test text', 'More text data'],
+            'text_id': [1, 2, 3]
+        })
+        self.text_col = 'text'
+        self.id_col = 'text_id'
+
+    def test_basic_functionality(self):
+        result = get_ngram_count(self.df, self.text_col, self.id_col)
+        self.assertIsInstance(result, pd.DataFrame)
+        self.assertEqual(result.shape[1], 7)  # 7 unique words in the sample data
+        self.assertEqual(len(result), 3)      # 3 rows corresponding to 3 ids
+
+    def test_different_ngram_range(self):
+        result = get_ngram_count(self.df, self.text_col, self.id_col, ngram_range=(2, 2))
+        # Assuming bigrams are correctly formed, e.g., 'this is', but not 'is a' because of default tokenizer
+        self.assertTrue('this is' in result.columns and 'another test' in result.columns)
+
+    def test_with_custom_tokenizer(self):
+        custom_tokenizer = RegexpTokenizer("[A-Za-z]{4,}")
+        result = get_ngram_count(self.df, self.text_col, self.id_col, tokenizer=custom_tokenizer)
+        # Expecting words with 4 or more letters only
+        self.assertTrue('this' in result.columns and 'test' in result.columns)
+        self.assertFalse('is' in result.columns or 'a' in result.columns)
+
+    def test_with_stop_words(self):
+        stop_words = ['is', 'a']
+        result = get_ngram_count(self.df, self.text_col, self.id_col, stop_words=stop_words)
+        # 'is' and 'a' should not be in the columns
+        self.assertFalse('is' in result.columns or 'a' in result.columns)
+
+    def test_with_no_stop_words(self):
+        stop_words = None
+        result = get_ngram_count(self.df, self.text_col, self.id_col, stop_words=stop_words)
+        # 'is' and 'a' should be in the columns
+        self.assertTrue('is' in result.columns or 'a' in result.columns)
+
+    def test_with_max_features(self):
+        result = get_ngram_count(self.df, self.text_col, self.id_col, max_features=2)
+        # Only 2 features (most frequent) should be returned
+        self.assertEqual(result.shape[1], 2)
+
+    def test_lowercasing(self):
+        result = get_ngram_count(self.df, self.text_col, self.id_col, ngram_range=(2, 2), lowercase=False)
+        # Assuming bigrams are correctly formed, e.g., 'this is', but not 'is a' because of default tokenizer
+        self.assertTrue('This is' in result.columns and 'Another test' in result.columns)
+
+    def test_frequency(self):
+        pass
+
+    def test_error_handling(self):
+        with self.assertRaises(KeyError):
+            get_ngram_count(self.df, 'wrong_col', self.id_col)
+
+
+class TestGetDataFrameTokens(unittest.TestCase):
+
+    def test_basic_functionality(self):
+        df = DataFrame({'text_id': [1, 2], 'text': ['Hello World', 'Sample Text']})
+        result = get_dataframe_tokens(df, 'text', 'text_id')
+        self.assertEqual(list(result.columns), [1, 2])
+        self.assertEqual(result.iloc[0, 0], 'hello')
+
+    def test_stop_words_removal(self):
+        df = DataFrame({'text_id': [1], 'text': ['hello world']})
+        result = get_dataframe_tokens(df, 'text', 'text_id', stop_words=['world'])
+        self.assertNotIn('world', result[1])
+
+    def test_custom_tokenizer(self):
+        # Define a simple custom tokenizer for the test
+        class CustomTokenizer:
+            def tokenize(self, text):
+                return text.split()
+
+        df = DataFrame({'text_id': [1], 'text': ['hello world']})
+        result = get_dataframe_tokens(df, 'text', 'text_id', tokenizer=CustomTokenizer())
+        self.assertEqual(result.iloc[0, 0], 'hello')
+
+    def test_lowercasing(self):
+        df = DataFrame({'text_id': [1], 'text': ['Hello World']})
+        result = get_dataframe_tokens(df, 'text', 'text_id', lowercase=False)
+        self.assertEqual(result.iloc[0, 0], 'Hello')
+
+    def test_empty_dataframe(self):
+        df = DataFrame({'text_id': [], 'text': []})
+        result = get_dataframe_tokens(df, 'text', 'text_id')
+        self.assertTrue(result.empty)
+
+
+class TestGetClusteredDataFrameTokens(unittest.TestCase):
+
+    def setUp(self):
+        self.df = pd.DataFrame({
+            'text_id': [1, 2, 3],
+            'text': ['Sample text 1', 'Sample text 2', 'Sample text 3'],
+            'cluster': [0, 1, 0]
+        })
+
+    def test_typical_case(self):
+        # Test with typical data
+        result = get_clustered_dataframe_tokens(self.df, 'text', 'text_id', 'cluster')
+        self.assertIsInstance(result, pd.DataFrame)
+        self.assertTrue(isinstance(result.columns, pd.MultiIndex))
+        # Check if MultiIndex is correctly formatted
+        self.assertTrue(all(c in ['Cluster 0', 'Cluster 1'] for c in result.columns.get_level_values(0)[:2]))
+        self.assertTrue(all(c in [2, 3] for c in result.columns.get_level_values(1)[1:]))
+        # Check if the number of texts matches
+        self.assertEqual(result.shape[1], self.df.shape[0])
+
+    def test_empty_dataframe(self):
+        # Test with an empty DataFrame
+        empty_df = pd.DataFrame()
+        with self.assertRaises(KeyError):
+            get_clustered_dataframe_tokens(empty_df, 'text', 'text_id', 'cluster')
+
+    def test_missing_columns(self):
+        # Test with missing columns
+        with self.assertRaises(KeyError):
+            get_clustered_dataframe_tokens(self.df, 'nonexistent_text_col', 'text_id', 'cluster')
+        with self.assertRaises(KeyError):
+            get_clustered_dataframe_tokens(self.df, 'text_col', 'nonexistent_text_id', 'cluster')
+        with self.assertRaises(KeyError):
+            get_clustered_dataframe_tokens(self.df, 'text_col', 'text_id', 'nonexistent_cluster')
+
+
+class TestGetClustersNgrams(unittest.TestCase):
+
+    def setUp(self):
+        self.sample_data = pd.DataFrame({
+            'text_id': [1, 2, 3, 4],
+            'text': ['apple banana Apple banana melon', 
+                     'apple banana melon apple orange', 
+                     'apple banana durian melon banana apple apple', 
+                     'orange banana raspberry'],
+            'cluster_id': [1, 1, 2, 2]
+        })
+
+    def test_normal_operation(self):
+        result = get_clusters_ngrams(self.sample_data, 'text', 'text_id', 'cluster_id', 2)
+        self.assertIsInstance(result, pd.DataFrame)
+        self.assertTrue(isinstance(result.columns, pd.MultiIndex))
+
+    def test_empty_data(self):
+        empty_data = pd.DataFrame(columns=['text_id', 'text', 'cluster_id'])
+        with self.assertRaises(ValueError):
+            get_clusters_ngrams(empty_data, 'text', 'text_id', 'cluster_id', 2)
+
+    def test_stop_words(self):
+        stop_words = ['melon']
+        result = get_clusters_ngrams(self.sample_data, 'text', 'text_id', 'cluster_id', 2, stop_words=stop_words)
+        self.assertNotIn('melon', result.iloc[:, 0])
+
+    def test_ngram_range(self):
+        ngram_range = (1, 3)
+        result = get_clusters_ngrams(self.sample_data, 'text', 'text_id', 'cluster_id', 2, ngram_range=ngram_range)
+        # Check if n-grams within specified range are present
+        self.assertIn(2, [len(col[0].split()) for col in result.columns])
+        # Check if n-grams outside specified range are present
+        self.assertNotIn(3, [len(col[0].split()) for col in result.columns])
+
+    def test_lowercase_true(self):
+        result = get_clusters_ngrams(self.sample_data, 'text', 'text_id', 'cluster_id', 2, lowercase=True)
+        all_lower = all(x.islower() for x in result[('Cluster 1', '1-Gram', 'Gram')])
+        self.assertTrue(all_lower)
+    
+    def test_lowercase_false(self):
+        result = get_clusters_ngrams(self.sample_data, 'text', 'text_id', 'cluster_id', 2, lowercase=False)
+        all_lower = all(x.islower() for x in result[('Cluster 1', '1-Gram', 'Gram')])
+        self.assertFalse(all_lower)
+
+    def test_invalid_input(self):
+        with self.assertRaises(ValueError):
+            get_clusters_ngrams(self.sample_data, 'text', 'text_id', 'cluster_id', -1)
+
+
+class TestGetClusterNgrams(unittest.TestCase):
+
+    def setUp(self):
+        self.sample_data = pd.DataFrame({
+            'text_id': [1, 2, 3],
+            'text': ['apple banana', 'apple', 'banana apple apple pear melon']
+        })
+
+    def test_normal_operation(self):
+        result = get_cluster_ngrams(self.sample_data, 'text', 'text_id', 1, 2)
+        self.assertIsInstance(result, pd.DataFrame)
+        self.assertIn(('Cluster 1', '2-Gram', 'Gram'), result.columns)
+        self.assertIn(('Cluster 1', '2-Gram', 'Frequency'), result.columns)
+
+    def test_max_features(self):
+        result = get_cluster_ngrams(self.sample_data, 'text', 'text_id', 1, 2, max_features=1)
+        self.assertEqual(len(result), 1)
+
+    def test_stop_words(self):
+        stop_words = ['apple']
+        result = get_cluster_ngrams(self.sample_data, 'text', 'text_id', 1, 2, stop_words=stop_words)
+        self.assertNotIn('apple', result[('Cluster 1', '2-Gram', 'Gram')].values)
+
+    def test_frequency_false(self):
+        result = get_cluster_ngrams(self.sample_data, 'text', 'text_id', 1, 2, frequency=False)
+        self.assertIn(('Cluster 1', '2-Gram', 'Count'), result.columns)
+        all_ints = all([isinstance(v, int) for v in result[('Cluster 1', '2-Gram', 'Count')]])
+        self.assertTrue(all_ints)
+
+    def test_lowercase_true(self):
+        result = get_cluster_ngrams(self.sample_data, 'text', 'text_id', 1, 2, lowercase=True)
+        all_lower = all(x.islower() for x in result[('Cluster 1', '2-Gram', 'Gram')].values)
+        self.assertTrue(all_lower)
+
+    def test_lowercase_false(self):
+        result = get_cluster_ngrams(self.sample_data, 'text', 'text_id', 1, 2, lowercase=False)
+        all_lower = all(x.islower() for x in result[('Cluster 1', '2-Gram', 'Gram')].values)
+        self.assertFalse(all_lower)
+
+    def test_empty_data(self):
+        empty_data = pd.DataFrame(columns=['text_id', 'text'])
+        with self.assertRaises(ValueError):
+            get_cluster_ngrams(empty_data, 'text', 'text_id', 1, 2)
+
+    def test_str_cluster(self):
+        result = get_cluster_ngrams(self.sample_data, 'text', 'text_id', "string", 2)
+        self.assertIn(('Cluster string', '2-Gram', 'Gram'), result.columns)
+
+
+class TestGenClustersNgramsSankeyColors(unittest.TestCase):
+
+    def test_return_type(self):
+        result = gen_clusters_ngrams_sankey_colors(['a', 'b'], ['x', 'y'])
+        self.assertIsInstance(result, Dict)
+
+    def test_structure_of_return_value(self):
+        result = gen_clusters_ngrams_sankey_colors(['a', 'b'], ['x', 'y'])
+        for key, value in result.items():
+            self.assertIsInstance(key, str)
+            self.assertIsInstance(value, List)
+            self.assertEqual(len(value), 4)
+            for color_component in value:
+                self.assertIsInstance(color_component, float)
+
+    def test_specific_input(self):
+        sources = ['a', 'b']
+        targets = ['x', 'y']
+        result = gen_clusters_ngrams_sankey_colors(sources, targets)
+        for key in [*sources, *targets]:
+            self.assertIn(key, result)
+
+    def test_empty_input(self):
+        result = gen_clusters_ngrams_sankey_colors([], [])
+        self.assertEqual(result, {})
+
+    def test_different_input(self):
+        result = gen_clusters_ngrams_sankey_colors(['a'], ['x', 'y'])
+        self.assertIn('a', result)
+        self.assertIn('x', result)
+        self.assertIn('y', result)
+
+
+class TestGenClustersNgramsSankeyPositions(unittest.TestCase):
+
+    def test_return_type(self):
+        result = gen_clusters_ngrams_sankey_positions(['a', 'b'], len(['a']))
+        self.assertIsInstance(result, Tuple)
+
+    def test_length_of_output(self):
+        labels = ['a', 'b', 'c']
+        sources = ['a']
+        result = gen_clusters_ngrams_sankey_positions(labels, len(sources))
+        self.assertEqual(len(result[0]), len(labels))
+        self.assertEqual(len(result[1]), len(labels))
+
+    def test_x_and_y_positions(self):
+        labels = ['a', 'b', 'c']
+        sources = ['a']
+        x_expected = [0.001, 0.999, 0.999]
+        y_expected = [0.001, 0.001, 0.999]
+        result = gen_clusters_ngrams_sankey_positions(labels, len(sources))
+        self.assertEqual(result[0], x_expected)
+        self.assertEqual(result[1], y_expected)
+
+    def test_value_range(self):
+        labels = ['a', 'b', 'c']
+        sources = ['a']
+        result = gen_clusters_ngrams_sankey_positions(labels, len(sources))
+        all_values = result[0] + result[1]
+        self.assertTrue(all(0.001 <= v <= 0.999 for v in all_values))
+
+    def test_empty_input(self):
+        with self.assertRaises(ValueError):
+            gen_clusters_ngrams_sankey_positions([], 1)
+
+    def test_single_element_input(self):
+        result = gen_clusters_ngrams_sankey_positions(['a'], 1)
+        self.assertEqual(result, ([0.001], [0.001]))
+
+
+class TestGenClustersNgramsSankeyLinksColors(unittest.TestCase):
+
+    def test_return_type(self):
+        result = gen_clusters_ngrams_sankey_links_colors({}, [], {})
+        self.assertIsInstance(result, List)
+
+    def test_return_format(self):
+        labels_ids = {'a': '1'}
+        targets = ['1']
+        labels_colors = {'a': (255, 0, 0)}
+        result = gen_clusters_ngrams_sankey_links_colors(labels_ids, targets, labels_colors)
+        for color in result:
+            self.assertIsInstance(color, str)
+            self.assertRegex(color, r'rgba\(\d+,\d+,\d+,[\d\.]+\)')
+    
+    def test_correct_color_transformation(self):
+        labels_ids = {'a': '1', 'b': '2'}
+        targets = ['1', '2']
+        labels_colors = {'a': (255, 0, 0), 'b': (0, 255, 0)}
+        result = gen_clusters_ngrams_sankey_links_colors(labels_ids, targets, labels_colors)
+        expected_colors = ['rgba(255,0,0,0.5)', 'rgba(0,255,0,0.5)']
+        self.assertEqual(result, expected_colors)
+
+    def test_handling_unknown_labels(self):
+        labels_ids = {'a': '1'}
+        targets = ['1', 'unknown']
+        labels_colors = {'a': (255, 0, 0)}
+        with self.assertRaises(KeyError):
+            gen_clusters_ngrams_sankey_links_colors(labels_ids, targets, labels_colors)
+
+    def test_empty_input(self):
+        result = gen_clusters_ngrams_sankey_links_colors({}, [], {})
+        self.assertEqual(result, [])
+
+
+class TestGenClustersNgramsSankeyNodesColors(unittest.TestCase):
+
+    def test_return_type(self):
+        result = gen_clusters_ngrams_sankey_nodes_colors([], {})
+        self.assertIsInstance(result, List)
+
+    def test_return_format(self):
+        labels = ['a', 'b']
+        labels_colors = {'a': (255, 0, 0, 1), 'b': (0, 255, 0, 1)}
+        result = gen_clusters_ngrams_sankey_nodes_colors(labels, labels_colors)
+        for color in result:
+            self.assertIsInstance(color, str)
+            self.assertRegex(color, r'rgba\(\d+,\d+,\d+,[\d\.]+\)')
+    
+    def test_correct_color_transformation(self):
+        labels = ['a', 'b']
+        labels_colors = {'a': (255, 0, 0, 1), 'b': (0, 255, 0, 1)}
+        result = gen_clusters_ngrams_sankey_nodes_colors(labels, labels_colors)
+        expected_colors = ['rgba(255,0,0,1)', 'rgba(0,255,0,1)']
+        self.assertEqual(result, expected_colors)
+
+    def test_handling_unknown_labels(self):
+        labels = ['a', 'unknown']
+        labels_colors = {'a': (255, 0, 0, 1)}
+        with self.assertRaises(KeyError):
+            gen_clusters_ngrams_sankey_nodes_colors(labels, labels_colors)
+
+    def test_empty_input(self):
+        result = gen_clusters_ngrams_sankey_nodes_colors([], {})
+        self.assertEqual(result, [])
 
 
 class TestPreprocessCountryName(unittest.TestCase):
@@ -507,6 +929,42 @@ class TestSortMultiIndexDataframe(TestCase):
             columns=pd.MultiIndex.from_arrays(arrays_sorted, names=('top_level', 'bot_level'))
         )
         pd.testing.assert_frame_equal(result_df, expected_df)
+
+class TestStopwordsManager(unittest.TestCase):
+    def setUp(self):
+        self.manager = StopwordsManager()
+        self.filename = "test.pkl"
+
+    def tearDown(self):
+        if os.path.exists(self.filename):
+            os.remove(self.filename)
+
+    def test_add_single_stopword(self):
+        self.manager.add_stopword('testword')
+        self.assertIn('testword', self.manager.words)
+
+    def test_add_multiple_stopwords(self):
+        words = ['testword1', 'testword2']
+        self.manager.add_stopwords(words)
+        self.assertTrue(set(words).issubset(self.manager.words))
+
+    def test_remove_single_stopword(self):
+        self.manager.add_stopword('testword')
+        self.manager.remove_stopword('testword')
+        self.assertNotIn('testword', self.manager.words)
+
+    def test_remove_multiple_stopwords(self):
+        words = ['testword1', 'testword2']
+        self.manager.add_stopwords(words)
+        self.manager.remove_stopwords(words)
+        self.assertFalse(set(words).issubset(self.manager.words))
+
+    def test_save_load(self):
+        self.manager.add_stopword('testword')
+        self.manager.save(self.filename)
+        loaded_manager = StopwordsManager.load(self.filename)
+        self.assertIn('testword', loaded_manager.words)
+
 
 if __name__ == '__main__':
     unittest.main()
