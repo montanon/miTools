@@ -1,3 +1,4 @@
+import os
 import unittest
 from typing import Dict, List, Tuple
 from unittest import TestCase
@@ -8,6 +9,7 @@ from pandas import DataFrame
 
 from mitools.nlp import (
     RegexpTokenizer,
+    StopwordsManager,
     find_countries_in_dataframe,
     find_country_in_token,
     gen_clusters_ngrams_sankey_colors,
@@ -927,6 +929,42 @@ class TestSortMultiIndexDataframe(TestCase):
             columns=pd.MultiIndex.from_arrays(arrays_sorted, names=('top_level', 'bot_level'))
         )
         pd.testing.assert_frame_equal(result_df, expected_df)
+
+class TestStopwordsManager(unittest.TestCase):
+    def setUp(self):
+        self.manager = StopwordsManager()
+        self.filename = "test.pkl"
+
+    def tearDown(self):
+        if os.path.exists(self.filename):
+            os.remove(self.filename)
+
+    def test_add_single_stopword(self):
+        self.manager.add_stopword('testword')
+        self.assertIn('testword', self.manager.words)
+
+    def test_add_multiple_stopwords(self):
+        words = ['testword1', 'testword2']
+        self.manager.add_stopwords(words)
+        self.assertTrue(set(words).issubset(self.manager.words))
+
+    def test_remove_single_stopword(self):
+        self.manager.add_stopword('testword')
+        self.manager.remove_stopword('testword')
+        self.assertNotIn('testword', self.manager.words)
+
+    def test_remove_multiple_stopwords(self):
+        words = ['testword1', 'testword2']
+        self.manager.add_stopwords(words)
+        self.manager.remove_stopwords(words)
+        self.assertFalse(set(words).issubset(self.manager.words))
+
+    def test_save_load(self):
+        self.manager.add_stopword('testword')
+        self.manager.save(self.filename)
+        loaded_manager = StopwordsManager.load(self.filename)
+        self.assertIn('testword', loaded_manager.words)
+
 
 if __name__ == '__main__':
     unittest.main()
