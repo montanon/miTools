@@ -12,6 +12,7 @@ import pandas as pd
 import seaborn as sns
 import statsmodels.formula.api as smf
 from matplotlib.patches import ArrowStyle, FancyArrowPatch
+from numpy import ndarray
 from pandas import DataFrame, Series
 
 from ..utils import clean_str, stretch_string
@@ -402,18 +403,19 @@ def prepare_regression_data(data: DataFrame, y_var: str, x_vars: List[str],
     if control_vars is None:
         control_vars = []
     _clean_str = functools.partial(clean_str, pattern='[ &$%(),-]+', sub_char='_')
-    regress_data = data.loc[:, [y_var, *x_vars, *control_vars]].copy(deep=True)
-    regress_data.columns = [_clean_str(var) for var in regress_data.columns]
+    regression_data = data.loc[:, [y_var, *x_vars, *control_vars]].copy(deep=True)
+    regression_data.columns = [_clean_str(var) for var in regression_data.columns]
     y_var = _clean_str(y_var)
     x_vars = [_clean_str(var) for var in x_vars]
     control_vars = [_clean_str(var) for var in control_vars]
-    return regress_data, y_var, x_vars, control_vars
+    return regression_data, y_var, x_vars, control_vars
     
-def get_quantile_regression_results(data: DataFrame, y_var: str, x_vars: List[str], control_vars: Optional[List[str]]=None, 
-                           quadratic=False, quantiles: Optional[List[float]]=None, 
-                           max_iter: Optional[int]=2_500) -> Tuple[DataFrame, Dict]:
+def get_quantile_regression_results(data: DataFrame, y_var: str, x_vars: List[str], 
+                                    control_vars: Optional[List[str]]=None, 
+                                    quadratic=False, quantiles: Optional[List[float]]=None, 
+                                    max_iter: Optional[int]=2_500) -> Tuple[DataFrame, Dict]:
     if quantiles is None:
-        quantiles = [0.1, 0.3, 0.5, 0.7, 0.9]
+        quantiles = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
     formula_terms = x_vars.copy()
     if quadratic:
         formula_terms += [f"I({var} ** 2)" for var in formula_terms]
@@ -424,31 +426,62 @@ def get_quantile_regression_results(data: DataFrame, y_var: str, x_vars: List[st
     return results
 
 def add_significance2(row: Series) -> Series:
-    coeff = round(row['coeff'], 2)
+    coeff = round(row['coeff'], 3)
+    t_value = round(row['t-value'], 2)
     p_value = row['p-value']
     if p_value < 0.001:
-        return f"({coeff})***"
+        return f"{coeff}({t_value})***"
     elif p_value < 0.01:
-        return f"({coeff})**"
+        return f"{coeff}({t_value})**"
     elif p_value < 0.05:
-        return f"({coeff})*"
+        return f"{coeff}({t_value})*"
     else:
-        return '-'
+        return f"{coeff}({t_value})"
     
-def get_quantile_regression_results_coeffs(results: Dict, independent_vars: List[str], quadratic: bool):
+def get_quantile_regression_results_coeffs(results: Dict[int, DataFrame]) -> DataFrame:
     regression_df = []
     for q, result in results.items():
-        coeffs = pd.concat([result.params, result.pvalues], axis=1)
-        coeffs.columns = ['coeff', 'p-value']
-        coeffs['significance'] = coeffs[['coeff', 'p-value']].apply(add_significance2, axis=1)
-        if quadratic:
-            quadratic_vars = [f"I({var} ** 2)" for var in independent_vars]
-            linear_coeffs = coeffs.loc[['Intercept', *independent_vars], :]
-            quadratic_coeffs = coeffs.loc[['Intercept', *quadratic_vars], :].copy(deep=True).set_index(linear_coeffs.index)
-            coeffs = pd.concat([linear_coeffs, quadratic_coeffs], axis=1, ignore_index=True)
-            coeffs.columns = ['beta1', 'p-value1', 'significance1', 'beta2', 'p-value2', 'significance2']
-        else:
-            coeffs.columns = ['beta1', 'p-value1', 'significance1']
-        coeffs.columns = pd.MultiIndex.from_tuples([(f'{q}-Quantile', c) for c in coeffs.columns])
+        coeffs = pd.concat([result.params, result.tvalues, result.pvalues], axis=1)
+        coeffs.columns = ['coeff', 't-value', 'p-value']
+        coeffs['Coefficient'] = coeffs[['coeff', 't-value', 'p-value']].apply(add_significance2, axis=1)
+        coeffs = coeffs[['Coefficient']]
+        coeffs.columns = pd.MultiIndex.from_tuples([(str(q), c) for c in coeffs.columns])
         regression_df.append(coeffs)
-    return pd.concat(regression_df, axis=1)
+    regression_df = pd.concat(regression_df, axis=1)
+    regression_df = regression_df.reset_index().melt(id_vars='index', var_name=['Quantile'], value_name='Coefficient')
+    regression_df.columns = ['Indep Vars', *regression_df.columns[1:]]
+    regression_df['Indep Vars'] = (regression_df['Indep Vars'].str
+                                   .replace(r'^I\((.*)\)$', r'\1', regex=True)
+                                   .replace('Intercept', '_Intercept')
+                                   )
+    regression_df['Type'] = 'quantreg'
+    regression_df = regression_df.sort_values(by=['Indep Vars', 'Quantile'])
+    regression_df = regression_df.set_index(['Type', 'Indep Vars', 'Quantile'])
+
+    regression_stats = results[q].summary().tables[0].as_html()
+    regression_stats = pd.read_html(regression_stats, index_col=0)[0].reset_index()
+    regression_stats = pd.concat(
+        [regression_stats.iloc[:-1, :2], regression_stats.iloc[:, 2:].rename(columns={2: 0, 3: 1})],
+          axis=0, ignore_index=True)
+    regression_stats.columns = ['Stat', 'Value']
+    regression_stats = regression_stats.set_index('Stat')
+
+    return regression_df, regression_stats
+
+def get_quantile_regression_predictions(regression_data: DataFrame, regression_coeffs: DataFrame)-> Dict[str, ndarray]:
+    independent_vars = regression_coeffs.index.get_level_values(0).unique()[1:]
+    x_values = {var: np.linspace(
+        regression_data[var].min(), regression_data[var].max(), 100
+        ) for var in independent_vars}
+    predictions = {}
+    for var in independent_vars:
+        predictions.setdefault(var, {})
+        for n, q in enumerate(regression_coeffs.columns.get_level_values(0).unique()):
+            beta = regression_coeffs.loc[var, (q, 'beta1')]
+            intercept = regression_coeffs.loc['Intercept', (q, 'beta1')]
+            pred = intercept + beta * x_values[var]
+            if (q, 'beta2') in regression_coeffs.columns:
+                beta2 = regression_coeffs.loc[var, (q, 'beta2')]
+                pred += beta2 * (x_values[var]**2)
+            predictions[var][q] = pred
+    return predictions, x_values
