@@ -85,5 +85,61 @@ class TestStringMapper(unittest.TestCase):
         self.assertEqual(mapper.prettify_str('UGLY1'), 'pretty1')
         self.assertEqual(mapper.uglify_str('PRETTY1'), 'ugly1')
 
+    def test_prettify_str_pass_if_mapped(self):
+        mapper = StringMapper(self.relations, pass_if_mapped=True)
+        self.assertEqual(mapper.prettify_str('pretty1'), 'pretty1')
+
+    def test_prettify_str_pass_if_mapped_not_found(self):
+        mapper = StringMapper(self.relations, pass_if_mapped=True)
+        with self.assertRaises(ValueError):
+            mapper.prettify_str('ugly3')
+
+    def test_uglify_str_pass_if_mapped(self):
+        mapper = StringMapper(self.relations, pass_if_mapped=True)
+        self.assertEqual(mapper.uglify_str('ugly1'), 'ugly1')
+
+    def test_uglify_str_pass_if_mapped_not_found(self):
+        mapper = StringMapper(self.relations, pass_if_mapped=True)
+        with self.assertRaises(ValueError):
+            mapper.uglify_str('pretty3')
+
+    def test_remap_str_pass_if_mapped(self):
+        mapper = StringMapper(self.relations, pass_if_mapped=True)
+        self.assertEqual(mapper.remap_str('pretty1'), 'ugly1')
+        self.assertEqual(mapper.remap_str('ugly1'), 'pretty1')
+
+    def test_remap_str_pass_if_mapped_not_found(self):
+        mapper = StringMapper(self.relations, pass_if_mapped=True)
+        with self.assertRaises(ValueError):
+            mapper.remap_str('pretty3')
+    
+    def test_case_insensitive_pass_if_mapped(self):
+        mapper = StringMapper(self.relations, case_sensitive=False, pass_if_mapped=True)
+        self.assertEqual(mapper.prettify_str('PRETTY1'), 'pretty1')
+        self.assertEqual(mapper.uglify_str('UGLY1'), 'ugly1')
+        self.assertEqual(mapper.prettify_str('pretty1'), 'pretty1')
+        self.assertEqual(mapper.uglify_str('ugly1'), 'ugly1')
+
+    def test_case_insensitive_pass_if_mapped_not_found(self):
+        mapper = StringMapper(self.relations, case_sensitive=False, pass_if_mapped=True)
+        with self.assertRaises(ValueError):
+            mapper.prettify_str('UGLY3')
+        with self.assertRaises(ValueError):
+            mapper.uglify_str('PRETTY3')
+
+    def test_case_insensitive_pass_if_mapped_remap(self):
+        mapper = StringMapper(self.relations, case_sensitive=False, pass_if_mapped=True)
+        self.assertEqual(mapper.remap_str('PRETTY1'), 'ugly1')
+        self.assertEqual(mapper.remap_str('UGLY1'), 'pretty1')
+        self.assertEqual(mapper.remap_str('pretty1'), 'ugly1')
+        self.assertEqual(mapper.remap_str('ugly1'), 'pretty1')
+
+    def test_case_insensitive_pass_if_mapped_remap_not_found(self):
+        mapper = StringMapper(self.relations, case_sensitive=False, pass_if_mapped=True)
+        with self.assertRaises(ValueError):
+            mapper.remap_str('PRETTY3')
+        with self.assertRaises(ValueError):
+            mapper.remap_str('ugly3')
+
 if __name__ == '__main__':
     unittest.main()

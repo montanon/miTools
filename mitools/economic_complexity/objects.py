@@ -77,8 +77,10 @@ class ProductsBasket:
 
 class StringMapper:
 
-    def __init__(self, relations: Dict[str,str], case_sensitive: Optional[bool]=True):
+    def __init__(self, relations: Dict[str,str], case_sensitive: Optional[bool]=True, 
+                 pass_if_mapped: Optional[bool]=False):
         self.case_sensitive = case_sensitive
+        self.pass_if_mapped = pass_if_mapped
         self.pretty_to_ugly = {}
         self.ugly_to_pretty = {}
         for pretty, ugly in relations.items():
@@ -99,9 +101,12 @@ class StringMapper:
     def prettify_str(self, ugly_str: str) -> str:
         if not self.case_sensitive:
             ugly_str = ugly_str.lower()
-        if ugly_str not in self.ugly_to_pretty:
+        if ugly_str in self.ugly_to_pretty:
+            return self.ugly_to_pretty[ugly_str]
+        elif self.pass_if_mapped and self.is_pretty(ugly_str):
+            return ugly_str
+        else:
             raise ValueError(f"No pretty string found for '{ugly_str}'")
-        return self.ugly_to_pretty[ugly_str]
     
     def prettify_strs(self, ugly_strs: str) -> List[str]:
         return [self.prettify_str(ugly_str) for ugly_str in ugly_strs]
@@ -109,10 +114,13 @@ class StringMapper:
     def uglify_str(self, pretty_str: str) -> str:
         if not self.case_sensitive:
             pretty_str = pretty_str.lower()
-        if pretty_str not in self.pretty_to_ugly:
+        if pretty_str in self.pretty_to_ugly:
+            return self.pretty_to_ugly[pretty_str]
+        elif self.pass_if_mapped and self.is_ugly(pretty_str):
+            return pretty_str
+        else:
             raise ValueError(f"No ugly string found for '{pretty_str}'")
-        return self.pretty_to_ugly[pretty_str]
-    
+
     def uglify_strs(self, pretty_strs: List[str]) -> List[str]:
         return [self.uglify_str(pretty_str) for pretty_str in pretty_strs]
     
