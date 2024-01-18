@@ -1,6 +1,8 @@
+import functools
 import random
 import statistics
 from string import ascii_uppercase, digits
+from typing import Dict, List, Optional, Tuple, Union
 
 import matplotlib.lines as mlines
 import matplotlib.patches as mpatches
@@ -8,9 +10,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+import statsmodels.formula.api as smf
 from matplotlib.patches import ArrowStyle, FancyArrowPatch
+from pandas import DataFrame, Series
 
-from ..utils import stretch_string
+from ..utils import clean_str, stretch_string
 from .objects import Product, ProductsBasket
 
 
@@ -263,7 +267,7 @@ def adjust_axes_lims(axes, x=True, y=True):
     return axes
 
 def plot_country_eci_indicator_scatter(country_data, x_col, y_col, color=None, income_colors=None, marker_kwargs=None, ax=None, 
-                               arrows=True, year_labels=True, figsize=(9, 9), arrow_style=None, arrow_kwargs=None):
+                               arrows=True, year_labels=True, figsize=(9, 9), arrow_style=None, arrow_kwargs=None, n_steps=1):
     
     if ax is None:
         _, ax = plt.subplots(1, figsize=figsize)
@@ -274,25 +278,29 @@ def plot_country_eci_indicator_scatter(country_data, x_col, y_col, color=None, i
     if arrow_kwargs is None:
         arrow_kwargs = dict(connectionstyle='arc3', color='grey', linewidth=1, linestyle=':', alpha=0.75)
 
-    years = country_data.index.get_level_values('Year')
-    income_levels = country_data.index.get_level_values('Income Group')
-    for income_level in income_levels.unique():
-        ax.plot(country_data.loc[pd.IndexSlice[:,:,income_level,:,:], x_col].values, 
-                country_data.loc[pd.IndexSlice[:,:,income_level,:,:], y_col].values, 
+    years = country_data.index.get_level_values('Year')[::n_steps]
+    steps_index = country_data.index[::n_steps]
+    income_levels = ['Low income', 'Lower middle income', 'Upper middle income', 'High income']
+    income_levels = [level for level in income_levels if level in country_data.loc[steps_index, :].index.get_level_values('Income Group')]
+    for income_level in income_levels:
+        ax.plot(country_data.loc[steps_index, :].loc[pd.IndexSlice[:,:,income_level,:,:], x_col].values, 
+                country_data.loc[steps_index, :].loc[pd.IndexSlice[:,:,income_level,:,:], y_col].values, 
                 marker=marker_kwargs['marker'], 
                 markeredgecolor=color if color else 'k', 
                 markeredgewidth=marker_kwargs['markeredgewidth'], 
                 markerfacecolor=income_colors[income_level] if income_colors else 'white', 
                 markersize=marker_kwargs['markersize'], 
-                linestyle=''
+                linestyle='',
+                alpha=0.75
                 )
         
     x_lims = ax.get_xlim()
     y_lims = ax.get_ylim()
+
+    x = country_data[x_col].values[::n_steps]
+    y = country_data[y_col].values[::n_steps]
         
     if arrows:
-        x = country_data[x_col].values
-        y = country_data[y_col].values
         for i in range(len(x) - 1):
             try:
                 arrow = FancyArrowPatch((x[i], y[i]), (x[i+1], y[i+1]),
@@ -321,7 +329,7 @@ def plot_country_eci_indicator_scatter(country_data, x_col, y_col, color=None, i
 
 def plot_country_ecis_indicator_scatter(data, x_cols, y_col, colors, income_colors=None, marker_kwargs=None, ncols=3, 
                                 figsize=(7,7), arrows=True, arrow_style=None, arrow_kwargs=None, year_labels=True, 
-                                axes=None):
+                                axes=None, n_steps=1):
     
     country = data.index.get_level_values('Country').unique()[0]
     nrows = (len(x_cols) + 1) // ncols
@@ -339,7 +347,8 @@ def plot_country_ecis_indicator_scatter(data, x_cols, y_col, colors, income_colo
                                         arrows=arrows,
                                         year_labels=year_labels,
                                         arrow_style=arrow_style,
-                                        arrow_kwargs=arrow_kwargs
+                                        arrow_kwargs=arrow_kwargs,
+                                        n_steps=n_steps
                                                 )
     axes.flat[0].figure.suptitle(f"{country} {x_type}s vs {y_col} Evolution", 
                  fontsize=24, 
@@ -362,7 +371,8 @@ def plot_country_ecis_indicator_scatter(data, x_cols, y_col, colors, income_colo
     return axes
 
 def plot_countries_ecis_indicator_scatter(data, countries, eci_type, x_cols, y_col, colors=None, income_colors=None, 
-                                          marker_kwargs=None, ncols=3, figsize=(7,7), arrow_style=None, arrow_kwargs=None):
+                                          marker_kwargs=None, ncols=3, figsize=(7,7), arrow_style=None, arrow_kwargs=None,
+                                          n_steps=1):
     axes = None
     for country in countries:
         country_data = data.query('Country == @country')
@@ -378,9 +388,67 @@ def plot_countries_ecis_indicator_scatter(data, countries, eci_type, x_cols, y_c
                                                    arrow_style=arrow_style,
                                                    arrow_kwargs=arrow_kwargs,
                                                    year_labels=False,
-                                                   axes=axes
+                                                   axes=axes,
+                                                   n_steps=n_steps
                                                    )
     axes.flat[0].figure.suptitle(f'Countries {eci_type} vs {y_col}', fontsize=22, y=0.9, 
                     verticalalignment='bottom', 
                     horizontalalignment='center')
     return axes
+
+def prepare_regression_data(data: DataFrame, y_var: str, x_vars: List[str], 
+                            control_vars: Optional[List[str]]=None
+                            ) -> Tuple[DataFrame, str, List[str], List[str]]:
+    if control_vars is None:
+        control_vars = []
+    _clean_str = functools.partial(clean_str, pattern='[ &$%(),-]+', sub_char='_')
+    regress_data = data.loc[:, [y_var, *x_vars, *control_vars]].copy(deep=True)
+    regress_data.columns = [_clean_str(var) for var in regress_data.columns]
+    y_var = _clean_str(y_var)
+    x_vars = [_clean_str(var) for var in x_vars]
+    control_vars = [_clean_str(var) for var in control_vars]
+    return regress_data, y_var, x_vars, control_vars
+    
+def get_quantile_regression_results(data: DataFrame, y_var: str, x_vars: List[str], control_vars: Optional[List[str]]=None, 
+                           quadratic=False, quantiles: Optional[List[float]]=None, 
+                           max_iter: Optional[int]=2_500) -> Tuple[DataFrame, Dict]:
+    if quantiles is None:
+        quantiles = [0.1, 0.3, 0.5, 0.7, 0.9]
+    formula_terms = x_vars.copy()
+    if quadratic:
+        formula_terms += [f"I({var} ** 2)" for var in formula_terms]
+    if control_vars: 
+        formula_terms += control_vars
+    formula = f"{y_var} ~ " + " + ".join(formula_terms)
+    results = {q: smf.quantreg(formula, data).fit(q=q, max_iter=max_iter) for q in quantiles}
+    return results
+
+def add_significance2(row: Series) -> Series:
+    coeff = round(row['coeff'], 2)
+    p_value = row['p-value']
+    if p_value < 0.001:
+        return f"({coeff})***"
+    elif p_value < 0.01:
+        return f"({coeff})**"
+    elif p_value < 0.05:
+        return f"({coeff})*"
+    else:
+        return '-'
+    
+def get_quantile_regression_results_coeffs(results: Dict, independent_vars: List[str], quadratic: bool):
+    regression_df = []
+    for q, result in results.items():
+        coeffs = pd.concat([result.params, result.pvalues], axis=1)
+        coeffs.columns = ['coeff', 'p-value']
+        coeffs['significance'] = coeffs[['coeff', 'p-value']].apply(add_significance2, axis=1)
+        if quadratic:
+            quadratic_vars = [f"I({var} ** 2)" for var in independent_vars]
+            linear_coeffs = coeffs.loc[['Intercept', *independent_vars], :]
+            quadratic_coeffs = coeffs.loc[['Intercept', *quadratic_vars], :].copy(deep=True).set_index(linear_coeffs.index)
+            coeffs = pd.concat([linear_coeffs, quadratic_coeffs], axis=1, ignore_index=True)
+            coeffs.columns = ['beta1', 'p-value1', 'significance1', 'beta2', 'p-value2', 'significance2']
+        else:
+            coeffs.columns = ['beta1', 'p-value1', 'significance1']
+        coeffs.columns = pd.MultiIndex.from_tuples([(f'{q}-Quantile', c) for c in coeffs.columns])
+        regression_df.append(coeffs)
+    return pd.concat(regression_df, axis=1)
