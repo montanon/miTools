@@ -14,7 +14,9 @@ import statsmodels.formula.api as smf
 from matplotlib.patches import ArrowStyle, FancyArrowPatch
 from numpy import ndarray
 from pandas import DataFrame, Series
+from statsmodels.regression.linear_model import RegressionResultsWrapper
 
+from ..economic_complexity import StringMapper
 from ..utils import clean_str, stretch_string
 from .objects import Product, ProductsBasket
 
@@ -398,16 +400,15 @@ def plot_countries_ecis_indicator_scatter(data, countries, eci_type, x_cols, y_c
     return axes
 
 def prepare_regression_data(data: DataFrame, y_var: str, x_vars: List[str], 
-                            control_vars: Optional[List[str]]=None
+                            str_mapper: StringMapper, control_vars: Optional[List[str]]=None,
                             ) -> Tuple[DataFrame, str, List[str], List[str]]:
     if control_vars is None:
         control_vars = []
-    _clean_str = functools.partial(clean_str, pattern='[ &$%(),-]+', sub_char='_')
     regression_data = data.loc[:, [y_var, *x_vars, *control_vars]].copy(deep=True)
-    regression_data.columns = [_clean_str(var) for var in regression_data.columns]
-    y_var = _clean_str(y_var)
-    x_vars = [_clean_str(var) for var in x_vars]
-    control_vars = [_clean_str(var) for var in control_vars]
+    regression_data.columns = [str_mapper.uglify_str(var) for var in regression_data.columns]
+    y_var = str_mapper.uglify_str(y_var)
+    x_vars = [str_mapper.uglify_str(var) for var in x_vars]
+    control_vars = [str_mapper.uglify_str(var) for var in control_vars]
     return regression_data, y_var, x_vars, control_vars
     
 def get_quantile_regression_results(data: DataFrame, y_var: str, x_vars: List[str], 
@@ -438,25 +439,34 @@ def add_significance2(row: Series) -> Series:
     else:
         return f"{coeff}({t_value})"
     
-def get_quantile_regression_results_coeffs(results: Dict[int, DataFrame]) -> DataFrame:
+def get_quantile_regression_results_coeffs(results: Dict[int, RegressionResultsWrapper]) -> DataFrame:
+    _col_name_map = {
+        'Unnamed: 0': 'Var',
+        'coef': 'coeff',
+        'std err': 'Std Err',
+        't': 't-value',
+        'P>|t|': 'p-value',
+    }
     regression_df = []
     for q, result in results.items():
-        coeffs = pd.concat([result.params, result.tvalues, result.pvalues], axis=1)
-        coeffs.columns = ['coeff', 't-value', 'p-value']
-        coeffs['Coefficient'] = coeffs[['coeff', 't-value', 'p-value']].apply(add_significance2, axis=1)
-        coeffs = coeffs[['Coefficient']]
+        coeffs = pd.concat(pd.read_html(results[q].summary().tables[1].as_html(), header=0))
+        coeffs = coeffs.rename(columns={col: _col_name_map.get(col, col) for col in coeffs.columns})
+        coeffs = coeffs.set_index('Var')
+        coeffs['Value'] = coeffs[['coeff', 't-value', 'p-value']].apply(add_significance2, axis=1)
+        coeffs = coeffs[['Value']]
         coeffs.columns = pd.MultiIndex.from_tuples([(str(q), c) for c in coeffs.columns])
         regression_df.append(coeffs)
     regression_df = pd.concat(regression_df, axis=1)
-    regression_df = regression_df.reset_index().melt(id_vars='index', var_name=['Quantile'], value_name='Coefficient')
+    regression_df = regression_df.reset_index().melt(id_vars='Var', var_name=['Quantile'], value_name='Value')
     regression_df.columns = ['Indep Vars', *regression_df.columns[1:]]
-    regression_df['Indep Vars'] = (regression_df['Indep Vars'].str
+    regression_df['Indep Vars'] = (regression_df['Indep Vars']
                                    .replace(r'^I\((.*)\)$', r'\1', regex=True)
                                    .replace('Intercept', '_Intercept')
                                    )
-    regression_df['Type'] = 'quantreg'
+    regression_df['Type'] = type(results[q].model).__name__
+    regression_df['Dep Var'] = results[q].model.endog_names
     regression_df = regression_df.sort_values(by=['Indep Vars', 'Quantile'])
-    regression_df = regression_df.set_index(['Type', 'Indep Vars', 'Quantile'])
+    regression_df = regression_df.set_index(['Type', 'Dep Var', 'Indep Vars', 'Quantile'])
 
     regression_stats = results[q].summary().tables[0].as_html()
     regression_stats = pd.read_html(regression_stats, index_col=0)[0].reset_index()
@@ -485,3 +495,13 @@ def get_quantile_regression_predictions(regression_data: DataFrame, regression_c
                 pred += beta2 * (x_values[var]**2)
             predictions[var][q] = pred
     return predictions, x_values
+
+def prettify_index_level(mapper: StringMapper, pattern: str, level: str, level_name: str, levels_to_remap: List[str]) -> str:
+    if level_name in levels_to_remap:
+        return level.map(lambda x: prettify_with_pattern(x, mapper, pattern))
+    return level
+
+def prettify_with_pattern(string: str, mapper: StringMapper, pattern: str) -> str:
+    base_string, pattern_str, _ = string.partition(pattern)
+    remapped_base = mapper.prettify_str(base_string)
+    return f"{remapped_base}{pattern}" if pattern_str else remapped_base
