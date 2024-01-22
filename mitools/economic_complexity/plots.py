@@ -1,5 +1,6 @@
 import functools
 import random
+import re
 import statistics
 from string import ascii_uppercase, digits
 from typing import Dict, List, Optional, Tuple, Union
@@ -13,10 +14,12 @@ import seaborn as sns
 import statsmodels.formula.api as smf
 from matplotlib.patches import ArrowStyle, FancyArrowPatch
 from numpy import ndarray
-from pandas import DataFrame, Series
+from pandas import DataFrame, MultiIndex, Series
 from statsmodels.regression.linear_model import RegressionResultsWrapper
 
 from ..economic_complexity import StringMapper
+from ..pandas import idxslice
+from ..regressions import generate_hash_from_dataframe
 from ..utils import clean_str, stretch_string
 from .objects import Product, ProductsBasket
 
@@ -439,7 +442,7 @@ def add_significance2(row: Series) -> Series:
     else:
         return f"{coeff}({t_value})"
     
-def get_quantile_regression_results_coeffs(results: Dict[int, RegressionResultsWrapper]) -> DataFrame:
+def get_quantile_regression_results_coeffs(results: Dict[int, RegressionResultsWrapper], x_vars: List[str]) -> DataFrame:
     _col_name_map = {
         'Unnamed: 0': 'Var',
         'coef': 'coeff',
@@ -463,10 +466,16 @@ def get_quantile_regression_results_coeffs(results: Dict[int, RegressionResultsW
                                    .replace(r'^I\((.*)\)$', r'\1', regex=True)
                                    .replace('Intercept', '_Intercept')
                                    )
-    regression_df['Type'] = type(results[q].model).__name__
+    regression_df['Reg Type'] = type(results[q].model).__name__
     regression_df['Dep Var'] = results[q].model.endog_names
-    regression_df = regression_df.sort_values(by=['Indep Vars', 'Quantile'])
-    regression_df = regression_df.set_index(['Type', 'Dep Var', 'Indep Vars', 'Quantile'])
+    regression_df['Var Type'] = regression_df['Indep Vars'].apply(
+        lambda x: 'Exog' if x.replace(' ** 2', '') in x_vars else 'Control'
+        )
+    regression_df = regression_df.sort_values(by=['Var Type', 'Indep Vars', 'Quantile'], ascending=[False, True, True])
+    regression_df = regression_df.set_index(['Reg Type', 'Dep Var', 'Var Type', 'Indep Vars', 'Quantile'])
+    regression_df['Id'] = generate_hash_from_dataframe(regression_df, ['Reg Type', 'Dep Var', 'Indep Vars'])
+    regression_df = regression_df.set_index('Id', append=True)
+    regression_df = regression_df.reorder_levels([regression_df.index.names[-1]] + regression_df.index.names[:-1])
 
     regression_stats = results[q].summary().tables[0].as_html()
     regression_stats = pd.read_html(regression_stats, index_col=0)[0].reset_index()
@@ -478,22 +487,28 @@ def get_quantile_regression_results_coeffs(results: Dict[int, RegressionResultsW
 
     return regression_df, regression_stats
 
-def get_quantile_regression_predictions(regression_data: DataFrame, regression_coeffs: DataFrame)-> Dict[str, ndarray]:
-    independent_vars = regression_coeffs.index.get_level_values(0).unique()[1:]
-    x_values = {var: np.linspace(
-        regression_data[var].min(), regression_data[var].max(), 100
-        ) for var in independent_vars}
-    predictions = {}
+def get_quantile_regression_predictions_by_group(regression_data: DataFrame, regression_coeffs: DataFrame, group: str) -> Tuple[DataFrame, DataFrame]:
+    quantiles = regression_coeffs.index.get_level_values('Quantile').unique()
+    independent_vars = [var for var in regression_coeffs.index.get_level_values('Indep Vars').unique() if var != 'Intercept']
+    x_values = DataFrame({var: np.linspace(regression_data[var].min(), regression_data[var].max(), 100) for var in independent_vars if ' ** 2' not in var})
+    predictions = []
+    predictions_columns = []
     for var in independent_vars:
-        predictions.setdefault(var, {})
-        for n, q in enumerate(regression_coeffs.columns.get_level_values(0).unique()):
-            beta = regression_coeffs.loc[var, (q, 'beta1')]
-            intercept = regression_coeffs.loc['Intercept', (q, 'beta1')]
-            pred = intercept + beta * x_values[var]
-            if (q, 'beta2') in regression_coeffs.columns:
-                beta2 = regression_coeffs.loc[var, (q, 'beta2')]
-                pred += beta2 * (x_values[var]**2)
-            predictions[var][q] = pred
+        quadratic = ' ** 2' in var
+        x_var_values = x_values[var.replace(' ** 2', '')]
+        var_values = [var, 'Intercept'] if not quadratic else [var.replace(' ** 2', ''), var, 'Intercept']
+        vars_idx = idxslice(regression_coeffs, level='Indep Vars', value=var_values, axis=0)
+        var_coeffs = regression_coeffs.loc[vars_idx, :]
+        for quantile in quantiles:
+            quantile_idx = idxslice(var_coeffs, level='Quantile', value=quantile, axis=0)
+            coeffs = var_coeffs.loc[quantile_idx, group].values
+            coeffs = [float(re.search(r"([-\d.]+)\(", c).group(1)) for c in coeffs]
+            prediction = coeffs[-1] + coeffs[0] * x_var_values
+            if quadratic:
+                prediction += coeffs[1] * x_var_values ** 2
+            predictions.append(prediction)
+            predictions_columns.append((var, quantile))
+    predictions = DataFrame(predictions, index=MultiIndex.from_tuples(predictions_columns)).T
     return predictions, x_values
 
 def prettify_index_level(mapper: StringMapper, pattern: str, level: str, level_name: str, levels_to_remap: List[str]) -> str:
