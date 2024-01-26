@@ -309,15 +309,17 @@ def plot_country_eci_indicator_scatter(country_data: DataFrame,
                                        y_var_col: str, 
                                        groups: List[str],
                                        groups_col: Optional[str]='Income Group',
+                                       time_col: Optional[str]='Year',
                                        n_steps: Optional[int]=1,
                                        year_labels: Optional[bool]=True, 
                                        color: Optional[Color]=None, 
                                        groups_colors: Optional[Dict[str, Color]]=None, 
-                                       figsize: Optional[Tuple(int, int)]=(9, 9), 
+                                        figsize: Optional[Tuple(int, int)]=(9, 9), 
                                        arrows: Optional[bool]=True, 
                                        arrow_style: Optional[ArrowStyle]=None, 
                                        arrow_kwargs: Optional[Dict[str, Any]]=None, 
-                                       marker_kwargs: Optional[Dict[str, Any]]=None, 
+                                       set_arrows_ax_limits: Optional[bool]=True, 
+                                       marker_kwargs: Optional[Dict[str, Any]]=None,
                                        ax: Optional[Axes]=None
                                        ):
     if ax is None:
@@ -328,7 +330,7 @@ def plot_country_eci_indicator_scatter(country_data: DataFrame,
         arrow_style = ArrowStyle("Fancy", head_length=10, head_width=5, tail_width=.4)
     if arrow_kwargs is None:
         arrow_kwargs = dict(connectionstyle='arc3', color='grey', linewidth=1, linestyle=':', alpha=0.75)
-    years = country_data.index.get_level_values('Year')[::n_steps]
+    years = country_data.index.get_level_values(time_col)[::n_steps]
     steps_index = country_data.index[::n_steps]
     groups = [level for level in groups if level in country_data.loc[steps_index, :].index.get_level_values(groups_col)]
     for group in groups:
@@ -360,8 +362,9 @@ def plot_country_eci_indicator_scatter(country_data: DataFrame,
             ax.add_patch(arrow)
             #except Exception:
             #    pass
-        #ax.set_xlim(x_lims)
-        #ax.set_ylim(y_lims)    
+        if set_arrows_ax_limits:
+            ax.set_xlim(x_lims)
+            ax.set_ylim(y_lims) 
     if year_labels:
         offset = 0.01 * (y_lims[1] - y_lims[0])  # Offset for annotation so it doesn't sit right on the point
         for xi, yi, year in zip(x, y, years):
