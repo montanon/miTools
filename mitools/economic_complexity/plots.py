@@ -2,8 +2,9 @@ import functools
 import random
 import re
 import statistics
+from os import PathLike
 from string import ascii_uppercase, digits
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import matplotlib.lines as mlines
 import matplotlib.patches as mpatches
@@ -24,6 +25,8 @@ from ..pandas import idxslice
 from ..regressions import generate_hash_from_dataframe
 from ..utils import clean_str, stretch_string
 from .objects import Product, ProductsBasket
+
+Color = Union[Tuple(int,int,int),str]
 
 
 def plot_country_sector_distributions_evolution(data, country, years, colors, value=False, kde=False):
@@ -651,17 +654,25 @@ def create_regression_file_paths(eci_type_folder, eci_type, regression_id):
     regression_plot = eci_type_folder / f"{regression_id}_regression.png"
     return main_plot, regression_plot
 
-def create_regression_plots(data, dependent_variable, eci_indicators, significance_plot_kwargs, 
-                            regression, regression_id, eci_type_folder, eci_type, colors, groups,
-                              groups_colors, recalculate):
-        main_plot = eci_type_folder / "regression_data.png"
-        regression_plot = eci_type_folder / f"{regression_id}_regression.png"
-
-        quantiles = regression.index.get_level_values('Quantile').unique()
-        quadratic = regression.index.get_level_values('Reg Degree').unique()[0] == 'quadratic'
-
+def create_regression_plots(data: DataFrame, 
+                            dependent_variable: str, 
+                            independent_variables: List[str],
+                            regression_coeffs: DataFrame,
+                            regression_id: str,
+                            folder: PathLike,
+                            name_tag: str,
+                            significance_plot_kwargs: Dict[str, Dict[str,Any]], 
+                            indep_vars_colors: List[Color],
+                            groups,
+                            groups_colors,
+                            recalculate
+                            ):
+        quantiles = regression_coeffs.index.get_level_values('Quantile').unique()
+        quadratic = regression_coeffs.index.get_level_values('Reg Degree').unique()[0] == 'quadratic'
+        main_plot = folder / "regression_data.png"
+        regression_plot = folder / f"{regression_id}_regression.png"
         if not main_plot.exists() or not regression_plot.exists() or recalculate:
-            predictions, significances, x_values = get_regression_predictions(data, regression, groups)
+            predictions, significances, x_values = get_regression_predictions(data, regression_coeffs, groups)
             axes = plot_income_levels_ecis_indicator_scatter(data, dependent_variable, groups, eci_type, colors, groups_colors, figsize=(9, 7))
             if not main_plot.exists() or recalculate:
                 axes.flat[0].figure.savefig(main_plot)
@@ -674,24 +685,45 @@ def create_regression_plots(data, dependent_variable, eci_indicators, significan
                 axes.flat[0].figure.savefig(regression_plot)
                 plt.close()
 
-def plot_regressions_predictions(data, dependent_variables, regressions_folder, groups, eci_types, colors,
-                                groups_colors, significance_plot_kwargs, recalculate):
+def plot_regressions_predictions(data: DataFrame, 
+                                 dependent_variables: List[str], 
+                                 independent_variables: Dict[str, List[str]], 
+                                 regressions_folder: PathLike, 
+                                 groups: List[str], 
+                                 significance_plot_kwargs: Dict[str, Dict[str, Any]],
+                                 indep_vars_colors: Optional[List[Color]]=None, 
+                                 groups_colors: Optional[Dict[str, Color]]=None, 
+                                 recalculate: Optional[bool]=False
+                                 ):
     for dependent_variable in tqdm(dependent_variables, desc='Dependent Variables', position=0, leave=True):
         dep_var_folder = regressions_folder / dependent_variable.replace('/', '')
-        if not dep_var_folder.exists(): dep_var_folder.mkdir(exist_ok=True)
-        for eci_type in tqdm(eci_types, desc='Eci Types', position=1, leave=False):
-            eci_type_folder = dep_var_folder / eci_type
-            if not eci_type_folder.exists(): eci_type_folder.mkdir(exist_ok=True)
-            eci_indicators = [c for c in data.columns if c.endswith(f' {eci_type}')]
-            regressions_data_path = eci_type_folder / f"{eci_type}_regressions.parquet"       
-            if regressions_data_path.exists():
-                regressions = pd.read_parquet(regressions_data_path)
-                for regression_id, regression in tqdm(
-                    regressions.groupby('Id', axis=0), desc='Plots', position=2, leave=False
+        if not dep_var_folder.exists(): 
+            dep_var_folder.mkdir(exist_ok=True)
+        for name_tag, independent_vars in tqdm(
+            independent_variables.items(), desc='Eci Types', position=1, leave=False
+            ):
+            type_folder = dep_var_folder / name_tag
+            if not type_folder.exists(): 
+                type_folder.mkdir(exist_ok=True)
+            regressions_coeffs_path = type_folder / f"{name_tag}_regressions.parquet"       
+            if regressions_coeffs_path.exists():
+                regressions_coeffs = pd.read_parquet(regressions_coeffs_path)
+                for regression_id, regression_coeffs in tqdm(
+                    regressions_coeffs.groupby('Id', axis=0), desc='Plots', position=2, leave=False
                     ):
-                    create_regression_plots(data, dependent_variable, eci_indicators, 
-                                            significance_plot_kwargs, regression, regression_id, eci_type_folder, 
-                                            eci_type, colors, groups, groups_colors, recalculate)
+                    create_regression_plots(data=data, 
+                                            dependent_variable=dependent_variable, 
+                                            independent_variables=independent_vars,
+                                            regression_coeffs=regression_coeffs,
+                                            regression_id=regression_id,
+                                            groups=groups,
+                                            folder=type_folder,
+                                            name_tag=name_tag,
+                                            significance_plot_kwargs=significance_plot_kwargs,
+                                            indep_vars_colors=indep_vars_colors,
+                                            groups_colors=groups_colors, 
+                                            recalculate=recalculate
+                                            )
 
 
 
