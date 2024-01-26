@@ -557,24 +557,26 @@ class QuantileRegStrs:
     QUADRATIC_VAR_SUFFIX: str = ' ** 2'
     INDEPENDENT_VARS_PATTERN: str = r'^I\((.*)\)$'
     STATS: str = 'Stats'
+
+def process_quantile_regression_result(q: float, result: RegressionResultsWrapper) -> DataFrame:
+    coeffs = pd.concat(pd.read_html(result.summary().tables[1].as_html(), header=0))
+    coeffs = coeffs.set_index(QuantileRegStrs.UNNAMED)
+    coeffs[QuantileRegStrs.VALUE] = coeffs[
+            [QuantileRegStrs.COEF, QuantileRegStrs.T_VALUE, QuantileRegStrs.P_VALUE]
+                            ].apply(quantile_regression_value, axis=1)
+    coeffs = coeffs[[QuantileRegStrs.VALUE]]
+    coeffs.columns = pd.MultiIndex.from_tuples([(str(q), c) for c in coeffs.columns])
+    return coeffs
     
 def get_quantile_regression_results_coeffs(results: Dict[int, RegressionResultsWrapper],
                                            independent_variables: List[str]
                                            ) -> DataFrame:
-    regression_coeffs = []
-    for q, result in results.items():
-        coeffs = pd.concat(pd.read_html(result.summary().tables[1].as_html(), header=0))
-        coeffs = coeffs.set_index(QuantileRegStrs.UNNAMED)
-        coeffs[QuantileRegStrs.VALUE] = coeffs[
-            [QuantileRegStrs.COEF, QuantileRegStrs.T_VALUE, QuantileRegStrs.P_VALUE]
-                            ].apply(quantile_regression_value, axis=1)
-        coeffs = coeffs[[QuantileRegStrs.VALUE]]
-        coeffs.columns = pd.MultiIndex.from_tuples([(str(q), c) for c in coeffs.columns])
-        regression_coeffs.append(coeffs)
-    regression_coeffs = pd.concat(regression_coeffs, axis=1)
-    regression_coeffs = regression_coeffs.reset_index().melt(id_vars=QuantileRegStrs.UNNAMED, 
-                                                             var_name=[QuantileRegStrs.QUANTILE], 
-                                                             value_name=QuantileRegStrs.VALUE)
+    regression_coeffs = pd.concat([process_quantile_regression_result(q, result) for q, result in results.items()], axis=1)
+    regression_coeffs = (regression_coeffs.reset_index()
+                         .melt(id_vars=QuantileRegStrs.UNNAMED, 
+                               var_name=[QuantileRegStrs.QUANTILE], 
+                               value_name=QuantileRegStrs.VALUE)
+                         )
     regression_coeffs.columns = [QuantileRegStrs.INDEPENDENT_VARS, *regression_coeffs.columns[1:]]
     regression_coeffs[QuantileRegStrs.INDEPENDENT_VARS] = (regression_coeffs[QuantileRegStrs.INDEPENDENT_VARS]
                                    .replace(QuantileRegStrs.INDEPENDENT_VARS_PATTERN, r'\1', regex=True)
@@ -585,7 +587,7 @@ def get_quantile_regression_results_coeffs(results: Dict[int, RegressionResultsW
             QuantileRegStrs.INDEPENDENT_VARS].values for var in independent_variables]
         ) else QuantileRegStrs.LINEAR_REG
     regression_coeffs[QuantileRegStrs.REGRESSION_DEGREE] = reg_degree
-    regression_coeffs[QuantileRegStrs.DEPENDENT_VAR] = results[q].model.endog_names
+    regression_coeffs[QuantileRegStrs.DEPENDENT_VAR] = list(results.values())[0].model.endog_names
     regression_coeffs[QuantileRegStrs.VARIABLE_TYPE] = regression_coeffs[QuantileRegStrs.INDEPENDENT_VARS].apply(
         lambda x: QuantileRegStrs.EXOG_VAR if x.replace(
             QuantileRegStrs.QUADRATIC_VAR_SUFFIX, ''
@@ -631,7 +633,9 @@ def get_quantile_regression_results_stats(results: Dict[int, RegressionResultsWr
     regression_stats = pd.concat(regression_stats, axis=0)
     return regression_stats
 
-def get_quantile_regression_predictions_by_group(regression_data: DataFrame, regression_coeffs: DataFrame, group: str) -> Tuple[DataFrame, DataFrame]:
+def get_quantile_regression_predictions_by_group(regression_data: DataFrame, 
+                                                 regression_coeffs: DataFrame, 
+                                                 group: str) -> Tuple[DataFrame, DataFrame]:
     group_data = regression_data.loc[
         idxslice(regression_data, level='Income Group', value=group, axis=0), :
         ] if group != 'All income' else regression_data
