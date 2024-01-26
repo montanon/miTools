@@ -918,41 +918,63 @@ def plot_regressions_predictions(data: DataFrame,
                                  independent_variables: Dict[str, List[str]], 
                                  regressions_folder: PathLike, 
                                  groups: List[str], 
-                                 significance_plot_kwargs: Dict[str, Dict[str, Any]],
-                                 indep_vars_colors: Optional[List[Color]]=None, 
-                                 groups_colors: Optional[Dict[str, Color]]=None, 
-                                 recalculate: Optional[bool]=False
+                                 all_groups: str,
+                                 groups_col: Optional[str]='Income Group',
+                                 entity_col: Optional[str]='Country',
+                                 time_col: Optional[str]='Year',
+                                 figsize: Optional[Tuple(float, float)]=(9,7),
+                                 marker_kwargs: Optional[Dict[str, Any]]=None,
+                                 annotation_kwargs: Optional[Dict[str, Any]]=None,
+                                 text_x_offset: Optional[float]=0.0025,
+                                 adjust_axes_lims_kwargs: Optional[Dict[str, Any]]=None,
+                                 significance_plot_kwargs: Optional[Dict[str, Dict[str,Any]]]=None, 
+                                 labels_fontsize: Optional[int]=16,
+                                 indep_vars_colors: Optional[List[Color]]=None,
+                                 groups_colors: Optional[Dict[str, Color]]=None,
+                                 quantiles: Optional[List[float]]=None,
+                                 recalculate: Optional[bool]=False,
                                  ):
     for dependent_variable in tqdm(dependent_variables, desc='Dependent Variables', position=0, leave=True):
-        dep_var_folder = regressions_folder / dependent_variable.replace('/', '')
+        dep_var_name = dependent_variable.replace('/', '').replace(' ', '_')
+        dep_var_folder = regressions_folder / dep_var_name
         if not dep_var_folder.exists(): 
             dep_var_folder.mkdir(exist_ok=True)
         for name_tag, independent_vars in tqdm(
-            independent_variables.items(), desc='Eci Types', position=1, leave=False
+            independent_variables.items(), desc='Independent Variables', position=1, leave=False
             ):
-            type_folder = dep_var_folder / name_tag
-            if not type_folder.exists(): 
-                type_folder.mkdir(exist_ok=True)
-            regressions_coeffs_path = type_folder / f"{name_tag}_regressions.parquet"       
+            name_tag_folder = dep_var_folder / name_tag
+            if not name_tag_folder.exists(): 
+                name_tag_folder.mkdir(exist_ok=True)
+            regressions_coeffs_path = name_tag_folder / f"{name_tag}_{dep_var_name}_regressions.parquet"       
             if regressions_coeffs_path.exists():
                 regressions_coeffs = pd.read_parquet(regressions_coeffs_path)
                 for regression_id, regression_coeffs in tqdm(
-                    regressions_coeffs.groupby('Id', axis=0), desc='Plots', position=2, leave=False
+                    regressions_coeffs.groupby(QuantileRegStrs.ID, axis=0), desc='Plots', position=2, leave=False
                     ):
                     create_regression_plots(data=data, 
-                                            dependent_variable=dependent_variable, 
-                                            independent_variables=independent_vars,
                                             regression_coeffs=regression_coeffs,
                                             regression_id=regression_id,
-                                            groups=groups,
-                                            folder=type_folder,
+                                            dependent_variable=dependent_variable,
+                                            independent_variables=independent_vars,
                                             name_tag=name_tag,
+                                            groups=groups,
+                                            all_groups=all_groups,
+                                            folder=name_tag_folder,
+                                            groups_col=groups_col,
+                                            entity_col=entity_col,
+                                            time_col=time_col,
+                                            figsize=figsize,
+                                            marker_kwargs=marker_kwargs,
+                                            annotation_kwargs=annotation_kwargs,
+                                            text_x_offset=text_x_offset,
+                                            adjust_axes_lims_kwargs=adjust_axes_lims_kwargs,
                                             significance_plot_kwargs=significance_plot_kwargs,
+                                            labels_fontsize=labels_fontsize,
                                             indep_vars_colors=indep_vars_colors,
-                                            groups_colors=groups_colors, 
-                                            recalculate=recalculate
+                                            groups_colors=groups_colors,
+                                            quantiles=quantiles,
+                                            recalculate=recalculate,
                                             )
-
 
 
                 
