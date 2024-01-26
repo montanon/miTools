@@ -17,6 +17,7 @@ from matplotlib.patches import ArrowStyle, FancyArrowPatch
 from numpy import ndarray
 from pandas import DataFrame, MultiIndex, Series
 from statsmodels.regression.linear_model import RegressionResultsWrapper
+from tqdm import tqdm
 
 from ..economic_complexity import StringMapper
 from ..pandas import idxslice
@@ -598,3 +599,102 @@ def plot_income_levels_ecis_indicator_scatter(data, dependent_var, income_levels
                                               )
     axes = adjust_axes_lims(axes, mode='rows', x=True, y=True)
     return axes
+
+def get_regression_predictions(data: DataFrame, regression_coeffs: DataFrame, groups: List[str],
+                               ) -> Tuple[DataFrame, DataFrame, DataFrame]:
+    predictions, significances, x_values = [], [], []
+    for group in groups:
+        group_predictions, group_significances, group_x_values = get_quantile_regression_predictions_by_group(
+            data,
+            regression_coeffs,
+            group)
+        group_predictions.columns = pd.MultiIndex.from_tuples([(group,) + c for c in group_predictions.columns])
+        group_significances.columns = pd.MultiIndex.from_tuples([(group,) + c for c in group_significances.columns])
+        group_x_values.columns = pd.MultiIndex.from_tuples([(group, c) for c in group_x_values.columns])
+        predictions.append(group_predictions)
+        significances.append(group_significances)
+        x_values.append(group_x_values)
+    predictions = pd.concat(predictions, axis=1)
+    significances = pd.concat(significances, axis=1)
+    x_values = pd.concat(x_values, axis=1)
+    return predictions, significances, x_values
+
+def plot_regression_predictions_by_group(variables, predictions, significances, x_values, dependent_variable, groups, quantiles, quadratic, significance_plot_kwargs, axes=None):
+    if axes is None:
+        _, axes = plt.subplots()
+    for n, group in enumerate(groups):
+        current_axes = axes.flat[n::len(groups)]
+        for ax, var in zip(current_axes, variables):
+            for line in ax.lines:
+                line.set_alpha(0.10)
+            for quantile in quantiles:
+                independent_var = f"{var} ** 2" if quadratic and f"{var} ** 2" in predictions.columns.get_level_values(-2).unique() else var
+                x_vals = x_values[group][var]
+                preds = predictions[group][(dependent_variable, independent_var, quantile)]
+                significance = significances[group][(dependent_variable, independent_var, quantile)].values[0]
+                ax.plot(x_vals, preds, **significance_plot_kwargs[significance])
+                text = ax.text(x_vals.iloc[-1]*1.0025, preds.iloc[-1], f'{quantile}Q', horizontalalignment='left', zorder=99, fontsize=10, color='k')
+            ax.figure.canvas.draw()
+            bbox = text.get_window_extent(renderer=ax.figure.canvas.get_renderer())
+            bbox_transformed = bbox.transformed(ax.transData.inverted())
+            right_x = bbox_transformed.x1
+            ax.set_xlim(ax.get_xlim()[0], right_x)
+            ax.autoscale(enable=True, axis='both', tight=False)
+            xlabel = ax.get_xlabel()
+            ylabel = ax.get_ylabel()
+            ax.set_xlabel(xlabel, fontsize=16)
+            ax.set_ylabel(ylabel, fontsize=16)
+    return axes
+
+def create_regression_file_paths(eci_type_folder, eci_type, regression_id):
+    main_plot = eci_type_folder / "regression_data.png"
+    regression_plot = eci_type_folder / f"{regression_id}_regression.png"
+    return main_plot, regression_plot
+
+def create_regression_plots(data, dependent_variable, eci_indicators, significance_plot_kwargs, 
+                            regression, regression_id, eci_type_folder, eci_type, colors, groups,
+                              groups_colors, recalculate):
+        main_plot = eci_type_folder / "regression_data.png"
+        regression_plot = eci_type_folder / f"{regression_id}_regression.png"
+
+        quantiles = regression.index.get_level_values('Quantile').unique()
+        quadratic = regression.index.get_level_values('Reg Degree').unique()[0] == 'quadratic'
+
+        if not main_plot.exists() or not regression_plot.exists() or recalculate:
+            predictions, significances, x_values = get_regression_predictions(data, regression, groups)
+            axes = plot_income_levels_ecis_indicator_scatter(data, dependent_variable, groups, eci_type, colors, groups_colors, figsize=(9, 7))
+            if not main_plot.exists() or recalculate:
+                axes.flat[0].figure.savefig(main_plot)
+        
+            if not regression_plot.exists() or recalculate:
+                plot_regression_predictions_by_group(eci_indicators, predictions, significances, 
+                                                        x_values, dependent_variable, groups, 
+                                                        quantiles, quadratic, significance_plot_kwargs, 
+                                                        axes=axes)
+                axes.flat[0].figure.savefig(regression_plot)
+                plt.close()
+
+def plot_regressions_predictions(data, dependent_variables, regressions_folder, groups, eci_types, colors,
+                                groups_colors, significance_plot_kwargs, recalculate):
+    for dependent_variable in tqdm(dependent_variables, desc='Dependent Variables', position=0, leave=True):
+        dep_var_folder = regressions_folder / dependent_variable.replace('/', '')
+        if not dep_var_folder.exists(): dep_var_folder.mkdir(exist_ok=True)
+        for eci_type in tqdm(eci_types, desc='Eci Types', position=1, leave=False):
+            eci_type_folder = dep_var_folder / eci_type
+            if not eci_type_folder.exists(): eci_type_folder.mkdir(exist_ok=True)
+            eci_indicators = [c for c in data.columns if c.endswith(f' {eci_type}')]
+            regressions_data_path = eci_type_folder / f"{eci_type}_regressions.parquet"       
+            if regressions_data_path.exists():
+                regressions = pd.read_parquet(regressions_data_path)
+                for regression_id, regression in tqdm(
+                    regressions.groupby('Id', axis=0), desc='Plots', position=2, leave=False
+                    ):
+                    create_regression_plots(data, dependent_variable, eci_indicators, 
+                                            significance_plot_kwargs, regression, regression_id, eci_type_folder, 
+                                            eci_type, colors, groups, groups_colors, recalculate)
+
+
+
+                
+                
+                    
