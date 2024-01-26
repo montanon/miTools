@@ -516,7 +516,7 @@ def get_quantile_regression_results(data: DataFrame,
         quantiles = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
     formula_terms = independent_variables.copy()
     if quadratic:
-        formula_terms += [f"I({var} ** 2)" for var in formula_terms]
+        formula_terms += [f"I({var}{QuantileRegStrs.QUADRATIC_VAR_SUFFIX})" for var in formula_terms]
     if control_variables: 
         formula_terms += control_variables
     formula = f"{dependent_variable} ~ " + " + ".join(formula_terms)
@@ -524,9 +524,9 @@ def get_quantile_regression_results(data: DataFrame,
     return results
 
 def quantile_regression_value(row: Series) -> Series:
-    coeff = round(row['coeff'], 5)
-    t_value = round(row['t'], 5)
-    p_value = row['P>|t|']
+    coeff = round(row[QuantileRegStrs.COEF], 5)
+    t_value = round(row[QuantileRegStrs.T_VALUE], 5)
+    p_value = row[QuantileRegStrs.P_VALUE]
     if p_value < 0.001:
         return f"{coeff}({t_value})***"
     elif p_value < 0.01:
@@ -558,6 +558,7 @@ class QuantileRegStrs:
     INDEPENDENT_VARS_PATTERN: str = r'^I\((.*)\)$'
     STATS: str = 'Stats'
     INTERCEPT: str = 'Intercept'
+    ANNOTATION: str = 'Q'
 
 def process_quantile_regression_result(q: float, result: RegressionResultsWrapper) -> DataFrame:
     coeffs = pd.concat(pd.read_html(result.summary().tables[1].as_html(), header=0))
@@ -715,7 +716,7 @@ def plot_income_levels_ecis_indicator_scatter(data: DataFrame,
                                               figsize: Optional[Tuple(float, float)]=(9,7),
                                               marker_kwargs: Optional[Dict[str, Any]]=None,
                                               adjust_axes_lims_kwargs: Optional[Dict[str, Any]]=None,
-                                              ):
+                                              ) -> Axes:
     if adjust_axes_lims_kwargs is None:
         adjust_axes_lims_kwargs = {'mode': 'rows', 'x': True, 'y': True}
     nrows = len(x_vars_cols)
@@ -759,7 +760,8 @@ def get_regression_predictions(data: DataFrame, regression_coeffs: DataFrame, gr
         group_predictions, group_significances, group_x_values = get_quantile_regression_predictions_by_group(
             data,
             regression_coeffs,
-            group)
+            group
+            )
         group_predictions.columns = pd.MultiIndex.from_tuples([(group,) + c for c in group_predictions.columns])
         group_significances.columns = pd.MultiIndex.from_tuples([(group,) + c for c in group_significances.columns])
         group_x_values.columns = pd.MultiIndex.from_tuples([(group, c) for c in group_x_values.columns])
@@ -771,31 +773,69 @@ def get_regression_predictions(data: DataFrame, regression_coeffs: DataFrame, gr
     x_values = pd.concat(x_values, axis=1)
     return predictions, significances, x_values
 
-def plot_regression_predictions_by_group(variables, predictions, significances, x_values, dependent_variable, groups, quantiles, quadratic, significance_plot_kwargs, axes=None):
+def plot_group_data(ax, group_data, x_vals, significance_plot_kwargs, annotation_kwargs):
+    for quantile, preds in group_data.items():
+        ax.plot(x_vals, preds, **significance_plot_kwargs[quantile])
+        text = ax.text(x_vals.iloc[-1]*1.0025, preds.iloc[-1], f'{quantile}Q', **annotation_kwargs)
+    return text
+
+def adjust_text_axes_limits(ax: Axes, text: str) -> None:
+    ax.figure.canvas.draw()
+    bbox = text.get_window_extent(renderer=ax.figure.canvas.get_renderer())
+    bbox_transformed = bbox.transformed(ax.transData.inverted())
+    right_x = bbox_transformed.x1
+    ax.set_xlim(ax.get_xlim()[0], right_x)
+    ax.autoscale(enable=True, axis='both', tight=False)
+
+def adjust_axes_labels(ax: Axes, fontsize: int) -> None:
+    xlabel = ax.get_xlabel()
+    ylabel = ax.get_ylabel()
+    ax.set_xlabel(xlabel, fontsize=fontsize)
+    ax.set_ylabel(ylabel, fontsize=fontsize)
+
+def plot_regression_predictions_by_group(independent_variables: List[str], 
+                                         dependent_variable: str, 
+                                         predictions: DataFrame, 
+                                         x_values: DataFrame, 
+                                         significances: DataFrame, 
+                                         groups: List[str], 
+                                         quantiles: List[float], 
+                                         quadratic: bool, 
+                                         significance_plot_kwargs: Dict[str, Dict[str, Any]],
+                                         annotation_kwargs: Dict[str, Any]=None,
+                                         ncols: Optional[int]=3,
+                                         figsize: Optional[Tuple(float, float)]=(7, 7),
+                                         labels_fontsize: Optional[int]=16,
+                                         text_x_offset: Optional[float]=0.0025,
+                                         axes=None) -> Axes:
     if axes is None:
-        _, axes = plt.subplots()
+        nrows = (len(independent_variables) + 1) // ncols
+        _, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(figsize[0]*ncols, figsize[1]*nrows))
+    if annotation_kwargs is None:
+        annotation_kwargs = {'fontsize': 10, 'color': 'k', 'horizontalalignment': 'left', 'zorder': 99}
     for n, group in enumerate(groups):
         current_axes = axes.flat[n::len(groups)]
-        for ax, var in zip(current_axes, variables):
+        for ax, var in zip(current_axes, independent_variables):
             for line in ax.lines:
                 line.set_alpha(0.10)
             for quantile in quantiles:
-                independent_var = f"{var} ** 2" if quadratic and f"{var} ** 2" in predictions.columns.get_level_values(-2).unique() else var
+                independent_variable = (
+                    f"{var}{QuantileRegStrs.QUADRATIC_VAR_SUFFIX}" 
+                    if quadratic and 
+                    f"{var}{QuantileRegStrs.QUADRATIC_VAR_SUFFIX}" in predictions.columns.get_level_values(-2).unique() 
+                    else var
+                    )
                 x_vals = x_values[group][var]
-                preds = predictions[group][(dependent_variable, independent_var, quantile)]
-                significance = significances[group][(dependent_variable, independent_var, quantile)].values[0]
+                preds = predictions[group][(dependent_variable, independent_variable, quantile)]
+                significance = significances[group][(dependent_variable, independent_variable, quantile)].values[0]
                 ax.plot(x_vals, preds, **significance_plot_kwargs[significance])
-                text = ax.text(x_vals.iloc[-1]*1.0025, preds.iloc[-1], f'{quantile}Q', horizontalalignment='left', zorder=99, fontsize=10, color='k')
-            ax.figure.canvas.draw()
-            bbox = text.get_window_extent(renderer=ax.figure.canvas.get_renderer())
-            bbox_transformed = bbox.transformed(ax.transData.inverted())
-            right_x = bbox_transformed.x1
-            ax.set_xlim(ax.get_xlim()[0], right_x)
-            ax.autoscale(enable=True, axis='both', tight=False)
-            xlabel = ax.get_xlabel()
-            ylabel = ax.get_ylabel()
-            ax.set_xlabel(xlabel, fontsize=16)
-            ax.set_ylabel(ylabel, fontsize=16)
+                text = ax.text(x_vals.iloc[-1]*(1 + text_x_offset), 
+                               preds.iloc[-1], 
+                               f'{quantile}{QuantileRegStrs.ANNOTATION}', 
+                               **annotation_kwargs
+                               )
+            adjust_text_axes_limits(ax, text)
+            adjust_axes_labels(ax, labels_fontsize)
     return axes
 
 def create_regression_file_paths(eci_type_folder, eci_type, regression_id):
