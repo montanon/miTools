@@ -801,13 +801,15 @@ def plot_regression_predictions_by_group(independent_variables: List[str],
                                          groups: List[str], 
                                          quantiles: List[float], 
                                          quadratic: bool, 
-                                         significance_plot_kwargs: Dict[str, Dict[str, Any]],
-                                         annotation_kwargs: Dict[str, Any]=None,
+                                         significance_plot_kwargs: Optional[Dict[str, Dict[str, Any]]]=None,
+                                         annotation_kwargs: Optional[Dict[str, Any]]=None,
                                          ncols: Optional[int]=3,
                                          figsize: Optional[Tuple(float, float)]=(7, 7),
                                          labels_fontsize: Optional[int]=16,
                                          text_x_offset: Optional[float]=0.0025,
                                          axes=None) -> Axes:
+    if significance_plot_kwargs is None:
+        significance_plot_kwargs = {}
     if axes is None:
         nrows = (len(independent_variables) + 1) // ncols
         _, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(figsize[0]*ncols, figsize[1]*nrows))
@@ -828,7 +830,7 @@ def plot_regression_predictions_by_group(independent_variables: List[str],
                 x_vals = x_values[group][var]
                 preds = predictions[group][(dependent_variable, independent_variable, quantile)]
                 significance = significances[group][(dependent_variable, independent_variable, quantile)].values[0]
-                ax.plot(x_vals, preds, **significance_plot_kwargs[significance])
+                ax.plot(x_vals, preds, **significance_plot_kwargs.get(significance, {}))
                 text = ax.text(x_vals.iloc[-1]*(1 + text_x_offset), 
                                preds.iloc[-1], 
                                f'{quantile}{QuantileRegStrs.ANNOTATION}', 
@@ -844,35 +846,72 @@ def create_regression_file_paths(eci_type_folder, eci_type, regression_id):
     return main_plot, regression_plot
 
 def create_regression_plots(data: DataFrame, 
-                            dependent_variable: str, 
-                            independent_variables: List[str],
                             regression_coeffs: DataFrame,
                             regression_id: str,
-                            folder: PathLike,
+                            dependent_variable: str, 
+                            independent_variables: List[str],
                             name_tag: str,
-                            significance_plot_kwargs: Dict[str, Dict[str,Any]], 
-                            indep_vars_colors: List[Color],
-                            groups,
-                            groups_colors,
-                            recalculate
+                            groups: List[str],
+                            all_groups: str,
+                            folder: PathLike,
+                            groups_col: Optional[str]='Income Group',
+                            entity_col: Optional[str]='Country',
+                            time_col: Optional[str]='Year',
+                            figsize: Optional[Tuple(float, float)]=(9,7),
+                            marker_kwargs: Optional[Dict[str, Any]]=None,
+                            annotation_kwargs: Optional[Dict[str, Any]]=None,
+                            text_x_offset: Optional[float]=0.0025,
+                            adjust_axes_lims_kwargs: Optional[Dict[str, Any]]=None,
+                            significance_plot_kwargs: Optional[Dict[str, Dict[str,Any]]]=None, 
+                            labels_fontsize: Optional[int]=16,
+                            indep_vars_colors: Optional[List[Color]]=None,
+                            groups_colors: Optional[Dict[str, Color]]=None,
+                            quantiles: Optional[List[float]]=None,
+                            recalculate: Optional[bool]=False,
                             ):
-        quantiles = regression_coeffs.index.get_level_values('Quantile').unique()
-        quadratic = regression_coeffs.index.get_level_values('Reg Degree').unique()[0] == 'quadratic'
-        main_plot = folder / "regression_data.png"
-        regression_plot = folder / f"{regression_id}_regression.png"
-        if not main_plot.exists() or not regression_plot.exists() or recalculate:
-            predictions, significances, x_values = get_regression_predictions(data, regression_coeffs, groups)
-            axes = plot_income_levels_ecis_indicator_scatter(data, dependent_variable, groups, eci_type, colors, groups_colors, figsize=(9, 7))
-            if not main_plot.exists() or recalculate:
-                axes.flat[0].figure.savefig(main_plot)
-        
-            if not regression_plot.exists() or recalculate:
-                plot_regression_predictions_by_group(eci_indicators, predictions, significances, 
-                                                        x_values, dependent_variable, groups, 
-                                                        quantiles, quadratic, significance_plot_kwargs, 
-                                                        axes=axes)
-                axes.flat[0].figure.savefig(regression_plot)
-                plt.close()
+    if not quantiles:
+        quantiles = regression_coeffs.index.get_level_values(QuantileRegStrs.QUANTILE).unique()
+    quadratic = (regression_coeffs.index
+                 .get_level_values(QuantileRegStrs.REGRESSION_DEGREE).unique()[0] == QuantileRegStrs.QUADRATIC_REG
+                 )
+    main_plot = folder / "regression_data.png"
+    regression_plot = folder / f"{regression_id}_regression.png"
+    if not main_plot.exists() or not regression_plot.exists() or recalculate:
+        predictions, significances, x_values = get_regression_predictions(data, regression_coeffs, groups)
+        axes = plot_income_levels_ecis_indicator_scatter(data=data,
+                                                         x_vars_cols=independent_variables,
+                                                         y_var_col=dependent_variable,
+                                                         name_tag=name_tag,
+                                                         groups=groups,
+                                                         all_groups=all_groups,
+                                                         groups_col=groups_col,
+                                                         entity_col=entity_col,
+                                                         time_col=time_col,
+                                                         colors=indep_vars_colors,
+                                                         groups_colors=groups_colors,
+                                                         figsize=figsize,
+                                                         marker_kwargs=marker_kwargs,
+                                                         adjust_axes_lims_kwargs=adjust_axes_lims_kwargs
+                                                         )
+        if not main_plot.exists() or recalculate:
+            axes.flat[0].figure.savefig(main_plot)
+        if not regression_plot.exists() or recalculate:
+            plot_regression_predictions_by_group(independent_variables=independent_variables, 
+                                                 dependent_variable=dependent_variable,
+                                                 predictions=predictions,
+                                                 x_values=x_values,
+                                                 significances=significances,
+                                                 groups=groups,
+                                                 quantiles=quantiles,
+                                                 quadratic=quadratic,
+                                                 significance_plot_kwargs=significance_plot_kwargs,
+                                                 annotation_kwargs=annotation_kwargs,
+                                                 labels_fontsize=labels_fontsize,
+                                                 text_x_offset=text_x_offset,
+                                                 axes=axes
+                                                 )
+            axes.flat[0].figure.savefig(regression_plot)
+            plt.close()
 
 def plot_regressions_predictions(data: DataFrame, 
                                  dependent_variables: List[str], 
