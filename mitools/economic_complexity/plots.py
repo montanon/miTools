@@ -249,9 +249,6 @@ def check_interval(interval, value):
         return False
     return interval.left <= value < interval.right
 
-def is_ax_empty(ax):
-    return not (ax.lines or ax.patches or ax.collections)
-
 def custom_agg_rca(group, n=5):
     return 1.0 if group.sum() >= n else 0.0
 
@@ -295,6 +292,17 @@ def adjust_axes_lims(axes, mode='all', x=True, y=True):
                 ylim_min, ylim_max = get_axes_limits(axes[:, j], lambda ax: ax.get_ylim())
                 set_axes_limits(axes[:, j], lambda ax, lim: ax.set_ylim(*lim), ylim_min, ylim_max)
     return axes
+
+def is_ax_empty(ax):
+    return not (ax.lines or ax.patches or ax.collections)
+
+def is_axes_empty(ax: Axes):
+    return (len(ax.get_lines()) == 0 and
+            len(ax.patches) == 0 and
+            len(ax.texts) == 0 and
+            ax.get_legend() is None and
+            not ax.get_xlabel() and
+            not ax.get_ylabel())
 
 def plot_country_eci_indicator_scatter(country_data: DataFrame, 
                                        x_var_col: str, 
@@ -385,7 +393,7 @@ def plot_country_ecis_indicator_scatter(country_data: DataFrame,
     nrows = (len(x_vars_cols) + 1) // ncols
     if axes is None:
         _, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(figsize[0]*ncols, figsize[1]*nrows))
-    for ax, x_var_col in zip(axes.flat, x_vars_cols):
+    for n, (ax, x_var_col) in enumerate(zip(axes.flat, x_vars_cols)):
         ax = plot_country_eci_indicator_scatter(country_data=country_data, 
                                                 x_var_col=x_var_col, 
                                                 y_var_col=y_var_col,
@@ -393,7 +401,7 @@ def plot_country_ecis_indicator_scatter(country_data: DataFrame,
                                                 groups_col=groups_col,
                                                 n_steps=n_steps,
                                                 year_labels=year_labels,
-                                                color=colors[x_var_col.replace(f' {name_tag}', '')], # TODO: FIX
+                                                color=colors[n] if colors else None,
                                                 groups_colors=groups_colors,
                                                 figsize=figsize,
                                                 arrows=arrows,
@@ -418,14 +426,6 @@ def plot_country_ecis_indicator_scatter(country_data: DataFrame,
                                         markersize=10, markeredgecolor='k', label=label) for label, color in groups_colors.items()]
         last_ax.legend(handles=legend_handles, fontsize=16, loc='center left', ncols=1)
     return axes
-
-def is_axes_empty(ax: Axes):
-    return (len(ax.get_lines()) == 0 and
-            len(ax.patches) == 0 and
-            len(ax.texts) == 0 and
-            ax.get_legend() is None and
-            not ax.get_xlabel() and
-            not ax.get_ylabel())
 
 def plot_countries_ecis_indicator_scatter(data, countries, eci_type, x_cols, y_col, colors=None, income_colors=None, 
                                           marker_kwargs=None, ncols=3, figsize=(7,7), arrow_style=None, arrow_kwargs=None,
