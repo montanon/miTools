@@ -424,10 +424,10 @@ def plot_country_ecis_indicator_scatter(country_data: DataFrame,
                  horizontalalignment='center'
                                  )
     last_ax = axes.flat[-1]
-    if is_axes_empty(last_ax) and groups_colors is not None:  # Check if last_ax is empty
+    if is_axes_empty(last_ax) and groups_colors is not None:
         last_ax.cla()
-        last_ax.set_xticks([])  # Remove x-axis ticks
-        last_ax.set_yticks([])  # Remove y-axis ticks
+        last_ax.set_xticks([]) 
+        last_ax.set_yticks([]) 
         last_ax.axis('off') 
         legend_handles = [mlines.Line2D([], [], color=color, marker='o', linestyle='None',
                                         markersize=10, markeredgecolor='k', label=label) for label, color in groups_colors.items()]
@@ -487,30 +487,38 @@ def plot_countries_ecis_indicator_scatter(data: DataFrame,
                     horizontalalignment='center')
     return axes
 
-def prepare_regression_data(data: DataFrame, y_var: str, x_vars: List[str], 
-                            str_mapper: StringMapper, control_vars: Optional[List[str]]=None,
+def prepare_regression_data(data: DataFrame, 
+                            dependent_variable: str, 
+                            independent_variables: List[str], 
+                            control_variables: Optional[List[str]]=None,
+                            str_mapper: Optional[StringMapper]=None, 
                             ) -> Tuple[DataFrame, str, List[str], List[str]]:
-    if control_vars is None:
-        control_vars = []
-    regression_data = data.loc[:, [y_var, *x_vars, *control_vars]].copy(deep=True)
-    regression_data.columns = [str_mapper.uglify_str(var) for var in regression_data.columns]
-    y_var = str_mapper.uglify_str(y_var)
-    x_vars = [str_mapper.uglify_str(var) for var in x_vars]
-    control_vars = [str_mapper.uglify_str(var) for var in control_vars]
-    return regression_data, y_var, x_vars, control_vars
+    if control_variables is None:
+        control_variables = []
+    regression_data = data.loc[:, [dependent_variable, *independent_variables, *control_variables]].copy(deep=True)
+    if str_mapper is not None:
+        regression_data.columns = [str_mapper.uglify_str(var) for var in regression_data.columns]
+        dependent_variable = str_mapper.uglify_str(dependent_variable)
+        independent_variables = [str_mapper.uglify_str(var) for var in independent_variables]
+        control_variables = [str_mapper.uglify_str(var) for var in control_variables]
+    return regression_data, dependent_variable, independent_variables, control_variables
     
-def get_quantile_regression_results(data: DataFrame, y_var: str, x_vars: List[str], 
-                                    control_vars: Optional[List[str]]=None, 
-                                    quadratic=False, quantiles: Optional[List[float]]=None, 
-                                    max_iter: Optional[int]=2_500) -> Tuple[DataFrame, Dict]:
+def get_quantile_regression_results(data: DataFrame, 
+                                    dependent_variable: str, 
+                                    independent_variables: List[str], 
+                                    control_variables: Optional[List[str]]=None, 
+                                    quantiles: Optional[List[float]]=None, 
+                                    quadratic=False, 
+                                    max_iter: Optional[int]=2_500
+                                    ) -> Dict[float, RegressionResultsWrapper]:
     if quantiles is None:
         quantiles = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
-    formula_terms = x_vars.copy()
+    formula_terms = independent_variables.copy()
     if quadratic:
         formula_terms += [f"I({var} ** 2)" for var in formula_terms]
-    if control_vars: 
-        formula_terms += control_vars
-    formula = f"{y_var} ~ " + " + ".join(formula_terms)
+    if control_variables: 
+        formula_terms += control_variables
+    formula = f"{dependent_variable} ~ " + " + ".join(formula_terms)
     results = {q: smf.quantreg(formula, data).fit(q=q, max_iter=max_iter) for q in quantiles}
     return results
 
