@@ -701,37 +701,55 @@ def prettify_with_pattern(string: str, mapper: StringMapper, pattern: str) -> st
     remapped_base = mapper.prettify_str(base_string)
     return f"{remapped_base}{pattern}" if pattern_str else remapped_base
 
-def plot_income_levels_ecis_indicator_scatter(data, dependent_var, income_levels, eci_type, colors, income_colors, figsize=(9, 7)):
-
-    eci_indicators = [c for c in data.columns if c.endswith(f' {eci_type}')]
-
-    nrows = len(eci_indicators)
-    ncols = len(income_levels)
+def plot_income_levels_ecis_indicator_scatter(data: DataFrame, 
+                                              x_vars_cols: List[str], 
+                                              y_var_col: str,
+                                              name_tag: str,
+                                              groups: List[str],
+                                              all_groups: str, 
+                                              groups_col: Optional[str]='Income Group',
+                                              entity_col: Optional[str]='Country', 
+                                              time_col: Optional[str]='Year',
+                                              colors: List[Color]=None, 
+                                              groups_colors: Dict[str, Color]=None, 
+                                              figsize: Optional[Tuple(float, float)]=(9,7),
+                                              marker_kwargs: Optional[Dict[str, Any]]=None,
+                                              adjust_axes_lims_kwargs: Optional[Dict[str, Any]]=None,
+                                              ):
+    if adjust_axes_lims_kwargs is None:
+        adjust_axes_lims_kwargs = {'mode': 'rows', 'x': True, 'y': True}
+    nrows = len(x_vars_cols)
+    ncols = len(groups)
     _, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(figsize[0]*ncols, figsize[1]*nrows))
-
-    for n, income_level in enumerate(income_levels):
-
-        if income_level != 'All income':
-            _data = data.loc[pd.IndexSlice[:,:,income_level,:,:], :].copy(deep=True)
+    for n, group in enumerate(groups):
+        if group != all_groups:
+            data = data.loc[pd.IndexSlice[:,:,group,:,:], :].copy(deep=True)
         else:
-            _data = data
-        countries = _data.index.get_level_values('Country').unique().tolist()
-        plot_countries_ecis_indicator_scatter(_data, 
-                                            countries, 
-                                            eci_type, 
-                                            eci_indicators, 
-                                            dependent_var, 
-                                            colors=colors, 
-                                            income_colors=income_colors, 
-                                            marker_kwargs=None, 
-                                            ncols=1, 
-                                            figsize=(7,7), 
-                                            arrow_style=None, 
-                                            arrow_kwargs=None,
+            data = data.copy(deep=True)
+        entities = data.index.get_level_values(entity_col).unique().tolist()
+        plot_countries_ecis_indicator_scatter(data=data, 
+                                            entities=entities, 
+                                            x_vars_cols=x_vars_cols,
+                                            y_var_col=y_var_col,
+                                            name_tag=name_tag,
+                                            groups=[group],
+                                            groups_col=groups_col,
+                                            entity_col=entity_col,
+                                            time_col=time_col,
                                             n_steps=1,
+                                            ncols=1,
+                                            year_labels=False,
+                                            colors=colors, 
+                                            groups_colors=groups_colors,
+                                            figsize=figsize, 
+                                            arrows=False,
+                                            arrow_style=None,
+                                            arrow_kwargs=None,
+                                            set_arrows_ax_limits=False,
+                                            marker_kwargs=marker_kwargs,
                                             axes=axes.flat[n::ncols]
                                               )
-    axes = adjust_axes_lims(axes, mode='rows', x=True, y=True)
+    axes = adjust_axes_lims(axes, **adjust_axes_lims_kwargs)
     return axes
 
 def get_regression_predictions(data: DataFrame, regression_coeffs: DataFrame, groups: List[str],
