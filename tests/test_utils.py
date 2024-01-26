@@ -22,6 +22,7 @@ from mitools.utils import (
     build_dir_tree,
     can_convert_to,
     check_symmetrical_matrix,
+    clean_str,
     dict_from_kwargs,
     display_env_variables,
     find_str_line_number_in_text,
@@ -603,6 +604,25 @@ class TestBuildDirTree(unittest.TestCase):
         self.assertEqual(len(tree.all_nodes()), len(self.tree.all_nodes()))
         self.assertTrue(any(node.tag == 'sub_dir' for node in tree.all_nodes()))
         self.assertTrue(any(node.tag == 'file.txt' for node in tree.all_nodes()))
+
+class TestCleanStr(unittest.TestCase):
+    def test_clean_str_no_pattern(self):
+        string = "Hello, World!"
+        result = clean_str(string, None)
+        self.assertEqual(result, string)
+
+    def test_clean_str_with_pattern(self):
+        string = "Hello, World!"
+        pattern = ","
+        result = clean_str(string, pattern)
+        self.assertEqual(result, "Hello World!")
+
+    def test_clean_str_with_pattern_and_sub_char(self):
+        string = "Hello, World!"
+        pattern = ","
+        sub_char = ";"
+        result = clean_str(string, pattern, sub_char)
+        self.assertEqual(result, "Hello; World!")
 
 
 if __name__ == '__main__':

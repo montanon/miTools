@@ -1,6 +1,9 @@
+import functools
 import random
+import re
 import statistics
 from string import ascii_uppercase, digits
+from typing import Dict, List, Optional, Tuple, Union
 
 import matplotlib.lines as mlines
 import matplotlib.patches as mpatches
@@ -8,9 +11,17 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+import statsmodels.formula.api as smf
+from matplotlib.axes import Axes
 from matplotlib.patches import ArrowStyle, FancyArrowPatch
+from numpy import ndarray
+from pandas import DataFrame, MultiIndex, Series
+from statsmodels.regression.linear_model import RegressionResultsWrapper
 
-from ..utils import stretch_string
+from ..economic_complexity import StringMapper
+from ..pandas import idxslice
+from ..regressions import generate_hash_from_dataframe
+from ..utils import clean_str, stretch_string
 from .objects import Product, ProductsBasket
 
 
@@ -240,30 +251,49 @@ def is_ax_empty(ax):
 def custom_agg_rca(group, n=5):
     return 1.0 if group.sum() >= n else 0.0
 
-def adjust_axes_lims(axes, x=True, y=True):
-    if not (x and y):
-        return axes
-    if x:
-        xlim_min, xlim_max = float('inf'), float('-inf')
-    if y:
-        ylim_min, ylim_max = float('inf'), float('-inf')
-    for ax in axes.flat:
+def get_axes_limits(axes, get_lim_func):
+    lim_min, lim_max = float('inf'), float('-inf')
+    for ax in axes:
         if not is_ax_empty(ax):
-            if x:
-                x_min, x_max = ax.get_xlim()
-                xlim_min, xlim_max = min(x_min, xlim_min), max(x_max, xlim_max)
-            if y:
-                y_min, y_max = ax.get_ylim()
-                ylim_min, ylim_max = min(y_min, ylim_min), max(y_max, ylim_max)
-    for ax in axes.flat:
+            lim1, lim2 = get_lim_func(ax)
+            lim_min, lim_max = min(lim1, lim_min), max(lim2, lim_max)
+    return lim_min, lim_max
+
+def set_axes_limits(axes, set_lim_func, lim_min, lim_max):
+    for ax in axes:
+        set_lim_func(ax, (lim_min, lim_max))
+
+def adjust_axes_lims(axes, mode='all', x=True, y=True):
+    if not (x or y):
+        return axes
+    nrows, ncols = axes.shape
+    if mode == 'all':
         if x:
-            ax.set_xlim(xlim_min, xlim_max)
+            xlim_min, xlim_max = get_axes_limits(axes.flat, lambda ax: ax.get_xlim())
+            set_axes_limits(axes.flat, lambda ax, lim: ax.set_xlim(*lim), xlim_min, xlim_max)
         if y:
-            ax.set_ylim(ylim_min, ylim_max)
+            ylim_min, ylim_max = get_axes_limits(axes.flat, lambda ax: ax.get_ylim())
+            set_axes_limits(axes.flat, lambda ax, lim: ax.set_ylim(*lim), ylim_min, ylim_max)
+    elif mode == 'rows':
+        for i in range(nrows):
+            if x:
+                xlim_min, xlim_max = get_axes_limits(axes[i, :], lambda ax: ax.get_xlim())
+                set_axes_limits(axes[i, :], lambda ax, lim: ax.set_xlim(*lim), xlim_min, xlim_max)
+            if y:
+                ylim_min, ylim_max = get_axes_limits(axes[i, :], lambda ax: ax.get_ylim())
+                set_axes_limits(axes[i, :], lambda ax, lim: ax.set_ylim(*lim), ylim_min, ylim_max)
+    elif mode == 'columns':
+        for j in range(ncols):
+            if x:
+                xlim_min, xlim_max = get_axes_limits(axes[:, j], lambda ax: ax.get_xlim())
+                set_axes_limits(axes[:, j], lambda ax, lim: ax.set_xlim(*lim), xlim_min, xlim_max)
+            if y:
+                ylim_min, ylim_max = get_axes_limits(axes[:, j], lambda ax: ax.get_ylim())
+                set_axes_limits(axes[:, j], lambda ax, lim: ax.set_ylim(*lim), ylim_min, ylim_max)
     return axes
 
 def plot_country_eci_indicator_scatter(country_data, x_col, y_col, color=None, income_colors=None, marker_kwargs=None, ax=None, 
-                               arrows=True, year_labels=True, figsize=(9, 9), arrow_style=None, arrow_kwargs=None):
+                               arrows=True, year_labels=True, figsize=(9, 9), arrow_style=None, arrow_kwargs=None, n_steps=1):
     
     if ax is None:
         _, ax = plt.subplots(1, figsize=figsize)
@@ -274,25 +304,29 @@ def plot_country_eci_indicator_scatter(country_data, x_col, y_col, color=None, i
     if arrow_kwargs is None:
         arrow_kwargs = dict(connectionstyle='arc3', color='grey', linewidth=1, linestyle=':', alpha=0.75)
 
-    years = country_data.index.get_level_values('Year')
-    income_levels = country_data.index.get_level_values('Income Group')
-    for income_level in income_levels.unique():
-        ax.plot(country_data.loc[pd.IndexSlice[:,:,income_level,:,:], x_col].values, 
-                country_data.loc[pd.IndexSlice[:,:,income_level,:,:], y_col].values, 
+    years = country_data.index.get_level_values('Year')[::n_steps]
+    steps_index = country_data.index[::n_steps]
+    income_levels = ['Low income', 'Lower middle income', 'Upper middle income', 'High income']
+    income_levels = [level for level in income_levels if level in country_data.loc[steps_index, :].index.get_level_values('Income Group')]
+    for income_level in income_levels:
+        ax.plot(country_data.loc[steps_index, :].loc[pd.IndexSlice[:,:,income_level,:,:], x_col].values, 
+                country_data.loc[steps_index, :].loc[pd.IndexSlice[:,:,income_level,:,:], y_col].values, 
                 marker=marker_kwargs['marker'], 
                 markeredgecolor=color if color else 'k', 
                 markeredgewidth=marker_kwargs['markeredgewidth'], 
                 markerfacecolor=income_colors[income_level] if income_colors else 'white', 
                 markersize=marker_kwargs['markersize'], 
-                linestyle=''
+                linestyle='',
+                alpha=0.75
                 )
         
     x_lims = ax.get_xlim()
     y_lims = ax.get_ylim()
+
+    x = country_data[x_col].values[::n_steps]
+    y = country_data[y_col].values[::n_steps]
         
     if arrows:
-        x = country_data[x_col].values
-        y = country_data[y_col].values
         for i in range(len(x) - 1):
             try:
                 arrow = FancyArrowPatch((x[i], y[i]), (x[i+1], y[i+1]),
@@ -321,7 +355,7 @@ def plot_country_eci_indicator_scatter(country_data, x_col, y_col, color=None, i
 
 def plot_country_ecis_indicator_scatter(data, x_cols, y_col, colors, income_colors=None, marker_kwargs=None, ncols=3, 
                                 figsize=(7,7), arrows=True, arrow_style=None, arrow_kwargs=None, year_labels=True, 
-                                axes=None):
+                                axes=None, n_steps=1):
     
     country = data.index.get_level_values('Country').unique()[0]
     nrows = (len(x_cols) + 1) // ncols
@@ -339,7 +373,8 @@ def plot_country_ecis_indicator_scatter(data, x_cols, y_col, colors, income_colo
                                         arrows=arrows,
                                         year_labels=year_labels,
                                         arrow_style=arrow_style,
-                                        arrow_kwargs=arrow_kwargs
+                                        arrow_kwargs=arrow_kwargs,
+                                        n_steps=n_steps
                                                 )
     axes.flat[0].figure.suptitle(f"{country} {x_type}s vs {y_col} Evolution", 
                  fontsize=24, 
@@ -349,7 +384,7 @@ def plot_country_ecis_indicator_scatter(data, x_cols, y_col, colors, income_colo
                                  )
     
     last_ax = axes.flat[-1]
-    if last_ax.get_legend() is None and income_colors is not None:  # Check if last_ax is empty
+    if is_axes_empty(last_ax) and income_colors is not None:  # Check if last_ax is empty
         last_ax.cla()
         last_ax.set_xticks([])  # Remove x-axis ticks
         last_ax.set_yticks([])  # Remove y-axis ticks
@@ -361,9 +396,22 @@ def plot_country_ecis_indicator_scatter(data, x_cols, y_col, colors, income_colo
 
     return axes
 
+def is_axes_empty(ax: Axes):
+    return (len(ax.get_lines()) == 0 and
+            len(ax.patches) == 0 and
+            len(ax.texts) == 0 and
+            ax.get_legend() is None and
+            not ax.get_xlabel() and
+            not ax.get_ylabel())
+
 def plot_countries_ecis_indicator_scatter(data, countries, eci_type, x_cols, y_col, colors=None, income_colors=None, 
-                                          marker_kwargs=None, ncols=3, figsize=(7,7), arrow_style=None, arrow_kwargs=None):
-    axes = None
+                                          marker_kwargs=None, ncols=3, figsize=(7,7), arrow_style=None, arrow_kwargs=None,
+                                          n_steps=1, axes=None):
+    
+    nrows = (len(x_cols) + 1) // ncols
+    if axes is None:
+        _, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(figsize[0]*ncols, figsize[1]*nrows))
+
     for country in countries:
         country_data = data.query('Country == @country')
         axes = plot_country_ecis_indicator_scatter(data=country_data, 
@@ -378,9 +426,175 @@ def plot_countries_ecis_indicator_scatter(data, countries, eci_type, x_cols, y_c
                                                    arrow_style=arrow_style,
                                                    arrow_kwargs=arrow_kwargs,
                                                    year_labels=False,
-                                                   axes=axes
+                                                   axes=axes,
+                                                   n_steps=n_steps
                                                    )
     axes.flat[0].figure.suptitle(f'Countries {eci_type} vs {y_col}', fontsize=22, y=0.9, 
                     verticalalignment='bottom', 
                     horizontalalignment='center')
+    return axes
+
+def prepare_regression_data(data: DataFrame, y_var: str, x_vars: List[str], 
+                            str_mapper: StringMapper, control_vars: Optional[List[str]]=None,
+                            ) -> Tuple[DataFrame, str, List[str], List[str]]:
+    if control_vars is None:
+        control_vars = []
+    regression_data = data.loc[:, [y_var, *x_vars, *control_vars]].copy(deep=True)
+    regression_data.columns = [str_mapper.uglify_str(var) for var in regression_data.columns]
+    y_var = str_mapper.uglify_str(y_var)
+    x_vars = [str_mapper.uglify_str(var) for var in x_vars]
+    control_vars = [str_mapper.uglify_str(var) for var in control_vars]
+    return regression_data, y_var, x_vars, control_vars
+    
+def get_quantile_regression_results(data: DataFrame, y_var: str, x_vars: List[str], 
+                                    control_vars: Optional[List[str]]=None, 
+                                    quadratic=False, quantiles: Optional[List[float]]=None, 
+                                    max_iter: Optional[int]=2_500) -> Tuple[DataFrame, Dict]:
+    if quantiles is None:
+        quantiles = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+    formula_terms = x_vars.copy()
+    if quadratic:
+        formula_terms += [f"I({var} ** 2)" for var in formula_terms]
+    if control_vars: 
+        formula_terms += control_vars
+    formula = f"{y_var} ~ " + " + ".join(formula_terms)
+    results = {q: smf.quantreg(formula, data).fit(q=q, max_iter=max_iter) for q in quantiles}
+    return results
+
+def add_significance2(row: Series) -> Series:
+    coeff = round(row['coeff'], 5)
+    t_value = round(row['t-value'], 5)
+    p_value = row['p-value']
+    if p_value < 0.001:
+        return f"{coeff}({t_value})***"
+    elif p_value < 0.01:
+        return f"{coeff}({t_value})**"
+    elif p_value < 0.05:
+        return f"{coeff}({t_value})*"
+    else:
+        return f"{coeff}({t_value})"
+    
+def get_quantile_regression_results_coeffs(results: Dict[int, RegressionResultsWrapper], x_vars: List[str]) -> DataFrame:
+    _col_name_map = {
+        'Unnamed: 0': 'Var',
+        'coef': 'coeff',
+        'std err': 'Std Err',
+        't': 't-value',
+        'P>|t|': 'p-value',
+    }
+    regression_df = []
+    for q, result in results.items():
+        coeffs = pd.concat(pd.read_html(results[q].summary().tables[1].as_html(), header=0))
+        coeffs = coeffs.rename(columns={col: _col_name_map.get(col, col) for col in coeffs.columns})
+        coeffs = coeffs.set_index('Var')
+        coeffs['Value'] = coeffs[['coeff', 't-value', 'p-value']].apply(add_significance2, axis=1)
+        coeffs = coeffs[['Value']]
+        coeffs.columns = pd.MultiIndex.from_tuples([(str(q), c) for c in coeffs.columns])
+        regression_df.append(coeffs)
+    regression_df = pd.concat(regression_df, axis=1)
+    regression_df = regression_df.reset_index().melt(id_vars='Var', var_name=['Quantile'], value_name='Value')
+    regression_df.columns = ['Indep Vars', *regression_df.columns[1:]]
+    regression_df['Indep Vars'] = (regression_df['Indep Vars']
+                                   .replace(r'^I\((.*)\)$', r'\1', regex=True)
+                                   .replace('Intercept', '_Intercept')
+                                   )
+    regression_df['Reg Type'] = type(results[q].model).__name__
+    reg_degree = 'quadratic' if all(
+        [f"{var} ** 2" in regression_df['Indep Vars'].values for var in x_vars]
+        ) else 'linear'
+    regression_df['Reg Degree'] = reg_degree
+    regression_df['Dep Var'] = results[q].model.endog_names
+    regression_df['Var Type'] = regression_df['Indep Vars'].apply(
+        lambda x: 'Exog' if x.replace(' ** 2', '') in x_vars else 'Control'
+        )
+    regression_df = regression_df.sort_values(by=['Var Type', 'Indep Vars', 'Quantile'], ascending=[False, True, True])
+    regression_df['Quantile'] = regression_df['Quantile'].astype(float)
+    regression_df = regression_df.set_index(['Reg Type', 'Reg Degree', 'Dep Var', 'Var Type', 'Indep Vars', 'Quantile'])
+    regression_df['Id'] = generate_hash_from_dataframe(regression_df, ['Reg Type', 'Dep Var', 'Indep Vars'])
+    regression_df = regression_df.set_index('Id', append=True)
+    regression_df = regression_df.reorder_levels([regression_df.index.names[-1]] + regression_df.index.names[:-1])
+    regression_stats = results[q].summary().tables[0].as_html()
+    regression_stats = pd.read_html(regression_stats, index_col=0)[0].reset_index()
+    regression_stats = pd.concat(
+        [regression_stats.iloc[:-1, :2], regression_stats.iloc[:, 2:].rename(columns={2: 0, 3: 1})],
+          axis=0, ignore_index=True)
+    regression_stats.columns = ['Stat', 'Value']
+    regression_stats = regression_stats.set_index('Stat')
+
+    return regression_df, regression_stats
+
+def get_quantile_regression_predictions_by_group(regression_data: DataFrame, regression_coeffs: DataFrame, group: str) -> Tuple[DataFrame, DataFrame]:
+    group_data = regression_data.loc[
+        idxslice(regression_data, level='Income Group', value=group, axis=0), :
+        ] if group != 'All income' else regression_data
+    dependent_var = regression_coeffs.index.get_level_values('Dep Var').unique()[0]
+    quantiles = regression_coeffs.index.get_level_values('Quantile').unique()
+    independent_vars = [var for var in regression_coeffs.index.get_level_values('Indep Vars').unique() if var != 'Intercept']
+    x_values = DataFrame({var: np.linspace(group_data[var].min(), group_data[var].max(), 100) for var in independent_vars if ' ** 2' not in var})
+    predictions = []
+    significances = []
+    columns = []
+    for var in independent_vars:
+        quadratic = ' ** 2' in var
+        x_var_values = x_values[var.replace(' ** 2', '')]
+        var_values = [var, 'Intercept'] if not quadratic else [var.replace(' ** 2', ''), var, 'Intercept']
+        vars_idx = idxslice(regression_coeffs, level='Indep Vars', value=var_values, axis=0)
+        var_coeffs = regression_coeffs.loc[vars_idx, :]
+        for quantile in quantiles:
+            quantile_idx = idxslice(var_coeffs, level='Quantile', value=quantile, axis=0)
+            values = var_coeffs.loc[quantile_idx, group].drop_duplicates()
+            values = values.values
+            significance = ','.join([match.group() if match else '-' for match in [re.search(r"\*+$", val) for val in values[:-1]]])
+            coeffs = [float(re.search(r"([-\d.]+)\(", val).group(1)) for val in values]
+            prediction = coeffs[-1] + coeffs[0] * x_var_values
+            if quadratic:
+                prediction += coeffs[1] * x_var_values ** 2
+            predictions.append(prediction)
+            significances.append(significance)
+            columns.append((dependent_var, var, quantile))
+    predictions = DataFrame(predictions, index=MultiIndex.from_tuples(columns)).T
+    significances = DataFrame(significances, index=MultiIndex.from_tuples(columns)).T
+    return predictions, significances, x_values
+
+def prettify_index_level(mapper: StringMapper, pattern: str, level: str, level_name: str, levels_to_remap: List[str]) -> str:
+    if level_name in levels_to_remap:
+        return level.map(lambda x: prettify_with_pattern(x, mapper, pattern))
+    return level
+
+def prettify_with_pattern(string: str, mapper: StringMapper, pattern: str) -> str:
+    base_string, pattern_str, _ = string.partition(pattern)
+    remapped_base = mapper.prettify_str(base_string)
+    return f"{remapped_base}{pattern}" if pattern_str else remapped_base
+
+def plot_income_levels_ecis_indicator_scatter(data, dependent_var, income_levels, eci_type, colors, income_colors, figsize=(9, 7)):
+
+    eci_indicators = [c for c in data.columns if c.endswith(f' {eci_type}')]
+
+    nrows = len(eci_indicators)
+    ncols = len(income_levels)
+    _, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(figsize[0]*ncols, figsize[1]*nrows))
+
+    for n, income_level in enumerate(income_levels):
+
+        if income_level != 'All income':
+            _data = data.loc[pd.IndexSlice[:,:,income_level,:,:], :].copy(deep=True)
+        else:
+            _data = data
+        countries = _data.index.get_level_values('Country').unique().tolist()
+        plot_countries_ecis_indicator_scatter(_data, 
+                                            countries, 
+                                            eci_type, 
+                                            eci_indicators, 
+                                            dependent_var, 
+                                            colors=colors, 
+                                            income_colors=income_colors, 
+                                            marker_kwargs=None, 
+                                            ncols=1, 
+                                            figsize=(7,7), 
+                                            arrow_style=None, 
+                                            arrow_kwargs=None,
+                                            n_steps=1,
+                                            axes=axes.flat[n::ncols]
+                                              )
+    axes = adjust_axes_lims(axes, mode='rows', x=True, y=True)
     return axes

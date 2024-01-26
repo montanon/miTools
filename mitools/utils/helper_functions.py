@@ -115,11 +115,11 @@ def split_strings(str_list: List[str]) -> List[str]:
 
 def add_significance(row: Series) -> Series:
     p_value = float(row.split(' ')[1].replace('(','').replace(')',''))  
-    if p_value < 0.01:
+    if p_value < 0.001:
         return row + "***"
-    elif p_value < 0.05:
+    elif p_value < 0.01:
         return row + "**"
-    elif p_value < 0.1:
+    elif p_value < 0.05:
         return row + "*"
     else:
         return row
@@ -237,3 +237,6 @@ def build_dir_tree(directory: PathLike, tree: Optional[Tree]=None, parent: Optio
         else:
             tree.create_node(item.name, node_id, parent=parent)
     return tree
+
+def clean_str(string: str, pattern: Optional[str], sub_char: Optional[str]='') -> str:
+    return re.sub(rf'{pattern}', sub_char, string)
