@@ -314,7 +314,7 @@ def plot_country_eci_indicator_scatter(country_data: DataFrame,
                                        year_labels: Optional[bool]=True, 
                                        color: Optional[Color]=None, 
                                        groups_colors: Optional[Dict[str, Color]]=None, 
-                                        figsize: Optional[Tuple(int, int)]=(9, 9), 
+                                       figsize: Optional[Tuple(int, int)]=(9, 9), 
                                        arrows: Optional[bool]=True, 
                                        arrow_style: Optional[ArrowStyle]=None, 
                                        arrow_kwargs: Optional[Dict[str, Any]]=None, 
@@ -351,7 +351,8 @@ def plot_country_eci_indicator_scatter(country_data: DataFrame,
     y = country_data[y_var_col].values[::n_steps]
     if arrows:
         for i in range(len(x) - 1):
-            #try:
+            if any([np.isnan(x[i]), np.isnan(x[i+1]), np.isnan(y[i]), np.isnan(y[i+1])]):
+                continue
             arrow = FancyArrowPatch((x[i], y[i]), (x[i+1], y[i+1]),
                                     arrowstyle=arrow_style, 
                                     connectionstyle=arrow_kwargs['connectionstyle'], 
@@ -360,8 +361,6 @@ def plot_country_eci_indicator_scatter(country_data: DataFrame,
                                     linestyle=arrow_kwargs['linestyle'], 
                                     alpha=arrow_kwargs['alpha'])
             ax.add_patch(arrow)
-            #except Exception:
-            #    pass
         if set_arrows_ax_limits:
             ax.set_xlim(x_lims)
             ax.set_ylim(y_lims) 
@@ -380,6 +379,7 @@ def plot_country_ecis_indicator_scatter(country_data: DataFrame,
                                         name_tag: str,
                                         groups: List[str],
                                         groups_col: Optional[str]='Income Group',
+                                        time_col: Optional[str]='Year',
                                         n_steps: Optional[int]=1,
                                         ncols: Optional[int]=3, 
                                         year_labels: Optional[bool]=True, 
@@ -388,7 +388,8 @@ def plot_country_ecis_indicator_scatter(country_data: DataFrame,
                                         figsize: Optional[Tuple(int, int)]=(9, 9), 
                                         arrows: Optional[bool]=True, 
                                         arrow_style: Optional[ArrowStyle]=None, 
-                                        arrow_kwargs: Optional[Dict[str, Any]]=None, 
+                                        arrow_kwargs: Optional[Dict[str, Any]]=None,
+                                        set_arrows_ax_limits: Optional[bool]=True, 
                                         marker_kwargs: Optional[Dict[str, Any]]=None, 
                                         axes: Optional[Axes]=None
                                         ):
@@ -402,6 +403,7 @@ def plot_country_ecis_indicator_scatter(country_data: DataFrame,
                                                 y_var_col=y_var_col,
                                                 groups=groups,
                                                 groups_col=groups_col,
+                                                time_col=time_col,
                                                 n_steps=n_steps,
                                                 year_labels=year_labels,
                                                 color=colors[n] if colors else None,
@@ -410,6 +412,7 @@ def plot_country_ecis_indicator_scatter(country_data: DataFrame,
                                                 arrows=arrows,
                                                 arrow_style=arrow_style,
                                                 arrow_kwargs=arrow_kwargs,
+                                                set_arrows_ax_limits=set_arrows_ax_limits,
                                                 marker_kwargs=marker_kwargs, 
                                                 ax=ax,
                                                 )
