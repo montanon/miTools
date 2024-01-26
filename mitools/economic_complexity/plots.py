@@ -556,6 +556,7 @@ class QuantileRegStrs:
     LINEAR_REG: str = 'linear'
     QUADRATIC_VAR_SUFFIX: str = ' ** 2'
     INDEPENDENT_VARS_PATTERN: str = r'^I\((.*)\)$'
+    STATS: str = 'Stats'
     
 def get_quantile_regression_results_coeffs(results: Dict[int, RegressionResultsWrapper],
                                            independent_variables: List[str]
@@ -623,9 +624,9 @@ def get_quantile_regression_results_stats(results: Dict[int, RegressionResultsWr
         stats = pd.concat(
             [stats.iloc[:-1, :2], stats.iloc[:, 2:].rename(columns={2: 0, 3: 1})],
             axis=0, ignore_index=True)
-        stats.columns = ['Stat', 'Value']
-        stats['Quantile'] = q
-        stats = stats.set_index(['Quantile', 'Stat'])
+        stats.columns = [QuantileRegStrs.STATS, QuantileRegStrs.VALUE]
+        stats[QuantileRegStrs.Quantile] = q
+        stats = stats.set_index([QuantileRegStrs.QUANTILE, QuantileRegStrs.STATS])
         regression_stats.append(stats)
     regression_stats = pd.concat(regression_stats, axis=0)
     return regression_stats
