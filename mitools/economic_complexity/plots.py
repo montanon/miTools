@@ -378,6 +378,7 @@ def plot_country_ecis_indicator_scatter(country_data: DataFrame,
                                         y_var_col: str,
                                         name_tag: str,
                                         groups: List[str],
+                                        entity_col: Optional[str]='Country',
                                         groups_col: Optional[str]='Income Group',
                                         time_col: Optional[str]='Year',
                                         n_steps: Optional[int]=1,
@@ -393,7 +394,7 @@ def plot_country_ecis_indicator_scatter(country_data: DataFrame,
                                         marker_kwargs: Optional[Dict[str, Any]]=None, 
                                         axes: Optional[Axes]=None
                                         ):
-    country = country_data.index.get_level_values('Country').unique()[0]
+    entity = country_data.index.get_level_values(entity_col).unique()[0]
     nrows = (len(x_vars_cols) + 1) // ncols
     if axes is None:
         _, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(figsize[0]*ncols, figsize[1]*nrows))
@@ -416,7 +417,7 @@ def plot_country_ecis_indicator_scatter(country_data: DataFrame,
                                                 marker_kwargs=marker_kwargs, 
                                                 ax=ax,
                                                 )
-    axes.flat[0].figure.suptitle(f"{country} {name_tag}s vs {y_var_col} Evolution", 
+    axes.flat[0].figure.suptitle(f"{entity} {name_tag}s vs {y_var_col} Evolution", 
                  fontsize=24, 
                  y=0.925, 
                  verticalalignment='bottom', 
