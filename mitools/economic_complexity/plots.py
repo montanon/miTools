@@ -676,7 +676,9 @@ def get_quantile_regression_predictions_by_group(regression_data: DataFrame,
         for quantile in quantiles:
             quantile_idx = idxslice(var_coeffs, level=QuantileRegStrs.QUANTILE, value=quantile, axis=0)
             values = var_coeffs.loc[quantile_idx, group].values
-            significance = ','.join([match.group() if match else '-' for match in [re.search(r"\*+$", val) for val in values[:-1]]])
+            significance = ','.join(
+                [match.group() if match else '-' for match in [re.search(r"\*+$", val) for val in values[:-1]]]
+                )
             coeffs = [float(re.search(r"([-\d.]+)\(", val).group(1)) for val in values]
             prediction = get_prediction(x_var_values, coeffs, quadratic)
 
@@ -688,7 +690,8 @@ def get_quantile_regression_predictions_by_group(regression_data: DataFrame,
     significances = DataFrame(significances, index=MultiIndex.from_tuples(columns)).T
     return predictions, significances, x_values
 
-def prettify_index_level(mapper: StringMapper, pattern: str, level: str, level_name: str, levels_to_remap: List[str]) -> str:
+def prettify_index_level(mapper: StringMapper, pattern: str, level: str, level_name: str, 
+                         levels_to_remap: List[str]) -> str:
     if level_name in levels_to_remap:
         return level.map(lambda x: prettify_with_pattern(x, mapper, pattern))
     return level
