@@ -296,9 +296,22 @@ def adjust_axes_lims(axes, mode='all', x=True, y=True):
                 set_axes_limits(axes[:, j], lambda ax, lim: ax.set_ylim(*lim), ylim_min, ylim_max)
     return axes
 
-def plot_country_eci_indicator_scatter(country_data, x_col, y_col, color=None, income_colors=None, marker_kwargs=None, ax=None, 
-                               arrows=True, year_labels=True, figsize=(9, 9), arrow_style=None, arrow_kwargs=None, n_steps=1):
-    
+def plot_country_eci_indicator_scatter(country_data: DataFrame, 
+                                       x_var_col: str, 
+                                       y_var_col: str, 
+                                       groups: List[str],
+                                       groups_col: Optional[str]='Income Group',
+                                       n_steps: Optional[int]=1,
+                                       year_labels: Optional[bool]=True, 
+                                       color: Optional[Color]=None, 
+                                       groups_colors: Optional[Dict[str, Color]]=None, 
+                                       figsize: Optional[Tuple(int, int)]=(9, 9), 
+                                       arrows: Optional[bool]=True, 
+                                       arrow_style: Optional[ArrowStyle]=None, 
+                                       arrow_kwargs: Optional[Dict[str, Any]]=None, 
+                                       marker_kwargs: Optional[Dict[str, Any]]=None, 
+                                       ax: Optional[Axes]=None
+                                       ):
     if ax is None:
         _, ax = plt.subplots(1, figsize=figsize)
     if marker_kwargs is None:
@@ -307,97 +320,103 @@ def plot_country_eci_indicator_scatter(country_data, x_col, y_col, color=None, i
         arrow_style = ArrowStyle("Fancy", head_length=10, head_width=5, tail_width=.4)
     if arrow_kwargs is None:
         arrow_kwargs = dict(connectionstyle='arc3', color='grey', linewidth=1, linestyle=':', alpha=0.75)
-
     years = country_data.index.get_level_values('Year')[::n_steps]
     steps_index = country_data.index[::n_steps]
-    income_levels = ['Low income', 'Lower middle income', 'Upper middle income', 'High income']
-    income_levels = [level for level in income_levels if level in country_data.loc[steps_index, :].index.get_level_values('Income Group')]
-    for income_level in income_levels:
-        ax.plot(country_data.loc[steps_index, :].loc[pd.IndexSlice[:,:,income_level,:,:], x_col].values, 
-                country_data.loc[steps_index, :].loc[pd.IndexSlice[:,:,income_level,:,:], y_col].values, 
-                marker=marker_kwargs['marker'], 
-                markeredgecolor=color if color else 'k', 
-                markeredgewidth=marker_kwargs['markeredgewidth'], 
-                markerfacecolor=income_colors[income_level] if income_colors else 'white', 
-                markersize=marker_kwargs['markersize'], 
+    groups = [level for level in groups if level in country_data.loc[steps_index, :].index.get_level_values(groups_col)]
+    for group in groups:
+        group_idxslice = idxslice(country_data, level=groups_col, value=group, axis=0)
+        ax.plot(country_data.loc[steps_index, :].loc[group_idxslice, x_var_col].values, 
+                country_data.loc[steps_index, :].loc[group_idxslice, y_var_col].values, 
+                markeredgecolor=color if color else 'k',
+                markerfacecolor=groups_colors[group] if groups_colors else 'white', 
+                marker=marker_kwargs['marker'],
+                markeredgewidth=marker_kwargs['markeredgewidth'],
+                markersize=marker_kwargs['markersize'],
                 linestyle='',
                 alpha=0.75
                 )
-        
     x_lims = ax.get_xlim()
     y_lims = ax.get_ylim()
-
-    x = country_data[x_col].values[::n_steps]
-    y = country_data[y_col].values[::n_steps]
-        
+    x = country_data[x_var_col].values[::n_steps]
+    y = country_data[y_var_col].values[::n_steps]
     if arrows:
         for i in range(len(x) - 1):
-            try:
-                arrow = FancyArrowPatch((x[i], y[i]), (x[i+1], y[i+1]),
-                                        arrowstyle=arrow_style, 
-                                        connectionstyle=arrow_kwargs['connectionstyle'], 
-                                        color=arrow_kwargs['color'], 
-                                        linewidth=arrow_kwargs['linewidth'], 
-                                        linestyle=arrow_kwargs['linestyle'], 
-                                        alpha=arrow_kwargs['alpha'])
-                ax.add_patch(arrow)
-            except Exception:
-                pass
+            #try:
+            arrow = FancyArrowPatch((x[i], y[i]), (x[i+1], y[i+1]),
+                                    arrowstyle=arrow_style, 
+                                    connectionstyle=arrow_kwargs['connectionstyle'], 
+                                    color=arrow_kwargs['color'], 
+                                    linewidth=arrow_kwargs['linewidth'], 
+                                    linestyle=arrow_kwargs['linestyle'], 
+                                    alpha=arrow_kwargs['alpha'])
+            ax.add_patch(arrow)
+            #except Exception:
+            #    pass
         #ax.set_xlim(x_lims)
         #ax.set_ylim(y_lims)    
-    
     if year_labels:
         offset = 0.01 * (y_lims[1] - y_lims[0])  # Offset for annotation so it doesn't sit right on the point
         for xi, yi, year in zip(x, y, years):
             ax.annotate(str(year), (xi, yi - offset), textcoords="offset points", xytext=(0, -10), ha='center', 
                         fontsize=marker_kwargs['label_fontsize'])
-            
-    ax.set_ylabel(y_col)
-    ax.set_xlabel(x_col)
-
+    ax.set_ylabel(y_var_col)
+    ax.set_xlabel(x_var_col)
     return ax
 
-def plot_country_ecis_indicator_scatter(data, x_cols, y_col, colors, income_colors=None, marker_kwargs=None, ncols=3, 
-                                figsize=(7,7), arrows=True, arrow_style=None, arrow_kwargs=None, year_labels=True, 
-                                axes=None, n_steps=1):
-    
-    country = data.index.get_level_values('Country').unique()[0]
-    nrows = (len(x_cols) + 1) // ncols
-    x_type = x_cols[0].split(' ')[-1]
+def plot_country_ecis_indicator_scatter(country_data: DataFrame,
+                                        x_vars_cols: List[str],
+                                        y_var_col: str,
+                                        name_tag: str,
+                                        groups: List[str],
+                                        groups_col: Optional[str]='Income Group',
+                                        n_steps: Optional[int]=1,
+                                        ncols: Optional[int]=3, 
+                                        year_labels: Optional[bool]=True, 
+                                        colors: Optional[List[Color]]=None,
+                                        groups_colors: Optional[Dict[str, Color]]=None, 
+                                        figsize: Optional[Tuple(int, int)]=(9, 9), 
+                                        arrows: Optional[bool]=True, 
+                                        arrow_style: Optional[ArrowStyle]=None, 
+                                        arrow_kwargs: Optional[Dict[str, Any]]=None, 
+                                        marker_kwargs: Optional[Dict[str, Any]]=None, 
+                                        axes: Optional[Axes]=None
+                                        ):
+    country = country_data.index.get_level_values('Country').unique()[0]
+    nrows = (len(x_vars_cols) + 1) // ncols
     if axes is None:
         _, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(figsize[0]*ncols, figsize[1]*nrows))
-    for ax, x_col in zip(axes.flat, x_cols):
-        ax = plot_country_eci_indicator_scatter(data, 
-                                        x_col, 
-                                        y_col, 
-                                        color=colors[x_col.replace(f' {x_type}', '')],
-                                        income_colors=income_colors,
-                                        marker_kwargs=marker_kwargs, 
-                                        ax=ax,
-                                        arrows=arrows,
-                                        year_labels=year_labels,
-                                        arrow_style=arrow_style,
-                                        arrow_kwargs=arrow_kwargs,
-                                        n_steps=n_steps
+    for ax, x_var_col in zip(axes.flat, x_vars_cols):
+        ax = plot_country_eci_indicator_scatter(country_data=country_data, 
+                                                x_var_col=x_var_col, 
+                                                y_var_col=y_var_col,
+                                                groups=groups,
+                                                groups_col=groups_col,
+                                                n_steps=n_steps,
+                                                year_labels=year_labels,
+                                                color=colors[x_var_col.replace(f' {name_tag}', '')], # TODO: FIX
+                                                groups_colors=groups_colors,
+                                                figsize=figsize,
+                                                arrows=arrows,
+                                                arrow_style=arrow_style,
+                                                arrow_kwargs=arrow_kwargs,
+                                                marker_kwargs=marker_kwargs, 
+                                                ax=ax,
                                                 )
-    axes.flat[0].figure.suptitle(f"{country} {x_type}s vs {y_col} Evolution", 
+    axes.flat[0].figure.suptitle(f"{country} {name_tag}s vs {y_var_col} Evolution", 
                  fontsize=24, 
                  y=0.925, 
                  verticalalignment='bottom', 
                  horizontalalignment='center'
                                  )
-    
     last_ax = axes.flat[-1]
-    if is_axes_empty(last_ax) and income_colors is not None:  # Check if last_ax is empty
+    if is_axes_empty(last_ax) and groups_colors is not None:  # Check if last_ax is empty
         last_ax.cla()
         last_ax.set_xticks([])  # Remove x-axis ticks
         last_ax.set_yticks([])  # Remove y-axis ticks
         last_ax.axis('off') 
-
         legend_handles = [mlines.Line2D([], [], color=color, marker='o', linestyle='None',
-                                        markersize=10, markeredgecolor='k', label=label) for label, color in income_colors.items()]
+                                        markersize=10, markeredgecolor='k', label=label) for label, color in groups_colors.items()]
         last_ax.legend(handles=legend_handles, fontsize=16, loc='center left', ncols=1)
-
     return axes
 
 def is_axes_empty(ax: Axes):
