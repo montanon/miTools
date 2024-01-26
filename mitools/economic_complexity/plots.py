@@ -557,6 +557,7 @@ class QuantileRegStrs:
     QUADRATIC_VAR_SUFFIX: str = ' ** 2'
     INDEPENDENT_VARS_PATTERN: str = r'^I\((.*)\)$'
     STATS: str = 'Stats'
+    INTERCEPT: str = 'Intercept'
 
 def process_quantile_regression_result(q: float, result: RegressionResultsWrapper) -> DataFrame:
     coeffs = pd.concat(pd.read_html(result.summary().tables[1].as_html(), header=0))
@@ -633,37 +634,56 @@ def get_quantile_regression_results_stats(results: Dict[int, RegressionResultsWr
     regression_stats = pd.concat(regression_stats, axis=0)
     return regression_stats
 
+def get_group_data(regression_data: DataFrame, group: str, group_col: str, all_groups: str) -> DataFrame:
+    if group != all_groups:
+        return regression_data.loc[regression_data.index.get_level_values(group_col) == group]
+    return regression_data
+
+def prepare_x_values(group_data: DataFrame, independent_vars: List[str]) -> DataFrame:
+    return DataFrame({
+        var: np.linspace(group_data[var].min(), group_data[var].max(), 100)
+        for var in independent_vars if QuantileRegStrs.QUADRATIC_VAR_SUFFIX not in var
+    })
+
+def get_prediction(x_values: Series, coeffs: List[float], quadratic: bool) -> float:
+    prediction = coeffs[-1] + coeffs[0] * x_values
+    if quadratic:
+        prediction += coeffs[1] * x_values ** 2
+    return prediction
+
 def get_quantile_regression_predictions_by_group(regression_data: DataFrame, 
                                                  regression_coeffs: DataFrame, 
-                                                 group: str) -> Tuple[DataFrame, DataFrame]:
-    group_data = regression_data.loc[
-        idxslice(regression_data, level='Income Group', value=group, axis=0), :
-        ] if group != 'All income' else regression_data
-    dependent_var = regression_coeffs.index.get_level_values('Dep Var').unique()[0]
-    quantiles = regression_coeffs.index.get_level_values('Quantile').unique()
-    independent_vars = [var for var in regression_coeffs.index.get_level_values('Indep Vars').unique() if var != 'Intercept']
-    x_values = DataFrame({var: np.linspace(group_data[var].min(), group_data[var].max(), 100) for var in independent_vars if ' ** 2' not in var})
-    predictions = []
-    significances = []
-    columns = []
+                                                 group: str,
+                                                 group_col: str,
+                                                 all_groups: str) -> Tuple[DataFrame, DataFrame]:
+    group_data = get_group_data(regression_data, group, group_col, all_groups)
+    dependent_var = regression_coeffs.index.get_level_values(QuantileRegStrs.DEPENDENT_VAR).unique()[0]
+    quantiles = regression_coeffs.index.get_level_values(QuantileRegStrs.QUANTILE).unique()
+    independent_vars = [var for var in regression_coeffs.index.get_level_values(
+        QuantileRegStrs.INDEPENDENT_VARS).unique() if var != QuantileRegStrs.INTERCEPT]
+    x_values = prepare_x_values(group_data, independent_vars)
+
+    predictions, significances, columns = [], [], []
     for var in independent_vars:
-        quadratic = ' ** 2' in var
-        x_var_values = x_values[var.replace(' ** 2', '')]
-        var_values = [var, 'Intercept'] if not quadratic else [var.replace(' ** 2', ''), var, 'Intercept']
-        vars_idx = idxslice(regression_coeffs, level='Indep Vars', value=var_values, axis=0)
+        quadratic = QuantileRegStrs.QUADRATIC_VAR_SUFFIX in var
+        x_var_values = x_values[var.replace(QuantileRegStrs.QUADRATIC_VAR_SUFFIX, '')]
+        var_values = [
+            var, QuantileRegStrs.INTERCEPT] if not quadratic else [
+                var.replace(QuantileRegStrs.QUADRATIC_VAR_SUFFIX, ''), var, QuantileRegStrs.INTERCEPT]
+        vars_idx = idxslice(regression_coeffs, level=QuantileRegStrs.INDEPENDENT_VARS, value=var_values, axis=0)
         var_coeffs = regression_coeffs.loc[vars_idx, :]
+
         for quantile in quantiles:
-            quantile_idx = idxslice(var_coeffs, level='Quantile', value=quantile, axis=0)
-            values = var_coeffs.loc[quantile_idx, group].drop_duplicates()
-            values = values.values
+            quantile_idx = idxslice(var_coeffs, level=QuantileRegStrs.QUANTILE, value=quantile, axis=0)
+            values = var_coeffs.loc[quantile_idx, group].values
             significance = ','.join([match.group() if match else '-' for match in [re.search(r"\*+$", val) for val in values[:-1]]])
             coeffs = [float(re.search(r"([-\d.]+)\(", val).group(1)) for val in values]
-            prediction = coeffs[-1] + coeffs[0] * x_var_values
-            if quadratic:
-                prediction += coeffs[1] * x_var_values ** 2
+            prediction = get_prediction(x_var_values, coeffs, quadratic)
+
             predictions.append(prediction)
             significances.append(significance)
             columns.append((dependent_var, var, quantile))
+
     predictions = DataFrame(predictions, index=MultiIndex.from_tuples(columns)).T
     significances = DataFrame(significances, index=MultiIndex.from_tuples(columns)).T
     return predictions, significances, x_values
