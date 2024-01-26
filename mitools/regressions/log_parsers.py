@@ -591,10 +591,10 @@ def print_duplicated_indices(df):
     for idx in duplicated:
         print(idx)
 
-def generate_hash_from_dataframe(df):
-    dep_var = df.index.get_level_values('Dep Var').unique()[0]
-    indep_vars = ' '.join(df.index.get_level_values('Indep Var').unique())
-    variables = ' '.join(df.index.get_level_values('Variable').unique())
+def generate_hash_from_dataframe(df, index_levels: List[str], length: Optional[int]=6):
+    str_to_hash = ''
+    for level in index_levels:
+        str_to_hash += ' '.join(df.index.get_level_values(level).unique())
     hasher = hashlib.md5()
-    hasher.update(rf'{dep_var} {indep_vars} {variables}'.encode('utf-8'))
-    return hasher.hexdigest()[:6]
+    hasher.update(rf'{str_to_hash}'.encode('utf-8'))
+    return hasher.hexdigest()[:length]
