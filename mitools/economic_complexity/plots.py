@@ -314,7 +314,7 @@ def plot_country_eci_indicator_scatter(country_data: DataFrame,
                                        year_labels: Optional[bool]=True, 
                                        color: Optional[Color]=None, 
                                        groups_colors: Optional[Dict[str, Color]]=None, 
-                                       figsize: Optional[Tuple(int, int)]=(9, 9), 
+                                       figsize: Optional[Tuple(float, float)]=(9, 9), 
                                        arrows: Optional[bool]=True, 
                                        arrow_style: Optional[ArrowStyle]=None, 
                                        arrow_kwargs: Optional[Dict[str, Any]]=None, 
@@ -378,15 +378,15 @@ def plot_country_ecis_indicator_scatter(country_data: DataFrame,
                                         y_var_col: str,
                                         name_tag: str,
                                         groups: List[str],
-                                        entity_col: Optional[str]='Country',
                                         groups_col: Optional[str]='Income Group',
+                                        entity_col: Optional[str]='Country',
                                         time_col: Optional[str]='Year',
                                         n_steps: Optional[int]=1,
                                         ncols: Optional[int]=3, 
                                         year_labels: Optional[bool]=True, 
                                         colors: Optional[List[Color]]=None,
                                         groups_colors: Optional[Dict[str, Color]]=None, 
-                                        figsize: Optional[Tuple(int, int)]=(9, 9), 
+                                        figsize: Optional[Tuple(float, float)]=(9, 9), 
                                         arrows: Optional[bool]=True, 
                                         arrow_style: Optional[ArrowStyle]=None, 
                                         arrow_kwargs: Optional[Dict[str, Any]]=None,
@@ -434,32 +434,55 @@ def plot_country_ecis_indicator_scatter(country_data: DataFrame,
         last_ax.legend(handles=legend_handles, fontsize=16, loc='center left', ncols=1)
     return axes
 
-def plot_countries_ecis_indicator_scatter(data, countries, eci_type, x_cols, y_col, colors=None, income_colors=None, 
-                                          marker_kwargs=None, ncols=3, figsize=(7,7), arrow_style=None, arrow_kwargs=None,
-                                          n_steps=1, axes=None):
-    
-    nrows = (len(x_cols) + 1) // ncols
+def plot_countries_ecis_indicator_scatter(data: DataFrame, 
+                                          entities: List[str], 
+                                          x_vars_cols: List[str], 
+                                          y_var_col: str, 
+                                          name_tag: str,
+                                          groups: List[str],
+                                          groups_col: Optional[str]='Income Group',
+                                          entity_col: Optional[str]='Country',
+                                          time_col: Optional[str]='Year', 
+                                          n_steps: Optional[int]=1, 
+                                          ncols: Optional[int]=3,
+                                          year_labels: Optional[bool]=False, 
+                                          colors: Optional[List[Color]]=None, 
+                                          groups_colors: Optional[Dict[str, Color]]=None, 
+                                          figsize: Optional[Tuple(float, float)]=(7,7), 
+                                          arrows: Optional[bool]=False,
+                                          arrow_style: Optional[bool]=None, 
+                                          arrow_kwargs: Optional[Dict[str, Any]]=None,
+                                          set_arrows_ax_limits: Optional[bool]=False,
+                                          marker_kwargs: Optional[Dict[str, Any]]=None, 
+                                          axes: Optional[Axes]=None
+                                          ):
+    nrows = (len(x_vars_cols) + 1) // ncols
     if axes is None:
         _, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(figsize[0]*ncols, figsize[1]*nrows))
-
-    for country in countries:
-        country_data = data.query('Country == @country')
-        axes = plot_country_ecis_indicator_scatter(data=country_data, 
-                                                   x_cols=x_cols, 
-                                                   y_col=y_col, 
-                                                   colors=colors, 
-                                                   income_colors=income_colors, 
-                                                   marker_kwargs=marker_kwargs, 
-                                                   ncols=ncols, 
+    for entity in entities:
+        country_data = data.query(f'{entity_col} == @entity')
+        axes = plot_country_ecis_indicator_scatter(country_data=country_data, 
+                                                   x_vars_cols=x_vars_cols, 
+                                                   y_var_col=y_var_col, 
+                                                   name_tag=name_tag,
+                                                   groups=groups,
+                                                   groups_col=groups_col,
+                                                   entity_col=entity_col,
+                                                   time_col=time_col,
+                                                   n_steps=n_steps,
+                                                   ncols=ncols,
+                                                   year_labels=year_labels,
+                                                   colors=colors,
+                                                   groups_colors=groups_colors,
                                                    figsize=figsize,
-                                                   arrows=False, 
+                                                   arrows=arrows,
                                                    arrow_style=arrow_style,
                                                    arrow_kwargs=arrow_kwargs,
-                                                   year_labels=False,
-                                                   axes=axes,
-                                                   n_steps=n_steps
+                                                   set_arrows_ax_limits=set_arrows_ax_limits,
+                                                   marker_kwargs=marker_kwargs,
+                                                   axes=axes
                                                    )
-    axes.flat[0].figure.suptitle(f'Countries {eci_type} vs {y_col}', fontsize=22, y=0.9, 
+    axes.flat[0].figure.suptitle(f'Countries {name_tag} vs {y_var_col}', fontsize=22, y=0.9, 
                     verticalalignment='bottom', 
                     horizontalalignment='center')
     return axes
