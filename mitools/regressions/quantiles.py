@@ -1,4 +1,5 @@
 import re
+import warnings
 from dataclasses import dataclass
 from os import PathLike
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -6,6 +7,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import matplotlib.lines as mlines
 import matplotlib.pyplot as plt
 import numpy as np
+import openpyxl
 import pandas as pd
 import statsmodels.formula.api as smf
 from matplotlib.axes import Axes
@@ -17,6 +19,7 @@ from tqdm import tqdm
 from ..economic_complexity import StringMapper
 from ..pandas import idxslice
 from ..regressions import generate_hash_from_dataframe
+from ..utils import auto_adjust_columns_width
 from ..visuals import (
     adjust_axes_labels,
     adjust_axes_lims,
@@ -24,6 +27,7 @@ from ..visuals import (
     is_axes_empty,
 )
 
+warnings.simplefilter('ignore')
 Color = Union[Tuple[int, int, int], str]
 
 @dataclass(frozen=True)    
@@ -49,6 +53,10 @@ class QuantileRegStrs:
     STATS: str = 'Stats'
     INTERCEPT: str = 'Intercept'
     ANNOTATION: str = 'Q'
+    PARQUET_SUFFIX: str = 'regressions'
+    EXCEL_SUFFIX: str = 'regressions'
+    MAIN_PLOT: str = 'regression_data'
+    PLOTS_SUFFIX: str = 'regression'
 
 
 def plot_regressions_predictions(data: DataFrame, 
@@ -83,7 +91,7 @@ def plot_regressions_predictions(data: DataFrame,
             name_tag_folder = dep_var_folder / name_tag
             if not name_tag_folder.exists(): 
                 name_tag_folder.mkdir(exist_ok=True)
-            regressions_coeffs_path = name_tag_folder / f"{name_tag}_{dep_var_name}_regressions.parquet"       
+            regressions_coeffs_path = name_tag_folder / f"{name_tag}_{dep_var_name}_{QuantileRegStrs.PARQUET_SUFFIX}.parquet"       
             if regressions_coeffs_path.exists():
                 regressions_coeffs = pd.read_parquet(regressions_coeffs_path)
                 for regression_id, regression_coeffs in tqdm(
@@ -143,8 +151,8 @@ def create_regression_plots(data: DataFrame,
     quadratic = (regression_coeffs.index
                  .get_level_values(QuantileRegStrs.REGRESSION_DEGREE).unique()[0] == QuantileRegStrs.QUADRATIC_REG
                  )
-    main_plot = folder / "regression_data.png"
-    regression_plot = folder / f"{regression_id}_{dependent_variable.replace('/', '').replace(' ', '_')}_regression.png"
+    main_plot = folder / f"{QuantileRegStrs.MAIN_PLOT}.png"
+    regression_plot = folder / f"{regression_id}_{dependent_variable.replace('/', '').replace(' ', '_')}_{QuantileRegStrs.PLOTS_SUFFIX}.png"
     if not main_plot.exists() or not regression_plot.exists() or recalculate:
         predictions, significances, x_values = get_regression_predictions(data, regression_coeffs, groups)
         axes = plot_income_levels_ecis_indicator_scatter(data=data,
@@ -230,14 +238,14 @@ def plot_regression_predictions_by_group(independent_variables: List[str],
     return axes
 
 def create_regression_file_paths(eci_type_folder, eci_type, regression_id):
-    main_plot = eci_type_folder / "regression_data.png"
-    regression_plot = eci_type_folder / f"{regression_id}_regression.png"
+    main_plot = eci_type_folder / f"{QuantileRegStrs.MAIN_PLOT}.png"
+    regression_plot = eci_type_folder / f"{regression_id}_{QuantileRegStrs.PLOTS_SUFFIX}.png"
     return main_plot, regression_plot
 
 def plot_group_data(ax, group_data, x_vals, significance_plot_kwargs, annotation_kwargs):
     for quantile, preds in group_data.items():
         ax.plot(x_vals, preds, **significance_plot_kwargs[quantile])
-        text = ax.text(x_vals.iloc[-1]*1.0025, preds.iloc[-1], f'{quantile}Q', **annotation_kwargs)
+        text = ax.text(x_vals.iloc[-1]*1.0025, preds.iloc[-1], f'{quantile}{QuantileRegStrs.ANNOTATION}', **annotation_kwargs)
     return text
 
 def get_regression_predictions(data: DataFrame, regression_coeffs: DataFrame, groups: List[str],
@@ -683,3 +691,103 @@ def plot_country_eci_indicator_scatter(country_data: DataFrame,
     ax.set_ylabel(y_var_col)
     ax.set_xlabel(x_var_col)
     return ax
+
+def create_quantile_regressions_results(data: DataFrame,
+                                        dependent_variables: List[str],
+                                        independent_variables: Dict[str, List[str]],
+                                        groups: List[str],
+                                        regressions_folder: PathLike,
+                                        quadratics: List[bool],
+                                        quantiles: Optional[List[float]]=None,
+                                        str_mapper: Optional[StringMapper]=None,
+                                        control_variables: Optional[List[List[str]]]=None,
+                                        group_col: Optional[str]='Income Group',
+                                        all_groups: Optional[str]='All income',
+                                        max_iter: Optional[int]=2_500,
+                                        recalculate: Optional[bool]=False,
+                                        ):
+    if control_variables is None:
+        control_variables = [[]]
+    for dependent_variable in tqdm(dependent_variables, desc='Dependent Variables', position=0, leave=True):
+        dep_var_name = dependent_variable.replace('/', '')
+        dep_var_folder = regressions_folder / dep_var_name
+        if not dep_var_folder.exists(): 
+            dep_var_folder.mkdir(exist_ok=True)
+        for name_tag, indep_variables in tqdm(
+            independent_variables.items(), desc='Independent Variables', position=1, leave=False
+            ):
+            name_tag_folder = dep_var_folder / name_tag
+            if not name_tag_folder.exists(): 
+                name_tag_folder.mkdir(exist_ok=True)
+            dep_var_name_excel = name_tag_folder / f"{name_tag}_{dep_var_name}_{QuantileRegStrs.EXCEL_SUFFIX}.xlsx"
+            dep_var_name_parquet = name_tag_folder / f"{name_tag}_{dep_var_name}_{QuantileRegStrs.PARQUET_SUFFIX}.parquet"
+            if not dep_var_name_excel.exists() or not dep_var_name_parquet.exists() or recalculate:
+                name_tag_regressions = []
+                for control_vars in tqdm(control_variables, desc='Control Variables', position=2, leave=False):
+                    if dependent_variable not in control_vars:
+                        #try:
+                        quadratic_regressions = []
+                        for quadratic in quadratics:
+                            group_regressions = []
+                            for group in groups:
+                                if group != all_groups:
+                                    group_data = data.loc[idxslice(data, level=group_col, value=group, axis=0), :].copy(deep=True)
+                                else:
+                                    group_data = data.copy(deep=True)
+                                regression_data, dependent_var, independent_vars, c_vars = prepare_regression_data(
+                                    data=group_data,
+                                    dependent_variable=dependent_variable,
+                                    independent_variables=indep_variables,
+                                    control_variables=control_vars,
+                                    str_mapper=str_mapper
+                                    )
+                                with warnings.catch_warnings():
+                                    regression_results = get_quantile_regression_results(
+                                        data=regression_data, 
+                                        dependent_variable=dependent_var, 
+                                        independent_variables=independent_vars, 
+                                        control_variables=c_vars, 
+                                        quantiles=quantiles,
+                                        quadratic=quadratic, 
+                                        max_iter=max_iter
+                                        )
+                                regression_coeffs = get_quantile_regression_results_coeffs(
+                                    results=regression_results,
+                                    independent_variables=independent_vars
+                                    )
+                                regression_coeffs.columns = [group]
+                                # regression_stats = get_quantile_regression_results_stats(results=regression_results)
+                                group_regressions.append(regression_coeffs)
+                            group_regressions = pd.concat(group_regressions, axis=1)
+                            quadratic_regressions.append(group_regressions)
+                        quadratic_regressions = pd.concat(quadratic_regressions, axis=0)
+                        name_tag_regressions.append(quadratic_regressions)
+                        #except Exception as e:
+                        #    print(f"{e}\n{traceback.format_exc()}")
+                        #    pass
+                if name_tag_regressions:
+                    name_tag_regressions = pd.concat(name_tag_regressions, axis=0)
+
+                    levels_to_remap = [QuantileRegStrs.DEPENDENT_VAR, QuantileRegStrs.INDEPENDENT_VARS]
+                    pretty_index = name_tag_regressions.index.set_levels([
+                        prettify_index_level(str_mapper, 
+                                             QuantileRegStrs.QUADRATIC_VAR_SUFFIX, 
+                                             level, 
+                                             level_id, 
+                                             levels_to_remap
+                                             ) for level, level_id in zip(name_tag_regressions.index.levels, 
+                                                                          name_tag_regressions.index.names
+                                                                          )
+                    ],
+                    level=name_tag_regressions.index.names
+                    )
+                    name_tag_regressions.index = pretty_index
+
+                    name_tag_regressions.to_parquet(dep_var_name_parquet)
+
+                    name_tag_regressions.to_excel(dep_var_name_excel)
+                    book = openpyxl.load_workbook(dep_var_name_excel)
+                    for sheet_name in book.sheetnames:
+                        sheet = book[sheet_name]
+                        auto_adjust_columns_width(sheet)
+                    book.save(dep_var_name_excel)
