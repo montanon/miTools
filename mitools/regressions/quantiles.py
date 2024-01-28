@@ -1,4 +1,5 @@
 import re
+import traceback
 import warnings
 from dataclasses import dataclass
 from os import PathLike
@@ -12,9 +13,12 @@ import pandas as pd
 import statsmodels.formula.api as smf
 from matplotlib.axes import Axes
 from matplotlib.patches import ArrowStyle, FancyArrowPatch
+from numpy.linalg import LinAlgError
 from pandas import DataFrame, MultiIndex, Series
 from statsmodels.regression.linear_model import RegressionResultsWrapper
-from tqdm import tqdm
+
+#from tqdm import tqdm
+from tqdm.notebook import tqdm
 
 from ..economic_complexity import StringMapper
 from ..pandas import idxslice
@@ -154,7 +158,12 @@ def create_regression_plots(data: DataFrame,
     main_plot = folder / f"{QuantileRegStrs.MAIN_PLOT}.png"
     regression_plot = folder / f"{regression_id}_{dependent_variable.replace('/', '').replace(' ', '_')}_{QuantileRegStrs.PLOTS_SUFFIX}.png"
     if not main_plot.exists() or not regression_plot.exists() or recalculate:
-        predictions, significances, x_values = get_regression_predictions(data, regression_coeffs, groups)
+        predictions, significances, x_values = get_regression_predictions(data=data, 
+                                                                          regression_coeffs=regression_coeffs,
+                                                                          groups=groups,
+                                                                          groups_col=groups_col,
+                                                                          all_groups=all_groups
+                                                                          )
         axes = plot_income_levels_ecis_indicator_scatter(data=data,
                                                          x_vars_cols=independent_variables,
                                                          y_var_col=dependent_variable,
@@ -248,14 +257,20 @@ def plot_group_data(ax, group_data, x_vals, significance_plot_kwargs, annotation
         text = ax.text(x_vals.iloc[-1]*1.0025, preds.iloc[-1], f'{quantile}{QuantileRegStrs.ANNOTATION}', **annotation_kwargs)
     return text
 
-def get_regression_predictions(data: DataFrame, regression_coeffs: DataFrame, groups: List[str],
+def get_regression_predictions(data: DataFrame, 
+                               regression_coeffs: DataFrame, 
+                               groups: List[str], 
+                               groups_col: str, 
+                               all_groups: str
                                ) -> Tuple[DataFrame, DataFrame, DataFrame]:
     predictions, significances, x_values = [], [], []
     for group in groups:
         group_predictions, group_significances, group_x_values = get_quantile_regression_predictions_by_group(
-            data,
-            regression_coeffs,
-            group
+            regression_data=data,
+            regression_coeffs=regression_coeffs,
+            group=group,
+            groups_col=groups_col,
+            all_groups=all_groups
             )
         group_predictions.columns = pd.MultiIndex.from_tuples([(group,) + c for c in group_predictions.columns])
         group_significances.columns = pd.MultiIndex.from_tuples([(group,) + c for c in group_significances.columns])
@@ -290,16 +305,18 @@ def plot_income_levels_ecis_indicator_scatter(data: DataFrame,
     _, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(figsize[0]*ncols, figsize[1]*nrows))
     for n, group in enumerate(groups):
         if group != all_groups:
-            data = data.loc[idxslice(data, level=groups_col, value=group, axis=0), :].copy(deep=True)
+            group_data = data.loc[idxslice(data, level=groups_col, value=group, axis=0), :].copy(deep=True)
+            groups = [group]
         else:
-            data = data.copy(deep=True)
+            group_data = data.copy(deep=True)
+            groups = group_data.index.get_level_values(groups_col).unique().tolist()
         entities = data.index.get_level_values(entity_col).unique().tolist()
-        plot_countries_ecis_indicator_scatter(data=data, 
+        plot_countries_ecis_indicator_scatter(data=group_data, 
                                             entities=entities, 
                                             x_vars_cols=x_vars_cols,
                                             y_var_col=y_var_col,
                                             name_tag=name_tag,
-                                            groups=[group],
+                                            groups=groups,
                                             groups_col=groups_col,
                                             entity_col=entity_col,
                                             time_col=time_col,
@@ -333,9 +350,9 @@ def prettify_with_pattern(string: str, mapper: StringMapper, pattern: str) -> st
 def get_quantile_regression_predictions_by_group(regression_data: DataFrame, 
                                                  regression_coeffs: DataFrame, 
                                                  group: str,
-                                                 group_col: str,
+                                                 groups_col: str,
                                                  all_groups: str) -> Tuple[DataFrame, DataFrame]:
-    group_data = get_group_data(regression_data, group, group_col, all_groups)
+    group_data = get_group_data(regression_data, group, groups_col, all_groups)
     dependent_var = regression_coeffs.index.get_level_values(QuantileRegStrs.DEPENDENT_VAR).unique()[0]
     quantiles = regression_coeffs.index.get_level_values(QuantileRegStrs.QUANTILE).unique()
     independent_vars = [var for var in regression_coeffs.index.get_level_values(
@@ -536,6 +553,8 @@ def plot_countries_ecis_indicator_scatter(data: DataFrame,
         _, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(figsize[0]*ncols, figsize[1]*nrows))
     for entity in entities:
         country_data = data.query(f'{entity_col} == @entity')
+        if country_data.empty: 
+            continue
         axes = plot_country_ecis_indicator_scatter(country_data=country_data, 
                                                    x_vars_cols=x_vars_cols, 
                                                    y_var_col=y_var_col, 
@@ -708,8 +727,8 @@ def create_quantile_regressions_results(data: DataFrame,
                                         ):
     if control_variables is None:
         control_variables = [[]]
-    for dependent_variable in tqdm(dependent_variables, desc='Dependent Variables', position=0, leave=True):
-        dep_var_name = dependent_variable.replace('/', '')
+    for dependent_variable in tqdm(dependent_variables, desc='Dependent Variables', position=0, leave=False):
+        dep_var_name = dependent_variable.replace('/', '').replace(' ', '_')
         dep_var_folder = regressions_folder / dep_var_name
         if not dep_var_folder.exists(): 
             dep_var_folder.mkdir(exist_ok=True)
@@ -725,46 +744,46 @@ def create_quantile_regressions_results(data: DataFrame,
                 name_tag_regressions = []
                 for control_vars in tqdm(control_variables, desc='Control Variables', position=2, leave=False):
                     if dependent_variable not in control_vars:
-                        #try:
-                        quadratic_regressions = []
-                        for quadratic in quadratics:
-                            group_regressions = []
-                            for group in groups:
-                                if group != all_groups:
-                                    group_data = data.loc[idxslice(data, level=group_col, value=group, axis=0), :].copy(deep=True)
-                                else:
-                                    group_data = data.copy(deep=True)
-                                regression_data, dependent_var, independent_vars, c_vars = prepare_regression_data(
-                                    data=group_data,
-                                    dependent_variable=dependent_variable,
-                                    independent_variables=indep_variables,
-                                    control_variables=control_vars,
-                                    str_mapper=str_mapper
-                                    )
-                                with warnings.catch_warnings():
-                                    regression_results = get_quantile_regression_results(
-                                        data=regression_data, 
-                                        dependent_variable=dependent_var, 
-                                        independent_variables=independent_vars, 
-                                        control_variables=c_vars, 
-                                        quantiles=quantiles,
-                                        quadratic=quadratic, 
-                                        max_iter=max_iter
+                        try:
+                            quadratic_regressions = []
+                            for quadratic in quadratics:
+                                group_regressions = []
+                                for group in groups:
+                                    if group != all_groups:
+                                        group_data = data.loc[idxslice(data, level=group_col, value=group, axis=0), :].copy(deep=True)
+                                    else:
+                                        group_data = data.copy(deep=True)
+                                    regression_data, dependent_var, independent_vars, c_vars = prepare_regression_data(
+                                        data=group_data,
+                                        dependent_variable=dependent_variable,
+                                        independent_variables=indep_variables,
+                                        control_variables=control_vars,
+                                        str_mapper=str_mapper
                                         )
-                                regression_coeffs = get_quantile_regression_results_coeffs(
-                                    results=regression_results,
-                                    independent_variables=independent_vars
-                                    )
-                                regression_coeffs.columns = [group]
-                                # regression_stats = get_quantile_regression_results_stats(results=regression_results)
-                                group_regressions.append(regression_coeffs)
-                            group_regressions = pd.concat(group_regressions, axis=1)
-                            quadratic_regressions.append(group_regressions)
-                        quadratic_regressions = pd.concat(quadratic_regressions, axis=0)
-                        name_tag_regressions.append(quadratic_regressions)
-                        #except Exception as e:
-                        #    print(f"{e}\n{traceback.format_exc()}")
-                        #    pass
+                                    with warnings.catch_warnings():
+                                        regression_results = get_quantile_regression_results(
+                                            data=regression_data, 
+                                            dependent_variable=dependent_var, 
+                                            independent_variables=independent_vars, 
+                                            control_variables=c_vars, 
+                                            quantiles=quantiles,
+                                            quadratic=quadratic, 
+                                            max_iter=max_iter
+                                            )
+                                    regression_coeffs = get_quantile_regression_results_coeffs(
+                                        results=regression_results,
+                                        independent_variables=independent_vars
+                                        )
+                                    regression_coeffs.columns = [group]
+                                    # regression_stats = get_quantile_regression_results_stats(results=regression_results)
+                                    group_regressions.append(regression_coeffs)
+                                group_regressions = pd.concat(group_regressions, axis=1)
+                                quadratic_regressions.append(group_regressions)
+                            quadratic_regressions = pd.concat(quadratic_regressions, axis=0)
+                            name_tag_regressions.append(quadratic_regressions)
+                        except LinAlgError as e:
+                            print(f"{e}\n{traceback.format_exc()}")
+                            pass
                 if name_tag_regressions:
                     name_tag_regressions = pd.concat(name_tag_regressions, axis=0)
 
