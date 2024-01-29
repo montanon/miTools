@@ -482,11 +482,11 @@ def quantile_regression_value(row: Series) -> Series:
     coeff = round(row[QuantileRegStrs.COEF], 5)
     t_value = round(row[QuantileRegStrs.T_VALUE], 5)
     p_value = row[QuantileRegStrs.P_VALUE]
-    if p_value < 0.001:
+    if p_value <= 0.001:
         return f"{coeff}({t_value})***"
-    elif p_value < 0.01:
+    elif p_value <= 0.01:
         return f"{coeff}({t_value})**"
-    elif p_value < 0.05:
+    elif p_value <= 0.05:
         return f"{coeff}({t_value})*"
     else:
         return f"{coeff}({t_value})"
