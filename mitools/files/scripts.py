@@ -1,6 +1,7 @@
 import argparse
 import os
 import re
+import shutil
 import sys
 from os import PathLike
 from typing import Dict
@@ -42,6 +43,21 @@ def set_folder_pdf_filenames_as_title(folder: PathLike) -> None:
                 set_pdf_filename_as_title(os.path.join(folder, pdf), title)
             except Exception as e:
                 print(e)
+
+def rename_folders_in_folder(folder_path: PathLike) -> None:
+    for name in os.listdir(folder_path):
+        if os.path.isdir(os.path.join(folder_path, name)):
+            new_name = name.replace(' ', '_')
+            shutil.move(os.path.join(folder_path, name), os.path.join(folder_path, new_name))
+
+def rename_files_in_folder(folder_path: PathLike) -> None:
+    for root, _, files in os.walk(folder_path):
+        for filename in files:
+            if os.path.isfile(os.path.join(root, filename)):
+                new_filename = filename.replace(' ', '_')
+                old_file = os.path.join(root, filename)
+                new_file = os.path.join(root, new_filename)
+                shutil.move(old_file, new_file)
 
 if __name__ == "__main__":
 
