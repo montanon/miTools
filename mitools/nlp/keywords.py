@@ -195,7 +195,7 @@ def get_ngram_count(df: DataFrame,
     if tokenizer is None: 
         tokenizer = RegexpTokenizer("[A-Za-z]{2,}[0-9]{,1}")
     if entities_map and lemmatize:
-        entities_map = {k: (lemmatize_token(s) for s in v) for k, v in entities_map.items()}
+        entities_map = {k: (lemmatize_token(s) for s in v) if isinstance(v, tuple) else [(lemmatize_token(s) for s in t) for t in v] for k, v in entities_map.items()}
     def tokenization(text):
         if lemmatize:
             tokens = lemmatize_tokens([t for t in tokenizer.tokenize(text) if t not in stop_words])
@@ -329,6 +329,7 @@ def get_clusters_ngrams(df: DataFrame,
 def get_clusters_texts_ngrams(df: DataFrame, text_col: str, id_col: str, 
                         cluster_col: str, max_features: int, 
                         stop_words: Optional[List[str]]=None, 
+                        entities_map: Dict[str, Tuple[str]]=None,
                         ngram_range: Optional[Tuple[int, int]]=(1,5),
                         frequency: Optional[bool]=True,
                         lowercase: Optional[bool]=False) -> DataFrame:
@@ -342,6 +343,7 @@ def get_clusters_texts_ngrams(df: DataFrame, text_col: str, id_col: str,
                                                     id_col=id_col, 
                                                     cluster=cluster, 
                                                     stop_words=stop_words, 
+                                                    entities_map=entities_map,
                                                     max_features=max_features, 
                                                     gram_n=gram_n,
                                                     frequency=frequency,
@@ -354,12 +356,14 @@ def get_clusters_texts_ngrams(df: DataFrame, text_col: str, id_col: str,
 def get_cluster_text_ngrams(cluster_texts: pd.DataFrame, text_col: str, id_col: str, cluster: Union[str,int], 
                        gram_n: int, max_features: Optional[int]=None,
                        stop_words: Optional[List[str]]=None,
+                       entities_map: Dict[str, Tuple[str]]=None,
                        frequency: Optional[bool]=True,
                        lowercase: Optional[bool]=False) -> pd.DataFrame:
         cluster_ngrams = get_ngram_count(cluster_texts, 
                                          text_col=text_col, 
                                          id_col=id_col, 
                                          stop_words=stop_words, 
+                                         entities_map=entities_map,
                                          ngram_range=(gram_n, gram_n),
                                          max_features=max_features,
                                          frequency=frequency
