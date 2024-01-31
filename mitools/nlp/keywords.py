@@ -545,7 +545,8 @@ def sankey_plot_clusters_ngrams(clusters_ngrams: DataFrame, n_gram: int, min_ngr
     clusters_ngram = clusters_ngrams.loc[:, pd.IndexSlice[:,n_gram,:]]
     common_ngrams = [g.droplevel([0, 1], axis=1) for n, g in clusters_ngram.groupby(level=[0, 1], axis=1)]
     common_ngrams = pd.concat(common_ngrams, axis=0)
-    common_ngrams = common_ngrams.groupby('Gram').sum().sort_values(by='Frequency', ascending=False)
+    value_col = [c for c in clusters_ngrams.columns.get_level_values(-1).unique() if 'Gram' not in c][0]
+    common_ngrams = common_ngrams.groupby('Gram').sum().sort_values(by=value_col, ascending=False)
     sources_labels = clusters_ngrams.columns.get_level_values(0).unique()
     targets_labels = common_ngrams.index[min_ngram:max_ngram].tolist()
     labels = [*sources_labels, *targets_labels]
