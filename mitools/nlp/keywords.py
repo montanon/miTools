@@ -151,11 +151,18 @@ def merge_into_dataframe_index(df: DataFrame, df_to_merge: DataFrame,
     return merged_df
 
 def replace_sequences(tokens: List[str], mapping: Dict[str, Union[Tuple[str], List[Tuple[str]]]]) -> List[str]:
+    sub_mapping = {
+        key: value
+        for key, value in mapping.items()
+        for item in (value if isinstance(value, list) else [value])
+        for string in item
+        if string in tokens
+    }
     result = []
     i = 0
     while i < len(tokens):
         replaced = False
-        for key, sequences in mapping.items():
+        for key, sequences in sub_mapping.items():
             if isinstance(sequences, tuple):
                 sequences = [sequences]
             for sequence in sequences:
