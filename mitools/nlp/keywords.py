@@ -266,7 +266,7 @@ def plot_ngrams_count(grams_count: DataFrame, n_grams: Optional[Union[int, float
             n_grams = int(len(grams_count)*n_grams)
         grams_count = grams_count.iloc[:n_grams]
     grams_n = len(grams_count.index[0].split(' '))
-    _mapping = {1: "Uni", 2:"Bi", 3:"Tri", 4:"Four"}
+    _mapping = {1: "Uni", 2:"Bi", 3:"Tri", 4:"Quad", 5:"Penta", 6:"Hexa"}
     if ax is None:
         fig, ax = plt.subplots(figsize=(12,8))
     sns.barplot(x=grams_count.values, y=grams_count.index, ax=ax)
