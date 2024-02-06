@@ -166,6 +166,9 @@ $PYTHON_PATH -m pip install .
 test_python_module racplusplus
 cd "$original_path"
 
+$PYTHON_PATH -m pip install bertopic
+test_python_module bertopic
+
 $PYTHON_PATH -m pip install xlsxwriter country_converter pycountry
 
 $PYTHON_PATH -m pip install spacy
