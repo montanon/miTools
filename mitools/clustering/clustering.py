@@ -101,12 +101,10 @@ def get_distances_to_centroids(data: DataFrame, centroids: DataFrame, cluster_co
     label_pos = data.index.names.index(cluster_col)
     for idx, values in data.iterrows():
         cluster = idx[label_pos]
-        print(cluster)
         centroid = centroids.loc[cluster]
         distance = euclidean(values, centroid)
         distances.append(distance)
-    distances = DataFrame(distances)
-    distances.index = data.index.get_level_values(1)
+    distances = DataFrame(distances, index=data.index)
     return distances.sort_index()
 
 def plot_kmeans_ncluster_search(silhouette_scores: List[float], inertia: List[float]) -> Axes:
@@ -383,7 +381,8 @@ def plot_clusters_growth_stacked(data: DataFrame, time_col: str, cluster_col: st
 
 def plot_cosine_similarities(cosine_similarities: Dict[int,DataFrame],
                              normed: Optional[bool]=False, 
-                             colors: Optional[List[Tuple]]=None) -> Axes:
+                             colors: Optional[List[Tuple]]=None,
+                             bins: Optional[bool]=False) -> Axes:
     fig, ax = plt.subplots(1, 1, figsize=(14, 6))
     
     if colors is None:
@@ -391,8 +390,9 @@ def plot_cosine_similarities(cosine_similarities: Dict[int,DataFrame],
     for cl, similarities in tqdm(cosine_similarities.items()):
         upper_tri_vals = similarities[np.triu_indices(similarities.shape[0], k=1)]
         if not normed:
-            ax = sns.histplot(upper_tri_vals, bins=30, ax=ax, alpha=0.05, stat="density", 
-                              color=colors[cl], legend=False)
+            if bins:
+                ax = sns.histplot(upper_tri_vals, bins=30, ax=ax, alpha=0.05, stat="density", 
+                                color=colors[cl], legend=False)
             ax = sns.kdeplot(upper_tri_vals, ax=ax, color=colors[cl], label=f"Cluster {cl}")
         else:
             kde = gaussian_kde(upper_tri_vals)
@@ -417,7 +417,7 @@ def plot_distances_to_centroids(distances: DataFrame, cluster_col: str,
         kde = gaussian_kde(distances)
         x_vals = np.linspace(min(distances), max(distances), 1000)
         y_vals = kde(x_vals) / max(kde(x_vals))
-        ax.plot(x_vals, y_vals, alpha=1.0, label=f"Cluster {cl}", color=colors[cl])
+        ax.plot(x_vals, y_vals, alpha=1.0, label=cl, color=colors[cl])
 
     ax.set_title('Standardized Distribution of Distances to Centroid of Embeddings by Cluster')
     ax.set_xlabel('Distance to Centroid')
