@@ -265,13 +265,14 @@ def add_clusters_centroids(ax: Axes, data: DataFrame, cluster_col: str,
         labels = data[cluster_col].unique()
     if colors is None:
         colors = sns.color_palette("husl", len(labels))[::1]
+    if kwargs is None or 'zorder' not in kwargs:
+        kwargs['zorder'] = 0
 
     for i, cls in enumerate(labels):
         ax.plot(
             data[data[cluster_col] == cls][x_col],
             data[data[cluster_col] == cls][y_col],
             color=colors[i],
-            zorder=0,
             **kwargs
         )
     return ax
@@ -352,6 +353,28 @@ def plot_clusters_growth(data: DataFrame, time_col: str, cluster_col: str,
     ax.set_title('Cluster Size Evolution')
     ax.set_ylabel('N° Elements')
     ax.set_xlabel('Year')
+    ax.legend(loc='upper left')
+
+    return ax
+
+def plot_clusters_growth_stacked(data: DataFrame, time_col: str, cluster_col: str, 
+                                 colors: Optional[List[Tuple]]=None) -> Axes:
+    clusters_count = data.groupby([time_col, cluster_col]).size().unstack(fill_value=0).cumsum(axis=0)
+
+    fig, ax = plt.subplots(figsize=(21, 7))
+
+    if colors is None:
+        colors = sns.color_palette("husl", len(clusters_count.columns))
+
+    times = clusters_count.index
+    cluster_values = [clusters_count[cluster].values for cluster in clusters_count]
+
+    ax.stackplot(times, cluster_values, labels=clusters_count.columns, colors=colors)
+
+    ax.set_title('Cluster Size Evolution (Stacked)')
+    ax.set_ylabel('N° Elements')
+    ax.set_xlabel('Year')
+    ax.legend(loc='upper left')
 
     return ax
 
