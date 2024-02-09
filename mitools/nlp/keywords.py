@@ -315,7 +315,7 @@ def get_clusters_ngrams(df: DataFrame,
     for cluster in tqdm(df[cluster_col].unique(), desc="Processing clusters"):
         cluster_texts_ids = df.query(f"{cluster_col} == @cluster")[id_col]
         cluster_texts = df[df[id_col].isin(cluster_texts_ids)]
-        for gram_n in range(*ngram_range):
+        for gram_n in range(ngram_range[0], ngram_range[1]+1):
             cluster_ngrams = get_cluster_ngrams(cluster_texts=cluster_texts, 
                                                     text_col=text_col, 
                                                     id_col=id_col, 
