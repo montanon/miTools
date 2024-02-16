@@ -188,6 +188,9 @@ $PYTHON_PATH -m pip install adapters
 $PYTHON_PATH -m pip install geopandas
 test_python_module geopandas
 
+$PYTHON_PATH -m pip install folium
+test_python_module folium
+
 $PYTHON_PATH -m pip install treelib
 treelib_path=$($PYTHON_PATH -m pip show treelib | grep -E '^Location: ' | awk '{print $2}')
 treelib_path=$treelib_path/treelib/tree.py
