@@ -1,5 +1,7 @@
 import math
 import os
+import random
+import time
 from dataclasses import asdict, dataclass
 from os import PathLike
 from pathlib import Path
@@ -11,9 +13,11 @@ import matplotlib.lines as mlines
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import requests
 import seaborn as sns
 import shapely
+from IPython.display import display
 from matplotlib.axes import Axes
 from pandas import DataFrame, Series
 from shapely.geometry import Point, Polygon
@@ -21,7 +25,15 @@ from shapely.ops import transform
 
 CircleType = NewType('CircleType', Polygon)
 
-NEARBY_SEARCH_URL = "https://places.googleapis.com/v1/places:searchNearby"
+
+# https://mapsplatform.google.com/pricing/#pricing-grid
+# https://developers.google.com/maps/documentation/places/web-service/search-nearby
+# https://developers.google.com/maps/documentation/places/web-service/usage-and-billing#nearby-search
+# https://developers.google.com/maps/documentation/places/web-service/nearby-search#fieldmask
+# https://developers.google.com/maps/documentation/places/web-service/search-nearby#PlaceSearchPaging
+# https://developers.google.com/maps/documentation/places/web-service/place-types
+NEW_NEARBY_SEARCH_URL = "https://places.googleapis.com/v1/places:searchNearby"
+NEARBY_SEARCH_URL = 'https://maps.googleapis.com/maps/api/place/nearbysearch/json?parameters'
 GOOGLE_PLACES_API_KEY = os.environ.get('GOOGLE_PLACES_API_KEY')
 RESTAURANT_TYPES = [
     'american_restaurant',
@@ -66,7 +78,7 @@ RESTAURANT_TYPES = [
 ]
 FIELD_MASK = 'places.accessibilityOptions,places.addressComponents,places.adrFormatAddress,places.businessStatus,' \
         + 'places.displayName,places.formattedAddress,places.googleMapsUri,places.iconBackgroundColor,' \
-            + 'places.iconMaskBaseUri,places.location,places.primaryType,places.primaryTypeDisplayName,places.plusCode,' \
+            + 'places.iconMaskBaseUri,places.id,places.location,places.name,places.primaryType,places.primaryTypeDisplayName,places.plusCode,' \
                 + 'places.shortFormattedAddress,places.subDestinations,places.types,places.utcOffsetMinutes,places.viewport'
 QUERY_HEADERS = {
     'Content-Type': 'aplication/json',
@@ -92,7 +104,7 @@ class CityGeojson:
                                 edgecolor=sns.color_palette('Paired')[0])
         return ax
 
-class NearbySearchRequest:
+class NewNearbySearchRequest:
     def __init__(self, 
                  location: Point,
                  distance_in_meters: float,
@@ -123,22 +135,35 @@ class NearbySearchRequest:
             }
         return query
     
+class NearbySearchRequest:
+    def __init__(self, 
+                 location: Point,
+                 distance_in_meters: float,
+                 type: str,
+                 language_code: Optional[str]='en'):
+        self.location = f"{location.centroid.y}, {location.centroid.x}"
+        self.distance_in_meters = distance_in_meters
+        self.type = type
+        self.key = GOOGLE_PLACES_API_KEY
+        self.language_code = language_code
+
+    def json_query(self):
+        query = {
+            'location': self.location,
+            'radius': self.distance_in_meters,
+            'type': self.type,
+            'key': self.key,
+            'language': self.language_code,
+            }
+        return query
+    
+
 @dataclass
 class AddressComponent:
     longText: str
     shortText: str
     types: List[str]
     languageCode: str
-
-@dataclass
-class PlusCode:
-    globalCode: str
-    compoundCode: str
-
-@dataclass
-class Location:
-    latitude: float
-    longitude: float
 
 @dataclass
 class ViewportCoordinate:
@@ -150,22 +175,22 @@ class Viewport:
     low: ViewportCoordinate
     high: ViewportCoordinate
 
-@dataclass
-class DisplayName:
-    text: str
-    languageCode: str
 
 @dataclass
 class AccessibilityOptions:
     wheelchairAccessibleSeating: bool
 
 @dataclass
-class Place:
-    types: List[str]
+class NewPlace:
+    _NON_SERIALIZED_DATA = ['addressComponents', 'viewport', 'accessibilityOptions']
+    id: str
+    types: str
     formattedAddress: str
     addressComponents: List[AddressComponent]
-    plusCode: PlusCode
-    location: Location
+    globalCode: str
+    compoundCode: str
+    latitude: float
+    longitude: float
     viewport: Viewport
     googleMapsUri: str
     utcOffsetMinutes: int
@@ -173,20 +198,23 @@ class Place:
     businessStatus: str
     iconMaskBaseUri: str
     iconBackgroundColor: str
-    displayName: DisplayName
-    primaryTypeDisplayName: DisplayName
+    displayName: str
+    primaryTypeDisplayName: str
     primaryType: str
     shortFormattedAddress: str
     accessibilityOptions: AccessibilityOptions
 
     @staticmethod
-    def from_json(data: str) -> 'Place':
-        return Place(
-            types=data['types'],
+    def from_json(data: dict) -> 'NewPlace':
+        return NewPlace(
+            id=data['id'],
+            types=','.join(data['types']),
             formattedAddress=data['formattedAddress'],
             addressComponents=[AddressComponent(**comp) for comp in data['addressComponents']],
-            plusCode=PlusCode(**data['plusCode']),
-            location=Location(**data['location']),
+            globalCode=data['plusCode']['globalCode'],
+            compoundCode=data['plusCode']['compoundCode'],
+            latitude=data['location']['latitude'],
+            longitude=data['location']['longitude'],
             viewport=Viewport(
                 low=ViewportCoordinate(**data['viewport']['low']),
                 high=ViewportCoordinate(**data['viewport']['high'])
@@ -197,13 +225,45 @@ class Place:
             businessStatus=data['businessStatus'],
             iconMaskBaseUri=data['iconMaskBaseUri'],
             iconBackgroundColor=data['iconBackgroundColor'],
-            displayName=DisplayName(**data['displayName']),
-            primaryTypeDisplayName=DisplayName(**data['primaryTypeDisplayName']),
+            displayName=data['displayName']['text'],
+            primaryTypeDisplayName=data['primaryTypeDisplayName']['text'],
             primaryType=data['primaryType'],
             shortFormattedAddress=data['shortFormattedAddress'],
             accessibilityOptions=AccessibilityOptions(**data['accessibilityOptions'])
         )
     
+    def to_series(self) -> Series:
+        place_dict = asdict(self)
+        place_dict = {key: value for key, value in place_dict.items() if key not in self._NON_SERIALIZED_DATA}
+        return Series(place_dict)
+    
+@dataclass
+class Place:
+    id: str
+    name: str
+    latitude: float
+    longitude: float
+    types: str
+    price_level: Optional[int]=None
+    rating: Optional[float]=None
+    total_ratings: Optional[int]=None
+    vicinity: Optional[str]=None
+    permanently_closed: Optional[bool]=None
+
+    @staticmethod
+    def from_json(data: dict) -> 'Place':
+        return Place(
+            id=data['place_id'],
+            name=data['name'],
+            latitude=data['geometry']['location'].get('lat'),
+            longitude=data['geometry']['location'].get('lng'),
+            types=','.join(data.get('types')),
+            price_level=data.get('price_level'),
+            rating=data.get('rating'),
+            total_ratings=data.get('user_ratings_total'),
+            vicinity=data.get('vicinity'),
+            permanently_closed=data.get('permanently_closed')
+        )
     def to_series(self) -> Series:
         place_dict = asdict(self)
         return Series(place_dict)
@@ -310,15 +370,16 @@ def polygon_plot_with_sampling_circles(polygon: Polygon,
                              facecolor='none',
                              linestyle='--',)
     ax.add_patch(rectangle)
-    ax = gpd.GeoSeries(out_circles).plot(
-        facecolor='none', edgecolor='r', ax=ax, alpha=0.5, label='Out Circles')
+    if out_circles:
+        ax = gpd.GeoSeries(out_circles).plot(
+            facecolor='none', edgecolor='r', ax=ax, alpha=0.5, label='Out Circles')
+        out_circle_proxy = mlines.Line2D(
+            [], [], color='r', marker='o', markersize=10, label='Out Circles', linestyle='None')
     ax = gpd.GeoSeries(in_circles).plot(
         facecolor='none', edgecolor='g', ax=ax, alpha=0.5, label='In Circles')
-    out_circle_proxy = mlines.Line2D(
-        [], [], color='r', marker='o', markersize=10, label='Out Circles', linestyle='None')
     in_circle_proxy = mlines.Line2D(
         [], [], color='g', marker='o', markersize=10, label='In Circles', linestyle='None')
-    ax.legend(handles=[out_circle_proxy, in_circle_proxy],
+    ax.legend(handles=[out_circle_proxy, in_circle_proxy] if out_circles else [in_circle_proxy],
               loc='lower center', bbox_to_anchor=(0.5, -0.1), ncol=2)
     ax.set_title('Sampling of POIs')
     ax.set_xticks([])
@@ -327,32 +388,63 @@ def polygon_plot_with_sampling_circles(polygon: Polygon,
         plt.savefig(output_file_path)
     return ax
 
+def run_new_nearby_search():
+    queries = [NewNearbySearchRequest(circle, 
+                                      distance_in_meters=RADIUS_IN_METERS, 
+                                      included_types=RESTAURANT_TYPES
+                                      ).json_query() for circle in circles]
+    for query in queries:
+        response = requests.post(NEARBY_SEARCH_URL, headers=QUERY_HEADERS, json=query)
+        response_data = response.json()['places']
+        for place in response_data:
+            place = Place.from_json(place).to_series()
+            break
+        break
+
 
 if __name__ == '__main__':
     
-    dehli_geojson = 'delhi_1997-2012_district.json'
+    dehli_geojson = '/Users/sebastian/Desktop/MontagnaInc/Projects/India_shapefiles/city/delhi/district/delhi_1997-2012_district.json'
     dehli = CityGeojson(dehli_geojson)
 
     ax1 = dehli.plot_unary_polygon()
     ax2 = dehli.plot_polygons()
 
-    RADIUS_IN_METERS = 1_750
-    STEP_IN_DEGREES = 0.025
+    RADIUS_IN_METERS = 1_000 #100
+    STEP_IN_DEGREES = 0.01 #0.0015
     circles = sample_polygons_with_circles(polygons=dehli.merged_polygon, 
                                            radius_in_meters=RADIUS_IN_METERS, 
                                            step_in_degrees=STEP_IN_DEGREES)
     ax3 = polygon_plot_with_sampling_circles(polygon=dehli.merged_polygon, 
                                              circles=circles)
+    plt.show()
+    print(len(circles))
 
-    queries = [NearbySearchRequest(circle, distance_in_meters=RADIUS_IN_METERS, included_types=RESTAURANT_TYPES).json_query() for circle in circles]
-
-    for query in queries:
-        response = requests.post(NEARBY_SEARCH_URL, headers=QUERY_HEADERS, json=query)
-        import json
-        response_data = response.json()['places']
-        json.dump(response_data, open('response.json', 'w'))
-        for place in response_data:
-            place = Place.from_json(place)
-            print(place.to_series())
-            break
-        break
+    random.shuffle(circles)
+    all_places = []
+    for circle in circles[:10]:
+        query = NearbySearchRequest(location=circle, distance_in_meters=RADIUS_IN_METERS, type='restaurant').json_query()
+        places = []
+        while True:
+            response = requests.get(NEARBY_SEARCH_URL, params=query)
+            if response.status_code == 200:
+                response = response.json()
+                for place in response['results']:
+                    place = Place.from_json(place).to_series()
+                    places.append(place)
+                next_page_token = response.get('next_page_token')
+                if not next_page_token:
+                    break
+                query['pagetoken'] = next_page_token
+                time.sleep(0.001)
+            else:
+                print('Response failed: ', response)
+                break
+        print('Found Places: ', len(places))
+        if places:
+            places = pd.concat(places, axis=1).T.reset_index(drop=True)
+            all_places.append(places)
+    all_places = pd.concat(all_places, axis=0).reset_index(drop=True)
+    all_places.to_excel('dehli_places.xlsx', index=False)
+    display(all_places)
+        
