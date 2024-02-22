@@ -169,6 +169,15 @@ cd "$original_path"
 $PYTHON_PATH -m pip install bertopic
 test_python_module bertopic
 
+$PYTHON_PATH -m pip install geopandas
+test_python_module geopandas
+
+$PYTHON_PATH -m pip install folium
+test_python_module folium
+
+$PYTHON_PATH -m pip install PyPDF2
+test_python_module PyPDF2
+
 $PYTHON_PATH -m pip install xlsxwriter country_converter pycountry
 
 $PYTHON_PATH -m pip install spacy
@@ -184,12 +193,6 @@ $PYTHON_PATH -m pip install stata_setup
 $PYTHON_PATH -m pip install pystata
 
 $PYTHON_PATH -m pip install adapters
-
-$PYTHON_PATH -m pip install geopandas
-test_python_module geopandas
-
-$PYTHON_PATH -m pip install folium
-test_python_module folium
 
 $PYTHON_PATH -m pip install treelib
 treelib_path=$($PYTHON_PATH -m pip show treelib | grep -E '^Location: ' | awk '{print $2}')
