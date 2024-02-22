@@ -458,7 +458,7 @@ def get_quantile_regression_results_coeffs(results: Dict[int, RegressionResultsW
     regression_coeffs[QuantileRegStrs.ID] = generate_hash_from_dataframe(regression_coeffs, [
         QuantileRegStrs.REGRESSION_TYPE, 
         QuantileRegStrs.REGRESSION_DEGREE,
-        QuantileRegStrs.DEPENDENT_VAR,
+        #QuantileRegStrs.DEPENDENT_VAR,
         QuantileRegStrs.INDEPENDENT_VARS
         ],
         length=12
