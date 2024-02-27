@@ -562,6 +562,30 @@ def plot_subsampled_circles_schema(original_circle, original_radius, circle_subs
             ax.fill(x, y, alpha=0.5, fc='b', ec='none')
         fig.savefig(plot_path)
 
+def create_subsampled_circles(city, circles, found_places, original_radius, subsampling_radius, subsampling_count, subsamplig_factor, project_folder, ):
+    subsampled_circles_path = project_folder / Path(f"{city.name}_{subsampling_radius}_radius_{subsampling_count}-{subsamplig_factor}_subsampled_circles.geojson")
+    subsampling_circles_schema_plot = project_folder / Path(f"{city.name}_{original_radius}-{subsampling_radius}_radius_{subsampling_count}-{subsamplig_factor}_subsampled_circles.png")
+
+    places_by_circle = found_places.groupby('circle')['id'].nunique().sort_values(ascending=False)
+    saturated_circles = places_by_circle[places_by_circle == 20].index
+
+    if not subsampled_circles_path.exists():
+        subsampled_circles = DataFrame(columns=['circle', 'subsampled_circle'])
+        for saturated_circle in saturated_circles:
+            circle = circles.loc[saturated_circle, 'geometry']
+            circle_subsamples = create_subsampled_circles(circle.centroid, original_radius, subsampling_radius, subsampling_count, subsamplig_factor)
+            for subsampled_circle in circle_subsamples:
+                    subsampled_circles = pd.concat([subsampled_circles, DataFrame({'circle': saturated_circle, 'subsampled_circle': subsampled_circle}, index=[0])], axis=0, ignore_index=True)
+        plot_subsampled_circles_schema(circle, original_radius, circle_subsamples, subsampling_circles_schema_plot)
+        subsampled_circles = subsampled_circles.reset_index(drop=True)
+        subsampled_circles['searched'] = False
+        subsampled_circles = gpd.GeoDataFrame(subsampled_circles, geometry='subsampled_circle')
+        subsampled_circles.to_file(subsampled_circles_path, driver='GeoJSON')
+    else:
+        subsampled_circles = gpd.read_file(subsampled_circles_path)
+    return subsampled_circles
+
+
 if __name__ == '__main__':
     
     cities_geojsons = {
@@ -599,12 +623,13 @@ if __name__ == '__main__':
         for saturated_circle in saturated_circles:
             circle = circles.loc[saturated_circle, 'geometry']
             circle_subsamples = create_subsampled_circles(circle.centroid, RADIUS_IN_METERS, SUBSAMPLE_RADIUS_IN_METERS, SUBSAMPLE_CIRCLE_COUNT, SUBSAMPLE_FACTOR)
-            plot_subsampled_circles_schema(circle, RADIUS_IN_METERS, circle_subsamples, subsampling_circles_schema_plot)
             for subsampled_circle in circle_subsamples:
                     subsampled_circles = pd.concat([subsampled_circles, DataFrame({'circle': saturated_circle, 'subsampled_circle': subsampled_circle}, index=[0])], axis=0, ignore_index=True)
-            subsampled_circles = subsampled_circles.reset_index(drop=True)
-            subsampled_circles['searched'] = False
-            subsampled_circles = gpd.GeoDataFrame(subsampled_circles, geometry='subsampled_circle')
+        plot_subsampled_circles_schema(circle, RADIUS_IN_METERS, circle_subsamples, subsampling_circles_schema_plot)
+        subsampled_circles = subsampled_circles.reset_index(drop=True)
+        subsampled_circles['searched'] = False
+        subsampled_circles = gpd.GeoDataFrame(subsampled_circles, geometry='subsampled_circle')
+        subsampled_circles.to_file(subsampled_circles_path, driver='GeoJSON')
     else:
         subsampled_circles = gpd.read_file(subsampled_circles_path)
 
