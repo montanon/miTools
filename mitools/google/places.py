@@ -20,11 +20,11 @@ import shapely
 from IPython.display import display
 from matplotlib.axes import Axes
 from pandas import DataFrame, Series
-from shapely.geometry import Point, Polygon
-from shapely.ops import transform
+from shapely.geometry import MultiPolygon, Point, Polygon
+from shapely.ops import transform, unary_union
+from tqdm import tqdm
 
 CircleType = NewType('CircleType', Polygon)
-
 
 # https://mapsplatform.google.com/pricing/#pricing-grid
 # https://developers.google.com/maps/documentation/places/web-service/search-nearby
@@ -90,7 +90,18 @@ class CityGeojson:
     def __init__(self, geojson_path: PathLike):
         self.geojson_path = Path(geojson_path)
         self.data = gpd.read_file(geojson_path)
-        self.polygons = self.data['geometry']
+
+        if self.geojson_path.name == 'translated_tokyo_wards.geojson':
+            wards = ['Chiyoda Ward', "Koto Ward", "Nakano", "Meguro", "Shinagawa Ward", "Ota-ku", "Setagaya",
+                "Suginami", "Nerima Ward", "Itabashi Ward", "Adachi Ward", "Katsushika",
+                "Edogawa Ward", "Sumida Ward", "Chuo-ku", "Minato-ku", "North Ward",
+                "Toshima ward", 'Shibuya Ward', 'Arakawa', 'Bunkyo Ward',
+                'Shinjuku ward', 'Taito'
+                     ]
+            polygons = [unary_union(self.data.loc[self.data['Wards'] == ward, 'geometry']) for ward in wards]
+            self.polygons = gpd.GeoSeries(polygons).explode(index_parts=True).reset_index(drop=True)
+        else:
+            self.polygons = self.data['geometry']
         self.merged_polygon = self.polygons.unary_union
         self.bounds = self.polygons.bounds.iloc[0].values
     
@@ -178,7 +189,10 @@ class Viewport:
 
 @dataclass
 class AccessibilityOptions:
-    wheelchairAccessibleSeating: bool
+    wheelchairAccessibleSeating: Optional[bool]=None
+    wheelchairAccessibleParking: Optional[bool]=None
+    wheelchairAccessibleEntrance: Optional[bool]=None
+    wheelchairAccessibleRestroom: Optional[bool]=None
 
 @dataclass
 class NewPlace:
@@ -199,37 +213,55 @@ class NewPlace:
     iconMaskBaseUri: str
     iconBackgroundColor: str
     displayName: str
-    primaryTypeDisplayName: str
     primaryType: str
     shortFormattedAddress: str
     accessibilityOptions: AccessibilityOptions
+    primaryTypeDisplayName: str
 
     @staticmethod
     def from_json(data: dict) -> 'NewPlace':
+        global_code, compound_code = NewPlace.parse_plus_code(data.get('plusCode', {}))
         return NewPlace(
-            id=data['id'],
-            types=','.join(data['types']),
-            formattedAddress=data['formattedAddress'],
-            addressComponents=[AddressComponent(**comp) for comp in data['addressComponents']],
-            globalCode=data['plusCode']['globalCode'],
-            compoundCode=data['plusCode']['compoundCode'],
-            latitude=data['location']['latitude'],
-            longitude=data['location']['longitude'],
-            viewport=Viewport(
-                low=ViewportCoordinate(**data['viewport']['low']),
-                high=ViewportCoordinate(**data['viewport']['high'])
-            ),
-            googleMapsUri=data['googleMapsUri'],
-            utcOffsetMinutes=data['utcOffsetMinutes'],
-            adrFormatAddress=data['adrFormatAddress'],
-            businessStatus=data['businessStatus'],
-            iconMaskBaseUri=data['iconMaskBaseUri'],
-            iconBackgroundColor=data['iconBackgroundColor'],
-            displayName=data['displayName']['text'],
-            primaryTypeDisplayName=data['primaryTypeDisplayName']['text'],
-            primaryType=data['primaryType'],
-            shortFormattedAddress=data['shortFormattedAddress'],
-            accessibilityOptions=AccessibilityOptions(**data['accessibilityOptions'])
+            id=data.get('id', ''),
+            types=','.join(data.get('types', [])),
+            formattedAddress=data.get('formattedAddress', ''),
+            addressComponents=NewPlace.parse_address_components(data.get('addressComponents')),
+            globalCode=global_code,
+            compoundCode=compound_code,
+            latitude=data.get('location', {}).get('latitude', 0.0),
+            longitude=data.get('location', {}).get('longitude', 0.0),
+            viewport=NewPlace.parse_viewport(data.get('viewport')),
+            googleMapsUri=data.get('googleMapsUri', ''),
+            utcOffsetMinutes=data.get('utcOffsetMinutes', 0),
+            adrFormatAddress=data.get('adrFormatAddress', ''),
+            businessStatus=data.get('businessStatus', ''),
+            iconMaskBaseUri=data.get('iconMaskBaseUri', ''),
+            iconBackgroundColor=data.get('iconBackgroundColor', ''),
+            displayName=data.get('displayName', {}).get('text', ''),
+            primaryTypeDisplayName=data.get('primaryTypeDisplayName', {}).get('text', ''),
+            primaryType=data.get('primaryType', ''),
+            shortFormattedAddress=data.get('shortFormattedAddress', ''),
+            accessibilityOptions=AccessibilityOptions(**data.get('accessibilityOptions', {}))
+        )
+    
+    @staticmethod
+    def parse_address_components(components: List[dict]) -> List[AddressComponent]:
+        return [AddressComponent(**comp) for comp in components] if components else []
+
+    @staticmethod
+    def parse_viewport(viewport_data: dict) -> Viewport:
+        if not viewport_data:
+            return Viewport(low=ViewportCoordinate(), high=ViewportCoordinate())
+        return Viewport(
+            low=ViewportCoordinate(**viewport_data.get('low', {})),
+            high=ViewportCoordinate(**viewport_data.get('high', {}))
+        )
+
+    @staticmethod
+    def parse_plus_code(plus_code_data: dict) -> tuple:
+        return (
+            plus_code_data.get('globalCode', ''),
+            plus_code_data.get('compoundCode', '')
         )
     
     def to_series(self) -> Series:
@@ -298,6 +330,8 @@ def sample_polygons_with_circles(polygons: Union[Iterable[Polygon], Polygon],
                                  step_in_degrees: float) -> List[CircleType]:
     if isinstance(polygons, Polygon):
         polygons = [polygons]
+    elif isinstance(polygons, MultiPolygon):
+        polygons = list(polygons.geoms)
     circles = []
     for polygon in polygons:
         circles.extend(sample_polygon_with_circle(polygon=polygon, 
@@ -351,7 +385,8 @@ def polygon_plot_with_sampling_circles(polygon: Polygon,
                                        output_file_path: Optional[PathLike]=None) -> Axes:
     minx, miny, maxx, maxy = polygon.bounds
     out_circles, in_circles = [], []
-    for circle in circles:
+    from tqdm import tqdm
+    for circle in tqdm(circles):
         if polygon.contains(circle) or polygon.intersects(circle):
             in_circles.append(circle)
         else:
@@ -401,25 +436,7 @@ def run_new_nearby_search():
             break
         break
 
-
-if __name__ == '__main__':
-    
-    dehli_geojson = '/Users/sebastian/Desktop/MontagnaInc/Projects/India_shapefiles/city/delhi/district/delhi_1997-2012_district.json'
-    dehli = CityGeojson(dehli_geojson)
-
-    ax1 = dehli.plot_unary_polygon()
-    ax2 = dehli.plot_polygons()
-
-    RADIUS_IN_METERS = 1_000 #100
-    STEP_IN_DEGREES = 0.01 #0.0015
-    circles = sample_polygons_with_circles(polygons=dehli.merged_polygon, 
-                                           radius_in_meters=RADIUS_IN_METERS, 
-                                           step_in_degrees=STEP_IN_DEGREES)
-    ax3 = polygon_plot_with_sampling_circles(polygon=dehli.merged_polygon, 
-                                             circles=circles)
-    plt.show()
-    print(len(circles))
-
+def run_nearby_search():
     random.shuffle(circles)
     all_places = []
     for circle in circles[:10]:
@@ -447,4 +464,184 @@ if __name__ == '__main__':
     all_places = pd.concat(all_places, axis=0).reset_index(drop=True)
     all_places.to_excel('dehli_places.xlsx', index=False)
     display(all_places)
+
+def get_circles_search(tokyo_circles_path, city, RADIUS_IN_METERS, STEP_IN_DEGREES, recalculate=False):
+    if not tokyo_circles_path.exists() or recalculate:
+        circles = sample_polygons_with_circles(polygons=city.merged_polygon, 
+                                            radius_in_meters=RADIUS_IN_METERS, 
+                                            step_in_degrees=STEP_IN_DEGREES)
+        circles = gpd.GeoDataFrame(geometry=circles).reset_index(drop=True)
+        circles['searched'] = False
+        circles.to_file(tokyo_circles_path, driver='GeoJSON')
+    else:
+        circles = gpd.read_file(tokyo_circles_path)
+    return circles
+
+def create_subsampled_circles(large_circle_center, large_radius, small_radius, radial_samples):
+    large_radius_in_deg = meters_to_degree(large_radius, large_circle_center.y)
+    small_radius_in_deg = meters_to_degree(small_radius, large_circle_center.y)
+    large_circle = Point(large_circle_center).buffer(large_radius_in_deg)
+    subsampled_points = []
+    angle_step = 2 * np.pi / radial_samples
+    for i in range(radial_samples):
+        angle = i * angle_step
+        dx = small_radius_in_deg * np.cos(angle)
+        dy = small_radius_in_deg * np.sin(angle)
+        point = Point(large_circle_center.x + dx, large_circle_center.y + dy)
+        if large_circle.contains(point):  # Check if small circle is within the large circle
+            subsampled_points.append(point.buffer(small_radius_in_deg))
+    return subsampled_points
+
+if __name__ == '__main__':
+    
+    cities_geojsons = {
+        'delhi': '/Users/sebastian/Desktop/MontagnaInc/Projects/India_shapefiles/city/delhi/district/delhi_1997-2012_district.json',
+        'tokyo': '/Users/sebastian/Desktop/MontagnaInc/Research/Cities_Restaurants/translated_tokyo_wards.geojson'
+    }
+
+    PROJECT_FOLDER = '/Users/sebastian/Desktop/MontagnaInc/Research/Cities_Restaurants'
+    CITY = 'tokyo'
+    SHOW = False
+
+    city = CityGeojson(cities_geojsons[CITY])
+
+    if SHOW:
+        ax2 = city.plot_polygons()
+        plt.show()
+        ax1 = city.plot_unary_polygon()
+        plt.show()
+
+    RADIUS_IN_METERS = 50
+    SMALL_RADIUS_IN_METERS = 30
+    STEP_IN_DEGREES = 0.00075
+
+    tokyo_circles_path = PROJECT_FOLDER / Path(f"{CITY}_{RADIUS_IN_METERS}_radius_{STEP_IN_DEGREES}_step_circles.geojson")
+
+    circles = get_circles_search(tokyo_circles_path, city, RADIUS_IN_METERS, STEP_IN_DEGREES, recalculate=False)
+
+    if SHOW:
+        ax3 = polygon_plot_with_sampling_circles(polygon=city.merged_polygon, 
+                                            circles=circles.geometry.tolist())
+        plt.show()
+
+    tokyo_found_places = PROJECT_FOLDER / Path(f"{CITY}_{RADIUS_IN_METERS}_radius_{STEP_IN_DEGREES}_step_places.parquet")
+
+    if (~circles['searched']).any():
+
+        circles_search = circles[~circles['searched']]
+
+        if tokyo_found_places.exists():
+            found_places = pd.read_parquet(tokyo_found_places)
+        else:
+            found_places = DataFrame(columns=['circle', *list(NewPlace.__annotations__.keys())])
         
+        total_circles = len(circles_search)
+        pbar = tqdm(total=total_circles, desc="Processing circles")
+        for index, circle in tqdm(circles_search.iterrows()):
+            query = NewNearbySearchRequest(circle.geometry, 
+                                    distance_in_meters=RADIUS_IN_METERS, 
+                                    included_types=RESTAURANT_TYPES
+                                           ).json_query()
+            response = requests.post(NEW_NEARBY_SEARCH_URL, headers=QUERY_HEADERS, json=query)
+            response_data = response.json()
+            if response.reason == 'OK':
+                if 'places' in response_data:
+                    for place in response_data['places']:
+                        place = NewPlace.from_json(place).to_series()
+                        place['circle'] = index
+                        found_places = pd.concat([found_places, pd.DataFrame(place).T], axis=0, ignore_index=True)    
+                    found_places.to_parquet(tokyo_found_places)
+                circles.loc[index, 'searched'] = True
+            else:
+                print(response.status_code, response.reason, response.text)
+            if index % 500 == 0 or index == circles_search.index[-1]:
+                circles.to_file(tokyo_circles_path, driver='GeoJSON')
+            pbar.update()
+            pbar.set_postfix({'Remaining Circles': circles['searched'].value_counts()[False], 
+                                'Found Places': found_places['id'].nunique(),
+                                'Searched Circles': circles['searched'].sum()
+                              })
+            if index > 6_000:
+                break
+
+    else:
+        found_places = pd.read_parquet(tokyo_found_places)
+
+    if False:
+
+        places_by_circle = found_places.groupby('circle')['id'].nunique().sort_values(ascending=False)
+        saturated_circles = places_by_circle[places_by_circle == 20].index
+
+        tokyo_subsampled_found_places = PROJECT_FOLDER / Path(f"{CITY}_{RADIUS_IN_METERS}_radius_{STEP_IN_DEGREES}_step_subsampled_places.parquet")
+        tokyo_subsampled_circles_path = PROJECT_FOLDER / Path(f"{CITY}_{RADIUS_IN_METERS}_radius_{STEP_IN_DEGREES}_step_saturated_circles.geojson")
+        if not tokyo_subsampled_circles_path.exists():
+            subsampled_circles = DataFrame(columns=['circle', 'subsampled_circle'])
+
+            for saturated_circle in saturated_circles:
+                circle = circles.loc[saturated_circle, 'geometry']
+                circle_subsamples = create_subsampled_circles(circle.centroid, RADIUS_IN_METERS, SMALL_RADIUS_IN_METERS, 5)
+
+                if False:
+                    fig, ax = plt.subplots()
+                    x, y = Point(circle.centroid).buffer(meters_to_degree(RADIUS_IN_METERS, circle.centroid.y)).exterior.xy
+                    ax.fill(x, y, alpha=0.25, fc='r', ec='none')
+                    for small_circle in circle_subsamples:
+                        x, y = small_circle.exterior.xy
+                        ax.fill(x, y, alpha=0.5, fc='b', ec='none')
+                    plt.show()
+                
+                for subsampled_circle in circle_subsamples:
+                    subsampled_circles = pd.concat([subsampled_circles, DataFrame({'circle': saturated_circle, 'subsampled_circle': subsampled_circle}, index=[0])], axis=0, ignore_index=True)
+            subsampled_circles = subsampled_circles.reset_index(drop=True)
+            subsampled_circles['searched'] = False
+            subsampled_circles = gpd.GeoDataFrame(subsampled_circles, geometry='subsampled_circle')
+            subsampled_circles.to_file(tokyo_subsampled_circles_path, driver='GeoJSON')
+        else:
+            subsampled_circles = gpd.read_file(tokyo_subsampled_circles_path)
+
+        if (~subsampled_circles['searched']).any():
+
+            circles_search = subsampled_circles[~subsampled_circles['searched']]
+
+            if tokyo_subsampled_found_places.exists():
+                subsampled_found_places = pd.read_parquet(tokyo_subsampled_found_places)
+            else:
+                subsampled_found_places = DataFrame(columns=['circle', *list(NewPlace.__annotations__.keys())])
+            
+            total_circles = len(circles_search)
+            pbar = tqdm(total=total_circles, desc="Processing circles")
+            for index, circle in tqdm(circles_search.iterrows()):
+                query = NewNearbySearchRequest(circle.subsampled_circle, 
+                                        distance_in_meters=SMALL_RADIUS_IN_METERS, 
+                                        included_types=RESTAURANT_TYPES
+                                               ).json_query()
+                response = requests.post(NEW_NEARBY_SEARCH_URL, headers=QUERY_HEADERS, json=query)
+                response_data = response.json()
+                if response.reason == 'OK':
+                    if 'places' in response_data:
+                        for place in response_data['places']:
+                            place = NewPlace.from_json(place).to_series()
+                            place['circle'] = circle['circle']
+                            subsampled_found_places = pd.concat([subsampled_found_places, pd.DataFrame(place).T], axis=0, ignore_index=True)    
+                        subsampled_found_places.to_parquet(tokyo_subsampled_found_places)
+                    else: print('No Places')
+                    subsampled_circles.loc[index, 'searched'] = True
+                else:
+                    print(response.status_code, response.reason, response.text)
+                if index % 500 == 0 or index == circles_search.index[-1]:
+                    subsampled_circles.to_file(tokyo_subsampled_circles_path, driver='GeoJSON')
+                pbar.update()
+                pbar.set_postfix({'Remaining Circles': subsampled_circles['searched'].value_counts()[False], 
+                                    'Found Places': found_places['id'].nunique(),
+                                    'Searched Circles': subsampled_circles['searched'].sum()
+                                  })
+
+        else:
+            subsampled_found_places = pd.read_parquet(tokyo_subsampled_found_places)
+
+        display(subsampled_circles)
+
+
+
+
+
