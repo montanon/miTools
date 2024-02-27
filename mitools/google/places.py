@@ -552,6 +552,16 @@ def run_level_circles_search(project_folder, city, radius_in_meters, step_in_deg
         found_places = None
     return circles, found_places
 
+def plot_subsampled_circles_schema(original_circle, original_radius, circle_subsamples, plot_path):
+    if not plot_path.exists():
+        fig, ax = plt.subplots()
+        x, y = Point(original_circle.centroid).buffer(meters_to_degree(original_radius, original_circle.centroid.y)).exterior.xy
+        ax.fill(x, y, alpha=0.25, fc='r', ec='none')
+        for circle_subsample in circle_subsamples:
+            x, y = circle_subsample.exterior.xy
+            ax.fill(x, y, alpha=0.5, fc='b', ec='none')
+        fig.savefig(plot_path)
+
 if __name__ == '__main__':
     
     cities_geojsons = {
@@ -577,28 +587,26 @@ if __name__ == '__main__':
     SUBSAMPLE_RADIUS_IN_METERS = 105
     SUBSAMPLE_CIRCLE_COUNT = 7
     SUBSAMPLE_FACTOR = 1.8
-    
-    subsampling_circles_schema_plot = PROJECT_FOLDER / Path(f"{city.name}_{RADIUS_IN_METERS}-{SUBSAMPLE_RADIUS_IN_METERS}_radius_{SUBSAMPLE_CIRCLE_COUNT}-{SUBSAMPLE_FACTOR}_subsampled_circles_.png")
+
+    subsampled_circles_path = PROJECT_FOLDER / Path(f"{city.name}_{SUBSAMPLE_RADIUS_IN_METERS}_radius_{SUBSAMPLE_CIRCLE_COUNT}-{SUBSAMPLE_FACTOR}_subsampled_circles.geojson")
+    subsampling_circles_schema_plot = PROJECT_FOLDER / Path(f"{city.name}_{RADIUS_IN_METERS}-{SUBSAMPLE_RADIUS_IN_METERS}_radius_{SUBSAMPLE_CIRCLE_COUNT}-{SUBSAMPLE_FACTOR}_subsampled_circles.png")
+
     places_by_circle = found_places.groupby('circle')['id'].nunique().sort_values(ascending=False)
     saturated_circles = places_by_circle[places_by_circle == 20].index
 
-    subsampled_circles = DataFrame(columns=['circle', 'subsampled_circle'])
-    for saturated_circle in saturated_circles:
-        circle = circles.loc[saturated_circle, 'geometry']
-        circle_subsamples = create_subsampled_circles(circle.centroid, RADIUS_IN_METERS, SUBSAMPLE_RADIUS_IN_METERS, SUBSAMPLE_CIRCLE_COUNT, SUBSAMPLE_FACTOR)
-        if not subsampling_circles_schema_plot.exists():
-            fig, ax = plt.subplots()
-            x, y = Point(circle.centroid).buffer(meters_to_degree(RADIUS_IN_METERS, circle.centroid.y)).exterior.xy
-            ax.fill(x, y, alpha=0.25, fc='r', ec='none')
-            for small_circle in circle_subsamples:
-                x, y = small_circle.exterior.xy
-                ax.fill(x, y, alpha=0.5, fc='b', ec='none')
-            fig.savefig(subsampling_circles_schema_plot)
-        for subsampled_circle in circle_subsamples:
-                subsampled_circles = pd.concat([subsampled_circles, DataFrame({'circle': saturated_circle, 'subsampled_circle': subsampled_circle}, index=[0])], axis=0, ignore_index=True)
-        subsampled_circles = subsampled_circles.reset_index(drop=True)
-        subsampled_circles['searched'] = False
-        subsampled_circles = gpd.GeoDataFrame(subsampled_circles, geometry='subsampled_circle')
+    if not subsampled_circles_path.exists():
+        subsampled_circles = DataFrame(columns=['circle', 'subsampled_circle'])
+        for saturated_circle in saturated_circles:
+            circle = circles.loc[saturated_circle, 'geometry']
+            circle_subsamples = create_subsampled_circles(circle.centroid, RADIUS_IN_METERS, SUBSAMPLE_RADIUS_IN_METERS, SUBSAMPLE_CIRCLE_COUNT, SUBSAMPLE_FACTOR)
+            plot_subsampled_circles_schema(circle, RADIUS_IN_METERS, circle_subsamples, subsampling_circles_schema_plot)
+            for subsampled_circle in circle_subsamples:
+                    subsampled_circles = pd.concat([subsampled_circles, DataFrame({'circle': saturated_circle, 'subsampled_circle': subsampled_circle}, index=[0])], axis=0, ignore_index=True)
+            subsampled_circles = subsampled_circles.reset_index(drop=True)
+            subsampled_circles['searched'] = False
+            subsampled_circles = gpd.GeoDataFrame(subsampled_circles, geometry='subsampled_circle')
+    else:
+        subsampled_circles = gpd.read_file(subsampled_circles_path)
 
     display(subsampled_circles)
 
