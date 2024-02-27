@@ -597,6 +597,23 @@ def get_subsampled_circles(city,
         plt.show()
     return subsampled_circles
 
+def resample_subsampled_area(city, subsampled_circles, project_folder, subsample_radius_in_meters, subsample_step_in_degrees, show=False):
+    subsampled_area = subsampled_circles.geometry.unary_union
+    if show:
+        gpd.GeoSeries(subsampled_area).plot(facecolor='none', edgecolor=sns.color_palette('Paired')[0])
+        plt.show()
+    resampled_subsampled_circles_path = project_folder / Path(f"{city.name}_{subsample_radius_in_meters}_radius_{subsample_step_in_degrees}_step_resubsampled_circles.geojson") 
+    if not resampled_subsampled_circles_path.exists():
+        resampled_circles = sample_polygons_with_circles(subsampled_area, subsample_radius_in_meters, subsample_step_in_degrees)
+        resampled_circles = gpd.GeoDataFrame(geometry=resampled_circles).reset_index(drop=True)
+        resampled_circles['searched'] = False
+        resampled_circles.to_file(resampled_subsampled_circles_path, driver='GeoJSON')
+    else:
+        resampled_circles = gpd.read_file(resampled_subsampled_circles_path)
+    if show:
+        _ = polygon_plot_with_sampling_circles(polygon=subsampled_area, circles=resampled_circles.geometry.tolist())
+        plt.show()
+    return subsampled_area, resampled_circles
 
 if __name__ == '__main__':
     
@@ -638,54 +655,15 @@ if __name__ == '__main__':
                                                    SUBSAMPLE_FACTOR, 
                                                    PROJECT_FOLDER,
                                                    show=False)
-
-    subsampled_area = subsampled_circles.geometry.unary_union
-    if True:
-        ax = gpd.GeoSeries(subsampled_area).plot(facecolor='none', edgecolor=sns.color_palette('Paired')[0])
-        plt.show()
-
-    resampled_subsampled_circles_path = PROJECT_FOLDER / Path(f"{city.name}_{SUBSAMPLE_RADIUS_IN_METERS}_radius_{SUBSAMPLE_STEP_IN_DEGREES}_step_resubsampled_circles.geojson") 
-    if not resampled_subsampled_circles_path.exists():
-        subsampled_circles = sample_polygons_with_circles(subsampled_area, SUBSAMPLE_RADIUS_IN_METERS, SUBSAMPLE_STEP_IN_DEGREES)
-        subsampled_circles = gpd.GeoDataFrame(geometry=subsampled_circles).reset_index(drop=True)
-        subsampled_circles['searched'] = False
-        subsampled_circles.to_file(resampled_subsampled_circles_path, driver='GeoJSON')
-    else:
-        subsampled_circles = gpd.read_file(resampled_subsampled_circles_path)
-    _ = polygon_plot_with_sampling_circles(polygon=subsampled_area, circles=subsampled_circles.geometry.tolist())
-    plt.show()
-
+    
+    subsampled_area, resampled_circles = resample_subsampled_area(city, 
+                                                                  subsampled_circles, 
+                                                                  PROJECT_FOLDER, 
+                                                                  SUBSAMPLE_RADIUS_IN_METERS, 
+                                                                  SUBSAMPLE_STEP_IN_DEGREES, 
+                                                                  show=False)
+    
     if False:
-
-        places_by_circle = found_places.groupby('circle')['id'].nunique().sort_values(ascending=False)
-        saturated_circles = places_by_circle[places_by_circle == 20].index
-
-        tokyo_subsampled_found_places = PROJECT_FOLDER / Path(f"{CITY}_{RADIUS_IN_METERS}_radius_{STEP_IN_DEGREES}_step_subsampled_places.parquet")
-        tokyo_subsampled_circles_path = PROJECT_FOLDER / Path(f"{CITY}_{RADIUS_IN_METERS}_radius_{STEP_IN_DEGREES}_step_saturated_circles.geojson")
-        if not tokyo_subsampled_circles_path.exists():
-            subsampled_circles = DataFrame(columns=['circle', 'subsampled_circle'])
-
-            for saturated_circle in saturated_circles:
-                circle = circles.loc[saturated_circle, 'geometry']
-                circle_subsamples = create_subsampled_circles(circle.centroid, RADIUS_IN_METERS, SMALL_RADIUS_IN_METERS, 5)
-
-                if False:
-                    fig, ax = plt.subplots()
-                    x, y = Point(circle.centroid).buffer(meters_to_degree(RADIUS_IN_METERS, circle.centroid.y)).exterior.xy
-                    ax.fill(x, y, alpha=0.25, fc='r', ec='none')
-                    for small_circle in circle_subsamples:
-                        x, y = small_circle.exterior.xy
-                        ax.fill(x, y, alpha=0.5, fc='b', ec='none')
-                    plt.show()
-                
-                for subsampled_circle in circle_subsamples:
-                    subsampled_circles = pd.concat([subsampled_circles, DataFrame({'circle': saturated_circle, 'subsampled_circle': subsampled_circle}, index=[0])], axis=0, ignore_index=True)
-            subsampled_circles = subsampled_circles.reset_index(drop=True)
-            subsampled_circles['searched'] = False
-            subsampled_circles = gpd.GeoDataFrame(subsampled_circles, geometry='subsampled_circle')
-            subsampled_circles.to_file(tokyo_subsampled_circles_path, driver='GeoJSON')
-        else:
-            subsampled_circles = gpd.read_file(tokyo_subsampled_circles_path)
 
         if (~subsampled_circles['searched']).any():
 
