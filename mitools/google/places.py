@@ -16,7 +16,6 @@ import numpy as np
 import pandas as pd
 import requests
 import seaborn as sns
-import shapely
 from IPython.display import display
 from matplotlib.axes import Axes
 from pandas import DataFrame, Series
@@ -87,9 +86,10 @@ QUERY_HEADERS = {
 }
 
 class CityGeojson:
-    def __init__(self, geojson_path: PathLike):
+    def __init__(self, geojson_path: PathLike, name: str):
         self.geojson_path = Path(geojson_path)
         self.data = gpd.read_file(geojson_path)
+        self.name = name
 
         if self.geojson_path.name == 'translated_tokyo_wards.geojson':
             wards = ['Chiyoda Ward', "Koto Ward", "Nakano", "Meguro", "Shinagawa Ward", "Ota-ku", "Setagaya",
@@ -477,16 +477,16 @@ def get_circles_search(tokyo_circles_path, city, RADIUS_IN_METERS, STEP_IN_DEGRE
         circles = gpd.read_file(tokyo_circles_path)
     return circles
 
-def create_subsampled_circles(large_circle_center, large_radius, small_radius, radial_samples):
+def create_subsampled_circles(large_circle_center, large_radius, small_radius, radial_samples, factor):
     large_radius_in_deg = meters_to_degree(large_radius, large_circle_center.y)
     small_radius_in_deg = meters_to_degree(small_radius, large_circle_center.y)
     large_circle = Point(large_circle_center).buffer(large_radius_in_deg)
-    subsampled_points = []
+    subsampled_points = [Point(large_circle_center).buffer(small_radius_in_deg)]
     angle_step = 2 * np.pi / radial_samples
     for i in range(radial_samples):
         angle = i * angle_step
-        dx = small_radius_in_deg * np.cos(angle)
-        dy = small_radius_in_deg * np.sin(angle)
+        dx = factor * small_radius_in_deg * np.cos(angle)
+        dy = factor * small_radius_in_deg * np.sin(angle)
         point = Point(large_circle_center.x + dx, large_circle_center.y + dy)
         if large_circle.contains(point):  # Check if small circle is within the large circle
             subsampled_points.append(point.buffer(small_radius_in_deg))
@@ -520,12 +520,37 @@ def search_and_update_places(circle, index, found_places, file_path):
 
 def update_progress_and_save(searched, circles, index, found_places, circles_path, pbar):
     circles.loc[index, 'searched'] = searched
-    if index % 500 == 0 or index == circles_search.index[-1]:
+    if index % 1_000 == 0 or index == circles.shape[0] - 1:
         circles.to_file(circles_path, driver='GeoJSON')
     pbar.update()
-    pbar.set_postfix({'Remaining Circles': circles['searched'].value_counts()[False], 
+    pbar.set_postfix({'Remaining Circles': circles['searched'].value_counts()[False] if False in circles['searched'].value_counts() else 0, 
                       'Found Places': found_places['id'].nunique(),
                       'Searched Circles': circles['searched'].sum()})
+    
+def process_circles(circles, file_path, circles_path):
+    if (~circles['searched']).any():
+        circles_search = circles[~circles['searched']]
+        found_places = read_or_initialize_places(file_path)
+        pbar = tqdm(total=len(circles_search), desc="Processing circles")
+        for index, circle in circles_search.iterrows():
+            searched, found_places = search_and_update_places(circle, index, found_places, file_path)
+            update_progress_and_save(searched, circles, index, found_places, circles_path, pbar)
+    else:
+        found_places = pd.read_parquet(file_path)
+    return found_places
+
+def run_level_circles_search(project_folder, city, radius_in_meters, step_in_degrees, process=False, show=False):
+    tokyo_circles_path = project_folder / Path(f"{city.name}_{radius_in_meters}_radius_{step_in_degrees}_step_circles.geojson")
+    tokyo_found_places = project_folder / Path(f"{city.name}_{radius_in_meters}_radius_{step_in_degrees}_step_places.parquet")
+    circles = get_circles_search(tokyo_circles_path, city, radius_in_meters, step_in_degrees)
+    if show:
+        _ = polygon_plot_with_sampling_circles(polygon=city.merged_polygon, circles=circles.geometry.tolist())
+        plt.show()
+    if process:
+        found_places = process_circles(circles, tokyo_found_places, tokyo_circles_path)
+    else:
+        found_places = None
+    return circles, found_places
 
 if __name__ == '__main__':
     
@@ -538,36 +563,44 @@ if __name__ == '__main__':
     CITY = 'tokyo'
     SHOW = False
 
-    city = CityGeojson(cities_geojsons[CITY])
+    city = CityGeojson(cities_geojsons[CITY], CITY)
     if SHOW:
         ax2 = city.plot_polygons()
         plt.show()
         ax1 = city.plot_unary_polygon()
         plt.show()
 
-    RADIUS_IN_METERS = 50
-    SMALL_RADIUS_IN_METERS = 30
-    STEP_IN_DEGREES = 0.00075
+    RADIUS_IN_METERS = 250 #50
+    STEP_IN_DEGREES = 0.00375 #0.00075
+    circles, found_places = run_level_circles_search(PROJECT_FOLDER, city, RADIUS_IN_METERS, STEP_IN_DEGREES, process=True, show=False)
 
-    tokyo_circles_path = PROJECT_FOLDER / Path(f"{CITY}_{RADIUS_IN_METERS}_radius_{STEP_IN_DEGREES}_step_circles.geojson")
-    circles = get_circles_search(tokyo_circles_path, city, RADIUS_IN_METERS, STEP_IN_DEGREES, recalculate=False)
-    if SHOW:
-        ax3 = polygon_plot_with_sampling_circles(polygon=city.merged_polygon, 
-                                            circles=circles.geometry.tolist())
-        plt.show()
+    SUBSAMPLE_RADIUS_IN_METERS = 105
+    SUBSAMPLE_CIRCLE_COUNT = 7
+    SUBSAMPLE_FACTOR = 1.8
+    
+    subsampling_circles_schema_plot = PROJECT_FOLDER / Path(f"{city.name}_{RADIUS_IN_METERS}-{SUBSAMPLE_RADIUS_IN_METERS}_radius_{SUBSAMPLE_CIRCLE_COUNT}-{SUBSAMPLE_FACTOR}_subsampled_circles_.png")
+    places_by_circle = found_places.groupby('circle')['id'].nunique().sort_values(ascending=False)
+    saturated_circles = places_by_circle[places_by_circle == 20].index
 
-    tokyo_found_places = PROJECT_FOLDER / Path(f"{CITY}_{RADIUS_IN_METERS}_radius_{STEP_IN_DEGREES}_step_places.parquet")
-    if (~circles['searched']).any():
-        circles_search = circles[~circles['searched']]
-        found_places = read_or_initialize_places(tokyo_found_places)
-        pbar = tqdm(total=len(circles_search), desc="Processing circles")
-        for index, circle in tqdm(circles_search.iterrows()):
-            searched, found_places = search_and_update_places(circle, index, found_places, tokyo_found_places)
-            update_progress_and_save(searched, circles, index, found_places, tokyo_circles_path, pbar)
-            if index > 10_000:
-                break
-    else:
-        found_places = pd.read_parquet(tokyo_found_places)
+    subsampled_circles = DataFrame(columns=['circle', 'subsampled_circle'])
+    for saturated_circle in saturated_circles:
+        circle = circles.loc[saturated_circle, 'geometry']
+        circle_subsamples = create_subsampled_circles(circle.centroid, RADIUS_IN_METERS, SUBSAMPLE_RADIUS_IN_METERS, SUBSAMPLE_CIRCLE_COUNT, SUBSAMPLE_FACTOR)
+        if not subsampling_circles_schema_plot.exists():
+            fig, ax = plt.subplots()
+            x, y = Point(circle.centroid).buffer(meters_to_degree(RADIUS_IN_METERS, circle.centroid.y)).exterior.xy
+            ax.fill(x, y, alpha=0.25, fc='r', ec='none')
+            for small_circle in circle_subsamples:
+                x, y = small_circle.exterior.xy
+                ax.fill(x, y, alpha=0.5, fc='b', ec='none')
+            fig.savefig(subsampling_circles_schema_plot)
+        for subsampled_circle in circle_subsamples:
+                subsampled_circles = pd.concat([subsampled_circles, DataFrame({'circle': saturated_circle, 'subsampled_circle': subsampled_circle}, index=[0])], axis=0, ignore_index=True)
+        subsampled_circles = subsampled_circles.reset_index(drop=True)
+        subsampled_circles['searched'] = False
+        subsampled_circles = gpd.GeoDataFrame(subsampled_circles, geometry='subsampled_circle')
+
+    display(subsampled_circles)
 
     if False:
 
