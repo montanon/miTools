@@ -570,7 +570,7 @@ if __name__ == '__main__':
         found_places = pd.read_parquet(tokyo_found_places)
 
     if False:
-
+xx
         places_by_circle = found_places.groupby('circle')['id'].nunique().sort_values(ascending=False)
         saturated_circles = places_by_circle[places_by_circle == 20].index
 
