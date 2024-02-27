@@ -492,6 +492,41 @@ def create_subsampled_circles(large_circle_center, large_radius, small_radius, r
             subsampled_points.append(point.buffer(small_radius_in_deg))
     return subsampled_points
 
+def read_or_initialize_places(file_path):
+    if file_path.exists():
+        return pd.read_parquet(file_path)
+    else:
+        return pd.DataFrame(columns=['circle', *list(NewPlace.__annotations__.keys())])
+
+def search_and_update_places(circle, index, found_places, file_path):
+    query = NewNearbySearchRequest(circle.geometry, 
+                                   distance_in_meters=RADIUS_IN_METERS, 
+                                   included_types=RESTAURANT_TYPES
+                                   ).json_query()
+    response = requests.post(NEW_NEARBY_SEARCH_URL, headers=QUERY_HEADERS, json=query)
+    response_data = response.json()
+    if response.reason == 'OK':
+        if 'places' in response_data:
+            for place in response.json()['places']:
+                place_series = NewPlace.from_json(place).to_series()
+                place_series['circle'] = index
+                found_places = pd.concat([found_places, pd.DataFrame(place_series).T], ignore_index=True)
+            found_places.to_parquet(file_path)
+        searched = True
+    else:
+        print(response.status_code, response.reason, response.text)
+        searched = False
+    return searched, found_places
+
+def update_progress_and_save(searched, circles, index, found_places, circles_path, pbar):
+    circles.loc[index, 'searched'] = searched
+    if index % 500 == 0 or index == circles_search.index[-1]:
+        circles.to_file(circles_path, driver='GeoJSON')
+    pbar.update()
+    pbar.set_postfix({'Remaining Circles': circles['searched'].value_counts()[False], 
+                      'Found Places': found_places['id'].nunique(),
+                      'Searched Circles': circles['searched'].sum()})
+
 if __name__ == '__main__':
     
     cities_geojsons = {
@@ -504,7 +539,6 @@ if __name__ == '__main__':
     SHOW = False
 
     city = CityGeojson(cities_geojsons[CITY])
-
     if SHOW:
         ax2 = city.plot_polygons()
         plt.show()
@@ -516,59 +550,27 @@ if __name__ == '__main__':
     STEP_IN_DEGREES = 0.00075
 
     tokyo_circles_path = PROJECT_FOLDER / Path(f"{CITY}_{RADIUS_IN_METERS}_radius_{STEP_IN_DEGREES}_step_circles.geojson")
-
     circles = get_circles_search(tokyo_circles_path, city, RADIUS_IN_METERS, STEP_IN_DEGREES, recalculate=False)
-
     if SHOW:
         ax3 = polygon_plot_with_sampling_circles(polygon=city.merged_polygon, 
                                             circles=circles.geometry.tolist())
         plt.show()
 
     tokyo_found_places = PROJECT_FOLDER / Path(f"{CITY}_{RADIUS_IN_METERS}_radius_{STEP_IN_DEGREES}_step_places.parquet")
-
     if (~circles['searched']).any():
-
         circles_search = circles[~circles['searched']]
-
-        if tokyo_found_places.exists():
-            found_places = pd.read_parquet(tokyo_found_places)
-        else:
-            found_places = DataFrame(columns=['circle', *list(NewPlace.__annotations__.keys())])
-        
-        total_circles = len(circles_search)
-        pbar = tqdm(total=total_circles, desc="Processing circles")
+        found_places = read_or_initialize_places(tokyo_found_places)
+        pbar = tqdm(total=len(circles_search), desc="Processing circles")
         for index, circle in tqdm(circles_search.iterrows()):
-            query = NewNearbySearchRequest(circle.geometry, 
-                                    distance_in_meters=RADIUS_IN_METERS, 
-                                    included_types=RESTAURANT_TYPES
-                                           ).json_query()
-            response = requests.post(NEW_NEARBY_SEARCH_URL, headers=QUERY_HEADERS, json=query)
-            response_data = response.json()
-            if response.reason == 'OK':
-                if 'places' in response_data:
-                    for place in response_data['places']:
-                        place = NewPlace.from_json(place).to_series()
-                        place['circle'] = index
-                        found_places = pd.concat([found_places, pd.DataFrame(place).T], axis=0, ignore_index=True)    
-                    found_places.to_parquet(tokyo_found_places)
-                circles.loc[index, 'searched'] = True
-            else:
-                print(response.status_code, response.reason, response.text)
-            if index % 500 == 0 or index == circles_search.index[-1]:
-                circles.to_file(tokyo_circles_path, driver='GeoJSON')
-            pbar.update()
-            pbar.set_postfix({'Remaining Circles': circles['searched'].value_counts()[False], 
-                                'Found Places': found_places['id'].nunique(),
-                                'Searched Circles': circles['searched'].sum()
-                              })
-            if index > 6_000:
+            searched, found_places = search_and_update_places(circle, index, found_places, tokyo_found_places)
+            update_progress_and_save(searched, circles, index, found_places, tokyo_circles_path, pbar)
+            if index > 10_000:
                 break
-
     else:
         found_places = pd.read_parquet(tokyo_found_places)
 
     if False:
-
+xx
         places_by_circle = found_places.groupby('circle')['id'].nunique().sort_values(ascending=False)
         saturated_circles = places_by_circle[places_by_circle == 20].index
 
