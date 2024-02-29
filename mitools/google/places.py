@@ -341,7 +341,7 @@ def sample_polygon_with_circles(polygon: Polygon,
 def sample_polygons_with_circles(polygons: Union[Iterable[Polygon], Polygon], 
                                  radius_in_meters: float, 
                                  step_in_degrees: float,
-                                 condition_rule: Optional[int]=1) -> List[CircleType]:
+                                 condition_rule: Optional[int]='center') -> List[CircleType]:
     if isinstance(polygons, Polygon):
         polygons = [polygons]
     elif isinstance(polygons, MultiPolygon):
@@ -515,7 +515,7 @@ def read_or_initialize_places(file_path):
 def generate_unique_place_id():
     return datetime.now().strftime("%Y%m%d%H%M%S%f")
 
-def create_place(query):
+def create_dummy_place(query):
     latitude = query['locationRestriction']['circle']['center']['latitude']
     longitude = query['locationRestriction']['circle']['center']['longitude']
     radius = query['locationRestriction']['circle']['radius']
@@ -542,21 +542,18 @@ class DummyResponse(dict):
         self.response = 'OK'
     
 def create_dummy_response(query):
-    print(query)
     dummy_response = DummyResponse()
     has_places = random.choice([True, False])
     if has_places:
         places_n = random.randint(1, 21)
-        dummy_response['places'] = [create_place(query) for _ in range(places_n)]
+        dummy_response['places'] = [create_dummy_place(query) for _ in range(places_n)]
     return dummy_response
 
-    
 def nearby_search_request(circle, radius_in_meters):
     query = NewNearbySearchRequest(circle.geometry, 
                                 distance_in_meters=radius_in_meters, 
                                 included_types=RESTAURANT_TYPES
                                    ).json_query()
-    print(query)
     if QUERY_HEADERS['X-Goog-Api-Key'] != '':
         return requests.post(NEW_NEARBY_SEARCH_URL, headers=QUERY_HEADERS, json=query)
     else:
@@ -608,10 +605,10 @@ def update_progress_and_save(searched, circles, index, found_places, file_path, 
                       'Found Places': found_places['id'].nunique(),
                       'Searched Circles': circles['searched'].sum()})
 
-def run_level_circles_search(project_folder, city, radius_in_meters, step_in_degrees, process=False, show=False):
+def run_level_circles_search(project_folder, city, radius_in_meters, step_in_degrees, process=False, recalculate=True, show=False):
     tokyo_circles_path = project_folder / Path(f"{city.name}_{radius_in_meters}_radius_{step_in_degrees}_step_circles.geojson")
     tokyo_found_places = project_folder / Path(f"{city.name}_{radius_in_meters}_radius_{step_in_degrees}_step_places.parquet")
-    circles = get_circles_search(tokyo_circles_path, city, radius_in_meters, step_in_degrees)
+    circles = get_circles_search(tokyo_circles_path, city, radius_in_meters, step_in_degrees, recalculate=recalculate)
     if show:
         _ = polygon_plot_with_sampling_circles(polygon=city.merged_polygon, circles=circles.geometry.tolist())
         plt.show()
@@ -692,7 +689,7 @@ if __name__ == '__main__':
 
     PROJECT_FOLDER = '/Users/sebastian/Desktop/MontagnaInc/Research/Cities_Restaurants'
     CITY = 'tokyo'
-    SHOW = False
+    SHOW = True
 
     city = CityGeojson(cities_geojsons[CITY], CITY)
     if SHOW:
@@ -708,9 +705,12 @@ if __name__ == '__main__':
                                                      RADIUS_IN_METERS, 
                                                      STEP_IN_DEGREES, 
                                                      process=True, 
+                                                     recalculate=True,
                                                      show=True)
     all_found_places = found_places.copy(deep=True)
     print(f'Found {all_found_places["id"].nunique()} unique places')
+
+    exit()
 
     SUBSAMPLE_RADIUS_IN_METERS = 105
     SUBSAMPLE_STEP_IN_DEGREES = STEP_IN_DEGREES * (SUBSAMPLE_RADIUS_IN_METERS / RADIUS_IN_METERS)
@@ -759,7 +759,7 @@ if __name__ == '__main__':
         resampled_circles = sample_polygons_with_circles(subsampled_area, 
                                                          SUBSAMPLE_RADIUS_IN_METERS2, 
                                                          SUBSAMPLE_STEP_IN_DEGREES2,
-                                                         condition_rule=2)
+                                                         condition_rule='circle')
         resampled_circles = gpd.GeoDataFrame(geometry=resampled_circles).reset_index(drop=True)
         resampled_circles['searched'] = False
         resampled_circles = resampled_circles.sample(frac=1, random_state=42).reset_index(drop=True)
