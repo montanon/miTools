@@ -4,6 +4,7 @@ import os
 import random
 import time
 from dataclasses import asdict, dataclass
+from datetime import datetime
 from os import PathLike
 from pathlib import Path
 from typing import Dict, Iterable, List, NewType, Optional, Tuple, Union
@@ -316,7 +317,7 @@ def circle_inside_polygon(polygon: Polygon, circle: CircleType) -> bool:
 def circle_center_inside_polygon(polygon: Polygon, circle: CircleType) -> bool:
     return polygon.contains(circle.centroid)
 
-def sample_polygon_with_circle(polygon: Polygon, 
+def sample_polygon_with_circles(polygon: Polygon, 
                                radius_in_meters: float, 
                                step_in_degrees: float,
                                condition_rule: Optional[str]='center') -> List[CircleType]:
@@ -328,14 +329,13 @@ def sample_polygon_with_circle(polygon: Polygon,
     if not polygon.is_valid:
         raise ValueError('Invalid Polygon')
     minx, miny, maxx, maxy = polygon.bounds
+    latitudes, longitudes = np.arange(miny, maxy, step_in_degrees), np.arange(minx, maxx, step_in_degrees)
     circles = []
-    for lat in np.arange(miny, maxy, step_in_degrees):
-        for lon in np.arange(minx, maxx, step_in_degrees):
-            point = Point(lon, lat)
-            deg_radius = meters_to_degree(distance_in_meters=radius_in_meters, reference_latitude=lat)
-            circle = point.buffer(deg_radius)
-            if conditions[condition_rule](polygon=polygon, circle=circle):
-                circles.append(circle)
+    for lat, lon in itertools.product(latitudes, longitudes):
+        deg_radius = meters_to_degree(distance_in_meters=radius_in_meters, reference_latitude=lat)
+        circle = Point(lon, lat).buffer(deg_radius)
+        if conditions[condition_rule](polygon=polygon, circle=circle):
+            circles.append(circle)
     return circles
 
 def sample_polygons_with_circles(polygons: Union[Iterable[Polygon], Polygon], 
@@ -348,7 +348,7 @@ def sample_polygons_with_circles(polygons: Union[Iterable[Polygon], Polygon],
         polygons = list(polygons.geoms)
     circles = []
     for polygon in polygons:
-        circles.extend(sample_polygon_with_circle(polygon=polygon, 
+        circles.extend(sample_polygon_with_circles(polygon=polygon, 
                                                   radius_in_meters=radius_in_meters, 
                                                   step_in_degrees=step_in_degrees,
                                                   condition_rule=condition_rule))
@@ -400,7 +400,6 @@ def polygon_plot_with_sampling_circles(polygon: Polygon,
                                        output_file_path: Optional[PathLike]=None) -> Axes:
     minx, miny, maxx, maxy = polygon.bounds
     out_circles, in_circles = [], []
-    from tqdm import tqdm
     for circle in tqdm(circles):
         if polygon.contains(circle) or polygon.intersects(circle):
             in_circles.append(circle)
@@ -513,28 +512,87 @@ def read_or_initialize_places(file_path):
     else:
         return pd.DataFrame(columns=['circle', *list(NewPlace.__annotations__.keys())])
 
-def search_and_update_places(circle, index, found_places):
+def generate_unique_place_id():
+    return datetime.now().now.strftime("%Y%m%d%H%M%S%f")
+
+def create_place(query):
+    latitude, longitude = (float(v) for v in query['location'].split(', '))
+    distance_in_deg = meters_to_degree(query['radius'], latitude)
+    random_types = random.sample(RESTAURANT_TYPES, random.randint(1, min(len(RESTAURANT_TYPES), random.randint(1,5))))
+    unique_id = generate_unique_place_id()
+    place_json = {
+        'id': unique_id,
+        'types': random_types,
+        'location': {
+            'latitude': random.uniform(latitude - distance_in_deg, latitude + distance_in_deg),
+            'longitude': random.uniform(longitude - distance_in_deg, longitude + distance_in_deg)
+        },
+        'displayName': {
+            'text': f'Name {unique_id}'
+            },
+        'primaryType': random.choice(random_types)
+    }
+    return place_json
+
+class DummyResponse(dict):
+    def __init__(self):
+        super().__init__()
+        self.response = 'OK'
+    
+def create_dummy_response(query):
+    dummy_response = DummyResponse()
+    has_places = random.choice([True, False])
+    if has_places:
+        places_n = random.randint(1, 21)
+        dummy_response['places'] = [create_place(query) for _ in range(places_n)]
+    return dummy_response
+
+    
+def nearby_search_request(circle, radius_in_meters):
     query = NewNearbySearchRequest(circle.geometry, 
-                                   distance_in_meters=RADIUS_IN_METERS, 
-                                   included_types=RESTAURANT_TYPES
+                                distance_in_meters=radius_in_meters, 
+                                included_types=RESTAURANT_TYPES
                                    ).json_query()
-    response = requests.post(NEW_NEARBY_SEARCH_URL, headers=QUERY_HEADERS, json=query)
-    response_data = response.json()
+    if QUERY_HEADERS['X-Goog-Api-Key'] != '':
+        return requests.post(NEW_NEARBY_SEARCH_URL, headers=QUERY_HEADERS, json=query)
+    else:
+        return create_dummy_response(query)
+
+def get_response_places(response_id, response):
+    for n, place in enumerate(response.json()['places']):
+        place_series = NewPlace.from_json(place).to_series()
+        place_series['circle'] = response_id
+        if n == 0:
+            places_df = pd.DataFrame(place_series).T
+        else:
+            places_df = pd.concat([places_df, pd.DataFrame(place_series).T], axis=0, ignore_index=True)
+    return places_df
+
+def search_and_update_places(circle, radius_in_meters, response_id):
+    response = nearby_search_request(circle, radius_in_meters)
+    places_df = None
     if response.reason == 'OK':
-        if 'places' in response_data:
-            for n, place in enumerate(response.json()['places']):
-                place_series = NewPlace.from_json(place).to_series()
-                place_series['circle'] = index
-                if n == 0:
-                    places_df = pd.DataFrame(place_series).T
-                else:
-                    places_df = pd.concat([places_df, pd.DataFrame(place_series).T], axis=0, ignore_index=True)
-            found_places = pd.concat([found_places, places_df], axis=0, ignore_index=True)
+        if 'places' in response.json():
+            places_df = get_response_places(response_id)
         searched = True
     else:
         print(response.status_code, response.reason, response.text)
         searched = False
-    return searched, found_places
+    return searched, places_df
+    
+def process_circles(circles, file_path, circles_path):
+    if (~circles['searched']).any():
+        circles_search = circles[~circles['searched']]
+        found_places = read_or_initialize_places(file_path)
+        pbar = tqdm(total=len(circles_search), desc="Processing circles")
+        for index, circle in circles_search.iterrows():
+            searched, places_df = search_and_update_places(circle, index)
+            if places_df:
+                found_places = pd.concat([found_places, places_df], axis=0, ignore_index=True)
+            update_progress_and_save(searched, circles, index, found_places, file_path, circles_path, pbar)
+    else:
+        found_places = pd.read_parquet(file_path)
+    return found_places
 
 def update_progress_and_save(searched, circles, index, found_places, file_path, circles_path, pbar):
     circles.loc[index, 'searched'] = searched
@@ -545,18 +603,6 @@ def update_progress_and_save(searched, circles, index, found_places, file_path, 
     pbar.set_postfix({'Remaining Circles': circles['searched'].value_counts()[False] if False in circles['searched'].value_counts() else 0, 
                       'Found Places': found_places['id'].nunique(),
                       'Searched Circles': circles['searched'].sum()})
-    
-def process_circles(circles, file_path, circles_path):
-    if (~circles['searched']).any():
-        circles_search = circles[~circles['searched']]
-        found_places = read_or_initialize_places(file_path)
-        pbar = tqdm(total=len(circles_search), desc="Processing circles")
-        for index, circle in circles_search.iterrows():
-            searched, found_places = search_and_update_places(circle, index, found_places)
-            update_progress_and_save(searched, circles, index, found_places, file_path, circles_path, pbar)
-    else:
-        found_places = pd.read_parquet(file_path)
-    return found_places
 
 def run_level_circles_search(project_folder, city, radius_in_meters, step_in_degrees, process=False, show=False):
     tokyo_circles_path = project_folder / Path(f"{city.name}_{radius_in_meters}_radius_{step_in_degrees}_step_circles.geojson")
