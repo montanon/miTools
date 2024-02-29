@@ -312,7 +312,8 @@ def meters_to_degree(distance_in_meters: float,
 
 def sample_polygon_with_circle(polygon: Polygon, 
                                radius_in_meters: float, 
-                               step_in_degrees: float) -> List[CircleType]:
+                               step_in_degrees: float,
+                               condition_rule: Optional[int]=1) -> List[CircleType]:
     if not polygon.is_valid:
         raise ValueError('Invalid Polygon')
     minx, miny, maxx, maxy = polygon.bounds
@@ -322,13 +323,17 @@ def sample_polygon_with_circle(polygon: Polygon,
             point = Point(lon, lat)
             deg_radius = meters_to_degree(distance_in_meters=radius_in_meters, reference_latitude=lat)
             circle = point.buffer(deg_radius)
-            if polygon.contains(point) or polygon.intersects(circle):
+            condition1 = polygon.contains(point) or polygon.intersects(circle)
+            condition2 = circle.within(polygon)
+            condition = condition1 if condition_rule == 1 else condition2
+            if condition:
                 circles.append(circle)
     return circles
 
 def sample_polygons_with_circles(polygons: Union[Iterable[Polygon], Polygon], 
                                  radius_in_meters: float, 
-                                 step_in_degrees: float) -> List[CircleType]:
+                                 step_in_degrees: float,
+                                 condition_rule: Optional[int]=1) -> List[CircleType]:
     if isinstance(polygons, Polygon):
         polygons = [polygons]
     elif isinstance(polygons, MultiPolygon):
@@ -337,7 +342,8 @@ def sample_polygons_with_circles(polygons: Union[Iterable[Polygon], Polygon],
     for polygon in polygons:
         circles.extend(sample_polygon_with_circle(polygon=polygon, 
                                                   radius_in_meters=radius_in_meters, 
-                                                  step_in_degrees=step_in_degrees))
+                                                  step_in_degrees=step_in_degrees,
+                                                  condition_rule=condition_rule))
     return circles
 
 def polygons_folium_map(polygons: Union[Iterable[Polygon], Polygon], 
@@ -499,7 +505,7 @@ def read_or_initialize_places(file_path):
     else:
         return pd.DataFrame(columns=['circle', *list(NewPlace.__annotations__.keys())])
 
-def search_and_update_places(circle, index, found_places, file_path):
+def search_and_update_places(circle, index, found_places):
     query = NewNearbySearchRequest(circle.geometry, 
                                    distance_in_meters=RADIUS_IN_METERS, 
                                    included_types=RESTAURANT_TYPES
@@ -508,20 +514,24 @@ def search_and_update_places(circle, index, found_places, file_path):
     response_data = response.json()
     if response.reason == 'OK':
         if 'places' in response_data:
-            for place in response.json()['places']:
+            for n, place in enumerate(response.json()['places']):
                 place_series = NewPlace.from_json(place).to_series()
                 place_series['circle'] = index
-                found_places = pd.concat([found_places, pd.DataFrame(place_series).T], ignore_index=True)
-            found_places.to_parquet(file_path)
+                if n == 0:
+                    places_df = pd.DataFrame(place_series).T
+                else:
+                    places_df = pd.concat([places_df, pd.DataFrame(place_series).T], axis=0, ignore_index=True)
+            found_places = pd.concat([found_places, places_df], axis=0, ignore_index=True)
         searched = True
     else:
         print(response.status_code, response.reason, response.text)
         searched = False
     return searched, found_places
 
-def update_progress_and_save(searched, circles, index, found_places, circles_path, pbar):
+def update_progress_and_save(searched, circles, index, found_places, file_path, circles_path, pbar):
     circles.loc[index, 'searched'] = searched
-    if index % 1_000 == 0 or index == circles.shape[0] - 1:
+    if index % 500 == 0 or index == circles.shape[0] - 1:
+        found_places.to_parquet(file_path)
         circles.to_file(circles_path, driver='GeoJSON')
     pbar.update()
     pbar.set_postfix({'Remaining Circles': circles['searched'].value_counts()[False] if False in circles['searched'].value_counts() else 0, 
@@ -534,8 +544,8 @@ def process_circles(circles, file_path, circles_path):
         found_places = read_or_initialize_places(file_path)
         pbar = tqdm(total=len(circles_search), desc="Processing circles")
         for index, circle in circles_search.iterrows():
-            searched, found_places = search_and_update_places(circle, index, found_places, file_path)
-            update_progress_and_save(searched, circles, index, found_places, circles_path, pbar)
+            searched, found_places = search_and_update_places(circle, index, found_places)
+            update_progress_and_save(searched, circles, index, found_places, file_path, circles_path, pbar)
     else:
         found_places = pd.read_parquet(file_path)
     return found_places
@@ -553,8 +563,8 @@ def run_level_circles_search(project_folder, city, radius_in_meters, step_in_deg
         found_places = None
     return circles, found_places
 
-def plot_subsampled_circles_schema(original_circle, original_radius, circle_subsamples, plot_path):
-    if not plot_path.exists():
+def plot_subsampled_circles_schema(original_circle, original_radius, circle_subsamples, plot_path, show=False):
+    if not plot_path.exists() or show:
         fig, ax = plt.subplots()
         x, y = Point(original_circle.centroid).buffer(meters_to_degree(original_radius, original_circle.centroid.y)).exterior.xy
         ax.fill(x, y, alpha=0.25, fc='r', ec='none')
@@ -585,7 +595,7 @@ def get_subsampled_circles(city,
             circle_subsamples = create_subsampled_circles(circle.centroid, original_radius, subsampling_radius, subsampling_count, subsamplig_factor)
             for subsampled_circle in circle_subsamples:
                     subsampled_circles = pd.concat([subsampled_circles, DataFrame({'circle': saturated_circle, 'subsampled_circle': subsampled_circle}, index=[0])], axis=0, ignore_index=True)
-        plot_subsampled_circles_schema(circle, original_radius, circle_subsamples, subsampling_circles_schema_plot)
+        plot_subsampled_circles_schema(circle, original_radius, circle_subsamples, subsampling_circles_schema_plot, show=show)
         subsampled_circles = subsampled_circles.reset_index(drop=True)
         subsampled_circles['searched'] = False
         subsampled_circles = gpd.GeoDataFrame(subsampled_circles, geometry='subsampled_circle')
@@ -640,7 +650,9 @@ if __name__ == '__main__':
                                                      RADIUS_IN_METERS, 
                                                      STEP_IN_DEGREES, 
                                                      process=True, 
-                                                     show=False)
+                                                     show=True)
+    all_found_places = found_places.copy(deep=True)
+    print(f'Found {all_found_places["id"].nunique()} unique places')
 
     SUBSAMPLE_RADIUS_IN_METERS = 105
     SUBSAMPLE_STEP_IN_DEGREES = STEP_IN_DEGREES * (SUBSAMPLE_RADIUS_IN_METERS / RADIUS_IN_METERS)
@@ -654,60 +666,71 @@ if __name__ == '__main__':
                                                    SUBSAMPLE_CIRCLE_COUNT, 
                                                    SUBSAMPLE_FACTOR, 
                                                    PROJECT_FOLDER,
-                                                   show=False)
+                                                   show=True)
     
     subsampled_area, resampled_circles = resample_subsampled_area(city, 
                                                                   subsampled_circles, 
                                                                   PROJECT_FOLDER, 
                                                                   SUBSAMPLE_RADIUS_IN_METERS, 
                                                                   SUBSAMPLE_STEP_IN_DEGREES, 
-                                                                  show=False)
+                                                                  show=True)
+    resampled_found_places = PROJECT_FOLDER / Path(f"{city.name}_{SUBSAMPLE_RADIUS_IN_METERS}_radius_{SUBSAMPLE_STEP_IN_DEGREES}_step_resampled_places.parquet")
+    resampled_circles_path = PROJECT_FOLDER / Path(f"{city.name}_{SUBSAMPLE_RADIUS_IN_METERS}_radius_{SUBSAMPLE_STEP_IN_DEGREES}_step_resampled_circles.geojson")
+    if resampled_circles_path.exists():
+        resampled_circles = gpd.read_file(resampled_circles_path)
+    found_places = process_circles(resampled_circles, resampled_found_places, resampled_circles_path)
+    all_found_places = pd.concat([all_found_places, found_places], axis=0, ignore_index=True)
+    print(f'Found {all_found_places["id"].nunique()} unique places')
+    SUBSAMPLE_RADIUS_IN_METERS2 = 50
+    SUBSAMPLE_STEP_IN_DEGREES2 = 0.0009
+    SUBSAMPLE_CIRCLE_COUNT2 = 7
+    SUBSAMPLE_FACTOR2 = 1.8
+    subsampled_circles_path2 = PROJECT_FOLDER / Path(f"{city.name}_{SUBSAMPLE_RADIUS_IN_METERS2}_radius_{SUBSAMPLE_CIRCLE_COUNT2}-{SUBSAMPLE_FACTOR2}_subsampled_circles.geojson")
+    subsampling_circles_schema_plot2 = PROJECT_FOLDER / Path(f"{city.name}_{SUBSAMPLE_RADIUS_IN_METERS}-{SUBSAMPLE_RADIUS_IN_METERS2}_radius_{SUBSAMPLE_CIRCLE_COUNT2}-{SUBSAMPLE_FACTOR2}_subsampled_circles.png")
+
+    places_by_circle = found_places.groupby('circle')['id'].nunique().sort_values(ascending=False)
+    saturated_circles = places_by_circle[places_by_circle == 20].index
+    saturated_circles = resampled_circles.loc[saturated_circles, :]
+
+    subsampled_area = saturated_circles.geometry.unary_union
+    if True:
+        gpd.GeoSeries(subsampled_area).plot(facecolor='none', edgecolor=sns.color_palette('Paired')[0])
+        plt.show()
+
+    if not subsampled_circles_path2.exists():
+        resampled_circles = sample_polygons_with_circles(subsampled_area, 
+                                                         SUBSAMPLE_RADIUS_IN_METERS2, 
+                                                         SUBSAMPLE_STEP_IN_DEGREES2,
+                                                         condition_rule=2)
+        resampled_circles = gpd.GeoDataFrame(geometry=resampled_circles).reset_index(drop=True)
+        resampled_circles['searched'] = False
+        resampled_circles = resampled_circles.sample(frac=1, random_state=42).reset_index(drop=True)
+        resampled_circles.to_file(subsampled_circles_path2, driver='GeoJSON')
+    else:
+        resampled_circles = gpd.read_file(subsampled_circles_path2)
+
+    if True:
+        _ = polygon_plot_with_sampling_circles(polygon=subsampled_area, circles=resampled_circles.geometry.tolist())
+        plt.show()
+
+    resampled_found_places2 = PROJECT_FOLDER / Path(f"{city.name}_{SUBSAMPLE_RADIUS_IN_METERS2}_radius_{SUBSAMPLE_STEP_IN_DEGREES2}_step_resampled_places.parquet")
+    resampled_circles_path2 = PROJECT_FOLDER / Path(f"{city.name}_{SUBSAMPLE_RADIUS_IN_METERS2}_radius_{SUBSAMPLE_STEP_IN_DEGREES2}_step_resampled_circles.geojson")
+    if resampled_circles_path2.exists():
+        resampled_circles = gpd.read_file(resampled_circles_path2)
+    found_places = process_circles(resampled_circles, resampled_found_places2, resampled_circles_path2)
+    all_found_places = pd.concat([all_found_places, found_places], axis=0, ignore_index=True)
+    print(f'Found {all_found_places["id"].nunique()} unique places')
     
-    if False:
+    places_by_circle = found_places.groupby('circle')["id"].nunique().sort_values(ascending=False)
+    saturated_circles = places_by_circle[places_by_circle == 20].index
+    saturated_circles = resampled_circles.loc[saturated_circles, :]
 
-        if (~subsampled_circles['searched']).any():
+    display(saturated_circles)
 
-            circles_search = subsampled_circles[~subsampled_circles['searched']]
+    subsampled_area = saturated_circles.geometry.unary_union
+    if True:
+        gpd.GeoSeries(subsampled_area).plot(facecolor='none', edgecolor=sns.color_palette('Paired')[0])
+        plt.show()
 
-            if tokyo_subsampled_found_places.exists():
-                subsampled_found_places = pd.read_parquet(tokyo_subsampled_found_places)
-            else:
-                subsampled_found_places = DataFrame(columns=['circle', *list(NewPlace.__annotations__.keys())])
-            
-            total_circles = len(circles_search)
-            pbar = tqdm(total=total_circles, desc="Processing circles")
-            for index, circle in tqdm(circles_search.iterrows()):
-                query = NewNearbySearchRequest(circle.subsampled_circle, 
-                                        distance_in_meters=SMALL_RADIUS_IN_METERS, 
-                                        included_types=RESTAURANT_TYPES
-                                               ).json_query()
-                response = requests.post(NEW_NEARBY_SEARCH_URL, headers=QUERY_HEADERS, json=query)
-                response_data = response.json()
-                if response.reason == 'OK':
-                    if 'places' in response_data:
-                        for place in response_data['places']:
-                            place = NewPlace.from_json(place).to_series()
-                            place['circle'] = circle['circle']
-                            subsampled_found_places = pd.concat([subsampled_found_places, pd.DataFrame(place).T], axis=0, ignore_index=True)    
-                        subsampled_found_places.to_parquet(tokyo_subsampled_found_places)
-                    else: print('No Places')
-                    subsampled_circles.loc[index, 'searched'] = True
-                else:
-                    print(response.status_code, response.reason, response.text)
-                if index % 500 == 0 or index == circles_search.index[-1]:
-                    subsampled_circles.to_file(tokyo_subsampled_circles_path, driver='GeoJSON')
-                pbar.update()
-                pbar.set_postfix({'Remaining Circles': subsampled_circles['searched'].value_counts()[False], 
-                                    'Found Places': found_places['id'].nunique(),
-                                    'Searched Circles': subsampled_circles['searched'].sum()
-                                  })
-
-        else:
-            subsampled_found_places = pd.read_parquet(tokyo_subsampled_found_places)
-
-        display(subsampled_circles)
-
-
-
-
+    
 
