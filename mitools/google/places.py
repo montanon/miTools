@@ -513,11 +513,13 @@ def read_or_initialize_places(file_path):
         return pd.DataFrame(columns=['circle', *list(NewPlace.__annotations__.keys())])
 
 def generate_unique_place_id():
-    return datetime.now().now.strftime("%Y%m%d%H%M%S%f")
+    return datetime.now().strftime("%Y%m%d%H%M%S%f")
 
 def create_place(query):
-    latitude, longitude = (float(v) for v in query['location'].split(', '))
-    distance_in_deg = meters_to_degree(query['radius'], latitude)
+    latitude = query['locationRestriction']['circle']['center']['latitude']
+    longitude = query['locationRestriction']['circle']['center']['longitude']
+    radius = query['locationRestriction']['circle']['radius']
+    distance_in_deg = meters_to_degree(radius, latitude)
     random_types = random.sample(RESTAURANT_TYPES, random.randint(1, min(len(RESTAURANT_TYPES), random.randint(1,5))))
     unique_id = generate_unique_place_id()
     place_json = {
@@ -540,6 +542,7 @@ class DummyResponse(dict):
         self.response = 'OK'
     
 def create_dummy_response(query):
+    print(query)
     dummy_response = DummyResponse()
     has_places = random.choice([True, False])
     if has_places:
@@ -553,6 +556,7 @@ def nearby_search_request(circle, radius_in_meters):
                                 distance_in_meters=radius_in_meters, 
                                 included_types=RESTAURANT_TYPES
                                    ).json_query()
+    print(query)
     if QUERY_HEADERS['X-Goog-Api-Key'] != '':
         return requests.post(NEW_NEARBY_SEARCH_URL, headers=QUERY_HEADERS, json=query)
     else:
