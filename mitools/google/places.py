@@ -6,7 +6,7 @@ import time
 from dataclasses import asdict, dataclass
 from os import PathLike
 from pathlib import Path
-from typing import Iterable, List, NewType, Optional, Tuple, Union
+from typing import Dict, Iterable, List, NewType, Optional, Tuple, Union
 
 import folium
 import geopandas as gpd
@@ -138,7 +138,7 @@ class NewNearbySearchRequest:
         self.included_types = included_types if included_types else []
         self.max_result_count = max_result_count
 
-    def json_query(self):
+    def json_query(self) -> Dict:
         query = {
             'includedTypes': self.included_types,
             'maxResultCount': self.max_result_count,
@@ -159,7 +159,7 @@ class NearbySearchRequest:
         self.key = GOOGLE_PLACES_API_KEY
         self.language_code = language_code
 
-    def json_query(self):
+    def json_query(self) -> Dict:
         query = {
             'location': self.location,
             'radius': self.distance_in_meters,
@@ -310,10 +310,21 @@ def meters_to_degree(distance_in_meters: float,
     lon_degrees = distance_in_meters / meters_per_degree_longitude
     return max(lat_degrees, lon_degrees)
 
+def circle_inside_polygon(polygon: Polygon, circle: CircleType) -> bool:
+    return circle.within(polygon)
+
+def circle_center_inside_polygon(polygon: Polygon, circle: CircleType) -> bool:
+    return polygon.contains(circle.centroid)
+
 def sample_polygon_with_circle(polygon: Polygon, 
                                radius_in_meters: float, 
                                step_in_degrees: float,
-                               condition_rule: Optional[int]=1) -> List[CircleType]:
+                               condition_rule: Optional[str]='center') -> List[CircleType]:
+    assert condition_rule in ['center', 'circle'], 'condition_rule must be one of "center" or "circle"'
+    conditions = {
+        'circle': circle_inside_polygon,
+        'center': circle_center_inside_polygon
+    }
     if not polygon.is_valid:
         raise ValueError('Invalid Polygon')
     minx, miny, maxx, maxy = polygon.bounds
@@ -323,10 +334,7 @@ def sample_polygon_with_circle(polygon: Polygon,
             point = Point(lon, lat)
             deg_radius = meters_to_degree(distance_in_meters=radius_in_meters, reference_latitude=lat)
             circle = point.buffer(deg_radius)
-            condition1 = polygon.contains(point) or polygon.intersects(circle)
-            condition2 = circle.within(polygon)
-            condition = condition1 if condition_rule == 1 else condition2
-            if condition:
+            if conditions[condition_rule](polygon=polygon, circle=circle):
                 circles.append(circle)
     return circles
 
