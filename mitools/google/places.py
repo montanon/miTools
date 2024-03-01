@@ -452,14 +452,14 @@ def polygon_plot_with_sampling_circles(polygon: Polygon,
         [], [], color='g', marker='o', markersize=10, label='In Circles', linestyle='None')
     ax.legend(handles=[out_circle_proxy, in_circle_proxy] if out_circles else [in_circle_proxy],
               loc='lower center', bbox_to_anchor=(0.5, -0.1), ncol=2)
-    ax.set_title('Sampling of POIs')
+    ax.set_title('Circles to Sample')
     ax.set_xticks([])
     ax.set_yticks([])
     if point_of_interest:
         ax.set_xlim([point_of_interest.centroid.x - zoom_level, point_of_interest.centroid.x + zoom_level])
         ax.set_ylim([point_of_interest.centroid.y - zoom_level, point_of_interest.centroid.y + zoom_level])
     if output_file_path:
-        plt.savefig(output_file_path)
+        plt.savefig(output_file_path, dpi=500)
     return ax
 
 def polygon_plot_with_circles_and_points(polygon, 
@@ -476,7 +476,7 @@ def polygon_plot_with_circles_and_points(polygon,
     for point in points:
         ax.plot(point[0], point[1], 'ro', markersize=0.25)
     if output_file_path:
-        plt.savefig(output_file_path)
+        plt.savefig(output_file_path, dpi=500)
     return ax
 
 def polygon_plot_with_points(polygon, 
@@ -508,14 +508,14 @@ def polygon_plot_with_points(polygon,
         [], [], color='g', marker='o', markersize=10, label='In Circles', linestyle='None')
     ax.legend(handles=[places_proxy],
               loc='lower center', bbox_to_anchor=(0.5, -0.1), ncol=2)
-    ax.set_title('Sampling of POIs')
+    ax.set_title('Sampled Points')
     ax.set_xticks([])
     ax.set_yticks([])
     if point_of_interest:
         ax.set_xlim([point_of_interest.centroid.x - zoom_level, point_of_interest.centroid.x + zoom_level])
         ax.set_ylim([point_of_interest.centroid.y - zoom_level, point_of_interest.centroid.y + zoom_level])
     if output_file_path:
-        plt.savefig(output_file_path)
+        plt.savefig(output_file_path, dpi=500)
     return ax
 
 def run_new_nearby_search():
@@ -717,7 +717,7 @@ def plot_subsampled_circles_schema(original_circle, original_radius, circle_subs
         for circle_subsample in circle_subsamples:
             x, y = circle_subsample.exterior.xy
             ax.fill(x, y, alpha=0.5, fc='b', ec='none')
-        fig.savefig(plot_path)
+        fig.savefig(plot_path, dpi=500)
 
 def get_subsampled_circles(city, 
                            circles, 
@@ -771,7 +771,8 @@ def resample_subsampled_area(city, subsampled_circles, project_folder, subsample
         plt.show()
     return subsampled_area, resampled_circles
 
-def search_places_in_polygon(root_folder, 
+def search_places_in_polygon(root_folder,
+                             plot_folder, 
                                  tag, 
                                  polygon,
                                  radius_in_meters, 
@@ -781,10 +782,10 @@ def search_places_in_polygon(root_folder,
                                  show=False):
         circles_path = root_folder / Path(f"{tag}_{radius_in_meters}_radius_{step_in_degrees}_step_circles.geojson")
         places_path = root_folder / Path(f"{tag}_{radius_in_meters}_radius_{step_in_degrees}_step_places.parquet")
-        polygon_with_circles_plot_path = root_folder / Path(f"{tag}_polygon_with_circles_plot.png")
-        polygon_with_circles_zoom_plot_path = root_folder / Path(f"{tag}_polygon_with_circles_zoom_plot.png")
-        polygon_with_circles_and_points_plot_path = root_folder / Path(f"{tag}_polygon_with_circles_and_places_plot.png")
-        polygon_with_circles_and_points_zoom_plot_path = root_folder / Path(f"{tag}_polygon_with_circles_and_places_zoom_plot.png")
+        polygon_with_circles_plot_path = plot_folder / Path(f"{tag}_polygon_with_circles_plot.png")
+        polygon_with_circles_zoom_plot_path = plot_folder / Path(f"{tag}_polygon_with_circles_zoom_plot.png")
+        polygon_with_circles_and_points_plot_path = plot_folder / Path(f"{tag}_polygon_with_circles_and_places_plot.png")
+        polygon_with_circles_and_points_zoom_plot_path = plot_folder / Path(f"{tag}_polygon_with_circles_and_places_zoom_plot.png")
         circles = get_circles_search(circles_path, 
                                     polygon, 
                                     radius_in_meters, 
@@ -829,21 +830,33 @@ def search_places_in_polygon(root_folder,
         return circles, found_places
 
 def get_saturated_circles(polygon, found_places, circles, threshold, show=False, output_file_path=None):
+    
     places_by_circle = found_places.groupby('circle')["id"].nunique().sort_values(ascending=False)
     saturated_circles = places_by_circle[places_by_circle >= threshold].index
     saturated_circles = circles.loc[saturated_circles, :]
+    _ = polygon_plot_with_circles_and_points(polygon=polygon, 
+                                            circles=saturated_circles.geometry.tolist(), 
+                                            points=found_places.loc[found_places['circle'].isin(saturated_circles.index), ['longitude', 'latitude']].values.tolist(), 
+                                            output_file_path=output_file_path)
     if show:
-        _ = polygon_plot_with_circles_and_points(polygon=polygon, 
-                                                circles=saturated_circles.geometry.tolist(), 
-                                                points=found_places.loc[found_places['circle'].isin(saturated_circles.index), ['longitude', 'latitude']].values.tolist(), 
-                                                output_file_path=output_file_path)
         plt.show()
     return saturated_circles
 
-def get_saturated_area(saturated_circles, show=False):
+def get_saturated_area(polygon, saturated_circles, show=False, output_path=None):
     saturated_area = saturated_circles.geometry.unary_union
+    width = 14
+    aspect_ratio = 16/9
+    height = width / aspect_ratio
+    polygon = gpd.GeoSeries(polygon)
+    ax = polygon.plot(
+            facecolor=sns.color_palette('Paired')[0], edgecolor='none', alpha=0.5, figsize=(width, height))
+    gpd.GeoSeries(saturated_area).plot(ax=ax, facecolor='none', edgecolor=sns.color_palette('Paired')[0])
+    ax.set_title('Saturated Sampled Areas')
+    ax.set_ylabel('Latitude')
+    ax.set_xlabel('Longitude')
+    if output_path:
+        plt.savefig(output_path, dpi=500)
     if show:
-            gpd.GeoSeries(saturated_area).plot(facecolor='none', edgecolor=sns.color_palette('Paired')[0])
             plt.show()
     return saturated_area
 
@@ -856,28 +869,31 @@ if __name__ == '__main__':
 
     PROJECT_FOLDER = Path('/Users/sebastian/Desktop/MontagnaInc/Research/Cities_Restaurants/test')
     PROJECT_FOLDER.mkdir(exist_ok=True)
+    PLOTS_FOLDER = PROJECT_FOLDER / 'plots'
+    PLOTS_FOLDER.mkdir(exist_ok=True)
     CITY = 'tokyo'
     SHOW = True
     RECALCULATE = True
 
     city = CityGeojson(cities_geojsons[CITY], CITY)
-    city_wards_plot_path = PROJECT_FOLDER / f"{city.name}_wards_polygons_plot.png"
-    city_plot_path = PROJECT_FOLDER / f"{city.name}_polygon_plot.png"
+    city_wards_plot_path = PLOTS_FOLDER / f"{city.name}_wards_polygons_plot.png"
+    city_plot_path = PLOTS_FOLDER / f"{city.name}_polygon_plot.png"
     if SHOW:
         ax = city.plot_polygons()
         if not city_wards_plot_path.exists() or RECALCULATE:
-            ax.get_figure().savefig(city_wards_plot_path)
+            ax.get_figure().savefig(city_wards_plot_path, dpi=500)
         plt.show()
         ax = city.plot_unary_polygon()
         if not city_plot_path.exists() or RECALCULATE:
-            ax.get_figure().savefig(city_plot_path)
+            ax.get_figure().savefig(city_plot_path, dpi=500)
         plt.show()
 
     print('STEP 1')
     RADIUS_IN_METERS = 500 #50
-    STEP_IN_DEGREES = 0.00375*2 #0.00075
+    STEP_IN_DEGREES = 0.0039*2 #0.00075
     TAG = f"Step-1_{city.name}"
     circles, found_places = search_places_in_polygon(PROJECT_FOLDER,
+                                                     PLOTS_FOLDER,
                                                      TAG,
                                                      city.merged_polygon,
                                                      RADIUS_IN_METERS,
@@ -886,19 +902,22 @@ if __name__ == '__main__':
                                                      recalculate=RECALCULATE,
                                                      show=SHOW)
     print('SATURED STEP 1')
+    saturated_circles_plot_path = PLOTS_FOLDER / f"{TAG}_saturated_circles_plot.png"
+    saturated_area_plot_path = PLOTS_FOLDER / f"{TAG}_saturated_area_plot.png"
     saturated_circles = get_saturated_circles(city.merged_polygon, 
                                               found_places, 
                                               circles, 
                                               threshold=12, 
                                               show=SHOW, 
-                                              output_file_path=None)
-    saturated_area = get_saturated_area(saturated_circles, show=SHOW)
+                                              output_file_path=saturated_circles_plot_path)
+    saturated_area = get_saturated_area(city.merged_polygon, saturated_circles, show=SHOW, output_path=saturated_area_plot_path)
     plt.close('all')
     print('STEP 2')
     RADIUS_IN_METERS2 = 100
     STEP_IN_DEGREES2 = STEP_IN_DEGREES * (RADIUS_IN_METERS2 / RADIUS_IN_METERS)
     TAG = f"Step-2_{city.name}"
     circles, found_places = search_places_in_polygon(PROJECT_FOLDER,
+                                                     PLOTS_FOLDER,
                                                      TAG,
                                                      saturated_area,
                                                      RADIUS_IN_METERS2,
@@ -907,19 +926,22 @@ if __name__ == '__main__':
                                                      recalculate=RECALCULATE,
                                                      show=SHOW)
     print('SATURED STEP 2')
+    saturated_circles_plot_path = PLOTS_FOLDER / f"{TAG}_saturated_circles_plot.png"
+    saturated_area_plot_path = PLOTS_FOLDER / f"{TAG}_saturated_area_plot.png"
     saturated_circles = get_saturated_circles(saturated_area, 
                                               found_places, 
                                               circles, 
                                               threshold=15, 
                                               show=SHOW, 
-                                              output_file_path=None)
-    saturated_area = get_saturated_area(saturated_circles, show=SHOW)
+                                              output_file_path=saturated_circles_plot_path)
+    saturated_area = get_saturated_area(city.merged_polygon, saturated_circles, show=SHOW, output_path=saturated_area_plot_path)
     plt.close('all')
     print('STEP 3')
     TAG = f"Step-3_{city.name}"
     RADIUS_IN_METERS3 = 50
     STEP_IN_DEGREES3 = STEP_IN_DEGREES2 * (RADIUS_IN_METERS3 / RADIUS_IN_METERS2)
     circles, found_places = search_places_in_polygon(PROJECT_FOLDER,
+                                                     PLOTS_FOLDER,
                                                      TAG,
                                                      saturated_area,
                                                      RADIUS_IN_METERS3,
