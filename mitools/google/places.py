@@ -522,7 +522,12 @@ def run_nearby_search():
     all_places.to_excel('dehli_places.xlsx', index=False)
     display(all_places)
 
-def get_circles_search(circles_path, polygon, radius_in_meters, step_in_degrees, condition_rule='center', recalculate=False):
+def get_circles_search(circles_path, 
+                       polygon, 
+                       radius_in_meters, 
+                       step_in_degrees, 
+                       condition_rule='center', 
+                       recalculate=False):
     if not circles_path.exists() or recalculate:
         circles = sample_polygons_with_circles(polygons=polygon, 
                                             radius_in_meters=radius_in_meters, 
@@ -728,6 +733,60 @@ def resample_subsampled_area(city, subsampled_circles, project_folder, subsample
         plt.show()
     return subsampled_area, resampled_circles
 
+def search_places_in_polygon(root_folder, 
+                                 tag, 
+                                 polygon,
+                                 radius_in_meters, 
+                                 step_in_degrees, 
+                                 condition_rule, 
+                                 ref_polygon: Optional[Polygon]=None,
+                                 recalculate=False, 
+                                 show=False):
+        circles_path = root_folder / Path(f"{tag}_{radius_in_meters}_radius_{step_in_degrees}_step_circles.geojson")
+        places_path = root_folder / Path(f"{tag}_{radius_in_meters}_radius_{step_in_degrees}_step_places.parquet")
+        circles = get_circles_search(circles_path, 
+                                    polygon, 
+                                    radius_in_meters, 
+                                    step_in_degrees, 
+                                    condition_rule=condition_rule,
+                                    recalculate=recalculate)
+        if show:
+            _ = polygon_plot_with_sampling_circles(polygon=polygon, 
+                                                   circles=circles.geometry.tolist())
+            plt.show()
+        found_places = process_circles(circles,
+                                    radius_in_meters, 
+                                    places_path, 
+                                    circles_path, 
+                                    recalculate=recalculate)
+        if show:
+            _ = polygon_plot_with_circles_and_points(polygon=polygon, 
+                                                    circles=circles.geometry.tolist(), 
+                                                    points=found_places[['longitude', 'latitude']].values.tolist(), 
+                                                    output_file_path=None)
+            plt.show()
+
+        return circles, found_places
+
+def get_saturated_circles(polygon, found_places, circles, threshold, show=False, output_file_path=None):
+    places_by_circle = found_places.groupby('circle')["id"].nunique().sort_values(ascending=False)
+    saturated_circles = places_by_circle[places_by_circle >= threshold].index
+    saturated_circles = circles.loc[saturated_circles, :]
+    if show:
+        _ = polygon_plot_with_circles_and_points(polygon=polygon, 
+                                                circles=saturated_circles.geometry.tolist(), 
+                                                points=found_places.loc[found_places['circle'].isin(saturated_circles.index), ['longitude', 'latitude']].values.tolist(), 
+                                                output_file_path=output_file_path)
+        plt.show()
+    return saturated_circles
+
+def get_saturated_area(saturated_circles, show=False):
+    saturated_area = saturated_circles.geometry.unary_union
+    if show:
+            gpd.GeoSeries(saturated_area).plot(facecolor='none', edgecolor=sns.color_palette('Paired')[0])
+            plt.show()
+    return saturated_area
+
 if __name__ == '__main__':
     
     cities_geojsons = {
@@ -735,9 +794,11 @@ if __name__ == '__main__':
         'tokyo': '/Users/sebastian/Desktop/MontagnaInc/Research/Cities_Restaurants/translated_tokyo_wards.geojson'
     }
 
-    PROJECT_FOLDER = '/Users/sebastian/Desktop/MontagnaInc/Research/Cities_Restaurants'
+    PROJECT_FOLDER = Path('/Users/sebastian/Desktop/MontagnaInc/Research/Cities_Restaurants/test')
+    PROJECT_FOLDER.mkdir(exist_ok=True)
     CITY = 'tokyo'
-    SHOW = False
+    SHOW = True
+    RECALCULATE = True
 
     city = CityGeojson(cities_geojsons[CITY], CITY)
     if SHOW:
@@ -746,69 +807,54 @@ if __name__ == '__main__':
         ax1 = city.plot_unary_polygon()
         plt.show()
 
+    print('STEP 1')
     RADIUS_IN_METERS = 500 #50
     STEP_IN_DEGREES = 0.00375*2 #0.00075
-    circles_path = PROJECT_FOLDER / Path(f"{city.name}_{RADIUS_IN_METERS}_radius_{STEP_IN_DEGREES}_step_circles.geojson")
-    places_path = PROJECT_FOLDER / Path(f"{city.name}_{RADIUS_IN_METERS}_radius_{STEP_IN_DEGREES}_step_places.parquet")
-    circles = get_circles_search(circles_path, 
-                                 city.merged_polygon, 
-                                 RADIUS_IN_METERS, 
-                                 STEP_IN_DEGREES, 
-                                 condition_rule='center',
-                                 recalculate=False)
-    if SHOW:
-        _ = polygon_plot_with_sampling_circles(polygon=city.merged_polygon, circles=circles.geometry.tolist())
-        plt.show()
-    found_places = process_circles(circles,
-                                   RADIUS_IN_METERS, 
-                                   places_path, 
-                                   circles_path, 
-                                   recalculate=False)
-    if SHOW:
-        _ = polygon_plot_with_circles_and_points(polygon=city.merged_polygon, 
-                                                 circles=circles.geometry.tolist(), 
-                                                 points=found_places[['longitude', 'latitude']].values.tolist(), 
-                                                 output_file_path=None)
-        plt.show()
-
-    places_by_circle = found_places.groupby('circle')["id"].nunique().sort_values(ascending=False)
-    saturated_circles = places_by_circle[places_by_circle >= 10].index
-    saturated_circles = circles.loc[saturated_circles, :]
-
-    if SHOW:
-        _ = polygon_plot_with_circles_and_points(polygon=city.merged_polygon, 
-                                                 circles=saturated_circles.geometry.tolist(), 
-                                                 points=found_places.loc[found_places['circle'].isin(saturated_circles.index), ['longitude', 'latitude']].values.tolist(), 
-                                                 output_file_path=None)
-        plt.show()
-
-    saturated_area = saturated_circles.geometry.unary_union
-    if True:
-            gpd.GeoSeries(saturated_area).plot(facecolor='none', edgecolor=sns.color_palette('Paired')[0])
-            plt.show()
-
+    circles, found_places = search_places_in_polygon(PROJECT_FOLDER,
+                                                     city.name,
+                                                     city.merged_polygon,
+                                                     RADIUS_IN_METERS,
+                                                     STEP_IN_DEGREES,
+                                                     condition_rule='center',
+                                                     recalculate=RECALCULATE,
+                                                     show=SHOW)
+    print('SATURED STEP 1')
+    saturated_circles = get_saturated_circles(city.merged_polygon, 
+                                              found_places, 
+                                              circles, 
+                                              threshold=12, 
+                                              show=SHOW, 
+                                              output_file_path=None)
+    saturated_area = get_saturated_area(saturated_circles, show=SHOW)
+    plt.close('all')
+    print('STEP 2')
     RADIUS_IN_METERS2 = 100
     STEP_IN_DEGREES2 = STEP_IN_DEGREES * (RADIUS_IN_METERS2 / RADIUS_IN_METERS)
-    circles_path = PROJECT_FOLDER / Path(f"{city.name}_{RADIUS_IN_METERS2}_radius_{STEP_IN_DEGREES2}_step_circles.geojson")
-    places_path = PROJECT_FOLDER / Path(f"{city.name}_{RADIUS_IN_METERS2}_radius_{STEP_IN_DEGREES2}_step_places.parquet")
-    circles = get_circles_search(circles_path, 
-                                 saturated_area, 
-                                 RADIUS_IN_METERS2, 
-                                 STEP_IN_DEGREES2, 
-                                 condition_rule='center',
-                                 recalculate=False)
-    if True:
-        _ = polygon_plot_with_sampling_circles(polygon=saturated_area, circles=circles.geometry.tolist())
-        plt.show()
-
-    found_places = process_circles(circles,
-                                   RADIUS_IN_METERS2, 
-                                   places_path, 
-                                   circles_path, 
-                                   recalculate=False)
-    if True:
-        _ = polygon_plot_with_circles_and_points(polygon=saturated_area, 
-                                                 circles=circles.geometry.tolist(), 
-                                                 points=found_places[['longitude', 'latitude']].values.tolist(), 
-                                                 output_file_path=None)
-        plt.show()
+    circles, found_places = search_places_in_polygon(PROJECT_FOLDER,
+                                                     city.name,
+                                                     saturated_area,
+                                                     RADIUS_IN_METERS2,
+                                                     STEP_IN_DEGREES2,
+                                                     condition_rule='center',
+                                                     recalculate=RECALCULATE,
+                                                     show=SHOW)
+    print('SATURED STEP 2')
+    saturated_circles = get_saturated_circles(saturated_area, 
+                                              found_places, 
+                                              circles, 
+                                              threshold=15, 
+                                              show=SHOW, 
+                                              output_file_path=None)
+    saturated_area = get_saturated_area(saturated_circles, show=SHOW)
+    plt.close('all')
+    print('STEP 3')
+    RADIUS_IN_METERS3 = 50
+    STEP_IN_DEGREES3 = STEP_IN_DEGREES2 * (RADIUS_IN_METERS3 / RADIUS_IN_METERS2)
+    circles, found_places = search_places_in_polygon(PROJECT_FOLDER,
+                                                     city.name,
+                                                     saturated_area,
+                                                     RADIUS_IN_METERS3,
+                                                     STEP_IN_DEGREES3,
+                                                     condition_rule='center',
+                                                     recalculate=RECALCULATE,
+                                                     show=SHOW)
