@@ -93,7 +93,7 @@ class CityGeojson:
         self.geojson_path = Path(geojson_path)
         self.data = gpd.read_file(geojson_path)
         self.name = name
-        self.plots_width = 16
+        self.plots_width = 14
         self.plots_aspect_ratio = 16/9
         self.plots_height = self.plots_width / self.plots_aspect_ratio
 
@@ -413,7 +413,12 @@ def polygons_folium_map_with_pois(polygons: Union[Iterable[Polygon], Polygon],
 
 def polygon_plot_with_sampling_circles(polygon: Polygon, 
                                        circles: List[CircleType],
+                                       point_of_interest: Optional[Point]=None,
+                                       zoom_level: Optional[float]=1.0,
                                        output_file_path: Optional[PathLike]=None) -> Axes:
+    width = 14
+    aspect_ratio = 16/9
+    height = width / aspect_ratio
     minx, miny, maxx, maxy = polygon.bounds
     out_circles, in_circles = [], []
     for circle in tqdm(circles):
@@ -423,7 +428,8 @@ def polygon_plot_with_sampling_circles(polygon: Polygon,
             out_circles.append(circle)
     polygon = gpd.GeoSeries(polygon)
     ax = polygon.plot(
-            facecolor=sns.color_palette('Paired')[0], edgecolor='none', alpha=0.5)
+            facecolor=sns.color_palette('Paired')[0], edgecolor='none', alpha=0.5,
+            figsize=(width, height))
     ax = polygon.plot(
         facecolor='none', edgecolor=sns.color_palette('Paired')[0], linewidth=3, ax=ax)
     point1 = (minx, miny)
@@ -449,23 +455,42 @@ def polygon_plot_with_sampling_circles(polygon: Polygon,
     ax.set_title('Sampling of POIs')
     ax.set_xticks([])
     ax.set_yticks([])
+    if point_of_interest:
+        ax.set_xlim([point_of_interest.centroid.x - zoom_level, point_of_interest.centroid.x + zoom_level])
+        ax.set_ylim([point_of_interest.centroid.y - zoom_level, point_of_interest.centroid.y + zoom_level])
     if output_file_path:
         plt.savefig(output_file_path)
     return ax
 
-def polygon_plot_with_circles_and_points(polygon, circles, points, output_file_path=None):
-    ax = polygon_plot_with_sampling_circles(polygon, circles, output_file_path=None)
+def polygon_plot_with_circles_and_points(polygon, 
+                                         circles, 
+                                         points, 
+                                         point_of_interest=None, 
+                                         zoom_level=None, 
+                                         output_file_path=None):
+    ax = polygon_plot_with_sampling_circles(polygon=polygon, 
+                                            circles=circles,
+                                            point_of_interest=point_of_interest, 
+                                            zoom_level=zoom_level,
+                                            output_file_path=output_file_path)
     for point in points:
         ax.plot(point[0], point[1], 'ro', markersize=0.25)
     if output_file_path:
         plt.savefig(output_file_path)
     return ax
 
-def polygon_plot_with_points(polygon, points, output_file_path=None):
+def polygon_plot_with_points(polygon, 
+                             points, 
+                             point_of_interest: Optional[Point]=None,
+                             zoom_level: Optional[float]=1.0,
+                             output_file_path=None):
+    width = 14
+    aspect_ratio = 16/9
+    height = width / aspect_ratio
     minx, miny, maxx, maxy = polygon.bounds
     polygon = gpd.GeoSeries(polygon)
     ax = polygon.plot(
-            facecolor=sns.color_palette('Paired')[0], edgecolor='none', alpha=0.5)
+            facecolor=sns.color_palette('Paired')[0], edgecolor='none', alpha=0.5, figsize=(width, height))
     ax = polygon.plot(
         facecolor='none', edgecolor=sns.color_palette('Paired')[0], linewidth=3, ax=ax)
     point1 = (minx, miny)
@@ -486,10 +511,12 @@ def polygon_plot_with_points(polygon, points, output_file_path=None):
     ax.set_title('Sampling of POIs')
     ax.set_xticks([])
     ax.set_yticks([])
+    if point_of_interest:
+        ax.set_xlim([point_of_interest.centroid.x - zoom_level, point_of_interest.centroid.x + zoom_level])
+        ax.set_ylim([point_of_interest.centroid.y - zoom_level, point_of_interest.centroid.y + zoom_level])
     if output_file_path:
         plt.savefig(output_file_path)
     return ax
-
 
 def run_new_nearby_search():
     queries = [NewNearbySearchRequest(circle, 
@@ -750,33 +777,55 @@ def search_places_in_polygon(root_folder,
                                  radius_in_meters, 
                                  step_in_degrees, 
                                  condition_rule, 
-                                 ref_polygon: Optional[Polygon]=None,
                                  recalculate=False, 
                                  show=False):
         circles_path = root_folder / Path(f"{tag}_{radius_in_meters}_radius_{step_in_degrees}_step_circles.geojson")
         places_path = root_folder / Path(f"{tag}_{radius_in_meters}_radius_{step_in_degrees}_step_places.parquet")
+        polygon_with_circles_plot_path = root_folder / Path(f"{tag}_polygon_with_circles_plot.png")
+        polygon_with_circles_zoom_plot_path = root_folder / Path(f"{tag}_polygon_with_circles_zoom_plot.png")
+        polygon_with_circles_and_points_plot_path = root_folder / Path(f"{tag}_polygon_with_circles_and_places_plot.png")
+        polygon_with_circles_and_points_zoom_plot_path = root_folder / Path(f"{tag}_polygon_with_circles_and_places_zoom_plot.png")
         circles = get_circles_search(circles_path, 
                                     polygon, 
                                     radius_in_meters, 
                                     step_in_degrees, 
                                     condition_rule=condition_rule,
                                     recalculate=recalculate)
-        if show:
+        if show or recalculate:
             _ = polygon_plot_with_sampling_circles(polygon=polygon, 
-                                                   circles=circles.geometry.tolist())
-            plt.show()
+                                                   circles=circles.geometry.tolist(),
+                                                   output_file_path=polygon_with_circles_plot_path)
+            if show:
+                plt.show()
+            random_circle = random.choice(circles.geometry.tolist())
+            _ = polygon_plot_with_sampling_circles(polygon=polygon, 
+                                                   circles=circles.geometry.tolist(),
+                                                   point_of_interest=random_circle,
+                                                   zoom_level=5*meters_to_degree(radius_in_meters, random_circle.centroid.y),
+                                                   output_file_path=polygon_with_circles_zoom_plot_path)
+            if show:
+                plt.show()
         found_places = process_circles(circles,
                                     radius_in_meters, 
                                     places_path, 
                                     circles_path, 
                                     recalculate=recalculate)
-        if show:
+        if show or recalculate:
             _ = polygon_plot_with_circles_and_points(polygon=polygon, 
                                                     circles=circles.geometry.tolist(), 
                                                     points=found_places[['longitude', 'latitude']].values.tolist(), 
-                                                    output_file_path=None)
-            plt.show()
-
+                                                    output_file_path=polygon_with_circles_and_points_plot_path)
+            if show:
+                plt.show()
+            random_circle = random.choice(circles.geometry.tolist())
+            _ = polygon_plot_with_circles_and_points(polygon=polygon, 
+                                                    circles=circles.geometry.tolist(), 
+                                                    point_of_interest=random_circle,
+                                                    zoom_level=5*meters_to_degree(radius_in_meters, random_circle.centroid.y),
+                                                    points=found_places[['longitude', 'latitude']].values.tolist(), 
+                                                    output_file_path=polygon_with_circles_and_points_zoom_plot_path)
+            if show:
+                plt.show()
         return circles, found_places
 
 def get_saturated_circles(polygon, found_places, circles, threshold, show=False, output_file_path=None):
