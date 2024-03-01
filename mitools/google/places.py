@@ -663,7 +663,7 @@ def get_response_places(response_id, response):
 def search_and_update_places(circle, radius_in_meters, response_id):
     response = nearby_search_request(circle, radius_in_meters)
     places_df = None
-    if response.status_code == 'OK':
+    if response.reason == 'OK':
         if 'places' in response.json():
             places_df = get_response_places(response_id, response)
         searched = True
@@ -673,22 +673,26 @@ def search_and_update_places(circle, radius_in_meters, response_id):
     return searched, places_df
     
 def process_circles(circles, radius_in_meters, file_path, circles_path, recalculate=False):
-    if (~circles['searched']).any() or recalculate:
+    global GLOBAL_REQUESTS_COUNTER, GLOBAL_REQUESTS_COUNTER_LIMIT
+    if ((~circles['searched']).any() or recalculate) and GLOBAL_REQUESTS_COUNTER <= GLOBAL_REQUESTS_COUNTER_LIMIT:
         circles_search = circles[~circles['searched']]
         found_places = read_or_initialize_places(file_path, recalculate)
-        pbar = tqdm(total=len(circles_search), desc="Processing circles")
-        for response_id, circle in circles_search.iterrows():
-            searched, places_df = search_and_update_places(circle, radius_in_meters, response_id)
-            if places_df is not None:
-                found_places = pd.concat([found_places, places_df], axis=0, ignore_index=True)
-            update_progress_and_save(searched, circles, response_id, found_places, file_path, circles_path, pbar)
+        with tqdm(total=len(circles_search), desc="Processing circles") as pbar:
+            for response_id, circle in circles_search.iterrows():
+                searched, places_df = search_and_update_places(circle, radius_in_meters, response_id)
+                if places_df is not None:
+                    found_places = pd.concat([found_places, places_df], axis=0, ignore_index=True)
+                update_progress_and_save(searched, circles, response_id, found_places, file_path, circles_path, pbar)
+                GLOBAL_REQUESTS_COUNTER += 1
+                if GLOBAL_REQUESTS_COUNTER >= GLOBAL_REQUESTS_COUNTER_LIMIT:
+                    break
     else:
         found_places = pd.read_parquet(file_path)
     return found_places
 
 def update_progress_and_save(searched, circles, index, found_places, file_path, circles_path, pbar):
     circles.loc[index, 'searched'] = searched
-    if index % 5_000 == 0 or index == circles.shape[0] - 1:
+    if index % 200 == 0 or index == circles.shape[0] - 1 or GLOBAL_REQUESTS_COUNTER == GLOBAL_REQUESTS_COUNTER_LIMIT:
         found_places.to_parquet(file_path)
         circles.to_file(circles_path, driver='GeoJSON')
     pbar.update()
@@ -906,13 +910,16 @@ if __name__ == '__main__':
     PLOTS_FOLDER = PROJECT_FOLDER / 'plots'
     PLOTS_FOLDER.mkdir(exist_ok=True)
     CITY = 'tokyo'
-    SHOW = True
+    SHOW = False
     RECALCULATE = False
 
+    GLOBAL_REQUESTS_COUNTER = 0
+    GLOBAL_REQUESTS_COUNTER_LIMIT = 6_000
+    
     city = CityGeojson(cities_geojsons[CITY], CITY)
     city_wards_plot_path = PLOTS_FOLDER / f"{city.name}_wards_polygons_plot.png"
     city_plot_path = PLOTS_FOLDER / f"{city.name}_polygon_plot.png"
-    if SHOW:
+    if SHOW or False:
         ax = city.plot_polygons()
         if not city_wards_plot_path.exists() or RECALCULATE:
             ax.get_figure().savefig(city_wards_plot_path, dpi=500)
@@ -941,3 +948,5 @@ if __name__ == '__main__':
                                                                                     show=SHOW, 
                                                                                     recalculate=RECALCULATE
                                                                                     )
+        if i >= 1:
+            break
