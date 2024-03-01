@@ -860,6 +860,40 @@ def get_saturated_area(polygon, saturated_circles, show=False, output_path=None)
             plt.show()
     return saturated_area
 
+def places_search_step(project_folder, plots_folder, tag, polygon, radius_in_meters, step_in_degrees, show=False, recalculate=False):
+    circles, found_places = search_places_in_polygon(project_folder,
+                                                     plots_folder,
+                                                     tag,
+                                                     polygon,
+                                                     radius_in_meters,
+                                                     step_in_degrees,
+                                                     condition_rule='center',
+                                                     recalculate=recalculate,
+                                                     show=show)
+    saturated_circles_plot_path = plots_folder / f"{tag}_saturated_circles_plot.png"
+    saturated_area_plot_path = plots_folder / f"{tag}_saturated_area_plot.png"
+    saturated_circles = get_saturated_circles(polygon, 
+                                              found_places, 
+                                              circles, 
+                                              threshold=20, 
+                                              show=show, 
+                                              output_file_path=saturated_circles_plot_path)
+    saturated_area = get_saturated_area(polygon, saturated_circles, show=show, output_path=saturated_area_plot_path)
+    plt.close('all')
+
+    return found_places, circles, saturated_area, saturated_circles
+
+def calculate_degree_steps(meter_radiuses):
+    degree_steps = []
+    for i, radius in enumerate(meter_radiuses):
+        if i == 0:  # First iteration uses the initial values
+            step = STEP_IN_DEGREES
+        else:  # Subsequent iterations calculate step based on the previous radius and step
+            step *= (radius / meter_radiuses[i - 1])
+        degree_steps.append(step)
+    return degree_steps
+
+
 if __name__ == '__main__':
     
     cities_geojsons = {
@@ -888,64 +922,43 @@ if __name__ == '__main__':
             ax.get_figure().savefig(city_plot_path, dpi=500)
         plt.show()
 
-    print('STEP 1')
-    RADIUS_IN_METERS = 500 #50
     STEP_IN_DEGREES = 0.0039*2 #0.00075
+
+    meter_radiuses = [500, 100, 50]
+    degree_steps = calculate_degree_steps(meter_radiuses)
+
+    RADIUS_IN_METERS = 500 #50
     TAG = f"Step-1_{city.name}"
-    circles, found_places = search_places_in_polygon(PROJECT_FOLDER,
-                                                     PLOTS_FOLDER,
-                                                     TAG,
-                                                     city.merged_polygon,
-                                                     RADIUS_IN_METERS,
-                                                     STEP_IN_DEGREES,
-                                                     condition_rule='center',
-                                                     recalculate=RECALCULATE,
-                                                     show=SHOW)
-    print('SATURED STEP 1')
-    saturated_circles_plot_path = PLOTS_FOLDER / f"{TAG}_saturated_circles_plot.png"
-    saturated_area_plot_path = PLOTS_FOLDER / f"{TAG}_saturated_area_plot.png"
-    saturated_circles = get_saturated_circles(city.merged_polygon, 
-                                              found_places, 
-                                              circles, 
-                                              threshold=12, 
-                                              show=SHOW, 
-                                              output_file_path=saturated_circles_plot_path)
-    saturated_area = get_saturated_area(city.merged_polygon, saturated_circles, show=SHOW, output_path=saturated_area_plot_path)
-    plt.close('all')
-    print('STEP 2')
+    found_places, circles, saturated_area, saturated_circles = places_search_step(PROJECT_FOLDER, 
+                                                                                    PLOTS_FOLDER, 
+                                                                                    TAG, 
+                                                                                    city.merged_polygon, 
+                                                                                    RADIUS_IN_METERS, 
+                                                                                    STEP_IN_DEGREES, 
+                                                                                    show=SHOW, 
+                                                                                    recalculate=RECALCULATE
+                                                                                  )
     RADIUS_IN_METERS2 = 100
     STEP_IN_DEGREES2 = STEP_IN_DEGREES * (RADIUS_IN_METERS2 / RADIUS_IN_METERS)
     TAG = f"Step-2_{city.name}"
-    circles, found_places = search_places_in_polygon(PROJECT_FOLDER,
-                                                     PLOTS_FOLDER,
-                                                     TAG,
-                                                     saturated_area,
-                                                     RADIUS_IN_METERS2,
-                                                     STEP_IN_DEGREES2,
-                                                     condition_rule='center',
-                                                     recalculate=RECALCULATE,
-                                                     show=SHOW)
-    print('SATURED STEP 2')
-    saturated_circles_plot_path = PLOTS_FOLDER / f"{TAG}_saturated_circles_plot.png"
-    saturated_area_plot_path = PLOTS_FOLDER / f"{TAG}_saturated_area_plot.png"
-    saturated_circles = get_saturated_circles(saturated_area, 
-                                              found_places, 
-                                              circles, 
-                                              threshold=15, 
-                                              show=SHOW, 
-                                              output_file_path=saturated_circles_plot_path)
-    saturated_area = get_saturated_area(city.merged_polygon, saturated_circles, show=SHOW, output_path=saturated_area_plot_path)
-    plt.close('all')
-    print('STEP 3')
+    found_places, circles, saturated_area, saturated_circles = places_search_step(PROJECT_FOLDER, 
+                                                                                    PLOTS_FOLDER, 
+                                                                                    TAG, 
+                                                                                    saturated_area, 
+                                                                                    RADIUS_IN_METERS2, 
+                                                                                    STEP_IN_DEGREES2, 
+                                                                                    show=SHOW, 
+                                                                                    recalculate=RECALCULATE
+                                                                                  )
     TAG = f"Step-3_{city.name}"
     RADIUS_IN_METERS3 = 50
     STEP_IN_DEGREES3 = STEP_IN_DEGREES2 * (RADIUS_IN_METERS3 / RADIUS_IN_METERS2)
-    circles, found_places = search_places_in_polygon(PROJECT_FOLDER,
-                                                     PLOTS_FOLDER,
-                                                     TAG,
-                                                     saturated_area,
-                                                     RADIUS_IN_METERS3,
-                                                     STEP_IN_DEGREES3,
-                                                     condition_rule='center',
-                                                     recalculate=RECALCULATE,
-                                                     show=SHOW)
+    found_places, circles, saturated_area, saturated_circles = places_search_step(PROJECT_FOLDER, 
+                                                                                    PLOTS_FOLDER, 
+                                                                                    TAG, 
+                                                                                    saturated_area, 
+                                                                                    RADIUS_IN_METERS3, 
+                                                                                    STEP_IN_DEGREES3, 
+                                                                                    show=SHOW, 
+                                                                                    recalculate=RECALCULATE
+                                                                                  )
