@@ -901,13 +901,13 @@ if __name__ == '__main__':
         'tokyo': '/Users/sebastian/Desktop/MontagnaInc/Research/Cities_Restaurants/translated_tokyo_wards.geojson'
     }
 
-    PROJECT_FOLDER = Path('/Users/sebastian/Desktop/MontagnaInc/Research/Cities_Restaurants/test')
+    PROJECT_FOLDER = Path('/Users/sebastian/Desktop/MontagnaInc/Research/Cities_Restaurants/Tokyo_Places')
     PROJECT_FOLDER.mkdir(exist_ok=True)
     PLOTS_FOLDER = PROJECT_FOLDER / 'plots'
     PLOTS_FOLDER.mkdir(exist_ok=True)
     CITY = 'tokyo'
     SHOW = True
-    RECALCULATE = True
+    RECALCULATE = False
 
     city = CityGeojson(cities_geojsons[CITY], CITY)
     city_wards_plot_path = PLOTS_FOLDER / f"{city.name}_wards_polygons_plot.png"
@@ -922,43 +922,22 @@ if __name__ == '__main__':
             ax.get_figure().savefig(city_plot_path, dpi=500)
         plt.show()
 
-    STEP_IN_DEGREES = 0.0039*2 #0.00075
+    STEP_IN_DEGREES = 0.00375
 
-    meter_radiuses = [500, 100, 50]
+    meter_radiuses = [250, 100, 50]
     degree_steps = calculate_degree_steps(meter_radiuses)
 
-    RADIUS_IN_METERS = 500 #50
-    TAG = f"Step-1_{city.name}"
-    found_places, circles, saturated_area, saturated_circles = places_search_step(PROJECT_FOLDER, 
+    area_polygon = city.merged_polygon
+
+    for i, (radius, step) in enumerate(zip(meter_radiuses, degree_steps)):
+        TAG = f"Step-{i+1}_{city.name}"
+        print(TAG)
+        found_places, circles, area_polygon, saturated_circles = places_search_step(PROJECT_FOLDER, 
                                                                                     PLOTS_FOLDER, 
                                                                                     TAG, 
-                                                                                    city.merged_polygon, 
-                                                                                    RADIUS_IN_METERS, 
-                                                                                    STEP_IN_DEGREES, 
+                                                                                    area_polygon,
+                                                                                    radius, 
+                                                                                    step, 
                                                                                     show=SHOW, 
                                                                                     recalculate=RECALCULATE
-                                                                                  )
-    RADIUS_IN_METERS2 = 100
-    STEP_IN_DEGREES2 = STEP_IN_DEGREES * (RADIUS_IN_METERS2 / RADIUS_IN_METERS)
-    TAG = f"Step-2_{city.name}"
-    found_places, circles, saturated_area, saturated_circles = places_search_step(PROJECT_FOLDER, 
-                                                                                    PLOTS_FOLDER, 
-                                                                                    TAG, 
-                                                                                    saturated_area, 
-                                                                                    RADIUS_IN_METERS2, 
-                                                                                    STEP_IN_DEGREES2, 
-                                                                                    show=SHOW, 
-                                                                                    recalculate=RECALCULATE
-                                                                                  )
-    TAG = f"Step-3_{city.name}"
-    RADIUS_IN_METERS3 = 50
-    STEP_IN_DEGREES3 = STEP_IN_DEGREES2 * (RADIUS_IN_METERS3 / RADIUS_IN_METERS2)
-    found_places, circles, saturated_area, saturated_circles = places_search_step(PROJECT_FOLDER, 
-                                                                                    PLOTS_FOLDER, 
-                                                                                    TAG, 
-                                                                                    saturated_area, 
-                                                                                    RADIUS_IN_METERS3, 
-                                                                                    STEP_IN_DEGREES3, 
-                                                                                    show=SHOW, 
-                                                                                    recalculate=RECALCULATE
-                                                                                  )
+                                                                                    )
