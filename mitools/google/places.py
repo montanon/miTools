@@ -93,6 +93,9 @@ class CityGeojson:
         self.geojson_path = Path(geojson_path)
         self.data = gpd.read_file(geojson_path)
         self.name = name
+        self.plots_width = 16
+        self.plots_aspect_ratio = 16/9
+        self.plots_height = self.plots_width / self.plots_aspect_ratio
 
         if self.geojson_path.name == 'translated_tokyo_wards.geojson':
             wards = ['Chiyoda Ward', "Koto Ward", "Nakano", "Meguro", "Shinagawa Ward", "Ota-ku", "Setagaya",
@@ -110,12 +113,20 @@ class CityGeojson:
     
     def plot_unary_polygon(self):
         ax = gpd.GeoSeries(self.merged_polygon).plot(facecolor='none',
-                                edgecolor=sns.color_palette('Paired')[0])
+                                edgecolor=sns.color_palette('Paired')[0],
+                                figsize=(self.plots_width, self.plots_height))
+        ax.set_ylabel('Latitude')
+        ax.set_xlabel('Longitude')
+        ax.set_title(f"{self.name.title()} Polygon")
         return ax
 
     def plot_polygons(self):
         ax = gpd.GeoSeries(self.polygons).plot(facecolor='none',
-                                edgecolor=sns.color_palette('Paired')[0])
+                                edgecolor=sns.color_palette('Paired')[0],
+                                figsize=(self.plots_width, self.plots_height))
+        ax.set_ylabel('Latitude')
+        ax.set_xlabel('Longitude')
+        ax.set_title(f"{self.name.title()} Wards Polygons")
         return ax
 
 class NewNearbySearchRequest:
@@ -801,17 +812,24 @@ if __name__ == '__main__':
     RECALCULATE = True
 
     city = CityGeojson(cities_geojsons[CITY], CITY)
+    city_wards_plot_path = PROJECT_FOLDER / f"{city.name}_wards_polygons_plot.png"
+    city_plot_path = PROJECT_FOLDER / f"{city.name}_polygon_plot.png"
     if SHOW:
-        ax2 = city.plot_polygons()
+        ax = city.plot_polygons()
+        if not city_wards_plot_path.exists() or RECALCULATE:
+            ax.get_figure().savefig(city_wards_plot_path)
         plt.show()
-        ax1 = city.plot_unary_polygon()
+        ax = city.plot_unary_polygon()
+        if not city_plot_path.exists() or RECALCULATE:
+            ax.get_figure().savefig(city_plot_path)
         plt.show()
 
     print('STEP 1')
     RADIUS_IN_METERS = 500 #50
     STEP_IN_DEGREES = 0.00375*2 #0.00075
+    TAG = f"Step-1_{city.name}"
     circles, found_places = search_places_in_polygon(PROJECT_FOLDER,
-                                                     city.name,
+                                                     TAG,
                                                      city.merged_polygon,
                                                      RADIUS_IN_METERS,
                                                      STEP_IN_DEGREES,
@@ -830,8 +848,9 @@ if __name__ == '__main__':
     print('STEP 2')
     RADIUS_IN_METERS2 = 100
     STEP_IN_DEGREES2 = STEP_IN_DEGREES * (RADIUS_IN_METERS2 / RADIUS_IN_METERS)
+    TAG = f"Step-2_{city.name}"
     circles, found_places = search_places_in_polygon(PROJECT_FOLDER,
-                                                     city.name,
+                                                     TAG,
                                                      saturated_area,
                                                      RADIUS_IN_METERS2,
                                                      STEP_IN_DEGREES2,
@@ -848,10 +867,11 @@ if __name__ == '__main__':
     saturated_area = get_saturated_area(saturated_circles, show=SHOW)
     plt.close('all')
     print('STEP 3')
+    TAG = f"Step-3_{city.name}"
     RADIUS_IN_METERS3 = 50
     STEP_IN_DEGREES3 = STEP_IN_DEGREES2 * (RADIUS_IN_METERS3 / RADIUS_IN_METERS2)
     circles, found_places = search_places_in_polygon(PROJECT_FOLDER,
-                                                     city.name,
+                                                     TAG,
                                                      saturated_area,
                                                      RADIUS_IN_METERS3,
                                                      STEP_IN_DEGREES3,
