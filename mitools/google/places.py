@@ -21,14 +21,12 @@ from shapely.geometry import MultiPolygon, Point, Polygon
 from shapely.ops import transform
 from tqdm import tqdm
 
-from mitools.google.places_objects import (
-    CityGeojson,
-    DummyResponse,
-    NewNearbySearchRequest,
-    NewPlace,
-)
+from mitools.google.places_objects import (CityGeojson, DummyResponse,
+                                           NewNearbySearchRequest, NewPlace,
+                                           intersection_condition_factory)
 
 CircleType = NewType('CircleType', Polygon)
+
 
 # https://mapsplatform.google.com/pricing/#pricing-grid
 # https://developers.google.com/maps/documentation/places/web-service/search-nearby
@@ -90,6 +88,9 @@ QUERY_HEADERS = {
     'X-Goog-FieldMask': FIELD_MASK
 }
 DPI = 500
+WIDTH = 14
+ASPECT_RATIO = 16/9
+HEIGHT = WIDTH / ASPECT_RATIO
 
 def meters_to_degree(distance_in_meters: float, 
                      reference_latitude:float) -> float:
@@ -99,25 +100,10 @@ def meters_to_degree(distance_in_meters: float,
     lon_degrees = distance_in_meters / meters_per_degree_longitude
     return max(lat_degrees, lon_degrees)
 
-def circle_inside_polygon(polygon: Polygon, circle: CircleType) -> bool:
-    return circle.within(polygon)
-
-def circle_center_inside_polygon(polygon: Polygon, circle: CircleType) -> bool:
-    return polygon.contains(circle.centroid)
-
-def circle_intersects_polygon(polygon: Polygon, circle: CircleType) -> bool:
-    return polygon.intersects(circle)
-
 def sample_polygon_with_circles(polygon: Polygon, 
                                radius_in_meters: float, 
                                step_in_degrees: float,
                                condition_rule: Optional[str]='center') -> List[CircleType]:
-    assert condition_rule in ['center', 'circle', 'intersection'], 'condition_rule must be one of "center", "intersection" or "circle"'
-    conditions = {
-        'circle': circle_inside_polygon,
-        'center': circle_center_inside_polygon,
-        'intersection': circle_intersects_polygon
-    }
     if not polygon.is_valid:
         raise ValueError('Invalid Polygon')
     minx, miny, maxx, maxy = polygon.bounds
@@ -126,7 +112,7 @@ def sample_polygon_with_circles(polygon: Polygon,
     for lat, lon in itertools.product(latitudes, longitudes):
         deg_radius = meters_to_degree(distance_in_meters=radius_in_meters, reference_latitude=lat)
         circle = Point(lon, lat).buffer(deg_radius)
-        if conditions[condition_rule](polygon=polygon, circle=circle):
+        if intersection_condition_factory(condition_rule).check(polygon=polygon, circle=circle):
             circles.append(circle)
     return circles
 
@@ -192,9 +178,6 @@ def polygon_plot_with_sampling_circles(polygon: Polygon,
                                        point_of_interest: Optional[Point]=None,
                                        zoom_level: Optional[float]=1.0,
                                        output_file_path: Optional[PathLike]=None) -> Axes:
-    width = 14
-    aspect_ratio = 16/9
-    height = width / aspect_ratio
     minx, miny, maxx, maxy = polygon.bounds
     out_circles, in_circles = [], []
     for circle in tqdm(circles):
@@ -205,7 +188,7 @@ def polygon_plot_with_sampling_circles(polygon: Polygon,
     polygon = gpd.GeoSeries(polygon)
     ax = polygon.plot(
             facecolor=sns.color_palette('Paired')[0], edgecolor='none', alpha=0.5,
-            figsize=(width, height))
+            figsize=(WIDTH, HEIGHT))
     ax = polygon.plot(
         facecolor='none', edgecolor=sns.color_palette('Paired')[0], linewidth=3, ax=ax)
     point1 = (minx, miny)
@@ -260,13 +243,10 @@ def polygon_plot_with_points(polygon,
                              point_of_interest: Optional[Point]=None,
                              zoom_level: Optional[float]=1.0,
                              output_file_path=None):
-    width = 14
-    aspect_ratio = 16/9
-    height = width / aspect_ratio
     minx, miny, maxx, maxy = polygon.bounds
     polygon = gpd.GeoSeries(polygon)
     ax = polygon.plot(
-            facecolor=sns.color_palette('Paired')[0], edgecolor='none', alpha=0.5, figsize=(width, height))
+            facecolor=sns.color_palette('Paired')[0], edgecolor='none', alpha=0.5, figsize=(WIDTH, HEIGHT))
     ax = polygon.plot(
         facecolor='none', edgecolor=sns.color_palette('Paired')[0], linewidth=3, ax=ax)
     point1 = (minx, miny)
@@ -500,12 +480,9 @@ def get_saturated_circles(polygon, found_places, circles, threshold, show=False,
 
 def get_saturated_area(polygon, saturated_circles, show=False, output_path=None):
     saturated_area = saturated_circles.geometry.unary_union
-    width = 14
-    aspect_ratio = 16/9
-    height = width / aspect_ratio
     polygon = gpd.GeoSeries(polygon)
     ax = polygon.plot(
-            facecolor=sns.color_palette('Paired')[0], edgecolor='none', alpha=0.5, figsize=(width, height))
+            facecolor=sns.color_palette('Paired')[0], edgecolor='none', alpha=0.5, figsize=(WIDTH, HEIGHT))
     gpd.GeoSeries(saturated_area).plot(ax=ax, facecolor='none', edgecolor=sns.color_palette('Paired')[0])
     ax.set_title('Saturated Sampled Areas')
     ax.set_ylabel('Latitude')
@@ -561,9 +538,9 @@ if __name__ == '__main__':
     PROJECT_FOLDER.mkdir(exist_ok=True)
     PLOTS_FOLDER = PROJECT_FOLDER / 'plots'
     PLOTS_FOLDER.mkdir(exist_ok=True)
-    CITY = 'tokyo'
+    CITY = 'delhi'
     SHOW = True
-    RECALCULATE = False
+    RECALCULATE = True
 
     GLOBAL_REQUESTS_COUNTER = 0
     GLOBAL_REQUESTS_COUNTER_LIMIT = 6_000
@@ -581,8 +558,8 @@ if __name__ == '__main__':
             ax.get_figure().savefig(city_plot_path, dpi=DPI)
         plt.show()
 
-    STEP_IN_DEGREES = 0.00375
-    meter_radiuses = [250, 100, 50, 25]
+    STEP_IN_DEGREES = 0.00375*2
+    meter_radiuses = [500, 250, 100]
     degree_steps = calculate_degree_steps(meter_radiuses)
 
     area_polygon = city.merged_polygon

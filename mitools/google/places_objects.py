@@ -2,13 +2,15 @@ import os
 from dataclasses import asdict, dataclass
 from os import PathLike
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, NewType, Optional, Protocol
 
 import geopandas as gpd
 import seaborn as sns
 from pandas import Series
-from shapely import Point
+from shapely import Point, Polygon
 from shapely.ops import unary_union
+
+CircleType = NewType('CircleType', Polygon)
 
 GOOGLE_PLACES_API_KEY = os.environ.get('GOOGLE_PLACES_API_KEY', '')
 
@@ -245,3 +247,29 @@ class DummyResponse(dict):
         self.status_code = 200
     def json(self):
         return self
+    
+class ConditionProtocol(Protocol):
+    def check(self, polygon: Polygon, circle: 'CircleType') -> bool:
+        ...
+
+class CircleInsidePolygon:
+    def check(self, polygon: Polygon, circle: 'CircleType') -> bool:
+        return circle.within(polygon)
+
+class CircleCenterInsidePolygon:
+    def check(self, polygon: Polygon, circle: 'CircleType') -> bool:
+        return polygon.contains(circle.centroid)
+
+class CircleIntersectsPolygon:
+    def check(self, polygon: Polygon, circle: 'CircleType') -> bool:
+        return polygon.intersects(circle)
+    
+def intersection_condition_factory(condition_type: str) -> ConditionProtocol:
+    if condition_type == 'circle':
+        return CircleInsidePolygon()
+    elif condition_type == 'center':
+        return CircleCenterInsidePolygon()
+    elif condition_type == 'intersection':
+        return CircleIntersectsPolygon()
+    else:
+        raise ValueError(f"Unknown condition type: {condition_type}")
