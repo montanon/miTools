@@ -628,7 +628,8 @@ def create_dummy_place(query):
 class DummyResponse(dict):
     def __init__(self):
         super().__init__()
-        self.status_code = 'OK'
+        self.reason = 'OK'
+        self.status_code = 200
     def json(self):
         return self
     
@@ -682,8 +683,8 @@ def process_circles(circles, radius_in_meters, file_path, circles_path, recalcul
                 searched, places_df = search_and_update_places(circle, radius_in_meters, response_id)
                 if places_df is not None:
                     found_places = pd.concat([found_places, places_df], axis=0, ignore_index=True)
-                update_progress_and_save(searched, circles, response_id, found_places, file_path, circles_path, pbar)
                 GLOBAL_REQUESTS_COUNTER += 1
+                update_progress_and_save(searched, circles, response_id, found_places, file_path, circles_path, pbar)
                 if GLOBAL_REQUESTS_COUNTER >= GLOBAL_REQUESTS_COUNTER_LIMIT:
                     break
     else:
@@ -692,7 +693,7 @@ def process_circles(circles, radius_in_meters, file_path, circles_path, recalcul
 
 def update_progress_and_save(searched, circles, index, found_places, file_path, circles_path, pbar):
     circles.loc[index, 'searched'] = searched
-    if index % 200 == 0 or index == circles.shape[0] - 1 or GLOBAL_REQUESTS_COUNTER == GLOBAL_REQUESTS_COUNTER_LIMIT:
+    if (index % 200 == 0) or (index == circles.shape[0] - 1) or (GLOBAL_REQUESTS_COUNTER >= GLOBAL_REQUESTS_COUNTER_LIMIT - 1):
         found_places.to_parquet(file_path)
         circles.to_file(circles_path, driver='GeoJSON')
     pbar.update()
@@ -910,7 +911,7 @@ if __name__ == '__main__':
     PLOTS_FOLDER = PROJECT_FOLDER / 'plots'
     PLOTS_FOLDER.mkdir(exist_ok=True)
     CITY = 'tokyo'
-    SHOW = False
+    SHOW = True
     RECALCULATE = False
 
     GLOBAL_REQUESTS_COUNTER = 0
@@ -930,11 +931,17 @@ if __name__ == '__main__':
         plt.show()
 
     STEP_IN_DEGREES = 0.00375
-
-    meter_radiuses = [250, 100, 50]
+    meter_radiuses = [250, 100, 50, 25]
     degree_steps = calculate_degree_steps(meter_radiuses)
 
     area_polygon = city.merged_polygon
+
+    all_places_parquet_path = PROJECT_FOLDER / f"{city.name}_all_found_places.parquet"
+    all_places_excel_path = PROJECT_FOLDER / f"{city.name}_all_found_places.xlsx"
+    unique_places_parquet_path = PROJECT_FOLDER / f"{city.name}_unique_found_places.parquet"
+    unique_places_excel_path = PROJECT_FOLDER / f"{city.name}_unique_found_places.xlsx"
+    all_places = pd.DataFrame(columns=['circle', *list(NewPlace.__annotations__.keys())])
+    total_sampled_circles = 0
 
     for i, (radius, step) in enumerate(zip(meter_radiuses, degree_steps)):
         TAG = f"Step-{i+1}_{city.name}"
@@ -948,5 +955,19 @@ if __name__ == '__main__':
                                                                                     show=SHOW, 
                                                                                     recalculate=RECALCULATE
                                                                                     )
-        if i >= 1:
-            break
+        sampled_circles = circles.shape[0]
+        total_sampled_circles += sampled_circles
+        print(f"Found Places: {found_places.shape[0]}, Sampled Circles: {sampled_circles}, Saturated Circles: {saturated_circles.shape[0]}")
+        all_places = pd.concat([all_places, found_places], axis=0, ignore_index=True)
+
+    print(f"Total Sampled Circles: {total_sampled_circles}")
+
+    if True:
+        all_places = all_places[[c for c in all_places.columns if c not in ['iconMaskBaseUri', 'googleMapsUri']]].reset_index(drop=True)
+        all_places.to_parquet(all_places_parquet_path)
+        all_places.to_excel(all_places_excel_path, index=False)
+
+        unique_places = all_places.drop_duplicates(subset=['id']).reset_index(drop=True)
+        unique_places.to_parquet(unique_places_parquet_path)
+        unique_places.to_excel(unique_places_excel_path, index=False)
+
