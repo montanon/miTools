@@ -1,14 +1,11 @@
 import itertools
-import json
 import math
 import os
 import random
-import time
-from dataclasses import asdict, dataclass
 from datetime import datetime
 from os import PathLike
 from pathlib import Path
-from typing import Dict, Iterable, List, NewType, Optional, Tuple, Union
+from typing import Iterable, List, NewType, Optional, Tuple, Union
 
 import folium
 import geopandas as gpd
@@ -19,12 +16,17 @@ import numpy as np
 import pandas as pd
 import requests
 import seaborn as sns
-from IPython.display import display
 from matplotlib.axes import Axes
-from pandas import DataFrame, Series
 from shapely.geometry import MultiPolygon, Point, Polygon
-from shapely.ops import transform, unary_union
+from shapely.ops import transform
 from tqdm import tqdm
+
+from mitools.google.places_objects import (
+    CityGeojson,
+    DummyResponse,
+    NewNearbySearchRequest,
+    NewPlace,
+)
 
 CircleType = NewType('CircleType', Polygon)
 
@@ -87,233 +89,6 @@ QUERY_HEADERS = {
     'X-Goog-Api-Key': GOOGLE_PLACES_API_KEY,
     'X-Goog-FieldMask': FIELD_MASK
 }
-
-class CityGeojson:
-    def __init__(self, geojson_path: PathLike, name: str):
-        self.geojson_path = Path(geojson_path)
-        self.data = gpd.read_file(geojson_path)
-        self.name = name
-        self.plots_width = 14
-        self.plots_aspect_ratio = 16/9
-        self.plots_height = self.plots_width / self.plots_aspect_ratio
-
-        if self.geojson_path.name == 'translated_tokyo_wards.geojson':
-            wards = ['Chiyoda Ward', "Koto Ward", "Nakano", "Meguro", "Shinagawa Ward", "Ota-ku", "Setagaya",
-                "Suginami", "Nerima Ward", "Itabashi Ward", "Adachi Ward", "Katsushika",
-                "Edogawa Ward", "Sumida Ward", "Chuo-ku", "Minato-ku", "North Ward",
-                "Toshima ward", 'Shibuya Ward', 'Arakawa', 'Bunkyo Ward',
-                'Shinjuku ward', 'Taito'
-                     ]
-            polygons = [unary_union(self.data.loc[self.data['Wards'] == ward, 'geometry']) for ward in wards]
-            self.polygons = gpd.GeoSeries(polygons).explode(index_parts=True).reset_index(drop=True)
-        else:
-            self.polygons = self.data['geometry']
-        self.merged_polygon = self.polygons.unary_union
-        self.bounds = self.polygons.bounds.iloc[0].values
-    
-    def plot_unary_polygon(self):
-        ax = gpd.GeoSeries(self.merged_polygon).plot(facecolor='none',
-                                edgecolor=sns.color_palette('Paired')[0],
-                                figsize=(self.plots_width, self.plots_height))
-        ax.set_ylabel('Latitude')
-        ax.set_xlabel('Longitude')
-        ax.set_title(f"{self.name.title()} Polygon")
-        return ax
-
-    def plot_polygons(self):
-        ax = gpd.GeoSeries(self.polygons).plot(facecolor='none',
-                                edgecolor=sns.color_palette('Paired')[0],
-                                figsize=(self.plots_width, self.plots_height))
-        ax.set_ylabel('Latitude')
-        ax.set_xlabel('Longitude')
-        ax.set_title(f"{self.name.title()} Wards Polygons")
-        return ax
-
-class NewNearbySearchRequest:
-    def __init__(self, 
-                 location: Point,
-                 distance_in_meters: float,
-                 max_result_count: Optional[int]=20, 
-                 included_types: Optional[List[str]]=None,
-                 language_code: Optional[str]='en'):
-        self.location = location
-        self.distance_in_meters = distance_in_meters
-        self.language_code = language_code
-        self.location_restriction = {
-            'circle': {
-                'center': {
-                    'latitude': self.location.centroid.y,
-                    'longitude': self.location.centroid.x
-                },
-                'radius': self.distance_in_meters
-            }
-        }
-        self.included_types = included_types if included_types else []
-        self.max_result_count = max_result_count
-
-    def json_query(self) -> Dict:
-        query = {
-            'includedTypes': self.included_types,
-            'maxResultCount': self.max_result_count,
-            'locationRestriction': self.location_restriction,
-            'languageCode': self.language_code,
-            }
-        return query
-    
-class NearbySearchRequest:
-    def __init__(self, 
-                 location: Point,
-                 distance_in_meters: float,
-                 type: str,
-                 language_code: Optional[str]='en'):
-        self.location = f"{location.centroid.y}, {location.centroid.x}"
-        self.distance_in_meters = distance_in_meters
-        self.type = type
-        self.key = GOOGLE_PLACES_API_KEY
-        self.language_code = language_code
-
-    def json_query(self) -> Dict:
-        query = {
-            'location': self.location,
-            'radius': self.distance_in_meters,
-            'type': self.type,
-            'key': self.key,
-            'language': self.language_code,
-            }
-        return query
-    
-
-@dataclass
-class AddressComponent:
-    longText: str
-    shortText: str
-    types: List[str]
-    languageCode: str
-
-@dataclass
-class ViewportCoordinate:
-    latitude: float
-    longitude: float
-
-@dataclass
-class Viewport:
-    low: ViewportCoordinate
-    high: ViewportCoordinate
-
-
-@dataclass
-class AccessibilityOptions:
-    wheelchairAccessibleSeating: Optional[bool]=None
-    wheelchairAccessibleParking: Optional[bool]=None
-    wheelchairAccessibleEntrance: Optional[bool]=None
-    wheelchairAccessibleRestroom: Optional[bool]=None
-
-@dataclass
-class NewPlace:
-    _NON_SERIALIZED_DATA = ['addressComponents', 'viewport', 'accessibilityOptions']
-    id: str
-    types: str
-    formattedAddress: str
-    addressComponents: List[AddressComponent]
-    globalCode: str
-    compoundCode: str
-    latitude: float
-    longitude: float
-    viewport: Viewport
-    googleMapsUri: str
-    utcOffsetMinutes: int
-    adrFormatAddress: str
-    businessStatus: str
-    iconMaskBaseUri: str
-    iconBackgroundColor: str
-    displayName: str
-    primaryType: str
-    shortFormattedAddress: str
-    accessibilityOptions: AccessibilityOptions
-    primaryTypeDisplayName: str
-
-    @staticmethod
-    def from_json(data: dict) -> 'NewPlace':
-        global_code, compound_code = NewPlace.parse_plus_code(data.get('plusCode', {}))
-        return NewPlace(
-            id=data.get('id', ''),
-            types=','.join(data.get('types', [])),
-            formattedAddress=data.get('formattedAddress', ''),
-            addressComponents=NewPlace.parse_address_components(data.get('addressComponents')),
-            globalCode=global_code,
-            compoundCode=compound_code,
-            latitude=data.get('location', {}).get('latitude', 0.0),
-            longitude=data.get('location', {}).get('longitude', 0.0),
-            viewport=NewPlace.parse_viewport(data.get('viewport')),
-            googleMapsUri=data.get('googleMapsUri', ''),
-            utcOffsetMinutes=data.get('utcOffsetMinutes', 0),
-            adrFormatAddress=data.get('adrFormatAddress', ''),
-            businessStatus=data.get('businessStatus', ''),
-            iconMaskBaseUri=data.get('iconMaskBaseUri', ''),
-            iconBackgroundColor=data.get('iconBackgroundColor', ''),
-            displayName=data.get('displayName', {}).get('text', ''),
-            primaryTypeDisplayName=data.get('primaryTypeDisplayName', {}).get('text', ''),
-            primaryType=data.get('primaryType', ''),
-            shortFormattedAddress=data.get('shortFormattedAddress', ''),
-            accessibilityOptions=AccessibilityOptions(**data.get('accessibilityOptions', {}))
-        )
-    
-    @staticmethod
-    def parse_address_components(components: List[dict]) -> List[AddressComponent]:
-        return [AddressComponent(**comp) for comp in components] if components else []
-
-    @staticmethod
-    def parse_viewport(viewport_data: dict) -> Viewport:
-        if not viewport_data:
-            return Viewport(low=ViewportCoordinate(0.0, 0.0), high=ViewportCoordinate(0.0, 0.0))
-        return Viewport(
-            low=ViewportCoordinate(**viewport_data.get('low', {})),
-            high=ViewportCoordinate(**viewport_data.get('high', {}))
-        )
-
-    @staticmethod
-    def parse_plus_code(plus_code_data: dict) -> tuple:
-        return (
-            plus_code_data.get('globalCode', ''),
-            plus_code_data.get('compoundCode', '')
-        )
-    
-    def to_series(self) -> Series:
-        place_dict = asdict(self)
-        place_dict = {key: value for key, value in place_dict.items() if key not in self._NON_SERIALIZED_DATA}
-        return Series(place_dict)
-    
-@dataclass
-class Place:
-    id: str
-    name: str
-    latitude: float
-    longitude: float
-    types: str
-    price_level: Optional[int]=None
-    rating: Optional[float]=None
-    total_ratings: Optional[int]=None
-    vicinity: Optional[str]=None
-    permanently_closed: Optional[bool]=None
-
-    @staticmethod
-    def from_json(data: dict) -> 'Place':
-        return Place(
-            id=data['place_id'],
-            name=data['name'],
-            latitude=data['geometry']['location'].get('lat'),
-            longitude=data['geometry']['location'].get('lng'),
-            types=','.join(data.get('types')),
-            price_level=data.get('price_level'),
-            rating=data.get('rating'),
-            total_ratings=data.get('user_ratings_total'),
-            vicinity=data.get('vicinity'),
-            permanently_closed=data.get('permanently_closed')
-        )
-    def to_series(self) -> Series:
-        place_dict = asdict(self)
-        return Series(place_dict)
-
 
 def meters_to_degree(distance_in_meters: float, 
                      reference_latitude:float) -> float:
@@ -518,48 +293,6 @@ def polygon_plot_with_points(polygon,
         plt.savefig(output_file_path, dpi=500)
     return ax
 
-def run_new_nearby_search():
-    queries = [NewNearbySearchRequest(circle, 
-                                      distance_in_meters=RADIUS_IN_METERS, 
-                                      included_types=RESTAURANT_TYPES
-                                      ).json_query() for circle in circles]
-    for query in queries:
-        response = requests.post(NEARBY_SEARCH_URL, headers=QUERY_HEADERS, json=query)
-        response_data = response.json()['places']
-        for place in response_data:
-            place = Place.from_json(place).to_series()
-            break
-        break
-
-def run_nearby_search():
-    random.shuffle(circles)
-    all_places = []
-    for circle in circles[:10]:
-        query = NearbySearchRequest(location=circle, distance_in_meters=RADIUS_IN_METERS, type='restaurant').json_query()
-        places = []
-        while True:
-            response = requests.get(NEARBY_SEARCH_URL, params=query)
-            if response.status_code == 200:
-                response = response.json()
-                for place in response['results']:
-                    place = Place.from_json(place).to_series()
-                    places.append(place)
-                next_page_token = response.get('next_page_token')
-                if not next_page_token:
-                    break
-                query['pagetoken'] = next_page_token
-                time.sleep(0.001)
-            else:
-                print('Response failed: ', response)
-                break
-        print('Found Places: ', len(places))
-        if places:
-            places = pd.concat(places, axis=1).T.reset_index(drop=True)
-            all_places.append(places)
-    all_places = pd.concat(all_places, axis=0).reset_index(drop=True)
-    all_places.to_excel('dehli_places.xlsx', index=False)
-    display(all_places)
-
 def get_circles_search(circles_path, 
                        polygon, 
                        radius_in_meters, 
@@ -624,14 +357,6 @@ def create_dummy_place(query):
         'primaryType': random.choice(random_types)
     }
     return place_json
-
-class DummyResponse(dict):
-    def __init__(self):
-        super().__init__()
-        self.reason = 'OK'
-        self.status_code = 200
-    def json(self):
-        return self
     
 def create_dummy_response(query):
     dummy_response = DummyResponse()
@@ -700,81 +425,6 @@ def update_progress_and_save(searched, circles, index, found_places, file_path, 
     pbar.set_postfix({'Remaining Circles': circles['searched'].value_counts()[False] if False in circles['searched'].value_counts() else 0, 
                       'Found Places': found_places['id'].nunique(),
                       'Searched Circles': circles['searched'].sum()})
-
-def run_level_circles_search(root_folder, city, radius_in_meters, step_in_degrees, process=False, recalculate=True, show=False):
-    tokyo_circles_path = root_folder / Path(f"{city.name}_{radius_in_meters}_radius_{step_in_degrees}_step_circles.geojson")
-    tokyo_found_places = root_folder / Path(f"{city.name}_{radius_in_meters}_radius_{step_in_degrees}_step_places.parquet")
-    circles = get_circles_search(tokyo_circles_path, city, radius_in_meters, step_in_degrees, recalculate=recalculate)
-    if show:
-        _ = polygon_plot_with_sampling_circles(polygon=city.merged_polygon, circles=circles.geometry.tolist())
-        plt.show()
-    if process:
-        found_places = process_circles(circles, radius_in_meters, tokyo_found_places, tokyo_circles_path)
-    else:
-        found_places = None
-    return circles, found_places
-
-def plot_subsampled_circles_schema(original_circle, original_radius, circle_subsamples, plot_path, show=False):
-    if not plot_path.exists() or show:
-        fig, ax = plt.subplots()
-        x, y = Point(original_circle.centroid).buffer(meters_to_degree(original_radius, original_circle.centroid.y)).exterior.xy
-        ax.fill(x, y, alpha=0.25, fc='r', ec='none')
-        for circle_subsample in circle_subsamples:
-            x, y = circle_subsample.exterior.xy
-            ax.fill(x, y, alpha=0.5, fc='b', ec='none')
-        fig.savefig(plot_path, dpi=500)
-
-def get_subsampled_circles(city, 
-                           circles, 
-                           found_places, 
-                           original_radius, 
-                           subsampling_radius, 
-                           subsampling_count, 
-                           subsamplig_factor, 
-                           project_folder,
-                           show=False):
-    subsampled_circles_path = project_folder / Path(f"{city.name}_{subsampling_radius}_radius_{subsampling_count}-{subsamplig_factor}_subsampled_circles.geojson")
-    subsampling_circles_schema_plot = project_folder / Path(f"{city.name}_{original_radius}-{subsampling_radius}_radius_{subsampling_count}-{subsamplig_factor}_subsampled_circles.png")
-
-    places_by_circle = found_places.groupby('circle')['id'].nunique().sort_values(ascending=False)
-    saturated_circles = places_by_circle[places_by_circle == 20].index
-
-    if not subsampled_circles_path.exists():
-        subsampled_circles = DataFrame(columns=['circle', 'subsampled_circle'])
-        for saturated_circle in saturated_circles:
-            circle = circles.loc[saturated_circle, 'geometry']
-            circle_subsamples = create_subsampled_circles(circle.centroid, original_radius, subsampling_radius, subsampling_count, subsamplig_factor)
-            for subsampled_circle in circle_subsamples:
-                    subsampled_circles = pd.concat([subsampled_circles, DataFrame({'circle': saturated_circle, 'subsampled_circle': subsampled_circle}, index=[0])], axis=0, ignore_index=True)
-        plot_subsampled_circles_schema(circle, original_radius, circle_subsamples, subsampling_circles_schema_plot, show=show)
-        subsampled_circles = subsampled_circles.reset_index(drop=True)
-        subsampled_circles['searched'] = False
-        subsampled_circles = gpd.GeoDataFrame(subsampled_circles, geometry='subsampled_circle')
-        subsampled_circles.to_file(subsampled_circles_path, driver='GeoJSON')
-    else:
-        subsampled_circles = gpd.read_file(subsampled_circles_path)
-    if show:
-        _ = polygon_plot_with_sampling_circles(polygon=city.merged_polygon, circles=subsampled_circles.geometry.tolist())
-        plt.show()
-    return subsampled_circles
-
-def resample_subsampled_area(city, subsampled_circles, project_folder, subsample_radius_in_meters, subsample_step_in_degrees, show=False):
-    subsampled_area = subsampled_circles.geometry.unary_union
-    if show:
-        gpd.GeoSeries(subsampled_area).plot(facecolor='none', edgecolor=sns.color_palette('Paired')[0])
-        plt.show()
-    resampled_subsampled_circles_path = project_folder / Path(f"{city.name}_{subsample_radius_in_meters}_radius_{subsample_step_in_degrees}_step_resubsampled_circles.geojson") 
-    if not resampled_subsampled_circles_path.exists():
-        resampled_circles = sample_polygons_with_circles(subsampled_area, subsample_radius_in_meters, subsample_step_in_degrees)
-        resampled_circles = gpd.GeoDataFrame(geometry=resampled_circles).reset_index(drop=True)
-        resampled_circles['searched'] = False
-        resampled_circles.to_file(resampled_subsampled_circles_path, driver='GeoJSON')
-    else:
-        resampled_circles = gpd.read_file(resampled_subsampled_circles_path)
-    if show:
-        _ = polygon_plot_with_sampling_circles(polygon=subsampled_area, circles=resampled_circles.geometry.tolist())
-        plt.show()
-    return subsampled_area, resampled_circles
 
 def search_places_in_polygon(root_folder,
                              plot_folder, 
@@ -891,9 +541,9 @@ def places_search_step(project_folder, plots_folder, tag, polygon, radius_in_met
 def calculate_degree_steps(meter_radiuses):
     degree_steps = []
     for i, radius in enumerate(meter_radiuses):
-        if i == 0:  # First iteration uses the initial values
+        if i == 0:  
             step = STEP_IN_DEGREES
-        else:  # Subsequent iterations calculate step based on the previous radius and step
+        else:
             step *= (radius / meter_radiuses[i - 1])
         degree_steps.append(step)
     return degree_steps
