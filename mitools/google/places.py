@@ -89,6 +89,7 @@ QUERY_HEADERS = {
     'X-Goog-Api-Key': GOOGLE_PLACES_API_KEY,
     'X-Goog-FieldMask': FIELD_MASK
 }
+DPI = 500
 
 def meters_to_degree(distance_in_meters: float, 
                      reference_latitude:float) -> float:
@@ -234,7 +235,7 @@ def polygon_plot_with_sampling_circles(polygon: Polygon,
         ax.set_xlim([point_of_interest.centroid.x - zoom_level, point_of_interest.centroid.x + zoom_level])
         ax.set_ylim([point_of_interest.centroid.y - zoom_level, point_of_interest.centroid.y + zoom_level])
     if output_file_path:
-        plt.savefig(output_file_path, dpi=500)
+        plt.savefig(output_file_path, dpi=DPI)
     return ax
 
 def polygon_plot_with_circles_and_points(polygon, 
@@ -251,7 +252,7 @@ def polygon_plot_with_circles_and_points(polygon,
     for point in points:
         ax.plot(point[0], point[1], 'ro', markersize=0.25)
     if output_file_path:
-        plt.savefig(output_file_path, dpi=500)
+        plt.savefig(output_file_path, dpi=DPI)
     return ax
 
 def polygon_plot_with_points(polygon, 
@@ -290,7 +291,7 @@ def polygon_plot_with_points(polygon,
         ax.set_xlim([point_of_interest.centroid.x - zoom_level, point_of_interest.centroid.x + zoom_level])
         ax.set_ylim([point_of_interest.centroid.y - zoom_level, point_of_interest.centroid.y + zoom_level])
     if output_file_path:
-        plt.savefig(output_file_path, dpi=500)
+        plt.savefig(output_file_path, dpi=DPI)
     return ax
 
 def get_circles_search(circles_path, 
@@ -510,7 +511,7 @@ def get_saturated_area(polygon, saturated_circles, show=False, output_path=None)
     ax.set_ylabel('Latitude')
     ax.set_xlabel('Longitude')
     if output_path:
-        plt.savefig(output_path, dpi=500)
+        plt.savefig(output_path, dpi=DPI)
     if show:
             plt.show()
     return saturated_area
@@ -573,11 +574,11 @@ if __name__ == '__main__':
     if SHOW or False:
         ax = city.plot_polygons()
         if not city_wards_plot_path.exists() or RECALCULATE:
-            ax.get_figure().savefig(city_wards_plot_path, dpi=500)
+            ax.get_figure().savefig(city_wards_plot_path, dpi=DPI)
         plt.show()
         ax = city.plot_unary_polygon()
         if not city_plot_path.exists() or RECALCULATE:
-            ax.get_figure().savefig(city_plot_path, dpi=500)
+            ax.get_figure().savefig(city_plot_path, dpi=DPI)
         plt.show()
 
     STEP_IN_DEGREES = 0.00375
