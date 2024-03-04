@@ -106,20 +106,22 @@ def sample_polygon_with_circles(polygon: Polygon,
                                condition_rule: Optional[str]='center') -> List[CircleType]:
     if not polygon.is_valid:
         raise ValueError('Invalid Polygon')
+    condition = intersection_condition_factory(condition_rule)
     minx, miny, maxx, maxy = polygon.bounds
-    latitudes, longitudes = np.arange(miny, maxy, step_in_degrees), np.arange(minx, maxx, step_in_degrees)
+    latitudes = np.arange(miny, maxy, step_in_degrees)
+    longitudes = np.arange(minx, maxx, step_in_degrees)
     circles = []
     for lat, lon in itertools.product(latitudes, longitudes):
         deg_radius = meters_to_degree(distance_in_meters=radius_in_meters, reference_latitude=lat)
         circle = Point(lon, lat).buffer(deg_radius)
-        if intersection_condition_factory(condition_rule).check(polygon=polygon, circle=circle):
+        if condition.check(polygon=polygon, circle=circle):
             circles.append(circle)
     return circles
 
 def sample_polygons_with_circles(polygons: Union[Iterable[Polygon], Polygon], 
                                  radius_in_meters: float, 
                                  step_in_degrees: float,
-                                 condition_rule: Optional[int]='center') -> List[CircleType]:
+                                 condition_rule: Optional[str]='center') -> List[CircleType]:
     if isinstance(polygons, Polygon):
         polygons = [polygons]
     elif isinstance(polygons, MultiPolygon):
