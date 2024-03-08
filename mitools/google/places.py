@@ -5,6 +5,7 @@ import random
 from datetime import datetime
 from os import PathLike
 from pathlib import Path
+from time import time
 from typing import Iterable, List, NewType, Optional, Tuple, Union
 
 import folium
@@ -21,9 +22,13 @@ from shapely.geometry import MultiPolygon, Point, Polygon
 from shapely.ops import transform
 from tqdm import tqdm
 
-from mitools.google.places_objects import (CityGeojson, DummyResponse,
-                                           NewNearbySearchRequest, NewPlace,
-                                           intersection_condition_factory)
+from mitools.google.places_objects import (
+    CityGeojson,
+    DummyResponse,
+    NewNearbySearchRequest,
+    NewPlace,
+    intersection_condition_factory,
+)
 
 CircleType = NewType('CircleType', Polygon)
 
@@ -379,6 +384,7 @@ def search_and_update_places(circle, radius_in_meters, response_id):
     else:
         print(response.status_code, response.reason, response.text)
         searched = False
+        time.sleep(30)
     return searched, places_df
     
 def process_circles(circles, radius_in_meters, file_path, circles_path, recalculate=False):
@@ -540,9 +546,9 @@ if __name__ == '__main__':
     PROJECT_FOLDER.mkdir(exist_ok=True)
     PLOTS_FOLDER = PROJECT_FOLDER / 'plots'
     PLOTS_FOLDER.mkdir(exist_ok=True)
-    CITY = 'delhi'
+    CITY = 'tokyo'
     SHOW = True
-    RECALCULATE = True
+    RECALCULATE = False
 
     GLOBAL_REQUESTS_COUNTER = 0
     GLOBAL_REQUESTS_COUNTER_LIMIT = 6_000
@@ -560,8 +566,8 @@ if __name__ == '__main__':
             ax.get_figure().savefig(city_plot_path, dpi=DPI)
         plt.show()
 
-    STEP_IN_DEGREES = 0.00375*2
-    meter_radiuses = [500, 250, 100]
+    STEP_IN_DEGREES = 0.00375
+    meter_radiuses = [250, 100, 50, 25, 12.5, 5, 2.5, 1]
     degree_steps = calculate_degree_steps(meter_radiuses)
 
     area_polygon = city.merged_polygon
@@ -572,7 +578,6 @@ if __name__ == '__main__':
     unique_places_excel_path = PROJECT_FOLDER / f"{city.name}_unique_found_places.xlsx"
     all_places = pd.DataFrame(columns=['circle', *list(NewPlace.__annotations__.keys())])
     total_sampled_circles = 0
-
     for i, (radius, step) in enumerate(zip(meter_radiuses, degree_steps)):
         TAG = f"Step-{i+1}_{city.name}"
         print(TAG)
@@ -601,3 +606,4 @@ if __name__ == '__main__':
         unique_places.to_parquet(unique_places_parquet_path)
         unique_places.to_excel(unique_places_excel_path, index=False)
 
+        print(f"Total Unique Found Places: {unique_places.shape[0]}")
