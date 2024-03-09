@@ -2,12 +2,14 @@ import unittest
 from dataclasses import FrozenInstanceError
 from pathlib import Path
 
+import numpy as np
 from pandas import DataFrame
 
 from mitools.regressions import (
     QuantileRegStrs,
     create_regression_file_paths,
     get_group_data,
+    prepare_x_values,
 )
 
 
@@ -105,6 +107,43 @@ class TestGetGroupData(unittest.TestCase):
         # Test with a group value not present in the DataFrame
         result = get_group_data(self.data, 'C', 'group', 'All')
         self.assertTrue(result.empty)  # Expecting an empty DataFrame
+
+class TestPrepareXValues(unittest.TestCase):
+    def setUp(self):
+        # Sample DataFrame for testing
+        self.group_data = DataFrame({
+            'x1': np.random.rand(10),
+            'x2': np.random.rand(10),
+            'x3' + QuantileRegStrs.QUADRATIC_VAR_SUFFIX: np.random.rand(10),  # Quadratic variable
+        })
+
+    def test_correct_columns(self):
+        # Test that the returned DataFrame has correct columns (excluding quadratic variables)
+        independent_vars = ['x1', 'x2', 'x3' + QuantileRegStrs.QUADRATIC_VAR_SUFFIX]
+        result = prepare_x_values(self.group_data, independent_vars)
+        expected_columns = ['x1', 'x2']  # 'x3' with the quadratic suffix should be excluded
+        self.assertListEqual(list(result.columns), expected_columns)
+
+    def test_linear_spacing(self):
+        # Test that the values in each column are linearly spaced
+        independent_vars = ['x1', 'x2']
+        result = prepare_x_values(self.group_data, independent_vars)
+        for var in independent_vars:
+            generated_values = result[var].to_numpy()
+            self.assertTrue(np.allclose(np.diff(generated_values), np.diff(generated_values)[0]), f"Column {var} values are not linearly spaced")
+
+    def test_empty_dataframe(self):
+        # Test with an empty DataFrame
+        empty_df = DataFrame()
+        independent_vars = ['x1', 'x2']
+        with self.assertRaises(KeyError):
+            prepare_x_values(empty_df, independent_vars)
+
+    def test_vars_not_in_dataframe(self):
+        # Test with independent variables not present in the DataFrame
+        independent_vars = ['x4', 'x5']  # Variables not in self.group_data
+        with self.assertRaises(KeyError):
+            prepare_x_values(self.group_data, independent_vars)
 
 
 if __name__ == '__main__':
