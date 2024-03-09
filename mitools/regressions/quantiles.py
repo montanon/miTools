@@ -378,6 +378,15 @@ def get_quantile_regression_predictions_by_group(regression_data: DataFrame,
                 [match.group() if match else '-' for match in [re.search(r"\*+$", val) for val in values[:-1]]]
                 )
             coeffs = [float(re.search(r"([-\d.]+)\(", val).group(1)) for val in values]
+            coeffs_names = [
+                QuantileRegStrs.LINEAR_REG, 
+                QuantileRegStrs.QUADRATIC_REG, 
+                QuantileRegStrs.INTERCEPT
+                ] if len(coeffs) == 3 else [
+                    QuantileRegStrs.LINEAR_REG, 
+                    QuantileRegStrs.INTERCEPT
+                    ]
+            coeffs = dict(zip(coeffs_names, coeffs))
             prediction = get_prediction(x_var_values, coeffs, quadratic)
 
             predictions.append(prediction)
@@ -400,9 +409,9 @@ def prepare_x_values(group_data: DataFrame, independent_vars: List[str]) -> Data
     })
 
 def get_prediction(x_values: Series, coeffs: List[float], quadratic: bool) -> float:
-    prediction = coeffs[-1] + coeffs[0] * x_values
+    prediction = coeffs[QuantileRegStrs.INTERCEPT] + coeffs[QuantileRegStrs.LINEAR_REG] * x_values
     if quadratic:
-        prediction += coeffs[1] * x_values ** 2
+        prediction += coeffs[QuantileRegStrs.QUADRATIC_REG] * x_values ** 2
     return prediction
 
 def get_quantile_regression_results_stats(results: Dict[int, RegressionResultsWrapper]) -> DataFrame:

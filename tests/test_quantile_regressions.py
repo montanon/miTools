@@ -3,12 +3,14 @@ from dataclasses import FrozenInstanceError
 from pathlib import Path
 
 import numpy as np
-from pandas import DataFrame
+from pandas import DataFrame, Series
+from pandas import testing as pd_testing
 
 from mitools.regressions import (
     QuantileRegStrs,
     create_regression_file_paths,
     get_group_data,
+    get_prediction,
     prepare_x_values,
 )
 
@@ -46,6 +48,7 @@ class TestQuantileRegStrs(unittest.TestCase):
             setattr(QuantileRegStrs(), 'UNNAMED', 'New Value')
 
 class TestCreateRegressionFilePaths(unittest.TestCase):
+    
     def setUp(self):
         # This list will hold the paths of all files created during the tests
         self.created_files = []
@@ -79,6 +82,7 @@ class TestCreateRegressionFilePaths(unittest.TestCase):
         self.assertEqual(regression_plot_path, regression_plot_str)
 
 class TestGetGroupData(unittest.TestCase):
+    
     def setUp(self):
         # Create a sample DataFrame for testing
         self.data = DataFrame({
@@ -109,6 +113,7 @@ class TestGetGroupData(unittest.TestCase):
         self.assertTrue(result.empty)  # Expecting an empty DataFrame
 
 class TestPrepareXValues(unittest.TestCase):
+    
     def setUp(self):
         # Sample DataFrame for testing
         self.group_data = DataFrame({
@@ -144,6 +149,45 @@ class TestPrepareXValues(unittest.TestCase):
         independent_vars = ['x4', 'x5']  # Variables not in self.group_data
         with self.assertRaises(KeyError):
             prepare_x_values(self.group_data, independent_vars)
+
+class TestGetPrediction(unittest.TestCase):
+
+    def setUp(self):
+        self.strs = QuantileRegStrs()
+
+    def test_linear_prediction(self):
+        # Test linear prediction without quadratic term
+        x_values = Series([1, 2, 3])
+        coeffs = {self.strs.LINEAR_REG: 2, self.strs.INTERCEPT: 5}  # coeffs[0] is the slope, coeffs[-1] is the intercept
+        quadratic = False
+        expected_predictions = coeffs[self.strs.INTERCEPT] + coeffs[self.strs.LINEAR_REG] * x_values
+        actual_predictions = x_values.apply(get_prediction, args=(coeffs, quadratic))
+        pd_testing.assert_series_equal(actual_predictions, expected_predictions)
+
+    def test_quadratic_prediction(self):
+        # Test prediction with a quadratic term
+        x_values = Series([1, 2, 3])
+        coeffs = {self.strs.LINEAR_REG: 2, self.strs.QUADRATIC_REG: 4, self.strs.INTERCEPT: 5}  # coeffs[1] is the quadratic term coefficient, coeffs[-1] is the intercept
+        quadratic = True
+        expected_predictions = coeffs[self.strs.INTERCEPT] + coeffs[self.strs.LINEAR_REG] * x_values + coeffs[self.strs.QUADRATIC_REG] * x_values ** 2
+        actual_predictions = x_values.apply(get_prediction, args=(coeffs, quadratic))
+        pd_testing.assert_series_equal(actual_predictions, expected_predictions)
+
+    def test_empty_series(self):
+        # Test with an empty Series
+        x_values = Series([])
+        coeffs = {self.strs.LINEAR_REG: 2, self.strs.INTERCEPT: 5}
+        quadratic = False
+        actual_predictions = x_values.apply(get_prediction, args=(coeffs, quadratic))
+        self.assertTrue(actual_predictions.empty, "Result should be an empty Series when input Series is empty")
+
+    def test_incorrect_coefficients(self):
+        # Test with incorrect number of coefficients
+        x_values = Series([1, 2, 3])
+        coeffs = {self.strs.LINEAR_REG: 2}  # Missing intercept
+        quadratic = False
+        with self.assertRaises(KeyError):
+            x_values.apply(get_prediction, args=(coeffs, quadratic))
 
 
 if __name__ == '__main__':
