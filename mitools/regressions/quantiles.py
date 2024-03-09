@@ -423,63 +423,54 @@ def get_quantile_regression_results_stats(results: Dict[int, RegressionResultsWr
             [stats.iloc[:-1, :2], stats.iloc[:, 2:].rename(columns={2: 0, 3: 1})],
             axis=0, ignore_index=True)
         stats.columns = [QuantileRegStrs.STATS, QuantileRegStrs.VALUE]
-        stats[QuantileRegStrs.Quantile] = q
+        stats[QuantileRegStrs.QUANTILE] = q
         stats = stats.set_index([QuantileRegStrs.QUANTILE, QuantileRegStrs.STATS])
         regression_stats.append(stats)
     regression_stats = pd.concat(regression_stats, axis=0)
     return regression_stats
 
-def get_quantile_regression_results_coeffs(results: Dict[int, RegressionResultsWrapper],
-                                           independent_variables: List[str]
-                                           ) -> DataFrame:
-    regression_coeffs = pd.concat([process_quantile_regression_result(q, result) for q, result in results.items()], axis=1)
-    regression_coeffs = (regression_coeffs.reset_index()
-                         .melt(id_vars=QuantileRegStrs.UNNAMED, 
-                               var_name=[QuantileRegStrs.QUANTILE], 
-                               value_name=QuantileRegStrs.VALUE)
-                         )
-    regression_coeffs.columns = [QuantileRegStrs.INDEPENDENT_VARS, *regression_coeffs.columns[1:]]
+def process_result_wrappers_coeffs(results: Dict[int, RegressionResultsWrapper]) -> DataFrame:
+    return pd.concat([process_quantile_regression_coeffs_result(q, result) for q, result in results.items()], axis=1)
+
+def melt_and_rename_regression_coeffs(regression_coeffs: DataFrame) -> DataFrame:
+    melted_df = (regression_coeffs.reset_index()
+                 .melt(id_vars=QuantileRegStrs.UNNAMED, var_name=[QuantileRegStrs.QUANTILE], value_name=QuantileRegStrs.VALUE))
+    melted_df.columns = [QuantileRegStrs.INDEPENDENT_VARS, *melted_df.columns[1:]]
+    return melted_df
+
+def update_regression_coeffs_independent_vars(regression_coeffs: DataFrame) -> DataFrame:
     regression_coeffs[QuantileRegStrs.INDEPENDENT_VARS] = (regression_coeffs[QuantileRegStrs.INDEPENDENT_VARS]
-                                   .replace(QuantileRegStrs.INDEPENDENT_VARS_PATTERN, r'\1', regex=True)
-                                            )
-    regression_coeffs[QuantileRegStrs.REGRESSION_TYPE] = type(list(results.values())[0].model).__name__
-    reg_degree = QuantileRegStrs.QUADRATIC_REG if all(
-        [f"{var}{QuantileRegStrs.QUADRATIC_VAR_SUFFIX}" in regression_coeffs[
-            QuantileRegStrs.INDEPENDENT_VARS].values for var in independent_variables]
-        ) else QuantileRegStrs.LINEAR_REG
-    regression_coeffs[QuantileRegStrs.REGRESSION_DEGREE] = reg_degree
-    regression_coeffs[QuantileRegStrs.DEPENDENT_VAR] = list(results.values())[0].model.endog_names
-    regression_coeffs[QuantileRegStrs.VARIABLE_TYPE] = regression_coeffs[QuantileRegStrs.INDEPENDENT_VARS].apply(
-        lambda x: QuantileRegStrs.EXOG_VAR if x.replace(
-            QuantileRegStrs.QUADRATIC_VAR_SUFFIX, ''
-            ) in independent_variables else QuantileRegStrs.CONTROL_VAR
-        )
-    regression_coeffs = regression_coeffs.sort_values(
-        by=[QuantileRegStrs.VARIABLE_TYPE, QuantileRegStrs.INDEPENDENT_VARS, QuantileRegStrs.QUANTILE],
-        ascending=[False, True, True]
-        )
-    regression_coeffs[QuantileRegStrs.QUANTILE] = regression_coeffs[QuantileRegStrs.QUANTILE].astype(float)
-    regression_coeffs = regression_coeffs.set_index([QuantileRegStrs.REGRESSION_TYPE, 
-                                             QuantileRegStrs.REGRESSION_DEGREE, 
-                                             QuantileRegStrs.DEPENDENT_VAR, 
-                                             QuantileRegStrs.VARIABLE_TYPE, 
-                                             QuantileRegStrs.INDEPENDENT_VARS, 
-                                             QuantileRegStrs.QUANTILE]
-                                                    )
-    regression_coeffs[QuantileRegStrs.ID] = generate_hash_from_dataframe(regression_coeffs, [
-        QuantileRegStrs.REGRESSION_TYPE, 
-        QuantileRegStrs.REGRESSION_DEGREE,
-        #QuantileRegStrs.DEPENDENT_VAR,
-        QuantileRegStrs.INDEPENDENT_VARS
-        ],
-        length=12
-        )
-    regression_coeffs = regression_coeffs.set_index(QuantileRegStrs.ID, append=True)
-    regression_coeffs = regression_coeffs.reorder_levels(
-        [regression_coeffs.index.names[-1]] + regression_coeffs.index.names[:-1])
+                                                           .replace(QuantileRegStrs.INDEPENDENT_VARS_PATTERN, r'\1', regex=True))
     return regression_coeffs
 
-def process_quantile_regression_result(q: float, result: RegressionResultsWrapper) -> DataFrame:
+def set_regression_coeffs_info(regression_coeffs: DataFrame, results: Dict[int, RegressionResultsWrapper], independent_variables: List[str]) -> DataFrame:
+    regression_coeffs[QuantileRegStrs.REGRESSION_TYPE] = type(list(results.values())[0].model).__name__
+    reg_degree = QuantileRegStrs.QUADRATIC_REG if all(
+        f"{var}{QuantileRegStrs.QUADRATIC_VAR_SUFFIX}" in regression_coeffs[QuantileRegStrs.INDEPENDENT_VARS].values 
+        for var in independent_variables) else QuantileRegStrs.LINEAR_REG
+    regression_coeffs[QuantileRegStrs.REGRESSION_DEGREE] = reg_degree
+    regression_coeffs[QuantileRegStrs.DEPENDENT_VAR] = list(results.values())[0].model.endog_names
+    return regression_coeffs
+
+def classify_regression_coeffs_variables(regression_coeffs: DataFrame, independent_variables: List[str]) -> DataFrame:
+    regression_coeffs[QuantileRegStrs.VARIABLE_TYPE] = regression_coeffs[QuantileRegStrs.INDEPENDENT_VARS].apply(
+        lambda x: QuantileRegStrs.EXOG_VAR if x.replace(QuantileRegStrs.QUADRATIC_VAR_SUFFIX, '') in independent_variables 
+        else QuantileRegStrs.CONTROL_VAR)
+    return regression_coeffs
+
+def sort_and_set_regression_coeffs_index(regression_coeffs: DataFrame) -> DataFrame:
+    regression_coeffs = regression_coeffs.sort_values(by=[QuantileRegStrs.VARIABLE_TYPE, QuantileRegStrs.INDEPENDENT_VARS, QuantileRegStrs.QUANTILE], ascending=[False, True, True])
+    regression_coeffs[QuantileRegStrs.QUANTILE] = regression_coeffs[QuantileRegStrs.QUANTILE].astype(float)
+    regression_coeffs = regression_coeffs.set_index([QuantileRegStrs.REGRESSION_TYPE, QuantileRegStrs.REGRESSION_DEGREE, QuantileRegStrs.DEPENDENT_VAR, QuantileRegStrs.VARIABLE_TYPE, QuantileRegStrs.INDEPENDENT_VARS, QuantileRegStrs.QUANTILE])
+    return regression_coeffs
+
+def add_id_and_reorder_regression_coeffs(regression_coeffs: DataFrame) -> DataFrame:
+    regression_coeffs[QuantileRegStrs.ID] = generate_hash_from_dataframe(regression_coeffs, [QuantileRegStrs.REGRESSION_TYPE, QuantileRegStrs.REGRESSION_DEGREE, QuantileRegStrs.INDEPENDENT_VARS], length=12)
+    regression_coeffs = regression_coeffs.set_index(QuantileRegStrs.ID, append=True)
+    regression_coeffs = regression_coeffs.reorder_levels([regression_coeffs.index.names[-1]] + regression_coeffs.index.names[:-1])
+    return regression_coeffs
+
+def process_quantile_regression_coeffs_result(q: float, result: RegressionResultsWrapper) -> DataFrame:
     coeffs = pd.concat(pd.read_html(result.summary().tables[1].as_html(), header=0))
     coeffs = coeffs.set_index(QuantileRegStrs.UNNAMED)
     coeffs[QuantileRegStrs.VALUE] = coeffs[
@@ -488,6 +479,16 @@ def process_quantile_regression_result(q: float, result: RegressionResultsWrappe
     coeffs = coeffs[[QuantileRegStrs.VALUE]]
     coeffs.columns = pd.MultiIndex.from_tuples([(str(q), c) for c in coeffs.columns])
     return coeffs
+
+def get_quantile_regression_results_coeffs(results: Dict[int, RegressionResultsWrapper], independent_variables: List[str]) -> DataFrame:
+    regression_coeffs = process_result_wrappers_coeffs(results)
+    regression_coeffs = melt_and_rename_regression_coeffs(regression_coeffs)
+    regression_coeffs = update_regression_coeffs_independent_vars(regression_coeffs)
+    regression_coeffs = set_regression_coeffs_info(regression_coeffs, results, independent_variables)
+    regression_coeffs = classify_regression_coeffs_variables(regression_coeffs, independent_variables)
+    regression_coeffs = sort_and_set_regression_coeffs_index(regression_coeffs)
+    regression_coeffs = add_id_and_reorder_regression_coeffs(regression_coeffs)
+    return regression_coeffs
 
 def quantile_regression_value(row: Series) -> Series:
     coeff = round(row[QuantileRegStrs.COEF], 5)
@@ -766,12 +767,12 @@ def create_quantile_regressions_results(data: DataFrame,
                                         str_mapper=str_mapper
                                         )
                                     regression = QuantilesRegression(
+                                        id=group,
                                         dependent_variable=dependent_var,
                                         independent_variables=independent_vars,
                                         control_variables=c_vars,
                                         quantiles=quantiles,
                                         quadratic=quadratic,
-                                        strs=QuantileRegStrs()
                                     )
                                     with warnings.catch_warnings():
                                         regression_results = get_quantile_regression_results(
@@ -779,14 +780,15 @@ def create_quantile_regressions_results(data: DataFrame,
                                             regression=regression,
                                             max_iter=max_iter
                                             )
+                                        
                                     regression_coeffs = get_quantile_regression_results_coeffs(
                                         results=regression_results,
                                         independent_variables=independent_vars
                                         )
                                     regression_coeffs.columns = [group]
+                                    regression_stats = get_quantile_regression_results_stats(results=regression_results)
 
-                                    return regression_coeffs
-                                    # regression_stats = get_quantile_regression_results_stats(results=regression_results)
+                                    return regression, regression_coeffs, regression_results, regression_stats
                                     group_regressions.append(regression_coeffs)
                                 group_regressions = pd.concat(group_regressions, axis=1)
                                 quadratic_regressions.append(group_regressions)
@@ -825,12 +827,11 @@ def create_quantile_regressions_results(data: DataFrame,
 
 @dataclass(frozen=True)
 class QuantilesRegression:
-
+    id: str
     dependent_variable: str
     independent_variables: List[str]
     quantiles: List[float]
     quadratic: bool
-    strs: QuantileRegStrs
     control_variables: Optional[List[str]]=None
 
 @dataclass(frozen=True)
@@ -841,7 +842,38 @@ class QuantilesRegressionData(RegressionData):
     quantiles: List[float]
     quadratic: bool
     strs: QuantileRegStrs
-    control_variables: Optional[List[str]]=None
+    control_variables: List[str]
+
+    coefficients: Dict[str,float]
+    std_errs: Dict[str,float]
+    t_values: Dict[str,float]
+    p_values: Dict[str,float]
+    significances: Dict[str,str]
+    conf_interval: Dict[str,Tuple[float,float]]
+    model_params: Dict[str,Any]
+
+    n_obs: int
+    R_sq: float
+    AdjR_sq: float
+    Root_MSE: float
+
+    F_stats: Dict[Tuple[int, int],float]
+    Prob_F: int
+
+    model_specification: str
+
+    coefficient_col: str = 'Coefficient'
+    significance_col: str = 'P>|t|'
+
+@dataclass(frozen=True)
+class QuantileRegressionData(RegressionData):
+
+    dependent_variable: str
+    independent_variables: List[str]
+    quantile: float
+    quadratic: bool
+    strs: QuantileRegStrs
+    control_variables: List[str]
 
     coefficients: Dict[str,float]
     std_errs: Dict[str,float]
