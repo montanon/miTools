@@ -2,15 +2,13 @@ import random
 import statistics
 from string import ascii_uppercase, digits
 
-import matplotlib.lines as mlines
-import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from matplotlib.patches import ArrowStyle, FancyArrowPatch
 
 from ..utils import stretch_string
+from ..visuals import adjust_axes_lims
 from .objects import Product, ProductsBasket
 
 
@@ -212,15 +210,14 @@ def plot_value_distribution(data, basket, n=10, bins=100, color=None, title=None
             h_al = 'right' if pci_value > x_mean else 'left'
             ax.text(pci_value, trade_value, product_name,
                 rotation=0, fontsize=12, horizontalalignment=h_al, verticalalignment='bottom', zorder=10)
-            
+    
     if weighted_mean:
         weighted_value = sum(product.pci * product.value for product in basket.products)
         weighted_value /= sum(product.value for product in basket.products)
         ax.axvline(x=weighted_value, linestyle='--', linewidth=5.0, color='green', zorder=10, alpha=0.75)
         ax.text(weighted_value*1.1, ax.get_ylim()[1]*0.55, f"SECI={round(weighted_value, 3)}", fontsize=24, zorder=99, 
                 verticalalignment='bottom', horizontalalignment='left', color='green', alpha=0.75)
-            
-    # Final plot adjustments
+        
     if title:
         title = stretch_string(title, 30)
         ax.set_title(title)
@@ -234,153 +231,5 @@ def check_interval(interval, value):
         return False
     return interval.left <= value < interval.right
 
-def is_ax_empty(ax):
-    return not (ax.lines or ax.patches or ax.collections)
-
 def custom_agg_rca(group, n=5):
     return 1.0 if group.sum() >= n else 0.0
-
-def adjust_axes_lims(axes, x=True, y=True):
-    if not (x and y):
-        return axes
-    if x:
-        xlim_min, xlim_max = float('inf'), float('-inf')
-    if y:
-        ylim_min, ylim_max = float('inf'), float('-inf')
-    for ax in axes.flat:
-        if not is_ax_empty(ax):
-            if x:
-                x_min, x_max = ax.get_xlim()
-                xlim_min, xlim_max = min(x_min, xlim_min), max(x_max, xlim_max)
-            if y:
-                y_min, y_max = ax.get_ylim()
-                ylim_min, ylim_max = min(y_min, ylim_min), max(y_max, ylim_max)
-    for ax in axes.flat:
-        if x:
-            ax.set_xlim(xlim_min, xlim_max)
-        if y:
-            ax.set_ylim(ylim_min, ylim_max)
-    return axes
-
-def plot_country_eci_indicator_scatter(country_data, x_col, y_col, color=None, income_colors=None, marker_kwargs=None, ax=None, 
-                               arrows=True, year_labels=True, figsize=(9, 9), arrow_style=None, arrow_kwargs=None):
-    
-    if ax is None:
-        _, ax = plt.subplots(1, figsize=figsize)
-    if marker_kwargs is None:
-        marker_kwargs = {'marker': 'o', 'markeredgewidth': 2, 'markersize': 10, 'label_fontsize': 12}
-    if arrow_style is None:
-        arrow_style = ArrowStyle("Fancy", head_length=10, head_width=5, tail_width=.4)
-    if arrow_kwargs is None:
-        arrow_kwargs = dict(connectionstyle='arc3', color='grey', linewidth=1, linestyle=':', alpha=0.75)
-
-    years = country_data.index.get_level_values('Year')
-    income_levels = country_data.index.get_level_values('Income Group')
-    for income_level in income_levels.unique():
-        ax.plot(country_data.loc[pd.IndexSlice[:,:,income_level,:,:], x_col].values, 
-                country_data.loc[pd.IndexSlice[:,:,income_level,:,:], y_col].values, 
-                marker=marker_kwargs['marker'], 
-                markeredgecolor=color if color else 'k', 
-                markeredgewidth=marker_kwargs['markeredgewidth'], 
-                markerfacecolor=income_colors[income_level] if income_colors else 'white', 
-                markersize=marker_kwargs['markersize'], 
-                linestyle=''
-                )
-        
-    x_lims = ax.get_xlim()
-    y_lims = ax.get_ylim()
-        
-    if arrows:
-        x = country_data[x_col].values
-        y = country_data[y_col].values
-        for i in range(len(x) - 1):
-            try:
-                arrow = FancyArrowPatch((x[i], y[i]), (x[i+1], y[i+1]),
-                                        arrowstyle=arrow_style, 
-                                        connectionstyle=arrow_kwargs['connectionstyle'], 
-                                        color=arrow_kwargs['color'], 
-                                        linewidth=arrow_kwargs['linewidth'], 
-                                        linestyle=arrow_kwargs['linestyle'], 
-                                        alpha=arrow_kwargs['alpha'])
-                ax.add_patch(arrow)
-            except Exception:
-                pass
-        #ax.set_xlim(x_lims)
-        #ax.set_ylim(y_lims)    
-    
-    if year_labels:
-        offset = 0.01 * (y_lims[1] - y_lims[0])  # Offset for annotation so it doesn't sit right on the point
-        for xi, yi, year in zip(x, y, years):
-            ax.annotate(str(year), (xi, yi - offset), textcoords="offset points", xytext=(0, -10), ha='center', 
-                        fontsize=marker_kwargs['label_fontsize'])
-            
-    ax.set_ylabel(y_col)
-    ax.set_xlabel(x_col)
-
-    return ax
-
-def plot_country_ecis_indicator_scatter(data, x_cols, y_col, colors, income_colors=None, marker_kwargs=None, ncols=3, 
-                                figsize=(7,7), arrows=True, arrow_style=None, arrow_kwargs=None, year_labels=True, 
-                                axes=None):
-    
-    country = data.index.get_level_values('Country').unique()[0]
-    nrows = (len(x_cols) + 1) // ncols
-    x_type = x_cols[0].split(' ')[-1]
-    if axes is None:
-        _, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(figsize[0]*ncols, figsize[1]*nrows))
-    for ax, x_col in zip(axes.flat, x_cols):
-        ax = plot_country_eci_indicator_scatter(data, 
-                                        x_col, 
-                                        y_col, 
-                                        color=colors[x_col.replace(f' {x_type}', '')],
-                                        income_colors=income_colors,
-                                        marker_kwargs=marker_kwargs, 
-                                        ax=ax,
-                                        arrows=arrows,
-                                        year_labels=year_labels,
-                                        arrow_style=arrow_style,
-                                        arrow_kwargs=arrow_kwargs
-                                                )
-    axes.flat[0].figure.suptitle(f"{country} {x_type}s vs {y_col} Evolution", 
-                 fontsize=24, 
-                 y=0.925, 
-                 verticalalignment='bottom', 
-                 horizontalalignment='center'
-                                 )
-    
-    last_ax = axes.flat[-1]
-    if last_ax.get_legend() is None and income_colors is not None:  # Check if last_ax is empty
-        last_ax.cla()
-        last_ax.set_xticks([])  # Remove x-axis ticks
-        last_ax.set_yticks([])  # Remove y-axis ticks
-        last_ax.axis('off') 
-
-        legend_handles = [mlines.Line2D([], [], color=color, marker='o', linestyle='None',
-                                        markersize=10, markeredgecolor='k', label=label) for label, color in income_colors.items()]
-        last_ax.legend(handles=legend_handles, fontsize=16, loc='center left', ncols=1)
-
-    return axes
-
-def plot_countries_ecis_indicator_scatter(data, countries, eci_type, x_cols, y_col, colors=None, income_colors=None, 
-                                          marker_kwargs=None, ncols=3, figsize=(7,7), arrow_style=None, arrow_kwargs=None):
-    axes = None
-    for country in countries:
-        country_data = data.query('Country == @country')
-        axes = plot_country_ecis_indicator_scatter(data=country_data, 
-                                                   x_cols=x_cols, 
-                                                   y_col=y_col, 
-                                                   colors=colors, 
-                                                   income_colors=income_colors, 
-                                                   marker_kwargs=marker_kwargs, 
-                                                   ncols=ncols, 
-                                                   figsize=figsize,
-                                                   arrows=False, 
-                                                   arrow_style=arrow_style,
-                                                   arrow_kwargs=arrow_kwargs,
-                                                   year_labels=False,
-                                                   axes=axes
-                                                   )
-    axes.flat[0].figure.suptitle(f'Countries {eci_type} vs {y_col}', fontsize=22, y=0.9, 
-                    verticalalignment='bottom', 
-                    horizontalalignment='center')
-    return axes

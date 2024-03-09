@@ -1,6 +1,6 @@
 import statistics
 from dataclasses import dataclass
-from typing import List
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -73,3 +73,81 @@ class ProductsBasket:
             closest_product = min(self.products, key=lambda product: abs(product.pci - quantile))
             closest_products.append(closest_product)
         return closest_products
+
+
+class StringMapper:
+
+    def __init__(self, relations: Dict[str,str], case_sensitive: Optional[bool]=True, 
+                 pass_if_mapped: Optional[bool]=False):
+        self.case_sensitive = case_sensitive
+        self.pass_if_mapped = pass_if_mapped
+        self.pretty_to_ugly = {}
+        self.ugly_to_pretty = {}
+        for pretty, ugly in relations.items():
+            self.add_relation(pretty, ugly)
+
+    def validate_relation(self, pretty: str, ugly: str) -> (str, str):
+        if not self.case_sensitive:
+            pretty, ugly = pretty.lower(), ugly.lower()
+        if pretty in self.pretty_to_ugly or ugly in self.ugly_to_pretty:
+            raise ValueError(f"Non-bijective mapping with pretty or ugly string found: {pretty} {ugly}")
+        return pretty, ugly
+    
+    def add_relation(self, pretty: str, ugly: str) -> None:
+        pretty, ugly = self.validate_relation(pretty, ugly)
+        self.pretty_to_ugly[pretty] = ugly
+        self.ugly_to_pretty[ugly] = pretty
+
+    def prettify_str(self, ugly_str: str) -> str:
+        if not self.case_sensitive:
+            ugly_str = ugly_str.lower()
+        if ugly_str in self.ugly_to_pretty:
+            return self.ugly_to_pretty[ugly_str]
+        elif self.pass_if_mapped and self.is_pretty(ugly_str):
+            return ugly_str
+        else:
+            raise ValueError(f"No pretty string found for '{ugly_str}'")
+    
+    def prettify_strs(self, ugly_strs: str) -> List[str]:
+        return [self.prettify_str(ugly_str) for ugly_str in ugly_strs]
+    
+    def uglify_str(self, pretty_str: str) -> str:
+        if not self.case_sensitive:
+            pretty_str = pretty_str.lower()
+        if pretty_str in self.pretty_to_ugly:
+            return self.pretty_to_ugly[pretty_str]
+        elif self.pass_if_mapped and self.is_ugly(pretty_str):
+            return pretty_str
+        else:
+            raise ValueError(f"No ugly string found for '{pretty_str}'")
+
+    def uglify_strs(self, pretty_strs: List[str]) -> List[str]:
+        return [self.uglify_str(pretty_str) for pretty_str in pretty_strs]
+    
+    def remap_str(self, string):
+        if (not self.case_sensitive and (string.lower() in self.pretty_to_ugly or string.lower() in self.ugly_to_pretty)) \
+                or (string in self.pretty_to_ugly or string in self.ugly_to_pretty):
+            if string in self.pretty_to_ugly or (not self.case_sensitive and string.lower() in self.pretty_to_ugly):
+                return self.uglify_str(string)
+            else:
+                return self.prettify_str(string)
+        else:
+            raise ValueError(f"String '{string}' is not mapped")
+        
+    def remap_strs(self, strings: List[str]) -> List[str]:
+        if all(self.is_pretty(string) for string in strings):
+            return [self.uglify_str(string) for string in strings]
+        elif all(self.is_ugly(string) for string in strings):
+            return [self.prettify_str(string) for string in strings]
+        else:
+            raise ValueError("All strings must be either pretty or ugly before remapping")
+    
+    def is_pretty(self, string: str) -> bool:
+        if not self.case_sensitive:
+            string = string.lower()
+        return string in self.pretty_to_ugly
+
+    def is_ugly(self, string: str) -> bool:
+        if not self.case_sensitive:
+            string = string.lower()
+        return string in self.ugly_to_pretty

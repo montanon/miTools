@@ -1,6 +1,12 @@
+import tempfile
 import unittest
+from pathlib import Path
+
+import matplotlib.pyplot as plt
+import numpy as np
 
 from mitools.context import Context, ContextVar
+from mitools.utils import SavePlotContext, save_plot
 
 VARIABLE = ContextVar("VARIABLE", 0)
 
@@ -106,6 +112,55 @@ with Context(VARIABLE=1):
     with Context(D=3):
       ...
     assert D.value == 2, f"Expected D to be 2, but was {D.value}. Indicates that Context.__exit__ did not restore to the correct value."
+
+
+class TestSavePlotContext(unittest.TestCase):
+    def setUp(self):
+        self.regression_plot = Path('test_plot.png')
+        self.context = SavePlotContext(self.regression_plot)
+
+    def tearDown(self):
+        if self.regression_plot.exists():
+            self.regression_plot.unlink()
+
+    def test_exit_with_axes(self):
+        self.context.axes = plt.figure().subplots()
+        self.context.__exit__(None, None, None)
+        self.assertTrue(self.regression_plot.exists())
+
+    def test_exit_with_axes_array(self):
+        self.context.axes = np.array([plt.figure().subplots(), plt.figure().subplots()])
+        self.context.__exit__(None, None, None)
+        self.assertTrue(self.regression_plot.exists())
+
+    def test_exit_with_invalid_axes(self):
+        self.context.axes = 'invalid'
+        with self.assertRaises(TypeError):
+            self.context.__exit__(None, None, None)
+
+class TestSavePlot(unittest.TestCase):
+    def test_save_plot_single_axes(self):
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            file_path = Path(tmpdirname) / "test.png"
+            with save_plot(file_path) as context:
+                fig, ax = plt.subplots()
+                context.axes = ax
+            self.assertTrue(file_path.is_file())
+
+    def test_save_plot_multiple_axes(self):
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            file_path = Path(tmpdirname) / "test.png"
+            with save_plot(file_path) as context:
+                fig, axes = plt.subplots(2, 2)
+                context.axes = axes
+            self.assertTrue(file_path.is_file())
+
+    def test_save_plot_invalid_axes(self):
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            file_path = Path(tmpdirname) / "test.png"
+            with self.assertRaises(TypeError):
+                with save_plot(file_path) as context:
+                    context.axes = 'invalid'
 
 if __name__ == '__main__':
   unittest.main()

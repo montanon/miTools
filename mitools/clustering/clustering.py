@@ -87,7 +87,7 @@ def get_clusters_centroids_distances(centroids: DataFrame) -> DataFrame:
     if centroids.empty:
         raise ArgumentStructureError(EMPTY_DF_ERROR)
     return DataFrame(
-        pairwise_distances(centroids)
+        pairwise_distances(centroids), index=centroids.index, columns=centroids.index
         )
 
 def get_cosine_similarities(data: DataFrame, cluster_col: str) -> ndarray:
@@ -104,8 +104,7 @@ def get_distances_to_centroids(data: DataFrame, centroids: DataFrame, cluster_co
         centroid = centroids.loc[cluster]
         distance = euclidean(values, centroid)
         distances.append(distance)
-    distances = DataFrame(distances)
-    distances.index = data.index.get_level_values(1)
+    distances = DataFrame(distances, index=data.index)
     return distances.sort_index()
 
 def plot_kmeans_ncluster_search(silhouette_scores: List[float], inertia: List[float]) -> Axes:
@@ -265,13 +264,14 @@ def add_clusters_centroids(ax: Axes, data: DataFrame, cluster_col: str,
         labels = data[cluster_col].unique()
     if colors is None:
         colors = sns.color_palette("husl", len(labels))[::1]
+    if kwargs is None or 'zorder' not in kwargs:
+        kwargs['zorder'] = 0
 
     for i, cls in enumerate(labels):
         ax.plot(
             data[data[cluster_col] == cls][x_col],
             data[data[cluster_col] == cls][y_col],
             color=colors[i],
-            zorder=0,
             **kwargs
         )
     return ax
@@ -352,21 +352,59 @@ def plot_clusters_growth(data: DataFrame, time_col: str, cluster_col: str,
     ax.set_title('Cluster Size Evolution')
     ax.set_ylabel('N° Elements')
     ax.set_xlabel('Year')
+    ax.legend(loc='upper left')
+
+    return ax
+
+def plot_clusters_growth_stacked(data: DataFrame, time_col: str, cluster_col: str, 
+                                 colors: Optional[Dict[str, Tuple]]=None, 
+                                 filtered_clusters: Optional[List[str]]=None,
+                                 share_pct: Optional[bool]=False) -> Axes:
+    topics = data[cluster_col].unique()
+    clusters_count = data.groupby([time_col, cluster_col]).size().unstack(fill_value=0)
+    clusters_count = clusters_count[topics]
+
+    if filtered_clusters:
+        clusters_count = clusters_count[[c for c in clusters_count.columns if c not in filtered_clusters]]
+    if share_pct:
+        clusters_count = clusters_count.div(clusters_count.sum(axis=1), axis=0) * 100
+    
+    _, ax = plt.subplots(figsize=(21, 7))
+
+    if colors is None:
+        colors = sns.color_palette("husl", len(clusters_count.columns))
+    else:
+        colors = [colors[c] for c in clusters_count.columns]
+
+    times = clusters_count.index
+    cluster_values = [clusters_count[cluster].values for cluster in clusters_count]
+
+    ax.stackplot(times, cluster_values, labels=clusters_count.columns, colors=colors)
+
+    ax.set_title('Stacked Cluster Size Evolution')
+    ax.set_ylabel('N° Elements')
+    ax.set_xlabel('Year')
+    if not share_pct:
+        ax.legend(loc='upper left')
+    else:
+        ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 
     return ax
 
 def plot_cosine_similarities(cosine_similarities: Dict[int,DataFrame],
                              normed: Optional[bool]=False, 
-                             colors: Optional[List[Tuple]]=None) -> Axes:
+                             colors: Optional[List[Tuple]]=None,
+                             bins: Optional[bool]=False) -> Axes:
     fig, ax = plt.subplots(1, 1, figsize=(14, 6))
     
     if colors is None:
         colors = sns.color_palette('husl', len(cosine_similarities))[::-1]
-    for cl, similarities in cosine_similarities.items():
+    for cl, similarities in tqdm(cosine_similarities.items()):
         upper_tri_vals = similarities[np.triu_indices(similarities.shape[0], k=1)]
         if not normed:
-            ax = sns.histplot(upper_tri_vals, bins=30, ax=ax, alpha=0.05, stat="density", 
-                              color=colors[cl], legend=False)
+            if bins:
+                ax = sns.histplot(upper_tri_vals, bins=30, ax=ax, alpha=0.05, stat="density", 
+                                color=colors[cl], legend=False)
             ax = sns.kdeplot(upper_tri_vals, ax=ax, color=colors[cl], label=f"Cluster {cl}")
         else:
             kde = gaussian_kde(upper_tri_vals)
@@ -386,12 +424,12 @@ def plot_distances_to_centroids(distances: DataFrame, cluster_col: str,
     fig, ax = plt.subplots(1, 1, figsize=(14, 6))
     if colors is None:
         colors = sns.color_palette('husl', len(distances.index.unique()))[::1]
-    for cl, distances in distances.groupby(cluster_col):
+    for cl, distances in tqdm(distances.groupby(cluster_col)):
         distances = distances[0].values
         kde = gaussian_kde(distances)
         x_vals = np.linspace(min(distances), max(distances), 1000)
         y_vals = kde(x_vals) / max(kde(x_vals))
-        ax.plot(x_vals, y_vals, alpha=1.0, label=f"Cluster {cl}", color=colors[cl])
+        ax.plot(x_vals, y_vals, alpha=1.0, label=cl, color=colors[cl])
 
     ax.set_title('Standardized Distribution of Distances to Centroid of Embeddings by Cluster')
     ax.set_xlabel('Distance to Centroid')

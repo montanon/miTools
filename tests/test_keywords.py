@@ -1,3 +1,4 @@
+import os
 import unittest
 from typing import Dict, List, Tuple
 from unittest import TestCase
@@ -8,6 +9,7 @@ from pandas import DataFrame
 
 from mitools.nlp import (
     RegexpTokenizer,
+    StopwordsManager,
     find_countries_in_dataframe,
     find_country_in_token,
     gen_clusters_ngrams_sankey_colors,
@@ -33,6 +35,7 @@ from mitools.nlp import (
     preprocess_texts,
     preprocess_token,
     preprocess_tokens,
+    replace_sequences,
     sort_multiindex_dataframe,
     tag_token,
     tag_tokens,
@@ -927,6 +930,97 @@ class TestSortMultiIndexDataframe(TestCase):
             columns=pd.MultiIndex.from_arrays(arrays_sorted, names=('top_level', 'bot_level'))
         )
         pd.testing.assert_frame_equal(result_df, expected_df)
+
+class TestStopwordsManager(unittest.TestCase):
+    def setUp(self):
+        self.manager = StopwordsManager()
+        self.filename = "test.pkl"
+
+    def tearDown(self):
+        if os.path.exists(self.filename):
+            os.remove(self.filename)
+
+    def test_add_single_stopword(self):
+        self.manager.add_stopword('testword')
+        self.assertIn('testword', self.manager.words)
+
+    def test_add_multiple_stopwords(self):
+        words = ['testword1', 'testword2']
+        self.manager.add_stopwords(words)
+        self.assertTrue(set(words).issubset(self.manager.words))
+
+    def test_remove_single_stopword(self):
+        self.manager.add_stopword('testword')
+        self.manager.remove_stopword('testword')
+        self.assertNotIn('testword', self.manager.words)
+
+    def test_remove_multiple_stopwords(self):
+        words = ['testword1', 'testword2']
+        self.manager.add_stopwords(words)
+        self.manager.remove_stopwords(words)
+        self.assertFalse(set(words).issubset(self.manager.words))
+
+    def test_save_load(self):
+        self.manager.add_stopword('testword')
+        self.manager.save(self.filename)
+        loaded_manager = StopwordsManager.load(self.filename)
+        self.assertIn('testword', loaded_manager.words)
+
+class TestReplaceSequences(unittest.TestCase):
+    def test_single_word_replacement(self):
+        tokens = ['this', 'is', 'a']
+        mapping = {'test': ('a',)}
+        expected_output = ['this', 'is', 'test']
+        self.assertEqual(replace_sequences(tokens, mapping), expected_output)
+
+    def test_single_word_replacement_with_repetition(self):
+        tokens = ['this', 'is', 'a', 'test']
+        mapping = {'test': ('a',)}
+        expected_output = ['this', 'is', 'test']
+        self.assertEqual(replace_sequences(tokens, mapping), expected_output)
+
+    def test_multiple_words_replacement(self):
+        tokens = ['this', 'is', 'another', 'test']
+        mapping = {'another_test': ('another', 'test')}
+        expected_output = ['this', 'is', 'another_test']
+        self.assertEqual(replace_sequences(tokens, mapping), expected_output)
+
+    def test_multiple_occurrences(self):
+        tokens = ['this', 'is', 'yet', 'another', 'test', 'or', 'yet', 'another', 'test']
+        mapping = {'yet_another_test': ('yet', 'another', 'test')}
+        expected_output = ['this', 'is', 'yet_another_test', 'or', 'yet_another_test']
+        self.assertEqual(replace_sequences(tokens, mapping), expected_output)
+
+    def test_multiple_occurrences_with_repetition(self):
+        tokens = ['this', 'is', 'yet', 'another', 'test', 'or', 'yet', 'another']
+        mapping = {'test': ('yet', 'another')}
+        expected_output = ['this', 'is', 'test', 'or', 'test']
+        self.assertEqual(replace_sequences(tokens, mapping), expected_output)
+
+    def test_multiple_occurrences_with_consequent_repetition(self):
+        tokens = ['this', 'is', 'yet', 'another', 'test', 'yet', 'another']
+        mapping = {'test': ('yet', 'another')}
+        expected_output = ['this', 'is', 'test', 'test']
+        self.assertEqual(replace_sequences(tokens, mapping), expected_output)
+
+    def test_overlapping_sequences(self):
+        tokens = ['this', 'is', 'yet', 'another', 'test']
+        mapping = {'yet_another': ('yet', 'another'), 'another_test': ('another', 'test')}
+        expected_output = ['this', 'is', 'yet_another', 'test']
+        self.assertEqual(replace_sequences(tokens, mapping), expected_output)
+
+    def test_no_sequences_to_replace(self):
+        tokens = ['this', 'is', 'a', 'test']
+        mapping = {'not_present': ('not', 'present')}
+        expected_output = ['this', 'is', 'a', 'test']
+        self.assertEqual(replace_sequences(tokens, mapping), expected_output)
+
+    def test_list_value_sequences(self):
+        tokens = ['this', 'is', 'a', 'test', 'this', 'is', 'a', 'tests']
+        mapping = {'test': [('a', 'test'), ('a', 'tests')]}
+        expected_output = ['this', 'is', 'test', 'this', 'is', 'test']
+        self.assertEqual(replace_sequences(tokens, mapping), expected_output)
+
 
 if __name__ == '__main__':
     unittest.main()

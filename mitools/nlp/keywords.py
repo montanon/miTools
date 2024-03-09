@@ -150,8 +150,47 @@ def merge_into_dataframe_index(df: DataFrame, df_to_merge: DataFrame,
                  )
     return merged_df
 
-def get_ngram_count(df: DataFrame, text_col: str, id_col: str, tokenizer: Optional[Type[StringTokenizer]]=None, 
-                    stop_words: Optional[List[str]]=None, ngram_range: Optional[Tuple[int, int]]=(1,1),
+def replace_sequences(tokens: List[str], mapping: Dict[str, Union[Tuple[str], List[Tuple[str]]]]) -> List[str]:
+    lowercase_tokens = [t.lower() for t in tokens]
+    sub_mapping = {}
+    for key, values in mapping.items():
+        sequences = [values] if isinstance(values, tuple) else values
+        for sequence in sequences:
+            if all(v.lower() in lowercase_tokens for v in sequence):
+                sub_mapping.setdefault(key, []).append(sequence)
+    result = []
+    i = 0
+    while i < len(tokens):
+        replaced = False
+        for key, sequences in sub_mapping.items():
+            for sequence in sequences:
+                seq_len = len(sequence)
+                end_idx = i + seq_len
+                if lowercase_tokens[i:end_idx+1] == list(sequence) + [key]:
+                    result.append(key)
+                    i += seq_len + 1
+                    replaced = True
+                    break
+                elif lowercase_tokens[i:end_idx] == list(sequence):
+                    result.append(key)
+                    i += seq_len
+                    replaced = True
+                    break
+            if replaced:
+                break
+        if not replaced:
+            result.append(tokens[i])
+            i += 1
+    return result
+
+def get_ngram_count(df: DataFrame, 
+                    text_col: str, 
+                    id_col: str, 
+                    tokenizer: Optional[Type[StringTokenizer]]=None, 
+                    ngram_range: Optional[Tuple[int, int]]=(1,1),
+                    stop_words: Optional[List[str]]=None,
+                    selected_words: Optional[List[str]]=None,
+                    entities_map: Dict[str, Union[Tuple[str], List[Tuple[str]]]]=None, 
                     lemmatize: Optional[bool]=False,
                     frequency: Optional[bool]=False,
                     max_features: Optional[int]=None, 
@@ -162,10 +201,18 @@ def get_ngram_count(df: DataFrame, text_col: str, id_col: str, tokenizer: Option
                     ) -> DataFrame:
     if tokenizer is None: 
         tokenizer = RegexpTokenizer("[A-Za-z]{2,}[0-9]{,1}")
+    if entities_map and lemmatize:
+        entities_map = {k: (lemmatize_token(s) for s in v) if isinstance(v, tuple) else [(lemmatize_token(s) for s in t) for t in v] for k, v in entities_map.items()}
     def tokenization(text):
-        if not lemmatize:
-            return tokenizer.tokenize(text)
-        return lemmatize_tokens([t for t in tokenizer.tokenize(text) if t not in stop_words])
+        if lemmatize:
+            tokens = lemmatize_tokens([t for t in tokenizer.tokenize(text) if t not in stop_words])
+        else:
+            tokens = tokenizer.tokenize(text)
+        if entities_map is not None:
+                tokens = replace_sequences(tokens, entities_map)
+        if selected_words is not None:
+            tokens = [t for t in tokens if t in selected_words]
+        return tokens
     Vectorizer = CountVectorizer if not tfidf else TfidfVectorizer
     ngrams_counter = Vectorizer(ngram_range=ngram_range, 
                                      stop_words=stop_words if not lemmatize else None,
@@ -183,8 +230,7 @@ def get_ngram_count(df: DataFrame, text_col: str, id_col: str, tokenizer: Option
                                 )
     ngrams_count = ngrams_count[ngrams_count.sum(axis=0).sort_values(ascending=False).index]
     if frequency and not tfidf:
-            ngrams_count = ngrams_count.div(ngrams_count
-            .sum(axis=1), axis=0)
+            ngrams_count = ngrams_count.div(ngrams_count.sum(axis=1), axis=0)
     return ngrams_count
 
 def plot_clusters_ngrams(clusters_ngrams: DataFrame, n_gram: int, ncols: int, n_grams: Optional[int]=20,
@@ -222,7 +268,7 @@ def plot_ngrams_count(grams_count: DataFrame, n_grams: Optional[Union[int, float
             n_grams = int(len(grams_count)*n_grams)
         grams_count = grams_count.iloc[:n_grams]
     grams_n = len(grams_count.index[0].split(' '))
-    _mapping = {1: "Uni", 2:"Bi", 3:"Tri", 4:"Four"}
+    _mapping = {1: "Uni", 2:"Bi", 3:"Tri", 4:"Quad", 5:"Penta", 6:"Hexa"}
     if ax is None:
         fig, ax = plt.subplots(figsize=(12,8))
     sns.barplot(x=grams_count.values, y=grams_count.index, ax=ax)
@@ -257,26 +303,52 @@ def get_clustered_dataframe_tokens(df: DataFrame, text_col: str, id_col: str, cl
     df_tokens.columns = pd.MultiIndex.from_tuples(list(zip(cluster_columns, df_tokens.columns)))
     return df_tokens
 
-def get_clusters_ngrams(df: DataFrame, text_col: str, id_col: str, 
-                        cluster_col: str, max_features: int, 
-                        stop_words: Optional[List[str]]=None, 
+def get_clusters_ngrams(df: DataFrame, 
+                        text_col: str, 
+                        id_col: str, 
+                        cluster_col: str, 
+                        max_features: int, 
+                        stop_words: Optional[List[str]]=None,
+                        selected_words: Optional[List[str]]=None,
+                        entities_map: Dict[str, Tuple[str]]=None, 
                         ngram_range: Optional[Tuple[int, int]]=(1,5),
+                        all_grams: Optional[bool]=False,
                         frequency: Optional[bool]=True,
+                        lemmatize: Optional[bool]=False,
                         lowercase: Optional[bool]=False) -> DataFrame:
     clusters_ngrams = []
     for cluster in tqdm(df[cluster_col].unique(), desc="Processing clusters"):
         cluster_texts_ids = df.query(f"{cluster_col} == @cluster")[id_col]
         cluster_texts = df[df[id_col].isin(cluster_texts_ids)]
-        for gram_n in range(*ngram_range):
+        if all_grams:
             cluster_ngrams = get_cluster_ngrams(cluster_texts=cluster_texts, 
                                                     text_col=text_col, 
                                                     id_col=id_col, 
                                                     cluster=cluster, 
-                                                    stop_words=stop_words, 
+                                                    stop_words=stop_words,
+                                                    selected_words=selected_words,
+                                                    entities_map=entities_map, 
+                                                    max_features=max_features, 
+                                                    gram_n=ngram_range,
+                                                    frequency=frequency,
+                                                    lowercase=lowercase,
+                                                    lemmatize=lemmatize
+                                                )
+            clusters_ngrams.append(cluster_ngrams)
+
+        for gram_n in range(ngram_range[0], ngram_range[1]+1):
+            cluster_ngrams = get_cluster_ngrams(cluster_texts=cluster_texts, 
+                                                    text_col=text_col, 
+                                                    id_col=id_col, 
+                                                    cluster=cluster, 
+                                                    stop_words=stop_words,
+                                                    selected_words=selected_words,
+                                                    entities_map=entities_map, 
                                                     max_features=max_features, 
                                                     gram_n=gram_n,
                                                     frequency=frequency,
-                                                    lowercase=lowercase
+                                                    lowercase=lowercase,
+                                                    lemmatize=lemmatize
                                                 )
             clusters_ngrams.append(cluster_ngrams)
     clusters_ngrams_frequency_df = pd.concat(clusters_ngrams, axis=1)
@@ -285,41 +357,81 @@ def get_clusters_ngrams(df: DataFrame, text_col: str, id_col: str,
 
 def get_clusters_texts_ngrams(df: DataFrame, text_col: str, id_col: str, 
                         cluster_col: str, max_features: int, 
-                        stop_words: Optional[List[str]]=None, 
+                        stop_words: Optional[List[str]]=None,
+                        selected_words: Optional[List[str]]=None, 
+                        entities_map: Dict[str, Tuple[str]]=None,
                         ngram_range: Optional[Tuple[int, int]]=(1,5),
+                        all_grams: Optional[bool]=False,
                         frequency: Optional[bool]=True,
-                        lowercase: Optional[bool]=False) -> DataFrame:
+                        lowercase: Optional[bool]=False,
+                        lemmatize: Optional[bool]=False,
+                        tfidf: Optional[bool]=False) -> DataFrame:
     clusters_ngrams = []
     for cluster in tqdm(df[cluster_col].unique(), desc="Processing clusters"):
         cluster_texts_ids = df.query(f"{cluster_col} == @cluster")[id_col]
         cluster_texts = df[df[id_col].isin(cluster_texts_ids)]
-        for gram_n in range(*ngram_range):
+        if all_grams:
             cluster_ngrams = get_cluster_text_ngrams(cluster_texts=cluster_texts, 
-                                                    text_col=text_col, 
-                                                    id_col=id_col, 
-                                                    cluster=cluster, 
-                                                    stop_words=stop_words, 
-                                                    max_features=max_features, 
-                                                    gram_n=gram_n,
-                                                    frequency=frequency,
-                                                    lowercase=lowercase
+                                                        text_col=text_col, 
+                                                        id_col=id_col, 
+                                                        cluster=cluster, 
+                                                        stop_words=stop_words, 
+                                                        selected_words=selected_words,
+                                                        entities_map=entities_map,
+                                                        max_features=max_features, 
+                                                        gram_n=ngram_range,
+                                                        frequency=frequency,
+                                                        lowercase=lowercase,
+                                                        tfidf=tfidf,
+                                                        lemmatize=lemmatize
                                                      )
             clusters_ngrams.append(cluster_ngrams)
+        else:
+            for gram_n in range(ngram_range[0], ngram_range[1]+1):
+                cluster_ngrams = get_cluster_text_ngrams(cluster_texts=cluster_texts, 
+                                                        text_col=text_col, 
+                                                        id_col=id_col, 
+                                                        cluster=cluster, 
+                                                        stop_words=stop_words, 
+                                                        selected_words=selected_words,
+                                                        entities_map=entities_map,
+                                                        max_features=max_features, 
+                                                        gram_n=gram_n,
+                                                        frequency=frequency,
+                                                        lowercase=lowercase,
+                                                        tfidf=tfidf,
+                                                        lemmatize=lemmatize
+                                                         )
+                clusters_ngrams.append(cluster_ngrams)
     clusters_ngrams_frequency_df = pd.concat(clusters_ngrams, axis=1)
     return clusters_ngrams_frequency_df.sort_index(axis=1)
 
 def get_cluster_text_ngrams(cluster_texts: pd.DataFrame, text_col: str, id_col: str, cluster: Union[str,int], 
-                       gram_n: int, max_features: Optional[int]=None,
+                       gram_n: Union[int, Tuple[int, int]], max_features: Optional[int]=None,
                        stop_words: Optional[List[str]]=None,
+                       selected_words: Optional[List[str]]=None,
+                       entities_map: Dict[str, Tuple[str]]=None,
                        frequency: Optional[bool]=True,
-                       lowercase: Optional[bool]=False) -> pd.DataFrame:
+                       lowercase: Optional[bool]=False,
+                       lemmatize: Optional[bool]=False,
+                       tfidf: Optional[bool]=False,
+                       max_df: Optional[Union[int, float]]=1.0, 
+                       min_df: Optional[Union[int, float]]=1) -> pd.DataFrame:
+        ngram_range = (gram_n, gram_n) if isinstance(gram_n, int) else gram_n
+        ngram_name = f"{gram_n}-Gram" if isinstance(gram_n, int) else f"{ngram_range[0]}_{ngram_range[1]}-Gram"
         cluster_ngrams = get_ngram_count(cluster_texts, 
                                          text_col=text_col, 
                                          id_col=id_col, 
                                          stop_words=stop_words, 
-                                         ngram_range=(gram_n, gram_n),
+                                         selected_words=selected_words,
+                                         entities_map=entities_map,
+                                         ngram_range=ngram_range,
                                          max_features=max_features,
-                                         frequency=frequency
+                                         frequency=frequency,
+                                         tfidf=tfidf,
+                                         lemmatize=lemmatize,
+                                         max_df=max_df,
+                                         min_df=min_df,
                                          )      
         cluster_ngrams = cluster_ngrams.reset_index()
         transformed_cluster_ngrams = cluster_ngrams.melt(id_vars=[id_col], var_name='Gram', value_name='__count__')
@@ -329,11 +441,13 @@ def get_cluster_text_ngrams(cluster_texts: pd.DataFrame, text_col: str, id_col: 
                                  .reset_index(drop=True)
                                  for text_id, text_grams in transformed_cluster_ngrams.groupby(id_col, axis=1)]
         cluster_ngrams = pd.concat(cluster_ngrams, axis=1)
+        value_col = 'Frequency' if frequency else 'Count'
+        value_col = 'Tfidf' if tfidf else value_col
         cluster_ngrams.columns = pd.MultiIndex.from_product([
             [f"Cluster {cluster}"],
             transformed_cluster_ngrams.columns.values,
-            [f'{gram_n}-Gram'],
-            ['Gram', 'Frequency' if frequency else 'Count']
+            [ngram_name],
+            ['Gram', value_col]
         ])
         if not lowercase:
             cluster_ngrams.iloc[:, 0::2] = cluster_ngrams.iloc[:, 0::2].apply(lambda x: [v.title() for v in x])
@@ -342,15 +456,26 @@ def get_cluster_text_ngrams(cluster_texts: pd.DataFrame, text_col: str, id_col: 
 def get_cluster_ngrams(cluster_texts: pd.DataFrame, text_col: str, id_col: str, cluster: Union[str,int], 
                        gram_n: int, max_features: Optional[int]=None,
                        stop_words: Optional[List[str]]=None,
+                       selected_words: Optional[List[str]]=None,
+                       entities_map: Dict[str, Tuple[str]]=None,
                        frequency: Optional[bool]=True,
-                       lowercase: Optional[bool]=False) -> pd.DataFrame:
+                       lemmatize: Optional[bool]=False,
+                       lowercase: Optional[bool]=False,
+                       max_df: Optional[Union[int, float]]=1.0, 
+                       min_df: Optional[Union[int, float]]=1) -> pd.DataFrame:
         cluster_grams = get_ngram_count(cluster_texts, 
                                         text_col=text_col, 
                                         id_col=id_col, 
-                                        stop_words=stop_words, 
+                                        stop_words=stop_words,
+                                        selected_words=selected_words,
+                                        entities_map=entities_map, 
                                         ngram_range=(gram_n, gram_n),
                                         max_features=max_features,
-                                        frequency=False
+                                        lemmatize=lemmatize,
+                                        frequency=False,
+                                        tfidf=False,
+                                        max_df=max_df,
+                                        min_df=min_df
                                         )
         cluster_grams = cluster_grams.sum()
         if frequency:
@@ -444,11 +569,18 @@ def process_group(group: DataFrame, year_range_col: str, gram_n_col: str, text_i
     group = pd.concat([
         g.droplevel(text_id, axis=1) for _, g in group.groupby([year_range_col, text_id], axis=1)
         ], axis=0)
-    groups = [process_subgroups(
-        sub_g, 
-        (y_range, gram_n, 'Gram'), 
-        (y_range, gram_n, 'Count')
-        ) for (y_range, gram_n), sub_g in group.groupby([year_range_col, gram_n_col], axis=1)]
+    if group.columns.get_level_values(gram_n_col).nunique() == 1:
+        groups = [process_subgroups(
+            group, 
+            (group.columns.get_level_values(year_range_col)[0], group.columns.get_level_values(gram_n_col)[0], group.columns.get_level_values(-1).unique()[1]), 
+            (group.columns.get_level_values(year_range_col)[0], group.columns.get_level_values(gram_n_col)[0], group.columns.get_level_values(-1).unique()[0])
+        )]
+    else:
+        groups = [process_subgroups(
+            sub_g, 
+            (y_range, gram_n, group.columns.get_level_values(-1).unique()[1]), 
+            (y_range, gram_n, group.columns.get_level_values(-1).unique()[0])
+            ) for (y_range, gram_n), sub_g in group.groupby([year_range_col, gram_n_col], axis=1)]
     return pd.concat(groups, axis=1)
 
 def strings_to_group_patterns(strings: List[str], union: str) -> str:
@@ -496,7 +628,8 @@ def sankey_plot_clusters_ngrams(clusters_ngrams: DataFrame, n_gram: int, min_ngr
     clusters_ngram = clusters_ngrams.loc[:, pd.IndexSlice[:,n_gram,:]]
     common_ngrams = [g.droplevel([0, 1], axis=1) for n, g in clusters_ngram.groupby(level=[0, 1], axis=1)]
     common_ngrams = pd.concat(common_ngrams, axis=0)
-    common_ngrams = common_ngrams.groupby('Gram').sum().sort_values(by='Frequency', ascending=False)
+    value_col = [c for c in clusters_ngrams.columns.get_level_values(-1).unique() if 'Gram' not in c][0]
+    common_ngrams = common_ngrams.groupby('Gram').sum().sort_values(by=value_col, ascending=False)
     sources_labels = clusters_ngrams.columns.get_level_values(0).unique()
     targets_labels = common_ngrams.index[min_ngram:max_ngram].tolist()
     labels = [*sources_labels, *targets_labels]

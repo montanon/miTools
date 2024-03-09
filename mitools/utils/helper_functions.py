@@ -24,6 +24,7 @@ from fuzzywuzzy import fuzz
 from numpy import ndarray
 from openpyxl.worksheet.worksheet import Worksheet
 from pandas import DataFrame, Series
+from treelib import Tree
 
 T = TypeVar('T')
 COLOR_CODES = {
@@ -110,15 +111,15 @@ def split_strings(str_list: List[str]) -> List[str]:
     new_list = []
     for s in str_list:
         new_list += re.split('(?=[A-Z])', s)
-    return new_list
+    return [s for s in new_list if s]
 
 def add_significance(row: Series) -> Series:
     p_value = float(row.split(' ')[1].replace('(','').replace(')',''))  
-    if p_value < 0.01:
+    if p_value < 0.001:
         return row + "***"
-    elif p_value < 0.05:
+    elif p_value < 0.01:
         return row + "**"
-    elif p_value < 0.1:
+    elif p_value < 0.05:
         return row + "*"
     else:
         return row
@@ -222,3 +223,20 @@ def display_env_variables(env_vars: List[Tuple[str, Any]], threshold_mb: float) 
 
 def pretty_dict_str(dictionary: Dict) -> str:
     return json.dumps(dictionary, indent=4, sort_keys=True)
+
+def build_dir_tree(directory: PathLike, tree: Optional[Tree]=None, parent: Optional[PathLike]=None) -> Tree:
+    if tree is None:
+        tree = Tree()
+        tree.create_node(directory.name, str(directory))
+        parent = str(directory)
+    for item in sorted(directory.iterdir()):
+        node_id = str(item)
+        if item.is_dir():
+            tree.create_node(item.name, node_id, parent=parent)
+            build_dir_tree(item, tree, parent=node_id)
+        else:
+            tree.create_node(item.name, node_id, parent=parent)
+    return tree
+
+def clean_str(string: str, pattern: Optional[str], sub_char: Optional[str]='') -> str:
+    return re.sub(rf'{pattern}', sub_char, string)
