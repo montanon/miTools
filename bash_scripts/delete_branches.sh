@@ -15,8 +15,10 @@ git stash push -u -m "Temporary stash for delete_branches script"
 
 # For each branch, except master and dev
 for branch in $(git for-each-ref --format '%(refname:short)' refs/heads/ | grep -v -e '^master$' -e '^dev$' -e '^notebooks$'); do
+    # Find the common ancestor of the branch and dev
+    merge_base=$(git merge-base $branch dev)
     # Check if the branch is identical to dev
-    if [ $(git rev-parse $branch) == $(git rev-parse dev) ]; then
+     if [ $(git rev-parse $branch) == $merge_base ]; then
         # Delete the branch
         git branch -d $branch
         echo "Deleted branch $branch as it was up to date with dev."
