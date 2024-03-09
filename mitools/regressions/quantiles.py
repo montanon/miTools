@@ -3,6 +3,7 @@ import traceback
 import warnings
 from dataclasses import dataclass
 from os import PathLike
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import matplotlib.lines as mlines
@@ -246,7 +247,8 @@ def plot_regression_predictions_by_group(independent_variables: List[str],
             adjust_axes_labels(ax, labels_fontsize)
     return axes
 
-def create_regression_file_paths(eci_type_folder, eci_type, regression_id):
+def create_regression_file_paths(eci_type_folder: PathLike, regression_id: str) -> Tuple[Path, Path]:
+    eci_type_folder = Path(eci_type_folder)
     main_plot = eci_type_folder / f"{QuantileRegStrs.MAIN_PLOT}.png"
     regression_plot = eci_type_folder / f"{regression_id}_{QuantileRegStrs.PLOTS_SUFFIX}.png"
     return main_plot, regression_plot
