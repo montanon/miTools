@@ -2,7 +2,13 @@ import unittest
 from dataclasses import FrozenInstanceError
 from pathlib import Path
 
-from mitools.regressions import QuantileRegStrs, create_regression_file_paths
+from pandas import DataFrame
+
+from mitools.regressions import (
+    QuantileRegStrs,
+    create_regression_file_paths,
+    get_group_data,
+)
 
 
 class TestQuantileRegStrs(unittest.TestCase):
@@ -69,6 +75,37 @@ class TestCreateRegressionFilePaths(unittest.TestCase):
         self.created_files.extend([main_plot_path, regression_plot_path, main_plot_str, regression_plot_str])
         self.assertEqual(main_plot_path, main_plot_str)
         self.assertEqual(regression_plot_path, regression_plot_str)
+
+class TestGetGroupData(unittest.TestCase):
+    def setUp(self):
+        # Create a sample DataFrame for testing
+        self.data = DataFrame({
+            'value': [1, 2, 3, 4],
+            'group': ['A', 'B', 'A', 'B']
+        }).set_index('group')
+
+    def test_filtering_by_group(self):
+        # Test filtering for a specific group
+        result = get_group_data(self.data, 'A', 'group', 'All')
+        self.assertEqual(len(result), 2)  # Expecting 2 rows for group 'A'
+        self.assertTrue((result.index == 'A').all())  # All rows should belong to group 'A'
+
+    def test_returning_all_data(self):
+        # Test returning all data when group equals all_groups
+        result = get_group_data(self.data, 'All', 'group', 'All')
+        self.assertEqual(len(result), len(self.data))  # Should return the entire DataFrame
+
+    def test_empty_dataframe(self):
+        # Test with an empty DataFrame
+        empty_df = DataFrame(columns=['value', 'group']).set_index('group')
+        result = get_group_data(empty_df, 'A', 'group', 'All')
+        self.assertTrue(result.empty)  # Result should also be an empty DataFrame
+
+    def test_group_not_present(self):
+        # Test with a group value not present in the DataFrame
+        result = get_group_data(self.data, 'C', 'group', 'All')
+        self.assertTrue(result.empty)  # Expecting an empty DataFrame
+
 
 if __name__ == '__main__':
     unittest.main()
