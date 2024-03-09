@@ -23,7 +23,7 @@ from tqdm.notebook import tqdm
 
 from ..economic_complexity import StringMapper
 from ..pandas import idxslice
-from ..regressions import generate_hash_from_dataframe
+from ..regressions import RegressionData, generate_hash_from_dataframe
 from ..utils import auto_adjust_columns_width
 from ..visuals import (
     adjust_axes_labels,
@@ -503,22 +503,16 @@ def quantile_regression_value(row: Series) -> Series:
         return f"{coeff}({t_value})"
     
 def get_quantile_regression_results(data: DataFrame, 
-                                    dependent_variable: str, 
-                                    independent_variables: List[str], 
-                                    control_variables: Optional[List[str]]=None, 
-                                    quantiles: Optional[List[float]]=None, 
-                                    quadratic=False, 
+                                    regression: 'QuantilesRegression',
                                     max_iter: Optional[int]=2_500
                                     ) -> Dict[float, RegressionResultsWrapper]:
-    if quantiles is None:
-        quantiles = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
-    formula_terms = independent_variables.copy()
-    if quadratic:
+    formula_terms = regression.independent_variables.copy()
+    if regression.quadratic:
         formula_terms += [f"I({var}{QuantileRegStrs.QUADRATIC_VAR_SUFFIX})" for var in formula_terms]
-    if control_variables: 
-        formula_terms += control_variables
-    formula = f"{dependent_variable} ~ " + " + ".join(formula_terms)
-    results = {q: smf.quantreg(formula, data).fit(q=q, max_iter=max_iter) for q in quantiles}
+    if regression.control_variables: 
+        formula_terms += regression.control_variables
+    formula = f"{regression.dependent_variable} ~ " + " + ".join(formula_terms)
+    results = {q: smf.quantreg(formula, data).fit(q=q, max_iter=max_iter) for q in regression.quantiles}
     return results
 
 def prepare_regression_data(data: DataFrame, 
@@ -771,14 +765,18 @@ def create_quantile_regressions_results(data: DataFrame,
                                         control_variables=control_vars,
                                         str_mapper=str_mapper
                                         )
+                                    regression = QuantilesRegression(
+                                        dependent_variable=dependent_var,
+                                        independent_variables=independent_vars,
+                                        control_variables=c_vars,
+                                        quantiles=quantiles,
+                                        quadratic=quadratic,
+                                        strs=QuantileRegStrs()
+                                    )
                                     with warnings.catch_warnings():
                                         regression_results = get_quantile_regression_results(
                                             data=regression_data, 
-                                            dependent_variable=dependent_var, 
-                                            independent_variables=independent_vars, 
-                                            control_variables=c_vars, 
-                                            quantiles=quantiles,
-                                            quadratic=quadratic, 
+                                            regression=regression,
                                             max_iter=max_iter
                                             )
                                     regression_coeffs = get_quantile_regression_results_coeffs(
@@ -786,6 +784,8 @@ def create_quantile_regressions_results(data: DataFrame,
                                         independent_variables=independent_vars
                                         )
                                     regression_coeffs.columns = [group]
+
+                                    return regression_coeffs
                                     # regression_stats = get_quantile_regression_results_stats(results=regression_results)
                                     group_regressions.append(regression_coeffs)
                                 group_regressions = pd.concat(group_regressions, axis=1)
@@ -821,3 +821,47 @@ def create_quantile_regressions_results(data: DataFrame,
                         sheet = book[sheet_name]
                         auto_adjust_columns_width(sheet)
                     book.save(dep_var_name_excel)
+
+
+@dataclass(frozen=True)
+class QuantilesRegression:
+
+    dependent_variable: str
+    independent_variables: List[str]
+    quantiles: List[float]
+    quadratic: bool
+    strs: QuantileRegStrs
+    control_variables: Optional[List[str]]=None
+
+@dataclass(frozen=True)
+class QuantilesRegressionData(RegressionData):
+
+    dependent_variable: str
+    independent_variables: List[str]
+    quantiles: List[float]
+    quadratic: bool
+    strs: QuantileRegStrs
+    control_variables: Optional[List[str]]=None
+
+    coefficients: Dict[str,float]
+    std_errs: Dict[str,float]
+    t_values: Dict[str,float]
+    p_values: Dict[str,float]
+    significances: Dict[str,str]
+    conf_interval: Dict[str,Tuple[float,float]]
+    model_params: Dict[str,Any]
+
+    n_obs: int
+    R_sq: float
+    AdjR_sq: float
+    Root_MSE: float
+
+    F_stats: Dict[Tuple[int, int],float]
+    Prob_F: int
+
+    model_specification: str
+
+    coefficient_col: str = 'Coefficient'
+    significance_col: str = 'P>|t|'
+
+
