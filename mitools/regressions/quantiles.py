@@ -17,7 +17,6 @@ from matplotlib.patches import ArrowStyle, FancyArrowPatch
 from numpy.linalg import LinAlgError
 from pandas import DataFrame, MultiIndex, Series
 from statsmodels.regression.linear_model import RegressionResultsWrapper
-
 #from tqdm import tqdm
 from tqdm.notebook import tqdm
 
@@ -25,12 +24,8 @@ from ..economic_complexity import StringMapper
 from ..pandas import idxslice
 from ..regressions import RegressionData, generate_hash_from_dataframe
 from ..utils import auto_adjust_columns_width, stretch_string
-from ..visuals import (
-    adjust_axes_labels,
-    adjust_axes_lims,
-    adjust_text_axes_limits,
-    is_axes_empty,
-)
+from ..visuals import (adjust_axes_labels, adjust_axes_lims,
+                       adjust_text_axes_limits, is_axes_empty)
 
 warnings.simplefilter('ignore')
 Color = Union[Tuple[int, int, int], str]
@@ -537,17 +532,10 @@ def quantile_regression_value(row: Series) -> Series:
     else:
         return f"{coeff}({t_value})"
     
-def get_quantile_regression_results(data: DataFrame, 
-                                    regression: 'QuantilesRegression',
+def get_quantile_regression_results(regression: 'QuantilesRegression',
                                     max_iter: Optional[int]=2_500
                                     ) -> Dict[float, RegressionResultsWrapper]:
-    formula_terms = regression.independent_variables.copy()
-    if regression.quadratic:
-        formula_terms += [f"I({var}{QuantileRegStrs.QUADRATIC_VAR_SUFFIX})" for var in formula_terms]
-    if regression.control_variables: 
-        formula_terms += regression.control_variables
-    formula = f"{regression.dependent_variable} ~ " + " + ".join(formula_terms)
-    results = {q: smf.quantreg(formula, data).fit(q=q, max_iter=max_iter) for q in regression.quantiles}
+    results = {q: smf.quantreg(regression.formula, regression.data).fit(q=q, max_iter=max_iter) for q in regression.quantiles}
     return results
 
 def prepare_regression_data(data: DataFrame, 
@@ -809,10 +797,10 @@ def create_quantile_regressions_results(data: DataFrame,
                                         control_variables=c_vars,
                                         quantiles=quantiles,
                                         quadratic=quadratic,
+                                        data=regression_data
                                     )
                                     with warnings.catch_warnings():
                                         regression_results = get_quantile_regression_results(
-                                            data=regression_data, 
                                             regression=regression,
                                             max_iter=max_iter
                                             )
@@ -865,14 +853,39 @@ def create_quantile_regressions_results(data: DataFrame,
     return regressions
 
 
-@dataclass(frozen=True)
 class QuantilesRegression:
-    group: str
-    dependent_variable: str
-    independent_variables: List[str]
-    quantiles: List[float]
-    quadratic: bool
-    control_variables: Optional[List[str]]=None
+
+    def __init__(self, 
+                 group: str, 
+                 dependent_variable: str, 
+                 independent_variables: List[str], 
+                 quantiles: List[float], 
+                 quadratic: bool,
+                 data: DataFrame, 
+                 control_variables: Optional[List[str]]=None
+                 ):
+        self.group = group
+        self.dependent_variable = dependent_variable
+        self.independent_variables = independent_variables
+        self.quantiles = quantiles
+        self.quadratic = quadratic
+        self.data = data
+        self.control_variables = control_variables if control_variables else []
+        self.formula = self.get_formula()
+
+    def get_formula(self, str_mapper: Optional[StringMapper]=None) -> str:
+        if str_mapper:
+            pass
+        formula_terms = self.independent_variables.copy()
+        if self.quadratic:
+            formula_terms += [f"I({var}{QuantileRegStrs.QUADRATIC_VAR_SUFFIX})" for var in formula_terms]
+        if self.control_variables: 
+            formula_terms += self.control_variables
+        formula = f"{self.dependent_variable} ~ " + " + ".join(formula_terms)
+        return formula
+    
+    def data_statistics_table(self):
+        return self.data.describe().T
 
 class QuantilesRegressionData:
 
@@ -885,14 +898,15 @@ class QuantilesRegressionData:
         self.group = self.coeffs.columns.tolist()[0]
 
         self.dependent_variables = self.coeffs.index.get_level_values(QuantileRegStrs.DEPENDENT_VAR).tolist()[0]
+        
         self.independent_variables = self.coeffs.loc[
             self.coeffs.index.get_level_values(QuantileRegStrs.VARIABLE_TYPE) == QuantileRegStrs.EXOG_VAR
-            ].index.get_level_values(QuantileRegStrs.INDEPENDENT_VARS).tolist()
+            ].index.get_level_values(QuantileRegStrs.INDEPENDENT_VARS).unique().tolist()
         self.control_variables = self.coeffs.loc[
             self.coeffs.index.get_level_values(QuantileRegStrs.VARIABLE_TYPE) == QuantileRegStrs.CONTROL_VAR
-            ].index.get_level_values(QuantileRegStrs.INDEPENDENT_VARS).tolist()
+            ].index.get_level_values(QuantileRegStrs.INDEPENDENT_VARS).unique().tolist()
         
-        self.quantiles = self.coeffs.index.get_level_values(QuantileRegStrs.QUANTILE).tolist()
+        self.quantiles = self.coeffs.index.get_level_values(QuantileRegStrs.QUANTILE).unique().tolist()
         self.quadratic = self.coeffs.index.get_level_values(
             QuantileRegStrs.REGRESSION_DEGREE
             ).tolist()[0] == QuantileRegStrs.QUADRATIC_REG
@@ -961,6 +975,39 @@ class QuantilesRegressionData:
         table_text = "\\begin{adjustbox}{width=\\textwidth,center}\n" + f"{table}" + "\end{adjustbox}\n"
         table_text = table_text + "{\\centering\\tiny Note: * p\\textless0.05, ** p\\textless0.01, *** p\\textless0.001\\par}" if note else table_text
         print(table_text)
+
+    def model_specification(self, str_mapper: Optional[StringMapper]=None):
+        if str_mapper:
+            independent_variables = [str_mapper.prettify_str(var) if QuantileRegStrs.QUADRATIC_VAR_SUFFIX not in var else f"{str_mapper.prettify_str(var.replace(QuantileRegStrs.QUADRATIC_VAR_SUFFIX, ''))}{QuantileRegStrs.QUADRATIC_VAR_SUFFIX}" for var in self.independent_variables]
+            control_variables = [str_mapper.prettify_str(var) for var in self.control_variables]
+        else:
+            independent_variables = self.independent_variables
+            control_variables = self.control_variables
+        model_specification = f"{self.dependent_variables if not str_mapper else str_mapper.prettify_str(self.dependent_variables)}"
+        model_specification += f" ~ {' + '.join(independent_variables)}"
+        model_specification += f" + {' + '.join([var for var in control_variables if var != 'Intercept'])}" if control_variables else ''
+        model_specification = model_specification.split(' + ')
+        lines = []
+        line = ''
+        for string in model_specification[:-1]:
+            if len(line) + len(string) < 120:
+                line += f"{string} + "
+            else:
+                lines.append(line + r'\\')
+                line = string + ' + '
+        lines.append(model_specification[-1])
+        model_specification = ''.join(lines)
+        symbols_pattern = r"([\ \_\-\&\%\$\#])"
+        model_specification = re.sub(symbols_pattern, regex_symbol_replacement, model_specification).replace('~', '\\sim')
+        print(f"${model_specification}$")
+
+    def abstract_model_specification(self):
+
+        pass
+
+    def quantile_model_equation(self):
+        print("$\\min_{\\beta} \\sum_{i:y_g \\geq x_g^T\\beta} q |y_g - x_g^T\\beta| + \\sum_{g:y_g < x_g^T\\beta} (1-q) |y_g - x_g^T\\beta|$")
+
 
 def regex_symbol_replacement(match):
     return rf'\{match.group(0)}'
