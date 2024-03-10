@@ -1,6 +1,7 @@
 import re
 import traceback
 import warnings
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
 from os import PathLike
 from pathlib import Path
@@ -17,6 +18,7 @@ from matplotlib.patches import ArrowStyle, FancyArrowPatch
 from numpy.linalg import LinAlgError
 from pandas import DataFrame, MultiIndex, Series
 from statsmodels.regression.linear_model import RegressionResultsWrapper
+
 #from tqdm import tqdm
 from tqdm.notebook import tqdm
 
@@ -24,8 +26,12 @@ from ..economic_complexity import StringMapper
 from ..pandas import idxslice
 from ..regressions import RegressionData, generate_hash_from_dataframe
 from ..utils import auto_adjust_columns_width, stretch_string
-from ..visuals import (adjust_axes_labels, adjust_axes_lims,
-                       adjust_text_axes_limits, is_axes_empty)
+from ..visuals import (
+    adjust_axes_labels,
+    adjust_axes_lims,
+    adjust_text_axes_limits,
+    is_axes_empty,
+)
 
 warnings.simplefilter('ignore')
 Color = Union[Tuple[int, int, int], str]
@@ -66,8 +72,83 @@ class QuantileRegStrs:
     N_OBSERVATIONS: str = 'N Observations'
     DF_RESIDUALS: str = 'Df Residuals'
     DF_MODEL: str = 'Df Model'
+    KURTOSIS: str = 'Kurtosis'
+    SKEWNESS: str = 'Skewness'
 
 
+def plot_regressions_predictions_parallel(data: DataFrame, 
+                                 dependent_variables: List[str], 
+                                 independent_variables: Dict[str, List[str]], 
+                                 regressions_folder: PathLike, 
+                                 groups: List[str], 
+                                 all_groups: str,
+                                 groups_col: Optional[str]='Income Group',
+                                 entity_col: Optional[str]='Country',
+                                 time_col: Optional[str]='Year',
+                                 figsize: Optional[Tuple[float, float]]=(9,7),
+                                 marker_kwargs: Optional[Dict[str, Any]]=None,
+                                 annotation_kwargs: Optional[Dict[str, Any]]=None,
+                                 text_x_offset: Optional[float]=0.0025,
+                                 adjust_axes_lims_kwargs: Optional[Dict[str, Any]]=None,
+                                 significance_plot_kwargs: Optional[Dict[str, Dict[str,Any]]]=None, 
+                                 labels_fontsize: Optional[int]=16,
+                                 indep_vars_colors: Optional[List[Color]]=None,
+                                 groups_colors: Optional[Dict[str, Color]]=None,
+                                 quantiles: Optional[List[float]]=None,
+                                 recalculate: Optional[bool]=False,
+                                 n_workers: Optional[int]=8):
+    tasks = []
+    for dependent_variable in dependent_variables:
+        dep_var_name = dependent_variable.replace('/', '').replace(' ', '_')
+        dep_var_folder = regressions_folder / dep_var_name
+        if not dep_var_folder.exists():
+            dep_var_folder.mkdir(exist_ok=True)
+        for name_tag, independent_vars in independent_variables.items():
+            name_tag_folder = dep_var_folder / name_tag
+            if not name_tag_folder.exists():
+                name_tag_folder.mkdir(exist_ok=True)
+            regressions_coeffs_path = name_tag_folder / f"{name_tag}_{dep_var_name}_{QuantileRegStrs.PARQUET_SUFFIX}.parquet"
+            if regressions_coeffs_path.exists():
+                regressions_coeffs = pd.read_parquet(regressions_coeffs_path)
+                for regression_id, regression_coeffs in regressions_coeffs.groupby(QuantileRegStrs.ID, axis=0):
+                    task = dict(data=data.copy(deep=True), 
+                                regression_coeffs=regression_coeffs.copy(deep=True),
+                                regression_id=regression_id,
+                                dependent_variable=dependent_variable,
+                                independent_variables=independent_vars.copy(),
+                                name_tag=name_tag,
+                                groups=groups.copy(),
+                                all_groups=all_groups,
+                                folder=name_tag_folder,
+                                groups_col=groups_col,
+                                entity_col=entity_col,
+                                time_col=time_col,
+                                figsize=figsize,
+                                marker_kwargs=marker_kwargs.copy() if marker_kwargs is not None else None,
+                                annotation_kwargs=annotation_kwargs.copy() if annotation_kwargs is not None else None,
+                                text_x_offset=text_x_offset,
+                                adjust_axes_lims_kwargs=adjust_axes_lims_kwargs.copy() if adjust_axes_lims_kwargs is not None else None,
+                                significance_plot_kwargs=significance_plot_kwargs.copy() if significance_plot_kwargs is not None else None,
+                                labels_fontsize=labels_fontsize,
+                                indep_vars_colors=indep_vars_colors.copy() if indep_vars_colors is not None else None,
+                                groups_colors=groups_colors.copy() if groups_colors is not None else None,
+                                quantiles=quantiles.copy() if quantiles is not None else None,
+                                recalculate=recalculate,)
+                    tasks.append(task)
+
+                    if len(tasks) == n_workers:
+                        with ProcessPoolExecutor(max_workers=n_workers) as executor:
+                            futures = [executor.submit(create_regression_plots, **task) for task in tasks]
+                            for future in tqdm(as_completed(futures), total=len(futures), desc='Processing Plots'):
+                                future.result()
+                        tasks = []
+    if tasks:
+        with ProcessPoolExecutor(max_workers=n_workers) as executor:
+            futures = [executor.submit(create_regression_plots, **task) for task in tasks]
+            for future in tqdm(as_completed(futures), total=len(futures), desc='Processing Plots'):
+                future.result()
+        tasks = []
+   
 def plot_regressions_predictions(data: DataFrame, 
                                  dependent_variables: List[str], 
                                  independent_variables: Dict[str, List[str]], 
@@ -130,7 +211,7 @@ def plot_regressions_predictions(data: DataFrame,
                                             quantiles=quantiles,
                                             recalculate=recalculate,
                                             )
-                    
+
 def create_regression_plots(data: DataFrame, 
                             regression_coeffs: DataFrame,
                             regression_id: str,
@@ -374,7 +455,6 @@ def get_quantile_regression_predictions_by_group(regression_data: DataFrame,
     independent_vars = [var for var in regression_coeffs.index.get_level_values(
         QuantileRegStrs.INDEPENDENT_VARS).unique() if var != QuantileRegStrs.INTERCEPT]
     x_values = prepare_x_values(group_data, independent_vars)
-
     predictions, significances, columns = [], [], []
     for var in independent_vars:
         quadratic = QuantileRegStrs.QUADRATIC_VAR_SUFFIX in var
@@ -384,7 +464,6 @@ def get_quantile_regression_predictions_by_group(regression_data: DataFrame,
                 var.replace(QuantileRegStrs.QUADRATIC_VAR_SUFFIX, ''), var, QuantileRegStrs.INTERCEPT]
         vars_idx = idxslice(regression_coeffs, level=QuantileRegStrs.INDEPENDENT_VARS, value=var_values, axis=0)
         var_coeffs = regression_coeffs.loc[vars_idx, :]
-
         for quantile in quantiles:
             quantile_idx = idxslice(var_coeffs, level=QuantileRegStrs.QUANTILE, value=quantile, axis=0)
             values = var_coeffs.loc[quantile_idx, group].values
@@ -396,7 +475,7 @@ def get_quantile_regression_predictions_by_group(regression_data: DataFrame,
                 QuantileRegStrs.LINEAR_REG, 
                 QuantileRegStrs.QUADRATIC_REG, 
                 QuantileRegStrs.INTERCEPT
-                ] if len(coeffs) == 3 else [
+                ] if quadratic else [
                     QuantileRegStrs.LINEAR_REG, 
                     QuantileRegStrs.INTERCEPT
                     ]
@@ -889,8 +968,27 @@ class QuantilesRegression:
         formula = f"{self.dependent_variable} ~ " + " + ".join(formula_terms)
         return formula
     
-    def data_statistics_table(self):
-        return self.data.describe().T
+    def data_statistics_table(self, str_mapper: Optional[StringMapper]=None):
+        table = self.data.describe(percentiles=[0.5]).T
+        table.columns = [QuantileRegStrs.N_OBSERVATIONS, 'Mean', 'Std. Dev.', 'Min', 'Median', 'Max']
+        table[QuantileRegStrs.KURTOSIS] = self.data.kurtosis()
+        table[QuantileRegStrs.SKEWNESS] = self.data.skew()
+        table[QuantileRegStrs.N_OBSERVATIONS] = table[QuantileRegStrs.N_OBSERVATIONS].astype(int)
+        table[[c for c in table.columns if c != QuantileRegStrs.N_OBSERVATIONS]] = table[
+            [c for c in table.columns if c != QuantileRegStrs.N_OBSERVATIONS]].round(7)
+        table.columns = pd.MultiIndex.from_product([[self.group], table.columns])
+        if str_mapper:
+            table.index = table.index.map(lambda x: str_mapper.prettify_str(x))
+        return table.sort_index(ascending=True)
+
+    def data_statistics_latex_table(self, str_mapper: Optional[StringMapper]=None):
+        table = self.data_statistics_table(str_mapper)
+        symbols_pattern = r"([\ \_\-\&\%\$\#])"
+        table = (table.rename(index=lambda x: re.sub(symbols_pattern, regex_symbol_replacement, x) if isinstance(x, str) else str(round(x, 1)))
+                 .to_latex(multirow=True, multicolumn=True, multicolumn_format='c'))
+        table_text = "\\begin{adjustbox}{width=\\textwidth,center}\n" + f"{table}" + "\end{adjustbox}\n"
+        print(table_text)
+
 
 class QuantilesRegressionData:
 
