@@ -753,10 +753,12 @@ def create_quantile_regressions_results(data: DataFrame,
                                         max_iter: Optional[int]=2_500,
                                         recalculate: Optional[bool]=False,
                                         ):
+    regressions_info = {}
     regressions = {}
     if control_variables is None:
         control_variables = [[]]
     for dependent_variable in tqdm(dependent_variables, desc='Dependent Variables', position=0, leave=False):
+        regressions_info[dependent_variable] = {}
         regressions[dependent_variable] = {}
         dep_var_name = dependent_variable.replace('/', '').replace(' ', '_')
         dep_var_folder = regressions_folder / dep_var_name
@@ -790,7 +792,7 @@ def create_quantile_regressions_results(data: DataFrame,
                                         control_variables=control_vars,
                                         str_mapper=str_mapper
                                         )
-                                    regression = QuantilesRegression(
+                                    regression_info = QuantilesRegression(
                                         group=group,
                                         dependent_variable=dependent_var,
                                         independent_variables=independent_vars,
@@ -801,7 +803,7 @@ def create_quantile_regressions_results(data: DataFrame,
                                     )
                                     with warnings.catch_warnings():
                                         regression_results = get_quantile_regression_results(
-                                            regression=regression,
+                                            regression=regression_info,
                                             max_iter=max_iter
                                             )
                                         
@@ -815,6 +817,9 @@ def create_quantile_regressions_results(data: DataFrame,
                                     regression = QuantilesRegressionData(coeffs=regression_coeffs, stats=regression_stats)
                                     regressions[dependent_variable].setdefault(regression.id, [])
                                     regressions[dependent_variable][regression.id].append(regression)
+
+                                    regressions_info[dependent_variable].setdefault(regression.id, [])
+                                    regressions_info[dependent_variable][regression.id].append(regression_info)
 
                                     group_regressions.append(regression.coeffs)
                                 group_regressions = pd.concat(group_regressions, axis=1)
@@ -850,7 +855,7 @@ def create_quantile_regressions_results(data: DataFrame,
                         sheet = book[sheet_name]
                         auto_adjust_columns_width(sheet)
                     book.save(dep_var_name_excel)
-    return regressions
+    return regressions, regressions_info
 
 
 class QuantilesRegression:
