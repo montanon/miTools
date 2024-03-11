@@ -86,7 +86,9 @@ RESTAURANT_TYPES = [
 FIELD_MASK = 'places.accessibilityOptions,places.addressComponents,places.adrFormatAddress,places.businessStatus,' \
         + 'places.displayName,places.formattedAddress,places.googleMapsUri,places.iconBackgroundColor,' \
             + 'places.iconMaskBaseUri,places.id,places.location,places.name,places.primaryType,places.primaryTypeDisplayName,places.plusCode,' \
-                + 'places.shortFormattedAddress,places.subDestinations,places.types,places.utcOffsetMinutes,places.viewport'
+                + 'places.shortFormattedAddress,places.subDestinations,places.types,places.utcOffsetMinutes,places.viewport,'\
+                + 'places.currentOpeningHours,places.currentSecondaryOpeningHours,places.internationalPhoneNumber,places.nationalPhoneNumber,' \
+                + 'places.priceLevel,places.rating,places.regularOpeningHours,places.regularSecondaryOpeningHours,places.userRatingCount,places.websiteUri'
 QUERY_HEADERS = {
     'Content-Type': 'aplication/json',
     'X-Goog-Api-Key': GOOGLE_PLACES_API_KEY,
@@ -409,6 +411,7 @@ def update_progress_and_save(searched, circles, index, found_places, file_path, 
     circles.loc[index, 'searched'] = searched
     if (index % 200 == 0) or (index == circles.shape[0] - 1) or (GLOBAL_REQUESTS_COUNTER >= GLOBAL_REQUESTS_COUNTER_LIMIT - 1):
         found_places.to_parquet(file_path)
+        found_places.to_excel(file_path.with_suffix('.xlsx'), index=False)
         circles.to_file(circles_path, driver='GeoJSON')
     pbar.update()
     pbar.set_postfix({'Remaining Circles': circles['searched'].value_counts()[False] if False in circles['searched'].value_counts() else 0, 
@@ -542,16 +545,16 @@ if __name__ == '__main__':
         'tokyo': '/Users/sebastian/Desktop/MontagnaInc/Research/Cities_Restaurants/translated_tokyo_wards.geojson'
     }
 
-    PROJECT_FOLDER = Path('/Users/sebastian/Desktop/MontagnaInc/Research/Cities_Restaurants/Tokyo_Places')
+    PROJECT_FOLDER = Path('/Users/sebastian/Desktop/MontagnaInc/Research/Cities_Restaurants/Tokyo_Places_with_Price')
     PROJECT_FOLDER.mkdir(exist_ok=True)
     PLOTS_FOLDER = PROJECT_FOLDER / 'plots'
     PLOTS_FOLDER.mkdir(exist_ok=True)
     CITY = 'tokyo'
-    SHOW = True
+    SHOW = False
     RECALCULATE = False
 
     GLOBAL_REQUESTS_COUNTER = 0
-    GLOBAL_REQUESTS_COUNTER_LIMIT = 6_000
+    GLOBAL_REQUESTS_COUNTER_LIMIT =  5_000
     
     city = CityGeojson(cities_geojsons[CITY], CITY)
     city_wards_plot_path = PLOTS_FOLDER / f"{city.name}_wards_polygons_plot.png"
@@ -598,7 +601,9 @@ if __name__ == '__main__':
     print(f"Total Sampled Circles: {total_sampled_circles}")
 
     if True:
-        all_places = all_places[[c for c in all_places.columns if c not in ['iconMaskBaseUri', 'googleMapsUri']]].reset_index(drop=True)
+        all_places = all_places[[c for c in all_places.columns if c not in ['iconMaskBaseUri', 
+                                                                            'googleMapsUri',
+                                                                            'websiteUri']]].reset_index(drop=True)
         all_places.to_parquet(all_places_parquet_path)
         all_places.to_excel(all_places_excel_path, index=False)
 
