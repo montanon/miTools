@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
+from pandas import DataFrame
 
 
 @dataclass(frozen=True)
@@ -73,6 +74,10 @@ class ProductsBasket:
             closest_product = min(self.products, key=lambda product: abs(product.pci - quantile))
             closest_products.append(closest_product)
         return closest_products
+    
+    def product_list(self, ascending=True):
+        return DataFrame([[product.code, product.name, product.pci, product.value] for product in self.products], 
+                         columns=['Code', 'Name', 'PCI', 'Value'])
 
 
 class StringMapper:
