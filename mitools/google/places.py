@@ -352,11 +352,13 @@ def create_dummy_response(query):
         dummy_response['places'] = [create_dummy_place(query) for _ in range(places_n)]
     return dummy_response
 
-def nearby_search_request(circle, radius_in_meters, restaurants=True):
+def nearby_search_request(circle, radius_in_meters, query_headers=None, restaurants=True):
     query = NewNearbySearchRequest(circle.geometry, 
                                 distance_in_meters=radius_in_meters, 
                                 included_types=RESTAURANT_TYPES if restaurants else None
                                    ).json_query()
+    if query_headers is not None:
+        QUERY_HEADERS = query_headers
     if QUERY_HEADERS['X-Goog-Api-Key'] != '':
         return requests.post(NEW_NEARBY_SEARCH_URL, headers=QUERY_HEADERS, json=query)
     else:
@@ -372,8 +374,8 @@ def get_response_places(response_id, response):
             places_df = pd.concat([places_df, pd.DataFrame(place_series).T], axis=0, ignore_index=True)
     return places_df
 
-def search_and_update_places(circle, radius_in_meters, response_id):
-    response = nearby_search_request(circle, radius_in_meters)
+def search_and_update_places(circle, radius_in_meters, response_id, query_headers=None):
+    response = nearby_search_request(circle, radius_in_meters, query_headers=query_headers)
     places_df = None
     if response.reason == 'OK':
         if 'places' in response.json():
@@ -385,7 +387,7 @@ def search_and_update_places(circle, radius_in_meters, response_id):
         time.sleep(30)
     return searched, places_df
     
-def process_circles(circles, radius_in_meters, file_path, circles_path, global_requests_counter=None, global_requests_counter_limit=None, recalculate=False):
+def process_circles(circles, radius_in_meters, file_path, circles_path, global_requests_counter=None, global_requests_counter_limit=None, query_headers=None, recalculate=False):
     if global_requests_counter is None and global_requests_counter_limit is None:
         global GLOBAL_REQUESTS_COUNTER, GLOBAL_REQUESTS_COUNTER_LIMIT
     else:
@@ -396,7 +398,7 @@ def process_circles(circles, radius_in_meters, file_path, circles_path, global_r
         found_places = read_or_initialize_places(file_path, recalculate)
         with tqdm(total=len(circles_search), desc="Processing circles") as pbar:
             for response_id, circle in circles_search.iterrows():
-                searched, places_df = search_and_update_places(circle, radius_in_meters, response_id)
+                searched, places_df = search_and_update_places(circle, radius_in_meters, response_id, query_headers=query_headers)
                 if places_df is not None:
                     found_places = pd.concat([found_places, places_df], axis=0, ignore_index=True)
                 GLOBAL_REQUESTS_COUNTER += 1
@@ -427,6 +429,7 @@ def search_places_in_polygon(root_folder,
                                  condition_rule,
                                  global_requests_counter=None,
                                     global_requests_counter_limit=None,
+                                    query_headers=None,
                                  recalculate=False, 
                                  show=False):
         circles_path = root_folder / Path(f"{tag}_{radius_in_meters}_radius_{step_in_degrees}_step_circles.geojson")
@@ -461,6 +464,7 @@ def search_places_in_polygon(root_folder,
                                     circles_path, 
                                     global_requests_counter=global_requests_counter, 
                                     global_requests_counter_limit=global_requests_counter_limit,
+                                    query_headers=query_headers,
                                     recalculate=recalculate)
         if show or recalculate:
             _ = polygon_plot_with_circles_and_points(polygon=polygon, 
@@ -508,7 +512,7 @@ def get_saturated_area(polygon, saturated_circles, show=False, output_path=None)
             plt.show()
     return saturated_area
 
-def places_search_step(project_folder, plots_folder, tag, polygon, radius_in_meters, step_in_degrees, global_requests_counter=None, global_requests_counter_limit=None, show=False, recalculate=False):
+def places_search_step(project_folder, plots_folder, tag, polygon, radius_in_meters, step_in_degrees, global_requests_counter=None, global_requests_counter_limit=None, query_headers=None, show=False, recalculate=False):
     circles, found_places = search_places_in_polygon(project_folder,
                                                      plots_folder,
                                                      tag,
@@ -518,6 +522,7 @@ def places_search_step(project_folder, plots_folder, tag, polygon, radius_in_met
                                                      condition_rule='center',
                                                      global_requests_counter=global_requests_counter,
                                                     global_requests_counter_limit=global_requests_counter_limit,
+                                                    query_headers=query_headers,
                                                      recalculate=recalculate,
                                                      show=show)
     saturated_circles_plot_path = plots_folder / f"{tag}_saturated_circles_plot.png"
