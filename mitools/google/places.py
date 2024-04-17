@@ -520,8 +520,8 @@ def places_search_step(project_folder, plots_folder, tag, polygon, radius_in_met
                                                      radius_in_meters,
                                                      step_in_degrees,
                                                      condition_rule='center',
-                                                     global_requests_counter=None,
-                                                    global_requests_counter_limit=None,
+                                                     global_requests_counter=global_requests_counter,
+                                                    global_requests_counter_limit=global_requests_counter_limit,
                                                      recalculate=recalculate,
                                                      show=show)
     saturated_circles_plot_path = plots_folder / f"{tag}_saturated_circles_plot.png"
