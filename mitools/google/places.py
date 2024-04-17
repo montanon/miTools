@@ -356,10 +356,10 @@ def create_dummy_response(query):
         dummy_response['places'] = [create_dummy_place(query) for _ in range(places_n)]
     return dummy_response
 
-def nearby_search_request(circle, radius_in_meters):
+def nearby_search_request(circle, radius_in_meters, restaurants=True):
     query = NewNearbySearchRequest(circle.geometry, 
                                 distance_in_meters=radius_in_meters, 
-                                included_types=RESTAURANT_TYPES
+                                included_types=RESTAURANT_TYPES if restaurants else None
                                    ).json_query()
     if QUERY_HEADERS['X-Goog-Api-Key'] != '':
         return requests.post(NEW_NEARBY_SEARCH_URL, headers=QUERY_HEADERS, json=query)
@@ -389,8 +389,12 @@ def search_and_update_places(circle, radius_in_meters, response_id):
         time.sleep(30)
     return searched, places_df
     
-def process_circles(circles, radius_in_meters, file_path, circles_path, recalculate=False):
-    global GLOBAL_REQUESTS_COUNTER, GLOBAL_REQUESTS_COUNTER_LIMIT
+def process_circles(circles, radius_in_meters, file_path, circles_path, global_requests_counter=None, global_requests_counter_limit=None, recalculate=False):
+    if global_requests_counter is None and global_requests_counter_limit is None:
+        global GLOBAL_REQUESTS_COUNTER, GLOBAL_REQUESTS_COUNTER_LIMIT
+    else:
+        GLOBAL_REQUESTS_COUNTER = global_requests_counter[0]
+        GLOBAL_REQUESTS_COUNTER_LIMIT = global_requests_counter_limit[0]
     if ((~circles['searched']).any() or recalculate) and GLOBAL_REQUESTS_COUNTER <= GLOBAL_REQUESTS_COUNTER_LIMIT:
         circles_search = circles[~circles['searched']]
         found_places = read_or_initialize_places(file_path, recalculate)
@@ -401,6 +405,7 @@ def process_circles(circles, radius_in_meters, file_path, circles_path, recalcul
                     found_places = pd.concat([found_places, places_df], axis=0, ignore_index=True)
                 GLOBAL_REQUESTS_COUNTER += 1
                 update_progress_and_save(searched, circles, response_id, found_places, file_path, circles_path, pbar)
+                global_requests_counter[0] = GLOBAL_REQUESTS_COUNTER
                 if GLOBAL_REQUESTS_COUNTER >= GLOBAL_REQUESTS_COUNTER_LIMIT:
                     break
     else:
@@ -411,7 +416,6 @@ def update_progress_and_save(searched, circles, index, found_places, file_path, 
     circles.loc[index, 'searched'] = searched
     if (index % 200 == 0) or (index == circles.shape[0] - 1) or (GLOBAL_REQUESTS_COUNTER >= GLOBAL_REQUESTS_COUNTER_LIMIT - 1):
         found_places.to_parquet(file_path)
-        found_places.to_excel(file_path.with_suffix('.xlsx'), index=False)
         circles.to_file(circles_path, driver='GeoJSON')
     pbar.update()
     pbar.set_postfix({'Remaining Circles': circles['searched'].value_counts()[False] if False in circles['searched'].value_counts() else 0, 
@@ -424,7 +428,9 @@ def search_places_in_polygon(root_folder,
                                  polygon,
                                  radius_in_meters, 
                                  step_in_degrees, 
-                                 condition_rule, 
+                                 condition_rule,
+                                 global_requests_counter=None,
+                                    global_requests_counter_limit=None,
                                  recalculate=False, 
                                  show=False):
         circles_path = root_folder / Path(f"{tag}_{radius_in_meters}_radius_{step_in_degrees}_step_circles.geojson")
@@ -457,6 +463,8 @@ def search_places_in_polygon(root_folder,
                                     radius_in_meters, 
                                     places_path, 
                                     circles_path, 
+                                    global_requests_counter=global_requests_counter, 
+                                    global_requests_counter_limit=global_requests_counter_limit,
                                     recalculate=recalculate)
         if show or recalculate:
             _ = polygon_plot_with_circles_and_points(polygon=polygon, 
@@ -504,7 +512,7 @@ def get_saturated_area(polygon, saturated_circles, show=False, output_path=None)
             plt.show()
     return saturated_area
 
-def places_search_step(project_folder, plots_folder, tag, polygon, radius_in_meters, step_in_degrees, show=False, recalculate=False):
+def places_search_step(project_folder, plots_folder, tag, polygon, radius_in_meters, step_in_degrees, global_requests_counter=None, global_requests_counter_limit=None, show=False, recalculate=False):
     circles, found_places = search_places_in_polygon(project_folder,
                                                      plots_folder,
                                                      tag,
@@ -512,6 +520,8 @@ def places_search_step(project_folder, plots_folder, tag, polygon, radius_in_met
                                                      radius_in_meters,
                                                      step_in_degrees,
                                                      condition_rule='center',
+                                                     global_requests_counter=None,
+                                                    global_requests_counter_limit=None,
                                                      recalculate=recalculate,
                                                      show=show)
     saturated_circles_plot_path = plots_folder / f"{tag}_saturated_circles_plot.png"
@@ -527,11 +537,11 @@ def places_search_step(project_folder, plots_folder, tag, polygon, radius_in_met
 
     return found_places, circles, saturated_area, saturated_circles
 
-def calculate_degree_steps(meter_radiuses):
+def calculate_degree_steps(meter_radiuses, step_in_degrees=0.00375):
     degree_steps = []
     for i, radius in enumerate(meter_radiuses):
         if i == 0:  
-            step = STEP_IN_DEGREES
+            step = step_in_degrees
         else:
             step *= (radius / meter_radiuses[i - 1])
         degree_steps.append(step)
@@ -550,12 +560,9 @@ if __name__ == '__main__':
     PLOTS_FOLDER = PROJECT_FOLDER / 'plots'
     PLOTS_FOLDER.mkdir(exist_ok=True)
     CITY = 'tokyo'
-    SHOW = False
+    SHOW = True
     RECALCULATE = False
 
-    GLOBAL_REQUESTS_COUNTER = 0
-    GLOBAL_REQUESTS_COUNTER_LIMIT =  5_000
-    
     city = CityGeojson(cities_geojsons[CITY], CITY)
     city_wards_plot_path = PLOTS_FOLDER / f"{city.name}_wards_polygons_plot.png"
     city_plot_path = PLOTS_FOLDER / f"{city.name}_polygon_plot.png"
@@ -571,7 +578,7 @@ if __name__ == '__main__':
 
     STEP_IN_DEGREES = 0.00375
     meter_radiuses = [250, 100, 50, 25, 12.5, 5, 2.5, 1]
-    degree_steps = calculate_degree_steps(meter_radiuses)
+    degree_steps = calculate_degree_steps(meter_radiuses, step_in_degrees=STEP_IN_DEGREES)
 
     area_polygon = city.merged_polygon
 
@@ -590,6 +597,8 @@ if __name__ == '__main__':
                                                                                     area_polygon,
                                                                                     radius, 
                                                                                     step, 
+                                                                                    global_requests_counter=None,
+                                                                                    global_requests_counter_limit=None,
                                                                                     show=SHOW, 
                                                                                     recalculate=RECALCULATE
                                                                                     )
@@ -598,7 +607,7 @@ if __name__ == '__main__':
         print(f"Found Places: {found_places.shape[0]}, Sampled Circles: {sampled_circles}, Saturated Circles: {saturated_circles.shape[0]}")
         all_places = pd.concat([all_places, found_places], axis=0, ignore_index=True)
 
-    print(f"Total Sampled Circles: {total_sampled_circles}")
+        print(f"Total Sampled Circles: {total_sampled_circles}")
 
     if True:
         all_places = all_places[[c for c in all_places.columns if c not in ['iconMaskBaseUri', 
