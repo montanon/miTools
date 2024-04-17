@@ -2,10 +2,10 @@ import itertools
 import math
 import os
 import random
+import time
 from datetime import datetime
 from os import PathLike
 from pathlib import Path
-from time import time
 from typing import Iterable, List, NewType, Optional, Tuple, Union
 
 import folium
@@ -22,13 +22,9 @@ from shapely.geometry import MultiPolygon, Point, Polygon
 from shapely.ops import transform
 from tqdm import tqdm
 
-from mitools.google.places_objects import (
-    CityGeojson,
-    DummyResponse,
-    NewNearbySearchRequest,
-    NewPlace,
-    intersection_condition_factory,
-)
+from mitools.google.places_objects import (CityGeojson, DummyResponse,
+                                           NewNearbySearchRequest, NewPlace,
+                                           intersection_condition_factory)
 
 CircleType = NewType('CircleType', Polygon)
 
