@@ -2,6 +2,7 @@ import os
 import sqlite3
 import unittest
 import warnings
+from pathlib import Path
 from unittest import TestCase
 from unittest.mock import MagicMock, Mock, patch
 
@@ -10,8 +11,48 @@ import pandas as pd
 from mitools.etl import *
 
 
-class TestCustomConnection(TestCase):
+class TestMainConnection(unittest.TestCase):
+    def setUp(self):
+        self.conn1 = Path("./tests/.test_assets/conn1.db")
+        self.conn2 = Path("./tests/.test_assets/conn2.db")
+        self.dummy_db_path = CustomConnection(self.conn1)
+        self.dummy_db_path = CustomConnection(self.conn2)
 
+    def tearDown(self):
+        self.conn1.unlink()
+        self.conn2.unlink()
+
+    def test_singleton_property(self):
+        """Test that the same instance is returned for the same path"""
+
+        conn1 = MainConnection(self.conn1)
+        conn2 = MainConnection(self.conn1)
+        self.assertIs(conn1, conn2)
+
+    def test_different_instances(self):
+        """Test that different instances are created for different paths"""
+        conn1 = MainConnection(self.conn1)
+        conn2 = MainConnection(self.conn2)
+        self.assertIsNot(conn1, conn2)
+
+    def test_path_normalization(self):
+        """Test that paths are normalized (absolute path handling)"""
+        absolute_path = Path(self.conn1).absolute()
+        conn1 = MainConnection(self.conn1)
+        conn2 = MainConnection(absolute_path)
+        self.assertIs(conn1, conn2)
+
+    def test_initialization_check(self):
+        """Test that initialization does not occur more than once"""
+        conn1 = MainConnection(self.conn1)
+        with self.assertRaises(AttributeError):
+            conn1.some_random_attribute
+        conn1.some_random_attribute = True
+        conn2 = MainConnection(self.conn1)
+        self.assertTrue(hasattr(conn2, "some_random_attribute"))
+
+
+class TestCustomConnection(TestCase):
     def setUp(self):
         self.path = "sample_path"
         self.conn = CustomConnection(self.path)
@@ -35,12 +76,12 @@ class TestCustomConnection(TestCase):
 
 
 class TestSuppressUserWarningDecorator(TestCase):
-
     def test_suppresses_user_warning(self):
         @suppress_user_warning
         def warn_user():
             warnings.warn("This is a user warning", category=UserWarning)
             return "Function Completed"
+
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             result = warn_user()
@@ -64,14 +105,14 @@ class TestSuppressUserWarningDecorator(TestCase):
         @suppress_user_warning
         def some_function(x, y):
             return x + y
+
         self.assertEqual(some_function(2, 3), 5)
 
 
 class TestCheckIfTable(TestCase):
-
     def setUp(self):
-        self.path = '.test_db'
-        self.conn = connect_to_sql_db('./', self.path)
+        self.path = ".test_db"
+        self.conn = connect_to_sql_db("./", self.path)
         self.conn.cursor().execute("CREATE TABLE table1(id)")
         self.conn.execute('INSERT INTO table1 VALUES ("abc")')
 
@@ -81,17 +122,16 @@ class TestCheckIfTable(TestCase):
             os.remove(self.path)
 
     def test_table_exists_in_db(self):
-        self.assertTrue(check_if_table(self.conn, 'table1'))
+        self.assertTrue(check_if_table(self.conn, "table1"))
 
     def test_table_nor_parquet_exists(self):
         self.assertFalse(check_if_table(self.conn, "table2"))
 
 
 class TestCheckIfTables(TestCase):
-
     def setUp(self):
-        self.path = '.test_db'
-        self.conn = connect_to_sql_db('./', self.path)
+        self.path = ".test_db"
+        self.conn = connect_to_sql_db("./", self.path)
         self.conn.cursor().execute("CREATE TABLE table1(id)")
         self.conn.execute('INSERT INTO table1 VALUES ("abc")')
         self.conn.cursor().execute("CREATE TABLE table2(id)")
@@ -124,12 +164,11 @@ class TestCheckIfTables(TestCase):
 
 
 class TestGetConnDbFolder(TestCase):
-
     def setUp(self):
         self.conn = Mock(spec=Connection)
         self.cursor = self.conn.cursor()
 
-    @patch('os.path.dirname', return_value="/path/to/db_folder")
+    @patch("os.path.dirname", return_value="/path/to/db_folder")
     def test_valid_path(self, mock_dirname):
         self.cursor.fetchone.return_value = [None, None, "/path/to/db.sqlite"]
         db_folder = get_conn_db_folder(self.conn)
@@ -137,7 +176,9 @@ class TestGetConnDbFolder(TestCase):
 
     def test_none_path(self):
         self.cursor.fetchone.return_value = None  # None is returned from fetchone
-        with self.assertRaises(TypeError):  # This would cause TypeError when trying to access result[2]
+        with self.assertRaises(
+            TypeError
+        ):  # This would cause TypeError when trying to access result[2]
             get_conn_db_folder(self.conn)
 
     def test_invalid_result(self):
@@ -146,17 +187,18 @@ class TestGetConnDbFolder(TestCase):
             get_conn_db_folder(self.conn)
 
     def test_exception_while_executing_sql(self):
-        self.cursor.execute.side_effect = Exception("Some error")  # Simulating some database error
+        self.cursor.execute.side_effect = Exception(
+            "Some error"
+        )  # Simulating some database error
         with self.assertRaises(Exception) as context:
             get_conn_db_folder(self.conn)
         self.assertEqual(str(context.exception), "Some error")
 
 
 class TestConnectToSqlDb(TestCase):
-
     def setUp(self):
-        self.path = '.test_db'
-        self.conn = connect_to_sql_db('./', self.path)
+        self.path = ".test_db"
+        self.conn = connect_to_sql_db("./", self.path)
 
     def tearDown(self):
         # Delete the 'sample_file' after the test is done
@@ -164,39 +206,46 @@ class TestConnectToSqlDb(TestCase):
             os.remove(self.path)
 
     def test_successful_connection(self):
-        conn = connect_to_sql_db('./', self.path)
-        self.assertIsInstance(conn, CustomConnection) 
+        conn = connect_to_sql_db("./", self.path)
+        self.assertIsInstance(conn, CustomConnection)
 
 
 class TestReadSqlTable(TestCase):
-
     def setUp(self):
         self.conn = Mock(spec=Connection)
 
-    @patch('pandas.read_sql')
+    @patch("pandas.read_sql")
     def test_read_full_table(self, mock_read_sql):
         tablename = "sample_table"
-        mock_read_sql.return_value = "dataframe_result"  # Mock return value for pd.read_sql
+        mock_read_sql.return_value = (
+            "dataframe_result"  # Mock return value for pd.read_sql
+        )
         result = read_sql_table(self.conn, tablename)
-        mock_read_sql.assert_called_once_with(f'SELECT * FROM "{tablename}"', self.conn, index_col='index')
+        mock_read_sql.assert_called_once_with(
+            f'SELECT * FROM "{tablename}"', self.conn, index_col="index"
+        )
         self.assertEqual(result, "dataframe_result")
 
-    @patch('pandas.read_sql')
+    @patch("pandas.read_sql")
     def test_read_specific_columns_list(self, mock_read_sql):
         tablename = "sample_table"
         columns = ["col1", "col2"]
         mock_read_sql.return_value = "dataframe_result"
         result = read_sql_table(self.conn, tablename, columns=columns)
-        mock_read_sql.assert_called_once_with(f'SELECT col1, col2 FROM "{tablename}"', self.conn)
+        mock_read_sql.assert_called_once_with(
+            f'SELECT col1, col2 FROM "{tablename}"', self.conn
+        )
         self.assertEqual(result, "dataframe_result")
 
-    @patch('pandas.read_sql')
+    @patch("pandas.read_sql")
     def test_read_specific_column_string(self, mock_read_sql):
         tablename = "sample_table"
         columns = "col1"
         mock_read_sql.return_value = "dataframe_result"
         result = read_sql_table(self.conn, tablename, columns=columns)
-        mock_read_sql.assert_called_once_with(f'SELECT col1 FROM "{tablename}"', self.conn)
+        mock_read_sql.assert_called_once_with(
+            f'SELECT col1 FROM "{tablename}"', self.conn
+        )
         self.assertEqual(result, "dataframe_result")
 
     def test_unexpected_columns_type(self):
@@ -207,10 +256,9 @@ class TestReadSqlTable(TestCase):
 
 
 class TestReadSqlTables(TestCase):
-
     def setUp(self):
-        self.path = '.test_db'
-        self.conn = connect_to_sql_db('./', self.path)
+        self.path = ".test_db"
+        self.conn = connect_to_sql_db("./", self.path)
         self.conn.cursor().execute("CREATE TABLE table1(id)")
         self.conn.execute('INSERT INTO table1 VALUES ("abc")')
         self.conn.cursor().execute("CREATE TABLE table2(id)")
@@ -222,31 +270,35 @@ class TestReadSqlTables(TestCase):
             os.remove(self.path)
 
     def test_read_existing_sql_tables(self):
-        tablenames = ['table1', 'table2']
+        tablenames = ["table1", "table2"]
         results = read_sql_tables(self.conn, tablenames, index_col=None)
-        self.assertEqual(len(results), len(tablenames))  # There should be 2 results, one for each table
+        self.assertEqual(
+            len(results), len(tablenames)
+        )  # There should be 2 results, one for each table
         for result, tablename in zip(results, tablenames):
             self.assertTrue(
-               pd.read_sql(f'SELECT * FROM "{tablename}"', self.conn).equals(result)
+                pd.read_sql(f'SELECT * FROM "{tablename}"', self.conn).equals(result)
             )
 
 
 class TestTransferSqlTables(TestCase):
-
     def setUp(self):
         # Set up two in-memory SQLite databases
         self.src_conn = sqlite3.connect(":memory:")
         self.dst_conn = sqlite3.connect(":memory:")
         # Create a sample table in the source database
-        self.src_conn.execute('''
+        self.src_conn.execute("""
             CREATE TABLE sample (
                 id INTEGER PRIMARY KEY,
                 data TEXT
             )
-        ''')
-        self.src_conn.executemany('''
+        """)
+        self.src_conn.executemany(
+            """
             INSERT INTO sample (data) VALUES (?)
-        ''', [('a',), ('b',), ('c',)])
+        """,
+            [("a",), ("b",), ("c",)],
+        )
 
     def tearDown(self):
         # Clean up the connections
@@ -255,14 +307,16 @@ class TestTransferSqlTables(TestCase):
 
     def test_transfer_sql_tables(self):
         # Given
-        tablename = 'sample'
+        tablename = "sample"
         # Transfer table from src to dst
-        transfer_sql_tables(self.src_conn, self.dst_conn, tablename, if_exists='replace', index_col=None)
+        transfer_sql_tables(
+            self.src_conn, self.dst_conn, tablename, if_exists="replace", index_col=None
+        )
         # Verify the data was transferred
-        df_dst = pd.read_sql('SELECT * FROM sample', self.dst_conn)
+        df_dst = pd.read_sql("SELECT * FROM sample", self.dst_conn)
         self.assertEqual(len(df_dst), 3)
-        self.assertTrue('data' in df_dst.columns)
-        self.assertTrue('index' in df_dst.columns)
+        self.assertTrue("data" in df_dst.columns)
+        self.assertTrue("index" in df_dst.columns)
 
 
 if __name__ == "__main__":
