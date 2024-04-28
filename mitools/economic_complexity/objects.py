@@ -1,5 +1,6 @@
 import statistics
 from dataclasses import dataclass
+from statistics import median
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
@@ -39,6 +40,9 @@ class ProductsBasket:
                 raise ValueError(f"Duplicate product name found: {product.name}")
             codes.add(product.code)
             names.add(product.name)
+        products_data = [[product.code, product.name, product.pci, product.value] for product in self.products]
+        df = DataFrame(products_data, columns=['Code', 'Name', 'PCI', 'Value'])
+        object.__setattr__(self, 'products_df', df) 
 
     @property
     def mean(self):
@@ -55,6 +59,14 @@ class ProductsBasket:
     @property
     def maximum(self):
         return max(product.pci for product in self.products)
+    
+    @property
+    def median(self):
+        return median(product.pci for product in self.products)
+    
+    @property
+    def range(self):
+        return {'min': self.minimum, 'mean': self.mean, 'median': self.median, 'max': self.maximum}
     
     def __len__(self):
         return len(self.products)
