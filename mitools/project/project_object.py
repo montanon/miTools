@@ -23,8 +23,8 @@ class Project:
         self.version = version
         self.version_folder = self.folder / self.version
         self.create_version_folder()
-        self.update_info()
         self.vars = {}
+        self.update_info()
 
     def create_main_folder(self) -> None:
         self.folder.mkdir(parents=True, exist_ok=True)
@@ -137,6 +137,12 @@ class Project:
     def update_info(self) -> None:
         self.versions = self.get_all_versions()
         self.subfolders = self.list_subfolders()
+        self.vars.update(self.folder_path_dict())
+
+    def folder_path_dict(self) -> List[str]:
+        return {
+            subfolder: self.version_folder / subfolder for subfolder in self.subfolders
+        }
 
     def get_info(self) -> Dict:
         self.update_info()
