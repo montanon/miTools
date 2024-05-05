@@ -1,5 +1,5 @@
 import re
-from typing import Dict, Optional, Tuple
+from typing import Dict, Literal, Optional, Tuple
 
 import pandas as pd
 import statsmodels.api as sm
@@ -49,19 +49,19 @@ def anderson_test_dataframe_groups(data: Dict[str, DataFrame], criteria: Optiona
     anderson_tests = pd.concat(anderson_tests, axis=0)
     return anderson_tests
 
-def adf_test(data: Series) -> Dict[str, float]:
+def adf_test(data: Series, critical_value: Optional[Literal[1, 5, 10]] = 5) -> Dict[str, float]:
     result = adfuller(data, autolag='AIC') 
     adf_statistic = result[0]
     p_value = result[1]
     critical_values = result[4]
-    return {'statistic': adf_statistic, 'p-value': p_value, 'critical_value_5%': critical_values['5%']}
+    return {'statistic': adf_statistic, 'p-value': p_value, f'critical_value_{critical_value}%': critical_values[f'{critical_value}%']}
 
-def adf_test_dataframe_groups(data: Dict[str, DataFrame]):
+def adf_test_dataframe_groups(data: Dict[str, DataFrame], critical_value: Optional[Literal[5, 10]] = 5):
     adf_tests = []
     for group, group_data in data.items():
-        statistics = group_data.apply(adf_test, axis=0, result_type='expand')
+        statistics = group_data.apply(adf_test, axis=0, result_type='expand', args=(critical_value,))
         statistics = statistics.T
-        statistics['hypothesis'] = statistics.apply(lambda row: 'Reject' if row['statistic'] < row['critical_value_5%'] else 'Accept', axis=1)
+        statistics['hypothesis'] = statistics.apply(lambda row: 'Reject' if row['statistic'] < row[f'critical_value_{critical_value}%'] else 'Accept', axis=1)
         statistics = statistics.T
         statistics.index.name = 'statistics'
         statistics['Group'] = group
@@ -70,7 +70,8 @@ def adf_test_dataframe_groups(data: Dict[str, DataFrame]):
     adf_tests = pd.concat(adf_tests, axis=0)
     return adf_tests
 
-def calculate_vif(data, threshold=5):
+def calculate_vif(data, dependent_var, threshold=5):
+    data = data[[c for c in data.columns if c != dependent_var]].copy(deep=True)
     data = add_constant(data)
     vif_data = pd.DataFrame()
     vif_data["variable"] = data.columns
@@ -79,10 +80,10 @@ def calculate_vif(data, threshold=5):
     vif_data = vif_data.set_index('variable')
     return vif_data
 
-def calculate_vif_dataframe_groups(data: Dict[str, DataFrame], threshold: Optional[float]=5):
+def calculate_vif_dataframe_groups(data: Dict[str, DataFrame], dependent_var: str, threshold: Optional[float]=5):
     vif_scores = []
     for group, group_data in data.items():
-        statistics = calculate_vif(group_data, threshold=threshold)
+        statistics = calculate_vif(group_data, dependent_var, threshold=threshold)
         statistics = statistics.loc[statistics.index != 'const'].T
         statistics.index.name = 'statistics'
         statistics['Group'] = group
@@ -122,7 +123,7 @@ def calculate_bp(data, dependent_var):
     X = sm.add_constant(X) 
     model = sm.OLS(y, X).fit()
     test_stat, p_value, _, _ = het_breuschpagan(model.resid, model.model.exog)
-    if p_value < 0.05:
+    if p_value < 0.01:
         hypothesis = 'Reject (Signs of heteroscedasticity)'
     else:
         hypothesis = 'Accept (No apparent heteroscedasticity)'
