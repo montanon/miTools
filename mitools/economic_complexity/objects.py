@@ -232,3 +232,18 @@ class StringMapper:
                 and self.ugly_to_pretty == other.ugly_to_pretty
             )
         return False
+
+    def __str__(self) -> str:
+        return (
+            f"{self.__class__.__name__}(case_sensitive={self.case_sensitive}, "
+            f"pass_if_mapped={self.pass_if_mapped}, "
+            f"mappings={len(self.pretty_to_ugly)})"
+        )
+
+    def __repr__(self) -> str:
+        relations_repr = json.dumps(self.pretty_to_ugly, indent=4)
+        return (
+            f"{self.__class__.__name__}(relations={relations_repr}, "
+            f"case_sensitive={self.case_sensitive}, "
+            f"pass_if_mapped={self.pass_if_mapped})"
+        )
