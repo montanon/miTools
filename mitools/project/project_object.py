@@ -117,8 +117,29 @@ class Project:
             pickle.dump(self, file)
 
     @classmethod
-    def load_project(cls, project_folder: PathLike) -> "Project":
-        project_path = Path(project_folder) / PROJECT_FILENAME
+    def load_project(
+        cls, project_folder: Optional[Path] = None, auto_load: bool = False, n: int = 3
+    ) -> "Project":
+        if project_folder is None and auto_load:
+            current_path = Path.cwd()
+            for _ in range(n):
+                project_path = current_path / PROJECT_FILENAME
+                if project_path.exists():
+                    break
+                if current_path.parent == current_path:  # reached the root directory
+                    break
+                current_path = current_path.parent
+            else:
+                raise FileNotFoundError(
+                    f"No {PROJECT_FILENAME} found in the current or {n} parent directories."
+                )
+        else:
+            project_path = Path(project_folder) / PROJECT_FILENAME
+            if not project_path.exists():
+                raise FileNotFoundError(
+                    f"{PROJECT_FILENAME} does not exist in the specified directory {project_folder}"
+                )
+
         with project_path.open("rb") as file:
             obj = pickle.load(file)
         obj.update_info()
