@@ -20,19 +20,28 @@ def transform_columns(
     if not isinstance(transformation, Callable):
         raise ArgumentTypeError(INVALID_TRANSFORMATION_ERROR.format(transformation))
     transformation_name = str(transformation).split("'")[1]
-    selected_columns = dataframe.loc[:, IndexSlice[:, columns_names]]
+    if isinstance(dataframe.columns, Index):
+        selected_columns = dataframe.loc[:, columns_names]
+    else:
+        selected_columns = dataframe.loc[:, IndexSlice[:, columns_names]]
     if transformation_name in set(("ln", "log")):  # YIKES: robustness needed
         selected_columns = selected_columns.replace(0, 1e-6)
     transformed_columns = selected_columns.apply(transformation)
-    transformed_columns.columns = MultiIndex.from_tuples(
-        [
-            (col_0, f"{col_1}_{transformation_name}")
-            if col_1 in columns_names
-            else (col_0, col_1)
-            for col_0, col_1 in transformed_columns.columns.values
-        ],
-        names=dataframe.columns.names,
-    )
+    if isinstance(dataframe.columns, Index):
+        transformed_columns.columns = [
+            f"{col}_{transformation_name}" if col in columns_names else col
+            for col in transformed_columns.columns
+        ]
+    else:
+        transformed_columns.columns = MultiIndex.from_tuples(
+            [
+                (col_0, f"{col_1}_{transformation_name}")
+                if col_1 in columns_names
+                else (col_0, col_1)
+                for col_0, col_1 in transformed_columns.columns.values
+            ],
+            names=dataframe.columns.names,
+        )
     return transformed_columns
 
 
