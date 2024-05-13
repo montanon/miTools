@@ -341,11 +341,15 @@ def get_cointegration_test_from_log_structure(
             if c.isdigit()
         ]
     )
+    if "Number of periods" in cointegration_test:
+        periods_split = "Number of periods"
+    elif "Avg. number of periods" in cointegration_test:
+        periods_split = "Avg. number of periods"
     n_periods = "".join(
         [
             c
-            for c in cointegration_test.split("Number of periods")[1].split("\n")[0]
-            if c.isdigit()
+            for c in cointegration_test.split(periods_split)[1].split("\n")[0]
+            if c.isdigit() or c == "."
         ]
     )
 
