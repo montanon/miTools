@@ -27,33 +27,40 @@ def get_log_data(
         for s in log_structures
     ]
 
+    log_data = {}
     descriptive_statistics = get_descriptive_statistics_from_log_structure(
         log_structures[0]
     )
+    log_data["descriptive_statistics"] = descriptive_statistics
+
     skewness_tests = get_skewness_test_from_log_structure(log_structures[1])
+    log_data["skewness_tests"] = skewness_tests
+
     correlations_table = get_correlations_table_from_log_structure(log_structures[2])
+    log_data["correlations_table"] = correlations_table
+
     unit_tests = get_unit_tests_from_log_structure(log_structures[3])
+    log_data.update(unit_tests)
+
     cointegration_specifications, cointegration_results = (
         get_cointegration_test_from_log_structure(log_structures[4])
     )
+    log_data["cointegration_specifications"] = cointegration_specifications
+    log_data["cointegration_results"] = cointegration_results
+
     quantile_tables, regression_table = get_model_results_from_log_structure(
         log_structures[5]
     )
-    vif_values = get_vif_from_log_structure(log_structures[6])
-    coeffs_correlations = get_coeffs_correlation_from_log_structure(log_structures[7])
+    log_data["quantile_tables"] = quantile_tables
+    log_data["regression_table"] = regression_table
 
-    return (
-        descriptive_statistics,
-        skewness_tests,
-        correlations_table,
-        unit_tests,
-        cointegration_specifications,
-        cointegration_results,
-        quantile_tables,
-        regression_table,
-        vif_values,
-        coeffs_correlations,
-    )
+    vif_values = get_vif_from_log_structure(log_structures[6])
+    log_data["vif_values"] = vif_values
+
+    coeffs_correlations = get_coeffs_correlation_from_log_structure(log_structures[7])
+    log_data["coeffs_correlations"] = coeffs_correlations
+
+    return log_data
 
 
 def get_descriptive_statistics_from_log_structure(
@@ -169,145 +176,156 @@ def get_correlations_table_from_log_structure(log_structure: LogStructure) -> Da
 def get_unit_tests_from_log_structure(
     log_structure: LogStructure,
 ) -> Dict[str, DataFrame]:
-    test1_results = []
-    test1_specifications = []
-    test2_results = []
-    test2_specifications = []
+    llc_unittests = log_structure[0::2]
+    ips_unittests = log_structure[1::2]
 
-    for section in log_structure:
-        if section and section != "\n":
-            pattern = r"-+\n|-+$"
-            matches = [match for match in re.finditer(pattern, section)]
-
-            test1 = section[: matches[0].start()].strip()
-
-            test1_name = test1.split("for")[0].strip()
-            variable = test1.split("for")[1].strip()
-
-            test1_specification = section[matches[0].end() : matches[1].start()].strip()
-            test1_specification = [
-                line for line in test1_specification.split("\n") if line
-            ]
-            test1_specification = [
-                re.split(r"\s{2,}", line, 1)
-                if len([c for c in line if c in [":", "="]]) == 2
-                else line
-                for line in test1_specification
-            ]
-            test1_specification = [
-                item
-                for sublist in test1_specification
-                for item in (sublist if isinstance(sublist, list) else [sublist])
-            ]
-            test1_specification = [
-                s.split(":") if ":" in s else s.split("=") for s in test1_specification
-            ]
-            test1_specification = {
-                key.strip(): val.strip() for key, val in test1_specification
-            }
-            test1_specification = pd.DataFrame(test1_specification, index=[variable])
-            test1_specification.index.name = test1_name
-            test1_specifications.append(test1_specification)
-
-            test1_variables = section[matches[1].end() : matches[2].start()].strip()
-            test1_variables = [
-                line.strip() for line in re.split(r"\s+", test1_variables) if line
-            ]
-
-            test1_result = section[matches[2].end() : matches[3].start()].strip()
-            test1_result = [
-                [v.strip() for v in re.split(r"\s{2,}", vals) if v]
-                for vals in test1_result.split("\n")
-                if vals
-            ]
-            test1_result[0].append("") if len(test1_result[0]) == 2 else test1_result[0]
-            test1_result = {vals[0]: vals[1:] for vals in test1_result}
-            test1_result = pd.DataFrame(test1_result, index=test1_variables).T
-            test1_result.index = pd.MultiIndex.from_product(
-                [[variable], test1_result.index]
-            )
-            test1_result.index.names = ["Variable", test1_name]
-            test1_results.append(test1_result)
-
-            test2 = section[matches[3].end() : matches[4].start()].strip()
-            test2_name = test2.split("for")[0].strip()
-            variable = test2.split("for")[1].strip()
-
-            test2_specification = section[matches[4].end() : matches[5].start()].strip()
-            test2_specification = [
-                line for line in test2_specification.split("\n") if line
-            ]
-            test2_specification = [
-                re.split(r"\s{2,}", line, 1)
-                if len([c for c in line if c in [":", "="]]) == 2
-                else line
-                for line in test2_specification
-            ]
-            test2_specification = [
-                item
-                for sublist in test2_specification
-                for item in (sublist if isinstance(sublist, list) else [sublist])
-            ]
-            test2_specification = [
-                s.split(":") if ":" in s else s.split("=") for s in test2_specification
-            ]
-            test2_specification = {
-                key.strip(): val.strip() for key, val in test2_specification
-            }
-            if test2_specification["Panel means"].find("sequentially"):
-                test2_specification["Panel means"] = test2_specification[
-                    "Panel means"
-                ].split(" ")[0]
-                test2_specification["Asymptotics"] = (
-                    test2_specification["Asymptotics"] + " sequentially"
-                )
-            test2_specification = pd.DataFrame(test2_specification, index=[variable])
-            test2_specification.index.name = test2_name
-            test2_specifications.append(test2_specification)
-
-            test2_variables = section[
-                matches[5].end() + 1 : matches[6].start() + 1
-            ].strip()
-            test2_variables = [line for line in test2_variables.split("\n") if line]
-            header, test2_variables = test2_variables[0], test2_variables[1]
-            test2_variables = [
-                line.strip() for line in re.split(r"\s{2,}", test2_variables) if line
-            ]
-            test2_variables = [
-                v if v in ["Statistic", "p-value"] else f"{header} {v}"
-                for v in test2_variables
-            ]
-
-            test2_result = section[matches[6].end() + 1 :].strip()
-            _test2_result = [line.strip() for line in test2_result.split("\n") if line]
-            test2_result = {}
-            for n, line in enumerate(_test2_result):
-                values = re.split(r"\s{2,}", line)
-                if n == 0:
-                    test2_result[values[0]] = [values[1], ""] + values[2:]
-                elif n == 1:
-                    test2_result[values[0]] = [values[1], "", "", "", ""]
-                elif n == 2:
-                    test2_result[values[0]] = values[1:3] + ["", "", ""]
-            test2_result = pd.DataFrame(test2_result, index=test2_variables).T
-            test2_result.index.name = test2_name
-            test2_result.index = pd.MultiIndex.from_product(
-                [[variable], test2_result.index]
-            )
-            test2_result.index.names = ["Variable", test2_name]
-            test2_results.append(test2_result)
-
-    test1_specifications = pd.concat(test1_specifications, axis=0)
-    test1_results = pd.concat(test1_results, axis=0)
-    test2_specifications = pd.concat(test2_specifications, axis=0)
-    test2_results = pd.concat(test2_results, axis=0)
-
-    return dict(
-        test1_specifications=test1_specifications,
-        test1_results=test1_results,
-        test2_specifications=test2_specifications,
-        test2_results=test2_results,
+    llc_specifications, llc_results = get_llc_unittest_data_from_log_structure(
+        llc_unittests
     )
+    ips_specifications, ips_results = get_ips_unittest_data_from_log_structure(
+        ips_unittests
+    )
+    return dict(
+        llc_specifications=llc_specifications,
+        llc_results=llc_results,
+        ips_specifications=ips_specifications,
+        ips_results=ips_results,
+    )
+
+
+def get_llc_unittest_data_from_log_structure(
+    log_structure: LogStructure,
+) -> Tuple[DataFrame]:
+    test_specifications = []
+    test_results = []
+    for section in log_structure:
+        pattern = r"-+\n|-+$"
+        matches = [match for match in re.finditer(pattern, section)]
+        if len(matches) == 0:
+            continue
+        test = section[: matches[0].start()].strip()
+        test_name = test.split("for")[0].strip()
+        variable = test.split("for")[1].strip()
+
+        test_specification = section[matches[0].end() : matches[1].start()].strip()
+        test_specification = [line for line in test_specification.split("\n") if line]
+        test_specification = [
+            re.split(r"\s{2,}", line, 1)
+            if len([c for c in line if c in [":", "="]]) == 2
+            else line
+            for line in test_specification
+        ]
+        test_specification = [
+            item
+            for sublist in test_specification
+            for item in (sublist if isinstance(sublist, list) else [sublist])
+        ]
+        test_specification = [
+            s.split(":") if ":" in s else s.split("=") for s in test_specification
+        ]
+        test_specification = {
+            key.strip(): val.strip() for key, val in test_specification
+        }
+        test_specification = pd.DataFrame(test_specification, index=[variable])
+        test_specification.index.name = test_name
+        test_specifications.append(test_specification)
+
+        test1_variables = section[matches[1].end() : matches[2].start()].strip()
+        test1_variables = [
+            line.strip() for line in re.split(r"\s+", test1_variables) if line
+        ]
+
+        test_result = section[matches[2].end() : matches[3].start()].strip()
+        test_result = [
+            [v.strip() for v in re.split(r"\s{2,}", vals) if v]
+            for vals in test_result.split("\n")
+            if vals
+        ]
+        test_result[0].append("") if len(test_result[0]) == 2 else test_result[0]
+        test_result = {vals[0]: vals[1:] for vals in test_result}
+        test_result = pd.DataFrame(test_result, index=test1_variables).T
+        test_result.index = pd.MultiIndex.from_product([[variable], test_result.index])
+        test_result.index.names = ["Variable", test_name]
+        test_results.append(test_result)
+    test_specifications = pd.concat(test_specifications, axis=0)
+    test_results = pd.concat(test_results, axis=0)
+    return test_specifications, test_results
+
+
+def get_ips_unittest_data_from_log_structure(
+    log_structure: LogStructure,
+) -> Tuple[DataFrame]:
+    test_results = []
+    test_specifications = []
+    for n, section in enumerate(log_structure):
+        pattern = r"-+\n|-+$"
+        matches = [match for match in re.finditer(pattern, section)]
+        test = section[: matches[0].start()].strip()
+        test_name = test.split("for")[0].strip()
+        variable = test.split("for")[1].strip()
+        test_specification = section[matches[0].end() : matches[1].start()].strip()
+        test_specification = [line for line in test_specification.split("\n") if line]
+        test_specification = [
+            re.split(r"\s{2,}", line, 1)
+            if len([c for c in line if c in [":", "="]]) == 2
+            else line
+            for line in test_specification
+        ]
+        test_specification = [
+            item
+            for sublist in test_specification
+            for item in (sublist if isinstance(sublist, list) else [sublist])
+        ]
+        test_specification = [
+            s.split(":") if ":" in s else s.split("=") for s in test_specification
+        ]
+        test_specification = {
+            key.strip(): val.strip() for key, val in test_specification
+        }
+        if test_specification["Panel means"].find("sequentially"):
+            test_specification["Panel means"] = test_specification["Panel means"].split(
+                " "
+            )[0]
+            test_specification["Asymptotics"] = (
+                test_specification["Asymptotics"] + " sequentially"
+            )
+        test_specification = pd.DataFrame(test_specification, index=[variable])
+        test_specification.index.name = test_name
+        test_specifications.append(test_specification)
+        test_variables = section[matches[1].end() : matches[2].start()].strip()
+        test_variables = [line for line in test_variables.split("\n") if line]
+        header, test_variables = test_variables[0], test_variables[1]
+        test_variables = [
+            line.strip() for line in re.split(r"\s{2,}", test_variables) if line
+        ]
+        test_variables = [
+            v if v in ["Statistic", "p-value"] else f"{header} {v}"
+            for v in test_variables
+        ]
+        test_result = section[matches[2].end() :].strip()
+        _test_result = [line.strip() for line in test_result.split("\n") if line]
+        test_result = {}
+        for n, line in enumerate(_test_result):
+            values = re.split(r"\s{2,}", line)
+            if n == 0:
+                if not "(Not available)" in line:
+                    _section = section
+                    test_result[values[0]] = [values[1], ""] + values[2:]
+                else:
+                    test_result[values[0]] = [values[1], "", "", "", ""]
+            elif n == 1:
+                test_result[values[0]] = [values[1], "", "", "", ""]
+            elif n == 2:
+                test_result[values[0]] = values[1:3] + ["", "", ""]
+        test_result = pd.DataFrame(test_result, index=test_variables).T
+        test_result.index.name = test_name
+        test_result.index = pd.MultiIndex.from_product([[variable], test_result.index])
+        test_result.index.names = ["Variable", test_name]
+        test_results.append(test_result)
+
+    test_specifications = pd.concat(test_specifications, axis=0)
+    test_results = pd.concat(test_results, axis=0)
+    return test_specifications, test_results
 
 
 def get_cointegration_test_from_log_structure(
