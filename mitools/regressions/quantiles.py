@@ -1,3 +1,4 @@
+import hashlib
 import re
 import traceback
 import warnings
@@ -15,10 +16,10 @@ from pandas import DataFrame, MultiIndex, Series
 from statsmodels.regression.linear_model import RegressionResultsWrapper
 from tqdm.notebook import tqdm
 
-from ..economic_complexity import StringMapper
-from ..pandas import idxslice
-from ..regressions import generate_hash_from_dataframe
-from ..utils import auto_adjust_columns_width
+from mitools.economic_complexity import StringMapper
+from mitools.pandas import idxslice
+from mitools.regressions import generate_hash_from_dataframe
+from mitools.utils import auto_adjust_columns_width
 
 warnings.simplefilter("ignore")
 Color = Union[Tuple[int, int, int], str]
@@ -62,6 +63,341 @@ class QuantileRegStrs:
     DF_MODEL: str = "Df Model"
     KURTOSIS: str = "Kurtosis"
     SKEWNESS: str = "Skewness"
+
+
+class QuantilesRegressionSpecs:
+    def __init__(
+        self,
+        dependent_variable: str,
+        independent_variables: List[str],
+        quantiles: List[float],
+        quadratic: bool,
+        regression_type: str,
+        data: DataFrame,
+        group: Optional[str] = None,
+        control_variables: Optional[List[str]] = None,
+        panel: Optional[bool] = False,
+    ):
+        self.dependent_variable = dependent_variable
+        self.independent_variables = independent_variables
+        self.quadratic = quadratic
+        if self.quadratic and not any(
+            [
+                f"{var}{QuantileRegStrs.QUADRATIC_VAR_SUFFIX}"
+                in self.independent_variables
+                for var in self.independent_variables
+            ]
+        ):
+            self.independent_variables += [
+                f"{var}{QuantileRegStrs.QUADRATIC_VAR_SUFFIX}"
+                for var in independent_variables
+            ]
+        self.independent_variables.sort()
+        self.control_variables = control_variables or []
+        self.control_variables.sort()
+        self.variables = (
+            [self.dependent_variable]
+            + self.independent_variables
+            + self.control_variables
+        )
+        self.quantiles = quantiles
+        self.regression_type = regression_type
+        self.data = data
+        self.regression_id = create_regression_id(
+            self.regression_type,
+            self.quadratic,
+            self.dependent_variable,
+            self.independent_variables,
+            self.control_variables,
+        )
+        self.group = group
+        self.formula = self.get_formula()
+
+    def get_formula(self, str_mapper: Optional[StringMapper] = None) -> str:
+        if str_mapper:
+            independent_variables = str_mapper.prettify_strs(self.independent_variables)
+            control_variables = str_mapper.prettify_strs(self.control_variables)
+            dependent_variable = str_mapper.prettify_str(self.dependent_variable)
+        else:
+            independent_variables = self.independent_variables
+            control_variables = self.control_variables
+            dependent_variable = self.dependent_variable
+        formula_terms = [
+            var
+            for var in independent_variables
+            if QuantileRegStrs.QUADRATIC_VAR_SUFFIX not in var
+        ]
+        formula_terms += [
+            f"I({var})"
+            for var in independent_variables
+            if QuantileRegStrs.QUADRATIC_VAR_SUFFIX in var
+        ]
+        if control_variables:
+            formula_terms += control_variables
+        formula = f"{dependent_variable} ~ " + " + ".join(formula_terms)
+        return formula
+
+    def data_statistics_table(self, str_mapper: Optional[StringMapper] = None):
+        table = self.data[[self.variables]].describe(percentiles=[0.5]).T
+        table.columns = [
+            QuantileRegStrs.N_OBSERVATIONS,
+            "Mean",
+            "Std. Dev.",
+            "Min",
+            "Median",
+            "Max",
+        ]
+        table[QuantileRegStrs.KURTOSIS] = self.data[[self.variables]].kurtosis()
+        table[QuantileRegStrs.SKEWNESS] = self.data[[self.variables]].skew()
+        table[QuantileRegStrs.N_OBSERVATIONS] = table[
+            QuantileRegStrs.N_OBSERVATIONS
+        ].astype(int)
+        numeric_cols = [c for c in table.columns if c != QuantileRegStrs.N_OBSERVATIONS]
+        table[numeric_cols] = table[numeric_cols].round(7)
+        table.columns = (
+            pd.MultiIndex.from_product([[self.group], table.columns])
+            if self.group
+            else table.columns
+        )
+        if str_mapper:
+            table.index = table.index.map(lambda x: str_mapper.prettify_str(x))
+        return table.sort_index(ascending=True)
+
+    def data_statistics_latex_table(self, str_mapper: Optional[StringMapper] = None):
+        table = self.data_statistics_table(str_mapper)
+        symbols_pattern = r"([\ \_\-\&\%\$\#])"
+        table = table.rename(
+            index=lambda x: re.sub(symbols_pattern, regex_symbol_replacement, x)
+            if isinstance(x, str)
+            else str(round(x, 1))
+        )
+        table_latex = table.to_latex(
+            multirow=True, multicolumn=True, multicolumn_format="c"
+        )
+        table_text = (
+            "\\begin{adjustbox}{width=\\textwidth,center}\n"
+            + f"{table_latex}"
+            + "\end{adjustbox}\n"
+        )
+        return table_text
+
+
+class QuantilesRegression:
+    def __init__(self, coeffs, stats):
+        self.coeffs = coeffs
+        self.stats = stats
+
+        self.id = self.coeffs.index.get_level_values(QuantileRegStrs.ID).tolist()[0]
+        self.group = self.coeffs.columns.tolist()[0]
+
+        self.dependent_variables = self.coeffs.index.get_level_values(
+            QuantileRegStrs.DEPENDENT_VAR
+        ).tolist()[0]
+
+        self.independent_variables = (
+            self.coeffs.loc[
+                self.coeffs.index.get_level_values(QuantileRegStrs.VARIABLE_TYPE)
+                == QuantileRegStrs.EXOG_VAR
+            ]
+            .index.get_level_values(QuantileRegStrs.INDEPENDENT_VARS)
+            .unique()
+            .tolist()
+        )
+        self.control_variables = (
+            self.coeffs.loc[
+                self.coeffs.index.get_level_values(QuantileRegStrs.VARIABLE_TYPE)
+                == QuantileRegStrs.CONTROL_VAR
+            ]
+            .index.get_level_values(QuantileRegStrs.INDEPENDENT_VARS)
+            .unique()
+            .tolist()
+        )
+
+        self.quantiles = (
+            self.coeffs.index.get_level_values(QuantileRegStrs.QUANTILE)
+            .unique()
+            .tolist()
+        )
+        self.quadratic = (
+            self.coeffs.index.get_level_values(
+                QuantileRegStrs.REGRESSION_DEGREE
+            ).tolist()[0]
+            == QuantileRegStrs.QUADRATIC_REG
+        )
+        self.regression_type = self.coeffs.index.get_level_values(
+            QuantileRegStrs.REGRESSION_TYPE
+        ).tolist()[0]
+
+    def coefficients(self, quantiles: Optional[List[float]] = None):
+        if quantiles is None:
+            return self.coeffs
+        return self.coeffs.loc[
+            self.coeffs.index.get_level_values(QuantileRegStrs.QUANTILE).isin(quantiles)
+        ]
+
+    def n_obs(self, quantiles: Optional[List[float]] = None):
+        if quantiles is None:
+            stats = self.stats.loc[(slice(None), QuantileRegStrs.N_OBSERVATIONS), :]
+        else:
+            stats = self.stats.loc[(quantiles, QuantileRegStrs.N_OBSERVATIONS), :]
+        stats.index = stats.index.droplevel(QuantileRegStrs.STATS)
+        stats.columns = [QuantileRegStrs.N_OBSERVATIONS]
+        return stats
+
+    def r_squared(self, quantiles: Optional[List[float]] = None):
+        if quantiles is None:
+            stats = self.stats.loc[(slice(None), QuantileRegStrs.PSEUDO_R_SQUARED), :]
+        else:
+            stats = self.stats.loc[(quantiles, QuantileRegStrs.PSEUDO_R_SQUARED), :]
+        stats.index = stats.index.droplevel(QuantileRegStrs.STATS)
+        stats.columns = [QuantileRegStrs.PSEUDO_R_SQUARED]
+        return stats
+
+    def coefficients_quantiles_table(self, quantiles: Optional[List[float]] = None):
+        table = self.coeffs.unstack(level=QuantileRegStrs.QUANTILE)
+        if quantiles is not None:
+            table = table.loc[:, (slice(None), quantiles)]
+        return table.sort_index(
+            axis=0,
+            level=[QuantileRegStrs.VARIABLE_TYPE, QuantileRegStrs.INDEPENDENT_VARS],
+            ascending=[False, True],
+        )
+
+    def coefficients_quantiles_latex_table(
+        self,
+        quantiles: Optional[List[float]] = None,
+        note: Optional[bool] = False,
+        str_mapper: Optional[StringMapper] = None,
+    ):
+        table = self.coefficients_quantiles_table(quantiles).droplevel(
+            [
+                QuantileRegStrs.ID,
+                QuantileRegStrs.REGRESSION_TYPE,
+                QuantileRegStrs.REGRESSION_DEGREE,
+                QuantileRegStrs.VARIABLE_TYPE,
+            ],
+            axis=0,
+        )
+        if str_mapper is not None:
+            levels_to_remap = [
+                QuantileRegStrs.DEPENDENT_VAR,
+                QuantileRegStrs.INDEPENDENT_VARS,
+            ]
+            pretty_index = table.index.set_levels(
+                [
+                    prettify_index_level(
+                        str_mapper,
+                        QuantileRegStrs.QUADRATIC_VAR_SUFFIX,
+                        level,
+                        level_id,
+                        levels_to_remap,
+                    )
+                    for level, level_id in zip(table.index.levels, table.index.names)
+                ],
+                level=table.index.names,
+            )
+            table.index = pretty_index
+        symbols_pattern = r"([\ \_\-\&\%\$\#])"
+        table = table.rename(
+            columns=lambda x: re.sub(symbols_pattern, regex_symbol_replacement, x)
+            if isinstance(x, str)
+            else str(round(x, 1)),
+            index=lambda x: re.sub(symbols_pattern, regex_symbol_replacement, x)
+            if isinstance(x, str)
+            else str(round(x, 1)),
+        ).to_latex(multirow=True, multicolumn=True, multicolumn_format="c")
+        table_text = (
+            "\\begin{adjustbox}{width=\\textwidth,center}\n"
+            + f"{table}"
+            + "\end{adjustbox}\n"
+        )
+        table_text = (
+            table_text
+            + "{\\centering\\tiny Note: * p\\textless0.05, ** p\\textless0.01, *** p\\textless0.001\\par}"
+            if note
+            else table_text
+        )
+        print(table_text)
+
+    def model_specification(self, str_mapper: Optional[StringMapper] = None):
+        if str_mapper:
+            independent_variables = [
+                str_mapper.prettify_str(var)
+                if QuantileRegStrs.QUADRATIC_VAR_SUFFIX not in var
+                else f"{str_mapper.prettify_str(var.replace(QuantileRegStrs.QUADRATIC_VAR_SUFFIX, ''))}{QuantileRegStrs.QUADRATIC_VAR_SUFFIX}"
+                for var in self.independent_variables
+            ]
+            control_variables = [
+                str_mapper.prettify_str(var) for var in self.control_variables
+            ]
+        else:
+            independent_variables = self.independent_variables
+            control_variables = self.control_variables
+        model_specification = f"{self.dependent_variables if not str_mapper else str_mapper.prettify_str(self.dependent_variables)}"
+        model_specification += f" ~ {' + '.join(independent_variables)}"
+        model_specification += (
+            f" + {' + '.join([var for var in control_variables if var != 'Intercept'])}"
+            if control_variables
+            else ""
+        )
+        model_specification = model_specification.split(" + ")
+        lines = []
+        line = ""
+        for string in model_specification[:-1]:
+            if len(line) + len(string) < 120:
+                line += f"{string} + "
+            else:
+                lines.append(line + r"\\")
+                line = string + " + "
+        lines.append(model_specification[-1])
+        model_specification = "".join(lines)
+        symbols_pattern = r"([\ \_\-\&\%\$\#])"
+        model_specification = re.sub(
+            symbols_pattern, regex_symbol_replacement, model_specification
+        ).replace("~", "\\sim")
+        print(f"${model_specification}$")
+
+    def abstract_model_specification(self):
+        pass
+
+    def quantile_model_equation(self):
+        print(
+            "$\\min_{\\beta} \\sum_{i:y_g \\geq x_g^T\\beta} q |y_g - x_g^T\\beta| + \\sum_{g:y_g < x_g^T\\beta} (1-q) |y_g - x_g^T\\beta|$"
+        )
+
+
+def create_regression_id(
+    regression_type: str,
+    regression_degree: str,
+    regression_dependent_var: str,
+    regression_indep_vars: List[str],
+    control_variables: List[str],
+    id_len: Optional[int] = 6,
+) -> str:
+    str_to_hash = " ".join(
+        [
+            regression_type,
+            regression_degree,
+        ]
+    )
+    id_hasher = hashlib.md5()
+    id_hasher.update(rf"{str_to_hash}".encode("utf-8"))
+    kind_id = id_hasher.hexdigest()[:id_len]
+
+    id_hasher = hashlib.md5()
+    id_hasher.update(rf"{regression_dependent_var}".encode("utf-8"))
+    dep_id = id_hasher.hexdigest()[:id_len]
+
+    str_to_hash = " ".join([v for v in regression_indep_vars if "_square" not in v])
+    id_hasher = hashlib.md5()
+    id_hasher.update(rf"{str_to_hash}".encode("utf-8"))
+    indep_id = id_hasher.hexdigest()[:id_len]
+
+    control_vars_str = " ".join([v for v in control_variables])
+    id_hasher = hashlib.md5()
+    id_hasher.update(rf"{control_vars_str}".encode("utf-8"))
+    control_vars_id = id_hasher.hexdigest()[:id_len] if control_variables else "None"
+    return f"{kind_id}-{dep_id}-{indep_id}-{control_vars_id}"
 
 
 def create_regression_file_paths(
@@ -409,7 +745,7 @@ def get_quantile_regression_results_coeffs(
         regression_coeffs, independent_variables
     )
     regression_coeffs = sort_and_set_regression_coeffs_index(regression_coeffs)
-    regression_coeffs = add_id_and_reorder_regression_coeffs(regression_coeffs)
+    # regression_coeffs = add_id_and_reorder_regression_coeffs(regression_coeffs)
     return regression_coeffs
 
 
@@ -428,7 +764,7 @@ def quantile_regression_value(row: Series) -> Series:
 
 
 def get_quantile_regression_results(
-    regression: "QuantilesRegression", max_iter: Optional[int] = 2_500
+    regression: "QuantilesRegressionSpecs", max_iter: Optional[int] = 2_500
 ) -> Dict[float, RegressionResultsWrapper]:
     results = {
         q: smf.quantreg(regression.formula, regression.data).fit(q=q, max_iter=max_iter)
@@ -545,7 +881,7 @@ def create_quantile_regressions_results(
                                         control_variables=control_vars,
                                         str_mapper=str_mapper,
                                     )
-                                    regression_info = QuantilesRegression(
+                                    regression_info = QuantilesRegressionSpecs(
                                         group=group,
                                         dependent_variable=dependent_var,
                                         independent_variables=independent_vars,
@@ -575,7 +911,7 @@ def create_quantile_regressions_results(
                                         )
                                     )
 
-                                    regression = QuantilesRegressionData(
+                                    regression = QuantilesRegression(
                                         coeffs=regression_coeffs, stats=regression_stats
                                     )
                                     regressions[dependent_variable].setdefault(
@@ -636,265 +972,6 @@ def create_quantile_regressions_results(
                         auto_adjust_columns_width(sheet)
                     book.save(dep_var_name_excel)
     return regressions, regressions_info
-
-
-class QuantilesRegression:
-    def __init__(
-        self,
-        group: str,
-        dependent_variable: str,
-        independent_variables: List[str],
-        quantiles: List[float],
-        quadratic: bool,
-        data: DataFrame,
-        control_variables: Optional[List[str]] = None,
-    ):
-        self.group = group
-        self.dependent_variable = dependent_variable
-        self.independent_variables = independent_variables
-        self.quantiles = quantiles
-        self.quadratic = quadratic
-        self.data = data
-        self.control_variables = control_variables if control_variables else []
-        self.formula = self.get_formula()
-
-    def get_formula(self, str_mapper: Optional[StringMapper] = None) -> str:
-        if str_mapper:
-            pass
-        formula_terms = self.independent_variables.copy()
-        if self.quadratic:
-            formula_terms += [
-                f"I({var}{QuantileRegStrs.QUADRATIC_VAR_SUFFIX})"
-                for var in formula_terms
-            ]
-        if self.control_variables:
-            formula_terms += self.control_variables
-        formula = f"{self.dependent_variable} ~ " + " + ".join(formula_terms)
-        return formula
-
-    def data_statistics_table(self, str_mapper: Optional[StringMapper] = None):
-        table = self.data.describe(percentiles=[0.5]).T
-        table.columns = [
-            QuantileRegStrs.N_OBSERVATIONS,
-            "Mean",
-            "Std. Dev.",
-            "Min",
-            "Median",
-            "Max",
-        ]
-        table[QuantileRegStrs.KURTOSIS] = self.data.kurtosis()
-        table[QuantileRegStrs.SKEWNESS] = self.data.skew()
-        table[QuantileRegStrs.N_OBSERVATIONS] = table[
-            QuantileRegStrs.N_OBSERVATIONS
-        ].astype(int)
-        table[[c for c in table.columns if c != QuantileRegStrs.N_OBSERVATIONS]] = (
-            table[
-                [c for c in table.columns if c != QuantileRegStrs.N_OBSERVATIONS]
-            ].round(7)
-        )
-        table.columns = pd.MultiIndex.from_product([[self.group], table.columns])
-        if str_mapper:
-            table.index = table.index.map(lambda x: str_mapper.prettify_str(x))
-        return table.sort_index(ascending=True)
-
-    def data_statistics_latex_table(self, str_mapper: Optional[StringMapper] = None):
-        table = self.data_statistics_table(str_mapper)
-        symbols_pattern = r"([\ \_\-\&\%\$\#])"
-        table = table.rename(
-            index=lambda x: re.sub(symbols_pattern, regex_symbol_replacement, x)
-            if isinstance(x, str)
-            else str(round(x, 1))
-        ).to_latex(multirow=True, multicolumn=True, multicolumn_format="c")
-        table_text = (
-            "\\begin{adjustbox}{width=\\textwidth,center}\n"
-            + f"{table}"
-            + "\end{adjustbox}\n"
-        )
-        print(table_text)
-
-
-class QuantilesRegressionData:
-    def __init__(self, coeffs, stats):
-        self.coeffs = coeffs
-        self.stats = stats
-
-        self.id = self.coeffs.index.get_level_values(QuantileRegStrs.ID).tolist()[0]
-        self.group = self.coeffs.columns.tolist()[0]
-
-        self.dependent_variables = self.coeffs.index.get_level_values(
-            QuantileRegStrs.DEPENDENT_VAR
-        ).tolist()[0]
-
-        self.independent_variables = (
-            self.coeffs.loc[
-                self.coeffs.index.get_level_values(QuantileRegStrs.VARIABLE_TYPE)
-                == QuantileRegStrs.EXOG_VAR
-            ]
-            .index.get_level_values(QuantileRegStrs.INDEPENDENT_VARS)
-            .unique()
-            .tolist()
-        )
-        self.control_variables = (
-            self.coeffs.loc[
-                self.coeffs.index.get_level_values(QuantileRegStrs.VARIABLE_TYPE)
-                == QuantileRegStrs.CONTROL_VAR
-            ]
-            .index.get_level_values(QuantileRegStrs.INDEPENDENT_VARS)
-            .unique()
-            .tolist()
-        )
-
-        self.quantiles = (
-            self.coeffs.index.get_level_values(QuantileRegStrs.QUANTILE)
-            .unique()
-            .tolist()
-        )
-        self.quadratic = (
-            self.coeffs.index.get_level_values(
-                QuantileRegStrs.REGRESSION_DEGREE
-            ).tolist()[0]
-            == QuantileRegStrs.QUADRATIC_REG
-        )
-        self.regression_type = self.coeffs.index.get_level_values(
-            QuantileRegStrs.REGRESSION_TYPE
-        ).tolist()[0]
-
-    def coefficients(self, quantiles: Optional[List[float]] = None):
-        if quantiles is None:
-            return self.coeffs
-        return self.coeffs.loc[
-            self.coeffs.index.get_level_values(QuantileRegStrs.QUANTILE).isin(quantiles)
-        ]
-
-    def n_obs(self, quantiles: Optional[List[float]] = None):
-        if quantiles is None:
-            stats = self.stats.loc[(slice(None), QuantileRegStrs.N_OBSERVATIONS), :]
-        else:
-            stats = self.stats.loc[(quantiles, QuantileRegStrs.N_OBSERVATIONS), :]
-        stats.index = stats.index.droplevel(QuantileRegStrs.STATS)
-        stats.columns = [QuantileRegStrs.N_OBSERVATIONS]
-        return stats
-
-    def r_squared(self, quantiles: Optional[List[float]] = None):
-        if quantiles is None:
-            stats = self.stats.loc[(slice(None), QuantileRegStrs.PSEUDO_R_SQUARED), :]
-        else:
-            stats = self.stats.loc[(quantiles, QuantileRegStrs.PSEUDO_R_SQUARED), :]
-        stats.index = stats.index.droplevel(QuantileRegStrs.STATS)
-        stats.columns = [QuantileRegStrs.PSEUDO_R_SQUARED]
-        return stats
-
-    def coefficients_quantiles_table(self, quantiles: Optional[List[float]] = None):
-        table = self.coeffs.unstack(level=QuantileRegStrs.QUANTILE)
-        if quantiles is not None:
-            table = table.loc[:, (slice(None), quantiles)]
-        return table.sort_index(
-            axis=0,
-            level=[QuantileRegStrs.VARIABLE_TYPE, QuantileRegStrs.INDEPENDENT_VARS],
-            ascending=[False, True],
-        )
-
-    def coefficients_quantiles_latex_table(
-        self,
-        quantiles: Optional[List[float]] = None,
-        note: Optional[bool] = False,
-        str_mapper: Optional[StringMapper] = None,
-    ):
-        table = self.coefficients_quantiles_table(quantiles).droplevel(
-            [
-                QuantileRegStrs.ID,
-                QuantileRegStrs.REGRESSION_TYPE,
-                QuantileRegStrs.REGRESSION_DEGREE,
-                QuantileRegStrs.VARIABLE_TYPE,
-            ],
-            axis=0,
-        )
-        if str_mapper is not None:
-            levels_to_remap = [
-                QuantileRegStrs.DEPENDENT_VAR,
-                QuantileRegStrs.INDEPENDENT_VARS,
-            ]
-            pretty_index = table.index.set_levels(
-                [
-                    prettify_index_level(
-                        str_mapper,
-                        QuantileRegStrs.QUADRATIC_VAR_SUFFIX,
-                        level,
-                        level_id,
-                        levels_to_remap,
-                    )
-                    for level, level_id in zip(table.index.levels, table.index.names)
-                ],
-                level=table.index.names,
-            )
-            table.index = pretty_index
-        symbols_pattern = r"([\ \_\-\&\%\$\#])"
-        table = table.rename(
-            columns=lambda x: re.sub(symbols_pattern, regex_symbol_replacement, x)
-            if isinstance(x, str)
-            else str(round(x, 1)),
-            index=lambda x: re.sub(symbols_pattern, regex_symbol_replacement, x)
-            if isinstance(x, str)
-            else str(round(x, 1)),
-        ).to_latex(multirow=True, multicolumn=True, multicolumn_format="c")
-        table_text = (
-            "\\begin{adjustbox}{width=\\textwidth,center}\n"
-            + f"{table}"
-            + "\end{adjustbox}\n"
-        )
-        table_text = (
-            table_text
-            + "{\\centering\\tiny Note: * p\\textless0.05, ** p\\textless0.01, *** p\\textless0.001\\par}"
-            if note
-            else table_text
-        )
-        print(table_text)
-
-    def model_specification(self, str_mapper: Optional[StringMapper] = None):
-        if str_mapper:
-            independent_variables = [
-                str_mapper.prettify_str(var)
-                if QuantileRegStrs.QUADRATIC_VAR_SUFFIX not in var
-                else f"{str_mapper.prettify_str(var.replace(QuantileRegStrs.QUADRATIC_VAR_SUFFIX, ''))}{QuantileRegStrs.QUADRATIC_VAR_SUFFIX}"
-                for var in self.independent_variables
-            ]
-            control_variables = [
-                str_mapper.prettify_str(var) for var in self.control_variables
-            ]
-        else:
-            independent_variables = self.independent_variables
-            control_variables = self.control_variables
-        model_specification = f"{self.dependent_variables if not str_mapper else str_mapper.prettify_str(self.dependent_variables)}"
-        model_specification += f" ~ {' + '.join(independent_variables)}"
-        model_specification += (
-            f" + {' + '.join([var for var in control_variables if var != 'Intercept'])}"
-            if control_variables
-            else ""
-        )
-        model_specification = model_specification.split(" + ")
-        lines = []
-        line = ""
-        for string in model_specification[:-1]:
-            if len(line) + len(string) < 120:
-                line += f"{string} + "
-            else:
-                lines.append(line + r"\\")
-                line = string + " + "
-        lines.append(model_specification[-1])
-        model_specification = "".join(lines)
-        symbols_pattern = r"([\ \_\-\&\%\$\#])"
-        model_specification = re.sub(
-            symbols_pattern, regex_symbol_replacement, model_specification
-        ).replace("~", "\\sim")
-        print(f"${model_specification}$")
-
-    def abstract_model_specification(self):
-        pass
-
-    def quantile_model_equation(self):
-        print(
-            "$\\min_{\\beta} \\sum_{i:y_g \\geq x_g^T\\beta} q |y_g - x_g^T\\beta| + \\sum_{g:y_g < x_g^T\\beta} (1-q) |y_g - x_g^T\\beta|$"
-        )
 
 
 def regex_symbol_replacement(match):

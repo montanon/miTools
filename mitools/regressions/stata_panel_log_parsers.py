@@ -5,10 +5,13 @@ from typing import Dict, Optional, Tuple, Type
 import pandas as pd
 from pandas import DataFrame
 
+from mitools.regressions.quantiles import QuantilesRegressionSpecs
+
 LogStructure = Type[str]  # type alias for log
 
 
 def get_log_data(
+    regression_info: QuantilesRegressionSpecs,
     log_path: Path,
     section_break: Optional[str] = None,
     subsection_break: Optional[str] = None,
@@ -31,15 +34,39 @@ def get_log_data(
     descriptive_statistics = get_descriptive_statistics_from_log_structure(
         log_structures[0]
     )
+    descriptive_statistics.index = descriptive_statistics.index.map(
+        lambda x: restore_variable(x, regression_info.variables)
+    )
     log_data["descriptive_statistics"] = descriptive_statistics
 
     skewness_tests = get_skewness_test_from_log_structure(log_structures[1])
+    skewness_tests.index = skewness_tests.index.map(
+        lambda x: restore_variable(x, regression_info.variables)
+    )
     log_data["skewness_tests"] = skewness_tests
 
     correlations_table = get_correlations_table_from_log_structure(log_structures[2])
+    correlations_table.index = correlations_table.index.map(
+        lambda x: restore_variable(x, regression_info.variables)
+    )
+    correlations_table.columns = correlations_table.columns.map(
+        lambda x: restore_variable(x, regression_info.variables)
+    )
     log_data["correlations_table"] = correlations_table
 
     unit_tests = get_unit_tests_from_log_structure(log_structures[3])
+    unit_tests["llc_specifications"].index = unit_tests["llc_specifications"].index.map(
+        lambda x: restore_variable(x, regression_info.variables)
+    )
+    unit_tests["llc_results"].index = unit_tests["llc_results"].index.map(
+        lambda x: restore_variable(x, regression_info.variables)
+    )
+    unit_tests["ips_specifications"].index = unit_tests["ips_specifications"].index.map(
+        lambda x: restore_variable(x, regression_info.variables)
+    )
+    unit_tests["ips_results"].index = unit_tests["ips_results"].index.map(
+        lambda x: (restore_variable(x[0], regression_info.variables), x[1])
+    )
     log_data.update(unit_tests)
 
     cointegration_specifications, cointegration_results = (
@@ -51,16 +78,79 @@ def get_log_data(
     quantile_tables, regression_table = get_model_results_from_log_structure(
         log_structures[5]
     )
+    quantile_tables.index = quantile_tables.index.map(
+        lambda x: restore_variable(x, regression_info.variables)
+    )
+    regression_table = arrange_regression_table(regression_table, regression_info)
     log_data["quantile_tables"] = quantile_tables
     log_data["regression_table"] = regression_table
 
     vif_values = get_vif_from_log_structure(log_structures[6])
+    vif_values.index = vif_values.index.map(
+        lambda x: restore_variable(x, regression_info.variables)
+    )
     log_data["vif_values"] = vif_values
 
     coeffs_correlations = get_coeffs_correlation_from_log_structure(log_structures[7])
+    coeffs_correlations.index = coeffs_correlations.index.map(
+        lambda x: restore_variable(x, regression_info.variables)
+    )
+    coeffs_correlations.columns = coeffs_correlations.columns.map(
+        lambda x: restore_variable(x, regression_info.variables)
+    )
     log_data["coeffs_correlations"] = coeffs_correlations
 
     return log_data
+
+
+def arrange_regression_table(
+    regression_table, regression_info: QuantilesRegressionSpecs
+):
+    regression_table = regression_table.unstack().to_frame()
+    regression_table.index = regression_table.index.map(
+        lambda x: (x[0], restore_variable(x[-1], regression_info.variables))
+    )
+    regression_table.columns = (
+        ["Value"] if not regression_info.group else [regression_info.group]
+    )
+    regression_table["Variable Type"] = regression_table.index.get_level_values(
+        "Independent Vars"
+    ).map(
+        lambda x: "Exog"
+        if x in regression_info.independent_variables
+        else "Control"
+        if x in regression_info.control_variables
+        else "Other"
+    )
+    regression_table = regression_table.reset_index()
+    regression_table["Dependent Var"] = regression_info.dependent_variable
+    regression_table["Regression Degree"] = (
+        regression_info.quadratic if regression_info.quadratic else "linear"
+    )
+    regression_table["Regression Type"] = regression_info.regression_type
+    regression_table["Id"] = regression_info.regression_id
+    regression_table = regression_table.set_index(
+        [
+            "Id",
+            "Regression Type",
+            "Regression Degree",
+            "Dependent Var",
+            "Variable Type",
+            "Independent Vars",
+            "Quantile",
+        ]
+    )
+    regression_table = regression_table.sort_index(
+        ascending=[True, True, True, True, False, True, True]
+    )
+    return regression_table
+
+
+def restore_variable(x, variables):
+    if "~" not in x:
+        return x
+    x = x.split("~")
+    return [var for var in variables if var.startswith(x[0]) and var.endswith(x[-1])][0]
 
 
 def get_descriptive_statistics_from_log_structure(
@@ -418,9 +508,9 @@ def get_model_results_from_log_structure(
         regression_table = pd.DataFrame(values, index=variables).T
         regression_table.columns = pd.MultiIndex.from_product(
             [[float(quantile.split(" ")[0])], regression_table.columns],
-            names=["quantile", "value"],
+            names=["Quantile", "value"],
         )
-        regression_table.index.name = "Variable"
+        regression_table.index.name = "Independent Vars"
         quantile_tables.append(regression_table)
     quantile_tables = pd.concat(quantile_tables, axis=1)
 
@@ -439,7 +529,7 @@ def get_model_results_from_log_structure(
     )
     significances.columns = pd.MultiIndex.from_tuples(
         [(col[0], "significance") for col in significances.columns],
-        names=["quantile", "value"],
+        names=["Quantile", "value"],
     )
     regression_table = pd.concat([regression_table, significances], axis=1).sort_index(
         axis=1
@@ -447,7 +537,7 @@ def get_model_results_from_log_structure(
     regression_table.loc[:, (slice(None), "z")] = (
         regression_table.loc[:, (slice(None), "z")]
         .astype(str)
-        .applymap(lambda x: f" ({x})")
+        .applymap(lambda x: f"({x})")
     )
     regression_table.loc[:, (slice(None), "Coefficient")] = regression_table.loc[
         :, (slice(None), "Coefficient")
