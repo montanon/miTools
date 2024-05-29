@@ -4,6 +4,7 @@ from typing import Dict, List, Optional, Sequence, Tuple, Union
 import chardet
 import numpy as np
 import pandas as pd
+from numba import jit
 from pandas import DataFrame
 
 
@@ -151,11 +152,55 @@ def calculate_relatedness_matrix(
     return wcp
 
 
+@jit(nopython=True)
+def fast_calculate_economic_complexity(
+    rca_matrix: np.ndarray,
+    diversity: np.ndarray,
+    ubiquity: np.ndarray,
+    standardize: bool,
+) -> Tuple[np.ndarray, np.ndarray]:
+    print("Fast Calculation of ECI/PCI!")
+    M1 = np.divide(rca_matrix.T, diversity).T
+    M1 = np.nan_to_num(M1)
+    M2 = np.divide(rca_matrix, ubiquity)
+    M2 = np.nan_to_num(M2)
+    M2_t = M2.T.copy()
+
+    # Mcc = M1.dot(M2_t)
+    Mpp = M2_t.dot(M1)
+
+    eigen_values, eigen_vectors = np.linalg.eig(Mpp)
+    eigen_vectors = np.real(eigen_vectors)
+
+    eigen_vector_index = eigen_values.argsort()[-2]
+    kp = eigen_vectors[:, eigen_vector_index]
+    kc = M1.dot(kp)
+
+    signature = np.sign(np.corrcoef(diversity, kc)[0, 1])
+    eci_t = signature * kc
+    pci_t = signature * kp
+
+    if standardize:
+        pci_t = (pci_t - pci_t.mean()) / pci_t.std()
+        eci_t = (eci_t - eci_t.mean()) / eci_t.std()
+
+    return eci_t, pci_t
+
+
 def calculate_economic_complexity(
     rca_matrix: DataFrame, year: int, standardize=True
 ) -> Tuple[DataFrame, DataFrame]:
     diversity = rca_matrix.sum(axis=1)
     ubiquity = rca_matrix.sum(axis=0)
+
+    # try:
+    #     eci_t, pci_t = fast_calculate_economic_complexity(
+    #         rca_matrix.to_numpy(),
+    #         diversity.to_numpy(),
+    #         ubiquity.to_numpy(),
+    #         standardize,
+    #     )
+    # except Exception as e:
 
     M1 = np.divide(rca_matrix.T, diversity).T
     M1 = np.nan_to_num(M1)
@@ -163,7 +208,7 @@ def calculate_economic_complexity(
     M2 = np.nan_to_num(M2)
     M2_t = M2.T.copy()
 
-    Mcc = M1.dot(M2_t)
+    # Mcc = M1.dot(M2_t)
     Mpp = M2_t.dot(M1)
 
     eigen_values, eigen_vectors = np.linalg.eig(Mpp)
