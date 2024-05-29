@@ -1,5 +1,6 @@
 import random
 import statistics
+from math import ceil
 from string import ascii_uppercase, digits
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -499,7 +500,7 @@ def plot_countries_ecis_indicator_scatter(
     marker_kwargs: Optional[Dict[str, Any]] = None,
     axes: Optional[Axes] = None,
 ) -> Axes:
-    nrows = (len(x_vars_cols) + 1) // ncols
+    nrows = ceil((len(x_vars_cols) + 1) / ncols)
     if axes is None:
         _, axes = plt.subplots(
             nrows=nrows, ncols=ncols, figsize=(figsize[0] * ncols, figsize[1] * nrows)
