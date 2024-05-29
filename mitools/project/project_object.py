@@ -1,8 +1,10 @@
 import pickle
+import shutil
 from os import PathLike
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from ..files import folder_in_subtree, folder_is_subfolder
 from ..utils import build_dir_tree
 
 PROJECT_FILENAME = "project.pkl"
@@ -121,7 +123,7 @@ class Project:
         cls, project_folder: Optional[Path] = None, auto_load: bool = False, n: int = 3
     ) -> "Project":
         if project_folder is None and auto_load:
-            current_path = Path.cwd()
+            current_path = Path.cwd().resolve()
             for _ in range(n):
                 project_path = current_path / PROJECT_FILENAME
                 if project_path.exists():
@@ -144,6 +146,16 @@ class Project:
             obj = pickle.load(file)
         obj.update_info()
         obj.vars = obj.vars if hasattr(obj, "vars") else {}
+
+        current_path = Path.cwd().resolve()
+        if folder_is_subfolder(obj.root, current_path):
+            version_folder = folder_in_subtree(
+                obj.root, current_path, obj.version_folders
+            )
+            if version_folder:
+                obj.update_version(version_folder.stem)
+                print(f"Updated Project version to current {obj.version} version.")
+
         return obj
 
     def __repr__(self) -> str:
@@ -157,6 +169,9 @@ class Project:
 
     def update_info(self) -> None:
         self.versions = self.get_all_versions()
+        self.version_folders = [
+            Path(self.folder) / version for version in self.versions
+        ]
         self.subfolders = self.list_subfolders()
         self.vars.update(self.folder_path_dict())
 
@@ -185,3 +200,18 @@ class Project:
     def directory_tree(self, directory: PathLike) -> None:
         tree = build_dir_tree(directory)
         tree.show()
+
+    def clone_version(self, source_version: str, new_version: str) -> None:
+        source_version_folder = self.folder / source_version
+        new_version_folder = self.folder / new_version
+
+        if not source_version_folder.exists():
+            raise ValueError(f"Source version {source_version} does not exist.")
+
+        if new_version_folder.exists():
+            raise ValueError(f"New version {new_version} already exists.")
+
+        shutil.copytree(source_version_folder, new_version_folder)
+        self.update_version(new_version)
+        self.update_info()
+        self.store_project()
