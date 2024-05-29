@@ -1,4 +1,5 @@
 import hashlib
+import pickle
 import re
 import traceback
 import warnings
@@ -180,6 +181,11 @@ class QuantilesRegressionSpecs:
             + "\end{adjustbox}\n"
         )
         return table_text
+
+    def store(self, folder_path: Path):
+        self.data = None
+        with open(folder_path / f"{self.regression_id}.reg_specs", "wb") as file:
+            pickle.dump(self, file)
 
 
 class QuantilesRegression:
@@ -365,6 +371,10 @@ class QuantilesRegression:
             "$\\min_{\\beta} \\sum_{i:y_g \\geq x_g^T\\beta} q |y_g - x_g^T\\beta| + \\sum_{g:y_g < x_g^T\\beta} (1-q) |y_g - x_g^T\\beta|$"
         )
 
+    def store(self, folder_path: Path):
+        with open(folder_path / f"{self.id}.reg_coeffs", "wb") as file:
+            pickle.dump(self, file)
+
 
 def create_regression_id(
     regression_type: str,
@@ -518,7 +528,9 @@ def get_quantile_regression_predictions_by_group(
                     for match in [re.search(r"\*+$", val) for val in values[:-1]]
                 ]
             )
-            coeffs = [float(re.search(r"([-\d.]+)\(", val).group(1)) for val in values]
+            coeffs = [
+                float(re.search(r"([-\d.eE]+)\(", val).group(1)) for val in values
+            ]
             coeffs_names = (
                 [
                     QuantileRegStrs.LINEAR_REG,
@@ -887,9 +899,13 @@ def create_quantile_regressions_results(
                                         independent_variables=independent_vars,
                                         control_variables=c_vars,
                                         quantiles=quantiles,
-                                        quadratic=quadratic,
+                                        quadratic="quadratic"
+                                        if quadratic
+                                        else "linear",
                                         data=regression_data,
+                                        regression_type="ols",
                                     )
+                                    regression_id = regression_info.regression_id
                                     with warnings.catch_warnings():
                                         regression_results = (
                                             get_quantile_regression_results(
@@ -905,6 +921,17 @@ def create_quantile_regressions_results(
                                         )
                                     )
                                     regression_coeffs.columns = [group]
+                                    regression_coeffs["Id"] = (
+                                        regression_info.regression_id
+                                    )
+                                    regression_coeffs = regression_coeffs.set_index(
+                                        "Id", append=True
+                                    )
+                                    regression_coeffs = (
+                                        regression_coeffs.reorder_levels(
+                                            [-1, 0, 1, 2, 3, 4, 5]
+                                        )
+                                    )
                                     regression_stats = (
                                         get_quantile_regression_results_stats(
                                             results=regression_results
@@ -927,7 +954,7 @@ def create_quantile_regressions_results(
                                     regressions_info[dependent_variable][
                                         regression.id
                                     ].append(regression_info)
-
+                                    regression_info.store(name_tag_folder)
                                     group_regressions.append(regression.coeffs)
                                 group_regressions = pd.concat(group_regressions, axis=1)
                                 quadratic_regressions.append(group_regressions)
