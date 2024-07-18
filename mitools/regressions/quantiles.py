@@ -20,7 +20,7 @@ from tqdm.notebook import tqdm
 from mitools.economic_complexity import StringMapper
 from mitools.pandas import idxslice
 from mitools.regressions import generate_hash_from_dataframe
-from mitools.utils import auto_adjust_columns_width
+from mitools.utils import auto_adjust_sheet_columns_width
 
 warnings.simplefilter("ignore")
 Color = Union[Tuple[int, int, int], str]
@@ -622,11 +622,11 @@ def get_quantile_regression_results_stats(
 
 
 def process_result_wrappers_coeffs(
-    results: Dict[int, RegressionResultsWrapper],
+    results: Dict[int, RegressionResultsWrapper], t_value: Optional[bool] = True
 ) -> DataFrame:
     return pd.concat(
         [
-            process_quantile_regression_coeffs_result(q, result)
+            process_quantile_regression_coeffs_result(q, result, t_value)
             for q, result in results.items()
         ],
         axis=1,
@@ -732,22 +732,24 @@ def add_id_and_reorder_regression_coeffs(regression_coeffs: DataFrame) -> DataFr
 
 
 def process_quantile_regression_coeffs_result(
-    q: float, result: RegressionResultsWrapper
+    q: float, result: RegressionResultsWrapper, t_values: Optional[bool] = True
 ) -> DataFrame:
     coeffs = pd.concat(pd.read_html(result.summary().tables[1].as_html(), header=0))
     coeffs = coeffs.set_index(QuantileRegStrs.UNNAMED)
     coeffs[QuantileRegStrs.VALUE] = coeffs[
         [QuantileRegStrs.COEF, QuantileRegStrs.T_VALUE, QuantileRegStrs.P_VALUE]
-    ].apply(quantile_regression_value, axis=1)
+    ].apply(quantile_regression_value, args=(t_values,), axis=1)
     coeffs = coeffs[[QuantileRegStrs.VALUE]]
     coeffs.columns = pd.MultiIndex.from_tuples([(str(q), c) for c in coeffs.columns])
     return coeffs
 
 
 def get_quantile_regression_results_coeffs(
-    results: Dict[int, RegressionResultsWrapper], independent_variables: List[str]
+    results: Dict[int, RegressionResultsWrapper],
+    independent_variables: List[str],
+    t_values: Optional[bool] = True,
 ) -> DataFrame:
-    regression_coeffs = process_result_wrappers_coeffs(results)
+    regression_coeffs = process_result_wrappers_coeffs(results, t_values)
     regression_coeffs = melt_and_rename_regression_coeffs(regression_coeffs)
     regression_coeffs = update_regression_coeffs_independent_vars(regression_coeffs)
     regression_coeffs = set_regression_coeffs_info(
@@ -761,18 +763,18 @@ def get_quantile_regression_results_coeffs(
     return regression_coeffs
 
 
-def quantile_regression_value(row: Series) -> Series:
-    coeff = round(row[QuantileRegStrs.COEF], 5)
-    t_value = round(row[QuantileRegStrs.T_VALUE], 5)
+def quantile_regression_value(row: Series, t_values: Optional[bool] = True) -> Series:
+    coeff = round(row[QuantileRegStrs.COEF], 3)
+    t_value = round(row[QuantileRegStrs.T_VALUE], 3)
     p_value = row[QuantileRegStrs.P_VALUE]
     if p_value <= 0.001:
-        return f"{coeff}({t_value})***"
+        return f"{coeff}({t_value})***" if t_values else f"{coeff}***"
     elif p_value <= 0.01:
-        return f"{coeff}({t_value})**"
+        return f"{coeff}({t_value})**" if t_values else f"{coeff}**"
     elif p_value <= 0.05:
-        return f"{coeff}({t_value})*"
+        return f"{coeff}({t_value})*" if t_values else f"{coeff}*"
     else:
-        return f"{coeff}({t_value})"
+        return f"{coeff}({t_value})" if t_values else f"{coeff}"
 
 
 def get_quantile_regression_results(
@@ -996,7 +998,7 @@ def create_quantile_regressions_results(
                     book = openpyxl.load_workbook(dep_var_name_excel)
                     for sheet_name in book.sheetnames:
                         sheet = book[sheet_name]
-                        auto_adjust_columns_width(sheet)
+                        auto_adjust_sheet_columns_width(sheet)
                     book.save(dep_var_name_excel)
     return regressions, regressions_info
 
