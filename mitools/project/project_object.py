@@ -34,6 +34,14 @@ class Project:
     def create_version_folder(self) -> None:
         self.version_folder.mkdir(parents=True, exist_ok=True)
 
+    def create_version(self, version: str) -> None:
+        version_path = self.version_folder / version
+        if not version_path.exists():
+            version_path.mkdir(parents=True, exist_ok=True)
+            self.update_info()
+        else:
+            raise ValueError(f"Version {version} already exists in Project {self.name}")
+
     def update_version(self, version: str) -> None:
         self.version = version
         self.version_folder = self.folder / self.version
