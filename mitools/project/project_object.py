@@ -224,8 +224,8 @@ class Project:
         self.update_info()
         self.store_project()
 
-    def add_var(self, key: str, value: Any) -> None:
-        if key in self.vars:
+    def add_var(self, key: str, value: Any, overwrite: bool) -> None:
+        if key in self.vars and not overwrite:
             raise ValueError(
                 f"Key '{key}' already exists in self.vars. Use update_var() to modify existing variables."
             )
