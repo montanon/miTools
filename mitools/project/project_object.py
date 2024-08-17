@@ -2,7 +2,7 @@ import pickle
 import shutil
 from os import PathLike
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from ..files import folder_in_subtree, folder_is_subfolder
 from ..utils import build_dir_tree
@@ -35,7 +35,7 @@ class Project:
         self.version_folder.mkdir(parents=True, exist_ok=True)
 
     def create_version(self, version: str) -> None:
-        version_path = self.version_folder / version
+        version_path = self.folder / version
         if not version_path.exists():
             version_path.mkdir(parents=True, exist_ok=True)
             self.update_info()
@@ -223,3 +223,20 @@ class Project:
         self.update_version(new_version)
         self.update_info()
         self.store_project()
+
+    def add_var(self, key: str, value: Any) -> None:
+        if key in self.vars:
+            raise ValueError(
+                f"Key '{key}' already exists in self.vars. Use update_var() to modify existing variables."
+            )
+        self.vars[key] = value
+        self.store_project()
+        print(f"Added '{key}' to project variables and stored the project.")
+
+    def try_add_var(self, key: str, value: Any) -> None:
+        if key in self.vars:
+            print(
+                f"Key '{key}' already exists in self.vars. Use update_var() to modify existing variables."
+            )
+        else:
+            self.add_var(key, value)
