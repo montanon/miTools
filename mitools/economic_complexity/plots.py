@@ -6,6 +6,7 @@ from string import ascii_uppercase, digits
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import matplotlib.lines as mlines
+import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -836,6 +837,7 @@ def remove_ylabel_for_non_leftmost(axes):
     for ax in axes.flat:
         if ax.get_subplotspec().colspan.start > 0:
             ax.set_ylabel("")
+    return axes
 
 
 def log_tick_formatter(val, pos):
@@ -901,7 +903,7 @@ def format_axes(
             axis_title_fontsize,
             axis_tick_fontsize,
         )
-    remove_ylabel_for_non_leftmost(axes)
+    axes = remove_ylabel_for_non_leftmost(axes)
     for ax in axes.flat:
         set_log_scale(ax)
     if axes_to_remove > 0:
@@ -1105,7 +1107,7 @@ def regression_coefficients_plots(
             group,
         )
 
-    remove_ylabel_for_non_leftmost(axes)
+    axes = remove_ylabel_for_non_leftmost(axes)
 
     linestyle_handles, significance_labels = create_regression_legend_handles_labels(
         linear_significance_linestyles, quadratic_significance_colors
@@ -1129,6 +1131,271 @@ def regression_coefficients_plots(
 
     adjust_figure_size(fig, width_mm)
 
+    plt.tight_layout()
+
+    return axes
+
+
+def get_pci_quantiles(pcis, quantiles=[0.05, 0.5, 0.95]):
+    return {q: pcis.quantile(q) for q in quantiles}
+
+
+def pci_quantiles_to_str(pci_quantiles):
+    str_mapping = {0.05: "5%", 0.5: "Mean", 0.95: "95%"}
+    return {
+        q: f"{str_mapping.get(q, q)} PCI:\n {quantile:.3f}"
+        for q, quantile in pci_quantiles.items()
+    }
+
+
+def get_closest_products_to_pci_quantiles(products_data, pci_quantiles, n_products=3):
+    return {
+        q: products_data.iloc[
+            (products_data["PCI"] - pci_quantiles[q]).abs().argsort()[:n_products]
+        ]["HS6"].values
+        for q, pci in pci_quantiles.items()
+    }
+
+
+def plot_sector_products(
+    sector_products,
+    sector,
+    color,
+    vline_width,
+    products_fontsize,
+    ticks_fontsize,
+    n_products=3,
+    ax=None,
+    pci_bins=None,
+):
+    ax.set_title(sector, fontsize=22)
+
+    pci_quantiles = get_pci_quantiles(sector_products["PCI"])
+    pci_quantiles_str = pci_quantiles_to_str(pci_quantiles)
+    quantiles_products = get_closest_products_to_pci_quantiles(
+        sector_products, pci_quantiles, n_products=n_products
+    )
+
+    ax.hist(sector_products["PCI"], bins=pci_bins, color=color, alpha=0.65)
+
+    sector_quantiles_str_loc = {
+        "Agriculture": {
+            0.05: (-0.085, 0.75, "right"),
+            0.5: (-0.085, 0.75, "right"),
+            0.95: (0.085, 0.75, "left"),
+        },
+        "Electronics & Instruments": {
+            0.05: (-0.085, 0.75, "right"),
+            0.5: (-0.085, 0.75, "right"),
+            0.95: (0.085, 0.75, "left"),
+        },
+        "Fishing": {
+            0.05: (-0.085, 0.75, "right"),
+            0.5: (0.085, 0.75, "left"),
+            0.95: (0.085, 0.75, "left"),
+        },
+        "Food & Beverages": {
+            0.05: (-0.085, 0.75, "right"),
+            0.5: (-0.085, 0.75, "right"),
+            0.95: (0.085, 0.75, "left"),
+        },
+        "Iron & Steel": {
+            0.05: (-0.085, 0.75, "right"),
+            0.5: (-0.085, 0.75, "right"),
+            0.95: (0.085, 0.75, "left"),
+        },
+        "Machinery": {
+            0.05: (-0.085, 0.75, "right"),
+            0.5: (-0.085, 0.75, "right"),
+            0.95: (0.085, 0.75, "left"),
+        },
+        "Metal Products": {
+            0.05: (-0.085, 0.75, "right"),
+            0.5: (-0.085, 0.75, "right"),
+            0.95: (0.085, 0.75, "left"),
+        },
+        "Mining & Quarrying": {
+            0.05: (-0.085, 0.75, "right"),
+            0.5: (-0.085, 0.75, "right"),
+            0.95: (0.085, 0.75, "left"),
+        },
+        "Other Manufacturing": {
+            0.05: (-0.085, 0.75, "right"),
+            0.5: (-0.085, 0.75, "right"),
+            0.95: (0.085, 0.75, "left"),
+        },
+        "Petroleum, Chemicals & Non-Metals": {
+            0.05: (-0.085, 0.75, "right"),
+            0.5: (-0.085, 0.75, "right"),
+            0.95: (0.085, 0.75, "left"),
+        },
+        "Textiles & Wearing Apparel": {
+            0.05: (-0.085, 0.75, "right"),
+            0.5: (0.085, 0.75, "left"),
+            0.95: (0.085, 0.75, "left"),
+        },
+        "Wood & Paper": {
+            0.05: (-0.085, 0.75, "right"),
+            0.5: (-0.085, 0.75, "right"),
+            0.95: (0.085, 0.75, "left"),
+        },
+    }
+    quantiles_str_loc = (
+        sector_quantiles_str_loc[sector]
+        if sector != "All Sectors"
+        else {
+            0.05: (-0.085, 0.75, "right"),
+            0.5: (-0.085, 0.75, "right"),
+            0.95: (0.085, 0.75, "left"),
+        }
+    )
+
+    products_valignment = [0.7, 0.475, 0.275]
+
+    for q, quantile in pci_quantiles.items():
+        ax.axvline(quantile, color="k", linestyle="--", linewidth=vline_width)
+        ax.text(
+            quantile + quantiles_str_loc[q][0],
+            ax.get_ylim()[1] * quantiles_str_loc[q][1],
+            pci_quantiles_str[q],
+            color="k",
+            ha=quantiles_str_loc[q][2],
+            fontsize=products_fontsize,
+            fontweight="bold",
+        )
+        for n, product in enumerate(quantiles_products[q]):
+            ax.text(
+                quantile + quantiles_str_loc[q][0],
+                ax.get_ylim()[1] * products_valignment[n],
+                stretch_string(f"- {product}", 18),
+                color="k",
+                ha=quantiles_str_loc[q][2],
+                va="top",
+                fontsize=products_fontsize,
+            )
+
+    ax.tick_params(axis="x", labelsize=ticks_fontsize)
+    ax.tick_params(axis="y", labelsize=ticks_fontsize)
+
+    legend_handles = [mpatches.Patch(color=color, label=sector)]
+    ax.legend(handles=legend_handles, fontsize=products_fontsize, loc="upper left")
+
+    return ax
+
+
+def calculate_pci_bins(products_data, pci_gap_scale, pci_n_bins):
+    pci = products_data["PCI"]
+    global_min = pci.min() * pci_gap_scale
+    global_max = pci.max() * pci_gap_scale
+    pci_bins = np.linspace(global_min, global_max, pci_n_bins)
+    return pci, global_min, global_max, pci_bins
+
+
+def set_axes_limits(axes, global_min, global_max):
+    for ax in axes.flat:
+        ax.set_xlim(global_min, global_max)
+    return axes
+
+
+def plot_background_histograms(axes, pci, pci_bins):
+    for ax in axes.flat:
+        ax.hist(pci, bins=pci_bins, color="lightgray", alpha=0.65)
+        ax.legend().remove()
+    return axes
+
+
+def plot_sector_products_on_axes(
+    axes,
+    sectors,
+    products_data,
+    n_products,
+    colors,
+    vline_width,
+    axis_tick_fontsize,
+    axis_label_fontsize,
+    axis_title_fontsize,
+    pci_bins,
+):
+    for n, (ax, sector) in enumerate(zip(axes.flat, sectors)):
+        ax = plot_sector_products(
+            products_data.loc[products_data["Sector"] == sector],
+            sector,
+            colors[sector],
+            vline_width,
+            axis_tick_fontsize,
+            axis_label_fontsize,
+            n_products=n_products,
+            ax=ax,
+            pci_bins=pci_bins,
+        )
+        ax.set_title("")
+        ax.set_title(
+            f"{string.ascii_lowercase[n]}) {sector} Sector PCI Histogram:",
+            fontsize=axis_title_fontsize,
+            loc="left",
+        )
+    return axes
+
+
+def set_distribution_axes_labels(axes, axis_label_fontsize):
+    for ax in axes.flat:
+        ax.set_xlabel("PCI", fontsize=axis_label_fontsize)
+        ax.set_ylabel("N° Products", fontsize=axis_label_fontsize)
+    return axes
+
+
+def plot_sectors_pci_distribution(
+    sectors,
+    products_data,
+    n_products,
+    pci_gap_scale,
+    pci_n_bins,
+    colors,
+    vline_width,
+    axis_tick_fontsize,
+    axis_label_fontsize,
+    axis_title_fontsize,
+    figure_suptitle_fontsize,
+    a4_width_inch,
+    a4_height_inch,
+):
+    ncols = 2
+    nrows = ceil(len(sectors) / ncols)
+
+    fig, axes = plt.subplots(
+        nrows, ncols, figsize=(a4_width_inch * 3 * 1.35, a4_height_inch * 3 * 1.335)
+    )
+
+    pci, global_min, global_max, pci_bins = calculate_pci_bins(
+        products_data, pci_gap_scale, pci_n_bins
+    )
+    axes = set_axes_limits(axes, global_min, global_max)
+
+    axes = plot_background_histograms(axes, pci, pci_bins)
+    axes = plot_sector_products_on_axes(
+        axes,
+        sectors,
+        products_data,
+        n_products,
+        colors,
+        vline_width,
+        axis_tick_fontsize,
+        axis_label_fontsize,
+        axis_title_fontsize,
+        pci_bins,
+    )
+
+    axes = set_distribution_axes_labels(axes, axis_label_fontsize)
+
+    axes = remove_ylabel_for_non_leftmost(axes)
+
+    fig.suptitle(
+        "Product Complexity Indexes Distribution by Sector",
+        fontsize=figure_suptitle_fontsize,
+        y=1.0,
+    )
+
+    adjust_figure_size(fig, 180.0 * 3.75)
     plt.tight_layout()
 
     return axes
