@@ -832,9 +832,10 @@ def plot_income_levels_ecis_indicator_scatter(
     return axes
 
 
-def remove_ylabel_for_non_leftmost(ax):
-    if ax.get_subplotspec().colspan.start > 0:
-        ax.set_ylabel("")
+def remove_ylabel_for_non_leftmost(axes):
+    for ax in axes.flat:
+        if ax.get_subplotspec().colspan.start > 0:
+            ax.set_ylabel("")
 
 
 def log_tick_formatter(val, pos):
@@ -900,8 +901,7 @@ def format_axes(
             axis_title_fontsize,
             axis_tick_fontsize,
         )
-    for ax in axes.flat:
-        remove_ylabel_for_non_leftmost(ax)
+    remove_ylabel_for_non_leftmost(axes)
     for ax in axes.flat:
         set_log_scale(ax)
     if axes_to_remove > 0:
@@ -965,4 +965,170 @@ def format_eci_scatter_plot(
     adjust_figure_size(fig, width_mm)
 
     plt.tight_layout()
+    return axes
+
+
+def calculate_regression_predictions(
+    var_coeffs,
+    x_axis,
+    group,
+    v,
+    colors,
+    linear_significane_linestyles,
+    quadratic_significance_colors,
+):
+    predictions = []
+    for q, color in zip(var_coeffs.columns.get_level_values("Quantile"), colors):
+        q_coeffs = var_coeffs.loc[:, [(group, q)]].droplevel([0, 1, 2, 3, 4])
+        significances = q_coeffs[(group, q)].str.count("\*")
+
+        x_value = float(q_coeffs.loc[v, :].str.split("(", expand=True)[0].values[0])
+        x_sq_value = float(
+            q_coeffs.loc[f"{v}_square", :].str.split("(", expand=True)[0].values[0]
+        )
+
+        pred = x_value * x_axis + x_sq_value * x_axis**2 + q
+        style = linear_significane_linestyles[significances.loc[v]]
+        color = quadratic_significance_colors[significances.loc[f"{v}_square"]]
+
+        predictions.append((pred, style, color))
+    return predictions
+
+
+def plot_regression_predictions(ax, predictions, x_axis):
+    for pred, style, color in predictions:
+        ax.plot(x_axis, pred, color=color, linestyle=style, linewidth=3)
+
+
+def set_regression_axis_properties(
+    ax, letter, v, axis_title_fontsize, axis_tick_fontsize, axis_label_fontsize, group
+):
+    ax.set_title(
+        f"{letter}) {v.replace(' SCI', ' Sector')}:",
+        fontsize=axis_title_fontsize,
+        loc="left",
+    )
+    ax.set_yticks(np.arange(0.1, 1.0, 0.1))
+    ax.set_yticklabels(
+        [f"{round(t, 1)} Q" for t in np.arange(0.1, 1.0, 0.1)],
+        fontsize=axis_tick_fontsize,
+    )
+    ax.set_xticks([])
+    ax.set_ylabel(
+        r"$\mathrm{CO}_2\,\mathrm{emissions\ (metric\ tons\ per\ capita)}_{log}$",
+        fontsize=axis_label_fontsize,
+    )
+    ax.set_xlabel(r"$\mathrm{SCI}$", fontsize=axis_label_fontsize)
+    ax.set_xlim(0, 1.0 if group != "Low income" else 0.6)
+
+
+def create_regression_legend_handles_labels(
+    linear_significane_linestyles, quadratic_significance_colors
+):
+    significance_levels = [0, 1, 2, 3]
+    significance_labels = [
+        r"$\chi(-)$",
+        r"$\chi({*})$",
+        r"$\chi({*}{*})$",
+        r"$\chi({*}{*}{*})$",
+        r"$\chi^2(-)$",
+        r"$\chi^2({*})$",
+        r"$\chi^2({*}{*})$",
+        r"$\chi^2({*}{*}{*})$",
+    ]
+    linestyle_handles = [
+        mlines.Line2D(
+            [0],
+            [0],
+            color="black",
+            linestyle=linear_significane_linestyles[significance],
+            linewidth=3,
+        )
+        for significance in significance_levels
+    ] + [
+        mlines.Line2D([0], [0], color=color, linestyle="-", linewidth=3)
+        for color in quadratic_significance_colors.values()
+    ]
+    return linestyle_handles, significance_labels
+
+
+def reorder_regression_legend_handles_labels(linestyle_handles, significance_labels):
+    reorder_indices = [0, 4, 1, 5, 2, 6, 3, 7]
+    reordered_handles = [linestyle_handles[n] for n in reorder_indices]
+    reordered_labels = [significance_labels[v] for v in reorder_indices]
+    return reordered_handles, reordered_labels
+
+
+def regression_coefficients_plots(
+    coeffs,
+    group,
+    sci_labels,
+    colors,
+    width_mm,
+    linear_significance_linestyles,
+    quadratic_significance_colors,
+    nrows,
+    ncols,
+    axis_title_fontsize,
+    axis_tick_fontsize,
+    axis_label_fontsize,
+    axis_legend_fontsize,
+    figure_suptitle_fontsize,
+):
+    fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(9 * ncols, 8 * nrows))
+    x_axis = (
+        np.arange(0, 1.01, 0.01) if group != "Low income" else np.arange(0, 0.61, 0.01)
+    )
+    group_coeffs = coeffs[group].coefficients_quantiles_table()
+
+    for letter, ax, v in zip(string.ascii_lowercase, axes.flat, sci_labels):
+        var_coeffs = group_coeffs.loc[
+            [v in i for i in group_coeffs.index.get_level_values("Independent Vars")], :
+        ]
+        predictions = calculate_regression_predictions(
+            var_coeffs,
+            x_axis,
+            group,
+            v,
+            colors,
+            linear_significance_linestyles,
+            quadratic_significance_colors,
+        )
+        plot_regression_predictions(ax, predictions, x_axis)
+        set_regression_axis_properties(
+            ax,
+            letter,
+            v,
+            axis_title_fontsize,
+            axis_tick_fontsize,
+            axis_label_fontsize,
+            group,
+        )
+
+    remove_ylabel_for_non_leftmost(axes)
+
+    linestyle_handles, significance_labels = create_regression_legend_handles_labels(
+        linear_significance_linestyles, quadratic_significance_colors
+    )
+    reordered_handles, reordered_labels = reorder_regression_legend_handles_labels(
+        linestyle_handles, significance_labels
+    )
+    fig.legend(
+        reordered_handles,
+        reordered_labels,
+        loc="lower center",
+        fontsize=axis_legend_fontsize,
+        ncol=4,
+        bbox_to_anchor=(0.5, -0.05),
+    )
+    axes.flat[0].get_figure().suptitle(
+        f"Quantile Regressions of Each Sector for {group} grouping.",
+        fontsize=figure_suptitle_fontsize,
+        y=1.005,
+    )
+
+    adjust_figure_size(fig, width_mm)
+
+    plt.tight_layout()
+
     return axes
