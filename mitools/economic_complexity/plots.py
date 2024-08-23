@@ -1,5 +1,6 @@
 import random
 import statistics
+import string
 from math import ceil
 from string import ascii_uppercase, digits
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -11,6 +12,7 @@ import pandas as pd
 import seaborn as sns
 from matplotlib.axes import Axes
 from matplotlib.patches import ArrowStyle, FancyArrowPatch
+from matplotlib.ticker import FuncFormatter
 from pandas import DataFrame
 from scipy.spatial.distance import squareform
 
@@ -477,6 +479,61 @@ def proximity_matrix_histogram(proximity_matrix, tag=""):
     axes[-1].set_title(f"{tag} - Non-Zero Proximity Values from Condensed Matrix")
 
 
+def plot_countries_ecis_indicators_scatter(
+    data: DataFrame,
+    income_level: str,
+    y_var_col: str,
+    name_tag: str,
+    n_steps: int,
+    n_cols: int,
+    groups: List[str],
+    groups_col: Optional[str] = "Income Group",
+    entity_col: Optional[str] = "Country",
+    time_col: Optional[str] = "Year",
+    year_labels: Optional[bool] = False,
+    colors: Optional[List[Color]] = None,
+    groups_colors: Optional[Dict[str, Color]] = None,
+    figsize: Optional[Tuple[float, float]] = (7, 7),
+    arrows: Optional[bool] = False,
+    arrow_style: Optional[bool] = None,
+    arrow_kwargs: Optional[Dict[str, Any]] = None,
+    set_arrows_ax_limits: Optional[bool] = False,
+    marker_kwargs: Optional[Dict[str, Any]] = None,
+    axes: Optional[Axes] = None,
+):
+    x_vars_cols = [c for c in data.columns if c.endswith(f" {name_tag}")]
+    if income_level != "All income":
+        _data = data.loc[pd.IndexSlice[:, :, income_level, :, :], :].copy(deep=True)
+    else:
+        _data = data
+    countries = _data.index.get_level_values("Country").unique().tolist()
+    axes = plot_countries_ecis_indicator_scatter(
+        data=_data,
+        entities=countries,
+        x_vars_cols=x_vars_cols,
+        y_var_col=y_var_col,
+        name_tag=name_tag,
+        groups=groups,
+        groups_col=groups_col,
+        entity_col=entity_col,
+        time_col=time_col,
+        n_steps=n_steps,
+        ncols=n_cols,
+        year_labels=year_labels,
+        colors=colors,
+        groups_colors=groups_colors,
+        figsize=figsize,
+        arrows=arrows,
+        arrow_style=arrow_style,
+        arrow_kwargs=arrow_kwargs,
+        set_arrows_ax_limits=set_arrows_ax_limits,
+        marker_kwargs=marker_kwargs,
+        axes=axes,
+    )
+
+    return axes
+
+
 def plot_countries_ecis_indicator_scatter(
     data: DataFrame,
     entities: List[str],
@@ -500,7 +557,7 @@ def plot_countries_ecis_indicator_scatter(
     marker_kwargs: Optional[Dict[str, Any]] = None,
     axes: Optional[Axes] = None,
 ) -> Axes:
-    nrows = ceil((len(x_vars_cols) + 1) / ncols)
+    nrows = ceil((len(x_vars_cols)) / ncols)
     if axes is None:
         _, axes = plt.subplots(
             nrows=nrows, ncols=ncols, figsize=(figsize[0] * ncols, figsize[1] * nrows)
@@ -772,4 +829,140 @@ def plot_income_levels_ecis_indicator_scatter(
             axes=axes.flat[n::ncols],
         )
     axes = adjust_axes_lims(axes, **adjust_axes_lims_kwargs)
+    return axes
+
+
+def remove_ylabel_for_non_leftmost(ax):
+    if ax.get_subplotspec().colspan.start > 0:
+        ax.set_ylabel("")
+
+
+def log_tick_formatter(val, pos):
+    return f"$10^{{{int(val)}}}$"
+
+
+def set_labels_and_titles(ax, letter, new_xlabel, label_size, title_size, tick_size):
+    ax.set_xlabel(r"$\mathrm{SCI}_{log}$", fontsize=label_size)
+    ax.set_ylabel(
+        r"$\mathrm{CO}_2\,\mathrm{emissions\ (metric\ tons\ per\ capita)}_{log}$",
+        fontsize=label_size,
+    )
+    new_title = new_xlabel.replace(" SCI", " Sector").replace("\n", "")
+    ax.set_title(f"{letter}) {new_title}:", fontsize=title_size, loc="left")
+    ax.tick_params(axis="both", labelsize=tick_size)
+
+
+def set_log_scale(ax):
+    ax.xaxis.set_major_formatter(FuncFormatter(log_tick_formatter))
+    ax.set_xticks([-3, -2, -1, 0])
+
+
+def create_legend(fig, income_colors, legend_fontsize):
+    legend_handles = [
+        mlines.Line2D(
+            [],
+            [],
+            color=color,
+            marker="o",
+            linestyle="None",
+            markersize=12,
+            markeredgecolor="k",
+            label=label,
+        )
+        for label, color in income_colors.items()
+    ]
+    fig.legend(
+        handles=legend_handles,
+        loc="lower center",
+        bbox_to_anchor=(0.5, -0.025),
+        fontsize=legend_fontsize,
+        ncol=4,
+    )
+
+
+def format_axes(
+    axes,
+    axis_label_fontsize,
+    axis_tick_fontsize,
+    axis_title_fontsize,
+    legend_fontsize,
+    new_labels,
+    income_colors,
+    axes_to_remove,
+    relevant_axes,
+):
+    for letter, ax, new_xlabel in zip(string.ascii_lowercase, axes.flat, new_labels):
+        set_labels_and_titles(
+            ax,
+            letter,
+            new_xlabel,
+            axis_label_fontsize,
+            axis_title_fontsize,
+            axis_tick_fontsize,
+        )
+    for ax in axes.flat:
+        remove_ylabel_for_non_leftmost(ax)
+    for ax in axes.flat:
+        set_log_scale(ax)
+    if axes_to_remove > 0:
+        for ax in axes.flat[-axes_to_remove:]:
+            ax.remove()
+    for ax in axes.flat[relevant_axes:]:
+        if ax is not None:
+            ax.clear()
+            ax.axis("off")
+    create_legend(axes.flat[0].get_figure(), income_colors, legend_fontsize)
+    return axes
+
+
+def adjust_figure_size(fig, width_mm):
+    current_width, current_height = fig.get_size_inches()
+    aspect_ratio = current_height / current_width
+    new_width_inches = width_mm / 25.4
+    new_height_inches = new_width_inches * aspect_ratio
+    fig.set_size_inches(new_width_inches, new_height_inches)
+
+
+def adjust_axes_alpha(axes, alpha):
+    for ax in axes.flat:
+        for line in ax.get_lines():
+            line.set_alpha(alpha)
+    return axes
+
+
+def format_eci_scatter_plot(
+    axes,
+    new_labels,
+    axis_label_fontsize,
+    axis_tick_fontsize,
+    axis_title_fontsize,
+    axis_legend_fontsize,
+    figure_suptitle_fontsize,
+    income_colors,
+    width_mm,
+    axes_to_remove,
+    relevant_axes,
+):
+    axes = format_axes(
+        axes,
+        axis_label_fontsize,
+        axis_tick_fontsize,
+        axis_title_fontsize,
+        axis_legend_fontsize,
+        new_labels,
+        income_colors,
+        axes_to_remove,
+        relevant_axes,
+    )
+
+    fig = axes.flat[0].get_figure()
+    fig.suptitle(
+        "Economic Sectors SCI vs CO2 Emissions for all countries in log scale",
+        fontsize=figure_suptitle_fontsize,
+        y=1.005,
+    )
+
+    adjust_figure_size(fig, width_mm)
+
+    plt.tight_layout()
     return axes
