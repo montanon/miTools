@@ -305,3 +305,8 @@ def save_dataframes_to_excel(
     with pd.ExcelWriter(filename, engine="xlsxwriter") as writer:
         for sheet_name, dataframe in dataframes_dict.items():
             dataframe.to_excel(writer, sheet_name=sheet_name)
+
+
+def read_html_file(file_path: PathLike) -> str:
+    with open(file_path, "r", encoding="utf-8") as file:
+        return file.read()
