@@ -1,23 +1,30 @@
 import random
 import statistics
 import string
+from io import BytesIO
 from math import ceil
+from pathlib import Path
 from string import ascii_uppercase, digits
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
+import cairosvg
 import matplotlib.lines as mlines
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from bs4 import BeautifulSoup
 from matplotlib.axes import Axes
+from matplotlib.offsetbox import AnnotationBbox, OffsetImage
 from matplotlib.patches import ArrowStyle, FancyArrowPatch
 from matplotlib.ticker import FuncFormatter
 from pandas import DataFrame
+from PIL import Image
 from scipy.spatial.distance import squareform
 
-from ..pandas import idxslice
+from ..country_converter import cc
+from ..pandas import idxslice, quantize_group
 from ..utils import stretch_string
 from ..visuals import (
     adjust_axes_lims,
@@ -1399,3 +1406,104 @@ def plot_sectors_pci_distribution(
     plt.tight_layout()
 
     return axes
+
+
+def extract_svg_country_mapping(html_content):
+    soup = BeautifulSoup(html_content, "lxml")
+    container = soup.find("div", class_="container")
+
+    svg_country_dict = {}
+
+    for div in container.find_all("div"):
+        img = div.find("img")
+        country = div.find("p").get_text(strip=True).split(" (")[0].strip()
+        country = cc.convert(country, to="name_short")
+        svg_file = Path(img["src"]).name
+        svg_country_dict[country] = svg_file
+
+    return svg_country_dict
+
+
+def add_svg_marker(country, x, y, flags_folder_path, flag_country_dict, ax, zoom=0.1):
+    flag_path = flags_folder_path / flag_country_dict[country]
+    png_data = cairosvg.svg2png(url=str(flag_path))
+    image = Image.open(BytesIO(png_data))
+    im = OffsetImage(image, zoom=zoom)
+    ab = AnnotationBbox(im, (x, y), frameon=False)
+    ax.add_artist(ab)
+
+
+def scatter_countries_plot(
+    data,
+    years,
+    x,
+    y,
+    flags_folder,
+    income_level,
+    all_income,
+    flag_country_dict,
+    ax=None,
+    figsize=(21, 14),
+    zoom=0.035,
+    title_fontsize=18,
+    labels_fontsize=16,
+    ticks_fontsize=10,
+    marker: Optional[Literal["flag", "name"]] = "flag",
+    size_col=None,
+    size_bins=5,
+):
+    plot_data = data.loc[
+        (data.index.get_level_values("Year").isin(years) if years else data.index)
+    ]
+    if income_level != all_income:
+        plot_data = plot_data.loc[
+            plot_data.index.get_level_values("Income Group") == income_level,
+            [y, x, size_col] if size_col else [y, x],
+        ]
+    else:
+        plot_data = plot_data[[y, x, size_col] if size_col else [y, x]]
+    size_data = plot_data[[size_col]] if size_col else None
+    if size_col:
+        quantized_size = (
+            size_data.groupby(level="Year")
+            .apply(quantize_group, column=size_col, N=size_bins)
+            .droplevel(0)
+        )
+        quantized_size = quantized_size * zoom
+    plot_data = plot_data[[x, y]]
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
+    ax.scatter(plot_data[x], plot_data[y], alpha=0)
+    for idx in plot_data.index:
+        x_values = plot_data.loc[idx, x]
+        y_values = plot_data.loc[idx, y]
+        if marker == "flag":
+            add_svg_marker(
+                idx[1],
+                x_values,
+                y_values,
+                flags_folder,
+                flag_country_dict,
+                ax,
+                zoom=quantized_size.loc[idx, size_col] if size_col else zoom,
+            )
+        elif marker == "name":
+            country = stretch_string(idx[1], 13)
+            text = ax.text(
+                x_values,
+                y_values,
+                country,
+                color="k",
+                ha="center",
+                va="center",
+                fontsize=12,
+            )
+            text.set_bbox(dict(facecolor="white", edgecolor="none", pad=5, alpha=0.66))
+    ax.set_xlabel(x, fontsize=labels_fontsize)
+    ax.set_ylabel(y, fontsize=labels_fontsize)
+    ax.set_facecolor("#c8c8c8")
+    ax.tick_params(axis="x", labelsize=ticks_fontsize)
+    ax.tick_params(axis="y", labelsize=ticks_fontsize)
+    ax.grid(True, which="both", linestyle="--", linewidth=0.5, color="black")
+    ax.set_title(f"{y} vs {x} for {income_level} countries", fontsize=title_fontsize)
+    return ax
