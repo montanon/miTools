@@ -847,6 +847,14 @@ def remove_ylabel_for_non_leftmost(axes):
     return axes
 
 
+def remove_xlabel_for_non_bottom(axes):
+    total_rows = axes.shape[0]
+    for ax in axes.flat:
+        if ax.get_subplotspec().rowspan.stop < total_rows:
+            ax.set_xlabel("")
+    return axes
+
+
 def log_tick_formatter(val, pos):
     return f"$10^{{{int(val)}}}$"
 
@@ -1506,4 +1514,82 @@ def scatter_countries_plot(
     ax.tick_params(axis="y", labelsize=ticks_fontsize)
     ax.grid(True, which="both", linestyle="--", linewidth=0.5, color="black")
     ax.set_title(f"{y} vs {x} for {income_level} countries", fontsize=title_fontsize)
+    return ax
+
+
+def plot_export_pct_evolution_by_income(
+    exports,
+    income_level,
+    colors=None,
+    stacked=True,
+    ax=None,
+    label_fontsize=16,
+    title_fontsize=24,
+):
+    if income_level != "All income":
+        exports_pct = exports.groupby(["Year", "Income Group", "Sector"])[
+            "Sector_Exports_pct"
+        ].agg(["mean", lambda x: x.quantile(0.25), lambda x: x.quantile(0.75)])
+        exports_pct.columns = ["mean", "q25", "q75"]
+        df_reset = (
+            exports_pct.loc[(slice(None), income_level), :].reset_index().reset_index()
+        )
+    else:
+        exports_pct = exports.groupby(["Year", "Sector"])["Sector_Exports_pct"].agg(
+            ["mean", lambda x: x.quantile(0.25), lambda x: x.quantile(0.75)]
+        )
+        exports_pct.columns = ["mean", "q25", "q75"]
+        df_reset = exports_pct.reset_index().reset_index()
+
+    df_pivot = df_reset.pivot(index="Year", columns="Sector", values="mean")
+    df_q05 = df_reset.pivot(index="Year", columns="Sector", values="q25")
+    df_q95 = df_reset.pivot(index="Year", columns="Sector", values="q75")
+
+    if colors:
+        plot_colors = [colors.get(sector, "#333333") for sector in df_pivot.columns]
+    else:
+        plot_colors = None
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(21, 7))
+    if stacked:
+        ax.stackplot(
+            df_pivot.index,
+            df_pivot.T,
+            labels=df_pivot.columns,
+            colors=plot_colors,
+            alpha=0.66,
+        )
+        ax.set_title(
+            f"Export Share by Sector for {income_level} Countries",
+            fontsize=title_fontsize,
+        )
+    else:
+        for sector in df_pivot.columns:
+            ax.plot(
+                df_pivot.index,
+                df_pivot[sector],
+                label=sector,
+                color=colors.get(sector, "#333333"),
+                marker="o",
+            )
+            ax.fill_between(
+                df_pivot.index,
+                df_q05[sector],
+                df_q95[sector],
+                color=colors.get(sector, "#333333"),
+                alpha=0.3,
+            )
+        ax.set_title(
+            f"Time Series Evolution of Export Percentages by Sector for {income_level} Countries"
+        )
+
+    ax.set_xlabel("Year", fontsize=label_fontsize)
+    ax.set_ylabel("Export Share (%) by Sector", fontsize=label_fontsize)
+
+    ax.set_yticks([0.1 * i for i in range(1, 11)])
+    ax.grid(True, which="both", axis="y", linestyle="--", linewidth=1.0, color="k")
+
+    ax.set_ylim(0.0, 1.0)
+    ax.set_xlim(1995, 2020)
+
     return ax
