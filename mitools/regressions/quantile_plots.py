@@ -11,10 +11,7 @@ from tqdm import tqdm
 from mitools.economic_complexity.plots import plot_income_levels_ecis_indicator_scatter
 from mitools.utils.helper_functions import stretch_string
 
-from ..visuals import (
-    adjust_axes_labels,
-    adjust_text_axes_limits,
-)
+from ..visuals import adjust_axes_labels, adjust_axes_lims, adjust_text_axes_limits
 from .quantiles import QuantileRegStrs, get_regression_predictions
 
 Color = Union[Tuple[int, int, int], str]
