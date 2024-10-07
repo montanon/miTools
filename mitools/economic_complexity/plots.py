@@ -862,10 +862,12 @@ def log_tick_formatter(val, pos):
 def set_labels_and_titles(ax, letter, new_xlabel, label_size, title_size, tick_size):
     ax.set_xlabel(r"$\mathrm{SCI}_{log}$", fontsize=label_size)
     ax.set_ylabel(
-        r"$\mathrm{CO}_2\,\mathrm{emissions\ (metric\ tons\ per\ capita)}_{log}$",
+        r"$\mathrm{CO}_2\,\mathrm{emissions}$"
+        + "\n"
+        + r"$\mathrm{(metric\ tons\ per\ capita)}_{log}$",
         fontsize=label_size,
     )
-    new_title = new_xlabel.replace(" SCI", " Sector").replace("\n", "")
+    new_title = new_xlabel.replace(" SCI", " Sector")
     ax.set_title(f"{letter}) {new_title}:", fontsize=title_size, loc="left")
     ax.tick_params(axis="both", labelsize=tick_size)
 
@@ -892,7 +894,7 @@ def create_legend(fig, income_colors, legend_fontsize):
     fig.legend(
         handles=legend_handles,
         loc="lower center",
-        bbox_to_anchor=(0.5, -0.025),
+        bbox_to_anchor=(0.5, -0.05),
         fontsize=legend_fontsize,
         ncol=4,
     )
@@ -974,14 +976,14 @@ def format_eci_scatter_plot(
 
     fig = axes.flat[0].get_figure()
     fig.suptitle(
-        "Economic Sectors SCI vs CO2 Emissions for all countries in log scale",
+        "Economic Sectors SCI vs CO2 Emissions for all countries across time in log scale",
         fontsize=figure_suptitle_fontsize,
         y=1.005,
     )
 
-    adjust_figure_size(fig, width_mm)
+    if width_mm:
+        adjust_figure_size(fig, width_mm)
 
-    plt.tight_layout()
     return axes
 
 
@@ -1591,5 +1593,165 @@ def plot_export_pct_evolution_by_income(
 
     ax.set_ylim(0.0, 1.0)
     ax.set_xlim(1995, 2020)
+
+    return ax
+
+
+def resize_image_mm(input_path, output_path, width_mm, dpi):
+    Image.MAX_IMAGE_PIXELS = None
+    width_px = int((width_mm / 25.4) * dpi)
+    with Image.open(input_path) as img:
+        aspect_ratio = img.height / img.width
+        new_height = int(width_px * aspect_ratio)
+        resized_img = img.resize((width_px, new_height), Image.LANCZOS)
+        resized_img.save(output_path, dpi=(dpi, dpi))
+    print(
+        f"Image resized to {width_mm}mm width and saved at {output_path} with {dpi} DPI."
+    )
+
+
+def extract_coefficients(
+    coefficients,
+    variables,
+    income_group,
+    q,
+    significance=False,
+    significance_threshold=3,
+):
+    variable_coeffs = coefficients.loc[
+        coefficients.index.get_level_values("Independent Vars").isin(variables), :
+    ]
+    coeffs_values = variable_coeffs.apply(lambda x: x.str.replace("*", "")).astype(
+        float
+    )
+    if significance:
+        coeffs_significances = variable_coeffs.apply(lambda x: x.str.count("\*"))
+        coeffs_values = coeffs_values.where(
+            coeffs_significances >= significance_threshold, 0.0
+        )
+
+    return coeffs_values.droplevel([0, 1, 2, 3, 4])[(income_group, q)]
+
+
+def prepare_prediction_data(
+    data, predicted_var, variables, sq_variables, control_variables, income_group
+):
+    prediction_data = data[
+        [predicted_var] + variables + sq_variables + control_variables
+    ].copy(deep=True)
+    if income_group != "All income":
+        prediction_data = prediction_data.loc[
+            prediction_data.index.get_level_values("Income Group") == income_group, :
+        ]
+
+    return prediction_data
+
+
+def calculate_predictions(
+    predicted_data,
+    variables_coeffs_values,
+    sq_variables_coeffs_values,
+    control_variables_coeffs_values,
+    intercept_coeffs_values,
+    variables,
+    sq_variables,
+    control_variables,
+    variables_group,
+):
+    predicted_data[variables] = predicted_data.mul(variables_coeffs_values, axis=1)[
+        variables
+    ]
+    predicted_data[sq_variables] = (predicted_data[sq_variables] ** 2).mul(
+        sq_variables_coeffs_values, axis=1
+    )[sq_variables]
+    predicted_data[control_variables] = predicted_data.mul(
+        control_variables_coeffs_values, axis=1
+    )[control_variables]
+
+    prediction_values = intercept_coeffs_values.values[0]
+    if variables_group in ["All", "SCI"]:
+        prediction_values += predicted_data[variables].sum(axis=1)
+        prediction_values += predicted_data[sq_variables].sum(axis=1)
+    if variables_group in ["All", "Control"]:
+        prediction_values += predicted_data[control_variables].sum(axis=1)
+
+    return prediction_values
+
+
+def plot_predictions_vs_actuals(
+    prediction_values,
+    values_to_predict,
+    predicted_var,
+    axis_label_fontsize=12,
+    axis_title_fontsize=14,
+    ax=None,
+    color="k",
+):
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(9, 9))
+
+    ax.plot(
+        prediction_values, values_to_predict, "o", color=color, markersize=2, alpha=0.35
+    )
+    ax.plot(
+        [min(values_to_predict), max(values_to_predict)],
+        [min(values_to_predict), max(values_to_predict)],
+        "r--",
+        lw=2,
+        label="x=y",
+    )
+    var_title = predicted_var.replace("_log", "").replace(" ", "\ ").split("\ (")[0]
+    ax.set_xlabel(
+        "Predicted $\mathrm{" + var_title + "}_{log}$", fontsize=axis_label_fontsize
+    )
+    ax.set_ylabel(
+        "Actual $\mathrm{" + var_title + "}_{log}$", fontsize=axis_label_fontsize
+    )
+    ax.grid(True, linestyle="--", alpha=0.7)
+    ax.set_title(
+        "Predicted vs. Actual $\mathrm{" + var_title + "}_{log}$",
+        fontsize=axis_title_fontsize,
+    )
+
+    r_squared = np.corrcoef(prediction_values, values_to_predict)[0, 1] ** 2
+    ax.text(
+        0.05,
+        0.95,
+        f"$R^2 = {r_squared:.2f}$",
+        transform=ax.transAxes,
+        fontsize=axis_label_fontsize,
+        verticalalignment="top",
+    )
+
+    return ax
+
+
+def plot_error_distribution(
+    prediction_values,
+    values_to_predict,
+    predicted_var,
+    axis_label_fontsize=12,
+    axis_title_fontsize=14,
+    ax=None,
+    color="k",
+):
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(9, 9))
+
+    errors = values_to_predict - prediction_values
+    sns.histplot(
+        errors, kde=True, ax=ax, color=color, stat="density", bins=30, alpha=0.6
+    )
+    ax.axvline(0, color="r", linestyle="--", lw=2, label="Error = 0")
+
+    var_title = predicted_var.replace("_log", "").replace(" ", "\ ").split("\ (")[0]
+    ax.set_xlabel("Errors (Actual - Predicted)", fontsize=axis_label_fontsize)
+    ax.set_ylabel("Density", fontsize=axis_label_fontsize)
+    ax.grid(True, linestyle="--", alpha=0.7)
+
+    ax.set_title(
+        "Error Distribution for $\mathrm{" + var_title + "}_{log}$",
+        fontsize=axis_title_fontsize,
+    )
 
     return ax
