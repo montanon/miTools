@@ -387,7 +387,7 @@ def create_regression_id(
     str_to_hash = " ".join(
         [
             regression_type,
-            regression_degree,
+            regression_degree if regression_degree else "linear",
         ]
     )
     id_hasher = hashlib.md5()
