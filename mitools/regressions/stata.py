@@ -114,12 +114,11 @@ def run_vce_corr_statistics():
 
 
 def get_transformed_variable(data: DataFrame, var: str, transformation: str) -> str:
-    if transformation in ["log", "square"]:
-        return (
-            f"{var}_{transformation}"
-            if f"{var}_{transformation}" in data.columns
-            else var
-        )
+    if transformation in ["log", "square", "boxcox"]:
+        if f"{var}_{transformation}" in data.columns:
+            return f"{var}_{transformation}"
+        else:
+            raise ValueError(f"{var}_{transformation} not in data columns")
     if transformation is None:
         return var
     else:
