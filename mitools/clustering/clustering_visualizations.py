@@ -8,7 +8,7 @@ from matplotlib.axes import Axes
 def create_figure(with_inertia: bool) -> Tuple[plt.Figure, List[Axes]]:
     if with_inertia:
         fig, axes = plt.subplots(nrows=2, ncols=1, figsize=(14, 10))
-        return fig, axes if isinstance(axes, np.ndarray) else [axes]
+        return fig, axes
     else:
         fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(14, 5))
         return fig, [ax]
