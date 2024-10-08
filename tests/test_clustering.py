@@ -4,6 +4,7 @@ from unittest import TestCase
 import numpy as np
 from numpy import allclose, array_equal, unique
 from pandas import DataFrame, MultiIndex, Series
+from pandas.testing import assert_frame_equal
 from sklearn.cluster import AgglomerativeClustering, KMeans
 from sklearn.datasets import make_blobs
 from sklearn.metrics import pairwise_distances
@@ -356,38 +357,79 @@ class TestGetDistancesBetweenCentroids(TestCase):
         self.assertTrue(allclose(result.values, expected.values))
 
 
-class TestGetDistancesToCentroids(TestCase):
+class TestGetDistancesToCentroids(unittest.TestCase):
     def setUp(self):
-        # Mock data setup
+        # Mock data setup: Create a small sample DataFrame with a multi-index and centroids DataFrame
         self.data = DataFrame(
             {"x": [1, 2, 3, 4], "y": [1, 2, 3, 4], "cluster": [0, 0, 1, 1]}
-        ).set_index(["cluster", "x"])
-
+        ).set_index(["cluster"])
         self.centroids = DataFrame({"x": [1.5, 3.5], "y": [1.5, 3.5]}, index=[0, 1])
 
     def test_positive_case(self):
-        distances = get_distances_to_centroids(self.data, self.centroids, "cluster")
-        expected_distances = DataFrame(
-            [0.70710678, 0.70710678, 0.70710678, 0.70710678], index=[1, 2, 3, 4]
+        # Calculate distances using the final function
+        distances = get_distances_to_centroids(
+            self.data, self.centroids, "cluster", metric="euclidean"
         )
-        self.assertTrue((distances.round(8) == expected_distances.round(8)).all().all())
+        # Expected distances based on Euclidean distance calculations
+        expected_distances = DataFrame(
+            [0.70710678, 0.70710678, 0.70710678, 0.70710678],
+            index=self.data.index,
+            columns=["distance_to_cluster_centroid"],
+        )
+        # Compare rounded values to avoid floating point precision issues
+        assert_frame_equal(distances, expected_distances, atol=1e-8)
 
-    def test_empty_dataframe(self):
-        # Test to ensure function handles empty dataframe gracefully
+    def test_empty_dataframes(self):
+        # Create an empty DataFrame with the same structure as the original data
         empty_data = DataFrame(columns=["x", "y", "cluster"]).set_index(
             ["cluster", "x"]
         )
-        distances = get_distances_to_centroids(empty_data, self.centroids, "cluster")
-        self.assertTrue(distances.empty)
+        # Ensure the function handles empty DataFrame correctly
+        with self.assertRaises(ArgumentStructureError):
+            get_distances_to_centroids(empty_data, self.centroids, "cluster")
+
+        # Ensure the function handles empty centroids DataFrame correctly
+        empty_centroids = DataFrame(columns=["x", "y"], index=[])
+        with self.assertRaises(ArgumentStructureError):
+            get_distances_to_centroids(self.data, empty_centroids, "cluster")
 
     def test_negative_case(self):
+        # Test with negative values in data and centroids
+        negative_data = -1 * self.data
+        negative_centroids = -1 * self.centroids
+        # Calculate distances for the negative values
         distances = get_distances_to_centroids(
-            -1 * self.data, -1 * self.centroids, "cluster"
+            negative_data, negative_centroids, "cluster", metric="euclidean"
         )
+        # Expected distances remain the same as absolute values are used in Euclidean distance calculation
         expected_distances = DataFrame(
-            [0.70710678, 0.70710678, 0.70710678, 0.70710678], index=[1, 2, 3, 4]
+            [0.70710678, 0.70710678, 0.70710678, 0.70710678],
+            index=negative_data.index,
+            columns=["distance_to_cluster_centroid"],
         )
-        self.assertTrue((distances.round(8) == expected_distances.round(8)).all().all())
+        # Compare rounded values to avoid floating point precision issues
+        assert_frame_equal(distances, expected_distances, atol=1e-8)
+
+    def test_missing_index_level(self):
+        # Create a DataFrame without the 'cluster' index level
+        incorrect_index_data = self.data.reset_index(level="cluster")
+        # Ensure function raises a KeyError when the specified cluster level is not present in the index
+        with self.assertRaises(KeyError):
+            get_distances_to_centroids(incorrect_index_data, self.centroids, "cluster")
+
+    def test_different_metric(self):
+        # Test with a different distance metric, e.g., 'cityblock' (Manhattan distance)
+        distances = get_distances_to_centroids(
+            self.data, self.centroids, "cluster", metric="cityblock"
+        )
+        # Expected distances based on Manhattan distance calculation
+        expected_distances = DataFrame(
+            [0.707107, 0.707107, 0.707107, 0.707107],
+            index=self.data.index,
+            columns=["distance_to_cluster_centroid"],
+        )
+        # Compare rounded values to avoid floating point precision issues
+        assert_frame_equal(distances, expected_distances, atol=1e-8)
 
 
 class TestGetCosineSimilarities(TestCase):
