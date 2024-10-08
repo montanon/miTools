@@ -1,6 +1,7 @@
 import unittest
 from unittest import TestCase
 
+import numpy as np
 from numpy import array_equal, unique
 from pandas import DataFrame, MultiIndex, Series
 from sklearn.cluster import AgglomerativeClustering, KMeans
@@ -101,37 +102,87 @@ class TestKMeansClustering(TestCase):
 
 class TestAgglomerativeClustering(TestCase):
     def setUp(self):
-        # Mock data setup: Create datasets with blobs that can be clustered
+        # Mock data setup: Create a simple dataset for clustering
         self.data, _ = make_blobs(n_samples=100, centers=3, random_state=42)
         self.data = DataFrame(self.data, columns=["x", "y"])
+        # Empty dataframe for testing
+        self.empty_data = DataFrame(columns=["x", "y"])
 
-    def test_positive_case(self):
+    def test_valid_clustering(self):
         n_clusters = 3
-        result = agglomerative_clustering(self.data, n_clusters).labels_
-        # Ensure function returns labels for all data points
-        self.assertEqual(len(result), len(self.data))
-        # Ensure the number of unique labels equals n_clusters
-        unique_labels = unique(result)
+        agg_model, labels = agglomerative_clustering(self.data, n_clusters)
+        # Check that the correct number of labels are generated
+        self.assertEqual(len(labels), len(self.data))
+        # Verify that the number of unique clusters matches `n_clusters`
+        unique_labels = np.unique(labels)
         self.assertEqual(len(unique_labels), n_clusters)
+        # Ensure the model object is of type `AgglomerativeClustering`
+        self.assertIsInstance(agg_model, AgglomerativeClustering)
 
     def test_empty_dataframe(self):
-        # Ensure function handles an empty dataframe without errors
-        empty_data = DataFrame(columns=["x", "y"])
-        with self.assertRaises(
-            ValueError
-        ):  # Assuming it raises a ValueError due to empty data
-            agglomerative_clustering(empty_data, 1)
+        # Ensure the function raises an error for an empty dataframe
+        with self.assertRaises(ArgumentStructureError):
+            agglomerative_clustering(self.empty_data, 3)
 
     def test_invalid_n_clusters(self):
-        # Ensure function raises an error with invalid n_clusters value
-        with self.assertRaises(
-            ValueError
-        ):  # Assuming it raises a ValueError for invalid n_clusters
-            agglomerative_clustering(self.data, 0)
-        with self.assertRaises(
-            ValueError
-        ):  # Assuming it raises a ValueError for invalid n_clusters
-            agglomerative_clustering(self.data, -1)
+        # Invalid `n_clusters` less than 2
+        with self.assertRaises(ArgumentValueError):
+            agglomerative_clustering(self.data, 1)
+
+        # Invalid `n_clusters` greater than number of samples
+        with self.assertRaises(ArgumentValueError):
+            agglomerative_clustering(self.data, 101)
+
+    def test_invalid_n_clusters_type(self):
+        # Ensure function raises an error with non-integer n_clusters value
+        with self.assertRaises(ArgumentTypeError):
+            agglomerative_clustering(
+                self.data, "three"
+            )  # Passing a string instead of an int
+
+    def test_ward_metric_error(self):
+        # Ensure the function raises an error when using a non-euclidean metric with "ward" linkage
+        with self.assertRaises(ArgumentValueError):
+            agglomerative_clustering(self.data, 3, metric="manhattan", linkage="ward")
+
+    def test_distance_threshold_error(self):
+        # Ensure the function raises an error when `distance_threshold` is set along with `n_clusters`
+        with self.assertRaises(ArgumentValueError):
+            agglomerative_clustering(self.data, 3, distance_threshold=5.0)
+
+        # Ensure the function raises an error when `distance_threshold` is set and `compute_full_tree` is False
+        with self.assertRaises(ArgumentValueError):
+            agglomerative_clustering(
+                self.data, 3, distance_threshold=5.0, compute_full_tree=False
+            )
+
+    def test_output_shape(self):
+        # Ensure that the output has the expected shape
+        agg_model, labels = agglomerative_clustering(self.data, 3)
+        self.assertEqual(labels.shape, (len(self.data),))
+
+    def test_custom_parameters(self):
+        # Test with custom metric and linkage
+        agg_model, labels = agglomerative_clustering(
+            self.data,
+            3,
+            metric="cosine",
+            linkage="complete",
+            compute_full_tree=True,
+        )
+        # Ensure model has the correct parameters set
+        self.assertEqual(agg_model.metric, "cosine")
+        self.assertEqual(agg_model.linkage, "complete")
+
+    def test_precomputed_metric(self):
+        # Test with precomputed distance matrix
+        distance_matrix = np.linalg.norm(
+            self.data.values[:, np.newaxis] - self.data.values, axis=2
+        )
+        agg_model, labels = agglomerative_clustering(
+            DataFrame(distance_matrix), 3, metric="precomputed", linkage="complete"
+        )
+        self.assertEqual(len(labels), len(self.data))
 
 
 class TestGetDistancesToCentroids(TestCase):
