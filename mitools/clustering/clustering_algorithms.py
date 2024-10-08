@@ -112,39 +112,28 @@ def agglomerative_clustering(
     return agg_clustering_model, cluster_labels
 
 
-def kmeans_ncluster_search(
+def clustering_ncluster_search(
     data: DataFrame,
     max_clusters: Optional[int] = 25,
-    random_state: Optional[int] = 0,
-    n_init: Optional[int] = 10,
-) -> Tuple[List[float], List[float]]:
+    clustering_method: Optional[
+        Union[kmeans_clustering, agglomerative_clustering]
+    ] = kmeans_clustering,
+    score_metric: Optional[Callable] = silhouette_score,
+    **kwargs,
+) -> Tuple[List[float], Union[List[float], None]]:
     if not isinstance(max_clusters, int):
         raise ArgumentTypeError(MAX_CLUSTERS_TYPE_ERROR)
     if max_clusters < 2:
         raise ArgumentValueError(MAX_CLUSTERS_VALUE_ERROR)
     silhouette_scores = []
-    inertia = []
+    inertia = [] if clustering_method == kmeans_clustering else None
     for n_clusters in tqdm(range(2, max_clusters)):
-        kmeans_clusters = kmeans_clustering(data, n_clusters, random_state, n_init)
-        score = silhouette_score(data, kmeans_clusters.labels_)
+        model, labels = clustering_method(data, n_clusters, **kwargs)
+        score = score_metric(data, labels)
         silhouette_scores.append(score)
-        inertia.append(kmeans_clusters.inertia_)
+        if inertia is not None:
+            inertia.append(model.inertia_)
     return silhouette_scores, inertia
-
-
-def agglomerative_ncluster_search(
-    data: DataFrame, max_clusters: Optional[int] = 25
-) -> List[float]:
-    if not isinstance(max_clusters, int):
-        raise ArgumentTypeError(MAX_CLUSTERS_TYPE_ERROR)
-    if max_clusters < 2:
-        raise ArgumentValueError(MAX_CLUSTERS_VALUE_ERROR)
-    silhouette_scores = []
-    for n_clusters in tqdm(range(2, max_clusters)):
-        agg_clustering = agglomerative_clustering(data, n_clusters)
-        score = silhouette_score(data, agg_clustering.labels_)
-        silhouette_scores.append(score)
-    return silhouette_scores
 
 
 def get_clusters_centroids(data: DataFrame, cluster_col: str) -> DataFrame:
