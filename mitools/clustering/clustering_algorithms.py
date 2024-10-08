@@ -14,7 +14,6 @@ from scipy.stats import gaussian_kde
 from sklearn.cluster import AgglomerativeClustering, KMeans
 from sklearn.metrics import silhouette_score
 from sklearn.metrics.pairwise import cosine_similarity, pairwise_distances
-from sklearn.neighbors import NearestCentroid
 from tqdm import tqdm
 
 from ..exceptions import ArgumentStructureError, ArgumentTypeError, ArgumentValueError
@@ -26,10 +25,8 @@ MAX_CLUSTERS_TYPE_ERROR = "n_clusters provided must be a positive int larger tha
 MIN_CLUSTERS_VALUE_ERROR = "n_clusters must be a number larger or equal than 2."
 MAX_CLUSTERS_VALUE_ERROR = "n_clusters must be a number larger or equal than 2."
 X_Y_SIZE_ERROR = "x values and y values must be the same size."
-CLUSTER_COL_NOT_IN_INDEX_ERROR = (
-    "DataFrame provided does not have the {cluster_col} index level!"
-)
-SINGLE_GROUP_DF_ERROR = "DataFrame provided has a single group!"
+
+
 EMPTY_DF_ERROR = "DataFrame provided is empty!"
 WARD_AFFINITY_ERROR = "Ward linkage only allows for euclidean affinity!"
 DISTANCE_THRESHOLD_ERROR = "If distance_threshold is not None, n_clusters must be None and compute_full_tree must be True!"
@@ -134,20 +131,6 @@ def clustering_ncluster_search(
         if inertia is not None:
             inertia.append(model.inertia_)
     return silhouette_scores, inertia
-
-
-def get_clusters_centroids(data: DataFrame, cluster_col: str) -> DataFrame:
-    if cluster_col not in data.index.names:
-        raise KeyError(f"{CLUSTER_COL_NOT_IN_INDEX_ERROR}")
-    if data.index.get_level_values(cluster_col).nunique() == 1:
-        raise ArgumentStructureError(SINGLE_GROUP_DF_ERROR)
-    clf = NearestCentroid()
-    clf.fit(data.values, data.index.get_level_values(cluster_col).values)
-    return DataFrame(
-        clf.centroids_,
-        columns=data.columns,
-        index=np.unique(data.index.get_level_values(cluster_col)),
-    )
 
 
 def get_clusters_centroids_distances(centroids: DataFrame) -> DataFrame:
