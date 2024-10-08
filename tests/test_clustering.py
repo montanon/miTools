@@ -3,11 +3,27 @@ from unittest import TestCase
 
 from numpy import array_equal, unique
 from pandas import DataFrame, MultiIndex, Series
+from sklearn.cluster import AgglomerativeClustering, KMeans
 from sklearn.datasets import make_blobs
+from sklearn.metrics import pairwise_distances
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.neighbors import NearestCentroid
 
-from mitools.clustering import *
+from mitools.clustering import (
+    N_ELEMENTS_COL,
+    ArgumentStructureError,
+    ArgumentTypeError,
+    ArgumentValueError,
+    agglomerative_clustering,
+    agglomerative_ncluster_search,
+    display_clusters_size,
+    get_clusters_centroids,
+    get_clusters_centroids_distances,
+    get_cosine_similarities,
+    get_distances_to_centroids,
+    kmeans_clustering,
+    kmeans_ncluster_search,
+)
 
 
 class TestKMeansClustering(TestCase):
@@ -81,6 +97,41 @@ class TestKMeansClustering(TestCase):
         # Ensure that the output has the expected shape
         kmeans_model, labels = kmeans_clustering(self.data, 3)
         self.assertEqual(labels.shape, (len(self.data),))
+
+
+class TestAgglomerativeClustering(TestCase):
+    def setUp(self):
+        # Mock data setup: Create datasets with blobs that can be clustered
+        self.data, _ = make_blobs(n_samples=100, centers=3, random_state=42)
+        self.data = DataFrame(self.data, columns=["x", "y"])
+
+    def test_positive_case(self):
+        n_clusters = 3
+        result = agglomerative_clustering(self.data, n_clusters).labels_
+        # Ensure function returns labels for all data points
+        self.assertEqual(len(result), len(self.data))
+        # Ensure the number of unique labels equals n_clusters
+        unique_labels = unique(result)
+        self.assertEqual(len(unique_labels), n_clusters)
+
+    def test_empty_dataframe(self):
+        # Ensure function handles an empty dataframe without errors
+        empty_data = DataFrame(columns=["x", "y"])
+        with self.assertRaises(
+            ValueError
+        ):  # Assuming it raises a ValueError due to empty data
+            agglomerative_clustering(empty_data, 1)
+
+    def test_invalid_n_clusters(self):
+        # Ensure function raises an error with invalid n_clusters value
+        with self.assertRaises(
+            ValueError
+        ):  # Assuming it raises a ValueError for invalid n_clusters
+            agglomerative_clustering(self.data, 0)
+        with self.assertRaises(
+            ValueError
+        ):  # Assuming it raises a ValueError for invalid n_clusters
+            agglomerative_clustering(self.data, -1)
 
 
 class TestGetDistancesToCentroids(TestCase):
@@ -253,41 +304,6 @@ class TestGetClustersCentroids(TestCase):
         ]
         with self.assertRaises(ArgumentStructureError):
             get_clusters_centroids(single_cluster_data, "cluster")
-
-
-class TestAgglomerativeClustering(TestCase):
-    def setUp(self):
-        # Mock data setup: Create datasets with blobs that can be clustered
-        self.data, _ = make_blobs(n_samples=100, centers=3, random_state=42)
-        self.data = DataFrame(self.data, columns=["x", "y"])
-
-    def test_positive_case(self):
-        n_clusters = 3
-        result = agglomerative_clustering(self.data, n_clusters).labels_
-        # Ensure function returns labels for all data points
-        self.assertEqual(len(result), len(self.data))
-        # Ensure the number of unique labels equals n_clusters
-        unique_labels = unique(result)
-        self.assertEqual(len(unique_labels), n_clusters)
-
-    def test_empty_dataframe(self):
-        # Ensure function handles an empty dataframe without errors
-        empty_data = DataFrame(columns=["x", "y"])
-        with self.assertRaises(
-            ValueError
-        ):  # Assuming it raises a ValueError due to empty data
-            agglomerative_clustering(empty_data, 1)
-
-    def test_invalid_n_clusters(self):
-        # Ensure function raises an error with invalid n_clusters value
-        with self.assertRaises(
-            ValueError
-        ):  # Assuming it raises a ValueError for invalid n_clusters
-            agglomerative_clustering(self.data, 0)
-        with self.assertRaises(
-            ValueError
-        ):  # Assuming it raises a ValueError for invalid n_clusters
-            agglomerative_clustering(self.data, -1)
 
 
 class TestAgglomerativeNClusterSearch(TestCase):
