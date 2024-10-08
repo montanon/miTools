@@ -16,14 +16,13 @@ from mitools.clustering import (
     ArgumentTypeError,
     ArgumentValueError,
     agglomerative_clustering,
-    agglomerative_ncluster_search,
+    clustering_ncluster_search,
     display_clusters_size,
     get_clusters_centroids,
     get_clusters_centroids_distances,
     get_cosine_similarities,
     get_distances_to_centroids,
     kmeans_clustering,
-    kmeans_ncluster_search,
 )
 
 
@@ -183,6 +182,93 @@ class TestAgglomerativeClustering(TestCase):
             DataFrame(distance_matrix), 3, metric="precomputed", linkage="complete"
         )
         self.assertEqual(len(labels), len(self.data))
+
+
+class TestClusteringNClusterSearch(unittest.TestCase):
+    def setUp(self):
+        # Mock data setup: Create datasets with blobs for clustering
+        self.data, _ = make_blobs(n_samples=100, centers=4, random_state=42)
+        self.data = DataFrame(self.data, columns=["x", "y"])
+        # Empty dataframe for testing
+        self.empty_data = DataFrame(columns=["x", "y"])
+
+    def test_positive_case_kmeans(self):
+        # Test positive case with KMeans clustering
+        max_clusters = 5
+        silhouette_scores, inertia_values = clustering_ncluster_search(
+            self.data,
+            max_clusters=max_clusters,
+            clustering_method=kmeans_clustering,
+            random_state=42,
+            n_init=10,
+        )
+        # Ensure function returns scores and inertia for all cluster counts from 2 to max_clusters - 1
+        self.assertEqual(len(silhouette_scores), max_clusters - 2)
+        self.assertEqual(len(inertia_values), max_clusters - 2)
+
+    def test_positive_case_agglomerative(self):
+        # Test positive case with Agglomerative clustering
+        max_clusters = 5
+        silhouette_scores, inertia_values = clustering_ncluster_search(
+            self.data,
+            max_clusters=max_clusters,
+            clustering_method=agglomerative_clustering,
+            linkage="ward",
+            metric="euclidean",
+        )
+        # Ensure function returns scores for all cluster counts from 2 to max_clusters - 1
+        self.assertEqual(len(silhouette_scores), max_clusters - 2)
+        self.assertIsNone(inertia_values)  # Inertia should be None for Agglomerative
+
+    def test_empty_dataframe(self):
+        # Ensure function raises an error for an empty dataframe for both clustering methods
+        with self.assertRaises(ArgumentStructureError):
+            clustering_ncluster_search(
+                self.empty_data, 10, clustering_method=kmeans_clustering
+            )
+
+        with self.assertRaises(ArgumentStructureError):
+            clustering_ncluster_search(
+                self.empty_data, 10, clustering_method=agglomerative_clustering
+            )
+
+    def test_invalid_max_clusters(self):
+        # Ensure function raises an error with invalid `max_clusters` value
+        with self.assertRaises(ArgumentValueError):
+            clustering_ncluster_search(
+                self.data, 1, clustering_method=kmeans_clustering
+            )
+
+        with self.assertRaises(ArgumentValueError):
+            clustering_ncluster_search(
+                self.data, 1, clustering_method=agglomerative_clustering
+            )
+
+    def test_invalid_clustering_method(self):
+        # Ensure function raises an error if an invalid clustering method is provided
+        with self.assertRaises(TypeError):
+            clustering_ncluster_search(
+                self.data, 10, clustering_method="invalid_method"
+            )
+
+    def test_valid_custom_metric(self):
+        # Test with a custom silhouette scoring metric
+        def custom_metric(data, labels):
+            # A mock scoring function that just returns a constant value
+            return 0.5
+
+        max_clusters = 5
+        silhouette_scores, _ = clustering_ncluster_search(
+            self.data,
+            max_clusters=max_clusters,
+            clustering_method=kmeans_clustering,
+            score_metric=custom_metric,
+            random_state=42,
+            n_init=10,
+        )
+
+        # Ensure that all the silhouette scores match the custom metric value
+        self.assertTrue(all(score == 0.5 for score in silhouette_scores))
 
 
 class TestGetDistancesToCentroids(TestCase):
@@ -355,67 +441,6 @@ class TestGetClustersCentroids(TestCase):
         ]
         with self.assertRaises(ArgumentStructureError):
             get_clusters_centroids(single_cluster_data, "cluster")
-
-
-class TestAgglomerativeNClusterSearch(TestCase):
-    def setUp(self):
-        # Mock data setup: Create datasets with blobs
-        self.data, _ = make_blobs(n_samples=100, centers=4, random_state=42)
-        self.data = DataFrame(self.data, columns=["x", "y"])
-
-    def test_positive_case(self):
-        max_clusters = 5
-        result = agglomerative_ncluster_search(self.data, max_clusters)
-
-        # Ensure function returns scores for all cluster counts from 2 to max_clusters - 1
-        self.assertEqual(len(result), max_clusters - 2)
-
-    def test_empty_dataframe(self):
-        # Ensure function handles an empty dataframe without errors
-        empty_data = DataFrame(columns=["x", "y"])
-        with self.assertRaises(
-            ValueError
-        ):  # Assuming it raises a ValueError due to empty data
-            agglomerative_ncluster_search(empty_data, 10)
-
-    def test_invalid_max_clusters(self):
-        # Ensure function raises an error with invalid max_clusters value
-        with self.assertRaises(
-            ValueError
-        ):  # Assuming it raises a ValueError for invalid max_clusters
-            agglomerative_ncluster_search(self.data, 1)
-
-
-class TestKMeansNClusterSearch(TestCase):
-    def setUp(self):
-        # Mock data setup: create datasets with blobs that can be clustered
-        self.data, _ = make_blobs(n_samples=100, centers=4, random_state=42)
-        self.data = DataFrame(self.data, columns=["x", "y"])
-
-    def test_positive_case(self):
-        max_clusters = 4
-        silhouette_scores, inertia_values = kmeans_ncluster_search(
-            self.data, max_clusters
-        )
-
-        # Ensure function returns scores and inertia for all cluster counts from 2 to max_clusters - 1
-        self.assertEqual(len(silhouette_scores), max_clusters - 2)
-        self.assertEqual(len(inertia_values), max_clusters - 2)
-
-    def test_empty_dataframe(self):
-        # Ensure function handles an empty dataframe without errors
-        empty_data = DataFrame(columns=["x", "y"])
-        with self.assertRaises(
-            ValueError
-        ):  # Assuming it raises a ValueError due to empty data
-            kmeans_ncluster_search(empty_data, 10)
-
-    def test_invalid_max_clusters(self):
-        # Ensure function raises an error with invalid max_clusters value
-        with self.assertRaises(
-            ValueError
-        ):  # Assuming it raises a ValueError for invalid max_clusters
-            kmeans_ncluster_search(self.data, 1)
 
 
 if __name__ == "__main__":
