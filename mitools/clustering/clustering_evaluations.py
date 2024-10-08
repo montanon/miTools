@@ -15,6 +15,7 @@ CLUSTER_COL_NOT_IN_INDEX_ERROR = (
 )
 SINGLE_GROUP_DF_ERROR = "DataFrame provided has a single group!"
 EMPTY_DATA_ERROR = "Input DataFrame cannot be empty."
+EMPTY_CENTROIDS_ERROR = "Centroids DataFrame cannot be empty."
 
 
 def get_clusters_centroids(
@@ -77,6 +78,10 @@ def get_distances_to_centroids(
 ) -> DataFrame:
     if cluster_level not in data.index.names:
         raise KeyError(f"{CLUSTER_COL_NOT_IN_INDEX_ERROR}")
+    if data.empty:
+        raise ArgumentStructureError(EMPTY_DATA_ERROR)
+    if centroids.empty:
+        raise ArgumentStructureError(EMPTY_CENTROIDS_ERROR)
     cluster_labels = data.index.get_level_values(cluster_level)
     corresponding_centroids = centroids.loc[cluster_labels]
     distances = cdist(
