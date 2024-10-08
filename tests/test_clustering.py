@@ -271,6 +271,54 @@ class TestClusteringNClusterSearch(unittest.TestCase):
         self.assertTrue(all(score == 0.5 for score in silhouette_scores))
 
 
+class TestGetClustersCentroids(unittest.TestCase):
+    def setUp(self):
+        # Mock data setup: Create a simple dataset with a multi-index that includes cluster labels
+        self.data = DataFrame({"x": [1, 2, 3, 4, 5], "y": [2, 3, 4, 5, 6]})
+        self.data["cluster"] = [0, 0, 1, 1, 2]
+        # Set cluster labels as an index level (along with the default range index)
+        self.data.set_index("cluster", inplace=True, append=True)
+
+    def test_positive_case(self):
+        # Compute centroids using the refactored function
+        result = get_clusters_centroids(self.data, "cluster")
+        # Expected centroids calculated manually
+        expected_data = {"x": [1.5, 3.5, 5], "y": [2.5, 4.5, 6]}
+        expected = DataFrame(expected_data, index=[0, 1, 2])
+        # Ensure centroids are computed correctly
+        self.assertTrue(
+            array_equal(result.values, expected.values)
+            and array_equal(result.index.values, expected.index.values)
+        )
+
+    def test_empty_dataframe(self):
+        # Test with an empty dataframe with a 'cluster' index level
+        empty_data = DataFrame(
+            columns=["x", "y"],
+            index=MultiIndex(levels=[[], []], codes=[[], []], names=[None, "cluster"]),
+        )
+
+        # Ensure function raises ArgumentStructureError for empty data
+        with self.assertRaises(ArgumentStructureError):
+            get_clusters_centroids(empty_data, "cluster")
+
+    def test_missing_cluster_index_level(self):
+        # Ensure function raises an error when the specified index level is missing
+        # Here we remove the cluster index level and attempt to access it
+        with self.assertRaises(KeyError):
+            get_clusters_centroids(self.data.reset_index(level="cluster"), "cluster")
+
+    def test_single_cluster(self):
+        # Create a DataFrame with a single unique cluster label
+        single_cluster_data = self.data.loc[
+            self.data.index.get_level_values("cluster") == 0
+        ]
+
+        # Ensure function raises an ArgumentStructureError for single-group data
+        with self.assertRaises(ArgumentStructureError):
+            get_clusters_centroids(single_cluster_data, "cluster")
+
+
 class TestGetDistancesToCentroids(TestCase):
     def setUp(self):
         # Mock data setup
@@ -396,51 +444,6 @@ class TestGetClustersCentroidsDistances(TestCase):
         result = get_clusters_centroids_distances(single_centroid_data)
         expected = DataFrame([[0]])
         self.assertTrue((result.values == expected.values).all())
-
-
-class TestGetClustersCentroids(TestCase):
-    def setUp(self):
-        # Mock data setup
-        self.data = DataFrame({"x": [1, 2, 3, 4, 5], "y": [2, 3, 4, 5, 6]})
-        self.data["cluster"] = [0, 0, 1, 1, 2]
-        self.data.set_index("cluster", inplace=True, append=True)
-
-    def test_positive_case(self):
-        result = get_clusters_centroids(self.data, "cluster")
-        # Calculate the expected centroids manually
-        expected_data = {"x": [1.5, 3.5, 5], "y": [2.5, 4.5, 6]}
-        expected = DataFrame(expected_data, index=[0, 1, 2])
-        # Ensure centroids are computed correctly
-        self.assertTrue(
-            array_equal(result.values, expected.values)
-            and array_equal(result.index.values, expected.index.values)
-        )
-
-    def test_empty_dataframe(self):
-        # Ensure function handles an empty dataframe without errors
-        empty_data = DataFrame(
-            columns=["x", "y"],
-            index=MultiIndex(levels=[[]], codes=[[]], names=["cluster"]),
-        )
-        with self.assertRaises(
-            ValueError
-        ):  # Assuming it raises a ValueError due to empty data
-            get_clusters_centroids(empty_data, "cluster")
-
-    def test_missing_cluster_column(self):
-        # Ensure function raises an error when cluster_col is missing
-        with self.assertRaises(KeyError):
-            get_clusters_centroids(
-                self.data.reset_index(level="cluster"), "missing_cluster_col"
-            )
-
-    def test_single_cluster(self):
-        # For a single cluster, the centroid should be the mean of the data
-        single_cluster_data = self.data[
-            self.data.index.get_level_values("cluster") == 0
-        ]
-        with self.assertRaises(ArgumentStructureError):
-            get_clusters_centroids(single_cluster_data, "cluster")
 
 
 if __name__ == "__main__":
