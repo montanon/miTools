@@ -131,14 +131,6 @@ def clustering_ncluster_search(
     return silhouette_scores, inertia
 
 
-def get_clusters_centroids_distances(centroids: DataFrame) -> DataFrame:
-    if centroids.empty:
-        raise ArgumentStructureError(EMPTY_DATA_ERROR)
-    return DataFrame(
-        pairwise_distances(centroids), index=centroids.index, columns=centroids.index
-    )
-
-
 def get_cosine_similarities(data: DataFrame, cluster_col: str) -> ndarray:
     cosine_similarities = data.groupby(level=cluster_col).apply(cosine_similarity)
     return cosine_similarities

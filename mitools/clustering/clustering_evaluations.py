@@ -34,3 +34,10 @@ def get_clusters_centroids(
         columns=data.columns,
         index=np.unique(data.index.get_level_values(cluster_level)),
     )
+
+
+def get_distances_between_centroids(centroids: DataFrame) -> DataFrame:
+    if centroids.empty:
+        raise ArgumentStructureError(EMPTY_DATA_ERROR)
+    distance_matrix = pairwise_distances(centroids.values)
+    return DataFrame(distance_matrix, index=centroids.index, columns=centroids.index)

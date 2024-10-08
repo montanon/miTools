@@ -2,7 +2,7 @@ import unittest
 from unittest import TestCase
 
 import numpy as np
-from numpy import array_equal, unique
+from numpy import allclose, array_equal, unique
 from pandas import DataFrame, MultiIndex, Series
 from sklearn.cluster import AgglomerativeClustering, KMeans
 from sklearn.datasets import make_blobs
@@ -19,8 +19,8 @@ from mitools.clustering import (
     clustering_ncluster_search,
     display_clusters_size,
     get_clusters_centroids,
-    get_clusters_centroids_distances,
     get_cosine_similarities,
+    get_distances_between_centroids,
     get_distances_to_centroids,
     kmeans_clustering,
 )
@@ -319,6 +319,43 @@ class TestGetClustersCentroids(unittest.TestCase):
             get_clusters_centroids(single_cluster_data, "cluster")
 
 
+class TestGetDistancesBetweenCentroids(TestCase):
+    def setUp(self):
+        # Mock centroids setup: Create a simple DataFrame with 3 centroids
+        self.centroids = DataFrame(
+            {"x": [1, 0, 0], "y": [0, 1, 0], "z": [0, 0, 1]}, index=["A", "B", "C"]
+        )
+
+    def test_positive_case(self):
+        # Compute pairwise distances using the function
+        result = get_distances_between_centroids(self.centroids)
+        # Expected pairwise distance DataFrame
+        expected = DataFrame(
+            pairwise_distances(self.centroids.values),
+            index=self.centroids.index,
+            columns=self.centroids.index,
+        )
+        # Use numpy's allclose for floating-point comparisons
+        self.assertTrue(allclose(result.values, expected.values))
+
+    def test_empty_dataframe(self):
+        # Test with an empty DataFrame with appropriate columns
+        empty_data = DataFrame(columns=["x", "y", "z"], index=[])
+        # Ensure the function raises ArgumentStructureError for empty DataFrame
+        with self.assertRaises(ArgumentStructureError):
+            get_distances_between_centroids(empty_data)
+
+    def test_single_centroid(self):
+        # Create a DataFrame with a single centroid
+        single_centroid_data = DataFrame({"x": [1], "y": [0], "z": [0]}, index=["A"])
+        # Compute distances using the function
+        result = get_distances_between_centroids(single_centroid_data)
+        # Expected pairwise distance matrix for a single point (1x1 matrix with 0)
+        expected = DataFrame([[0]], index=["A"], columns=["A"])
+        # Use numpy's allclose for floating-point comparisons
+        self.assertTrue(allclose(result.values, expected.values))
+
+
 class TestGetDistancesToCentroids(TestCase):
     def setUp(self):
         # Mock data setup
@@ -419,31 +456,6 @@ class TestDisplayClustersSize(TestCase):
         # Ensure function raises an error when cluster_col is missing
         with self.assertRaises(KeyError):
             display_clusters_size(self.data, "missing_cluster_col")
-
-
-class TestGetClustersCentroidsDistances(TestCase):
-    def setUp(self):
-        # Mock centroids setup
-        self.centroids = DataFrame({"x": [1, 0, 0], "y": [0, 1, 0], "z": [0, 0, 1]})
-
-    def test_positive_case(self):
-        result = get_clusters_centroids_distances(self.centroids)
-        expected = DataFrame(pairwise_distances(self.centroids))
-        # Use numpy's allclose for floating point comparisons
-        self.assertTrue((result.values == expected.values).all())
-
-    def test_empty_dataframe(self):
-        # Ensure function handles an empty dataframe without errors
-        empty_data = DataFrame(columns=["x", "y", "z"])
-        with self.assertRaises(ArgumentStructureError):
-            get_clusters_centroids_distances(empty_data)
-
-    def test_single_centroid(self):
-        # For a single centroid, the pairwise distance should be a 1x1 DataFrame with value 0
-        single_centroid_data = DataFrame({"x": [1], "y": [0], "z": [0]})
-        result = get_clusters_centroids_distances(single_centroid_data)
-        expected = DataFrame([[0]])
-        self.assertTrue((result.values == expected.values).all())
 
 
 if __name__ == "__main__":
