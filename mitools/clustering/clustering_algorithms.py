@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 import matplotlib.pyplot as plt
 import matplotlib.transforms as transforms
@@ -20,8 +20,10 @@ from ..exceptions import ArgumentStructureError, ArgumentTypeError, ArgumentValu
 
 N_ELEMENTS_COL = "N Elements"
 
-MAX_CLUSTERS_TYPE_ERROR = "max_clusters provided must be a positive int larger than 2."
-MAX_CLUSTERS_VALUE_ERROR = "max_clusters must be a number larger or equal than 2."
+EMPTY_DATA_ERROR = "Input DataFrame cannot be empty."
+MAX_CLUSTERS_TYPE_ERROR = "n_clusters provided must be a positive int larger than 2."
+MIN_CLUSTERS_VALUE_ERROR = "n_clusters must be a number larger or equal than 2."
+MAX_CLUSTERS_VALUE_ERROR = "n_clusters must be a number larger or equal than 2."
 X_Y_SIZE_ERROR = "x values and y values must be the same size."
 CLUSTER_COL_NOT_IN_INDEX_ERROR = (
     "DataFrame provided does not have the {cluster_col} index level!"
@@ -30,6 +32,37 @@ SINGLE_GROUP_DF_ERROR = "DataFrame provided has a single group!"
 EMPTY_DF_ERROR = "DataFrame provided is empty!"
 
 N_ELEMENTS_COL = "N Elements"
+
+
+def kmeans_clustering(
+    data: DataFrame,
+    n_clusters: int,
+    random_state: Optional[int] = 0,
+    n_init: Optional[int] = 10,
+    max_iter: Optional[int] = 300,
+    algorithm: Optional[Literal["auto", "full", "elkan"]] = "auto",
+    tol: Optional[float] = 1e-4,
+    verbose: Optional[bool] = False,
+) -> Tuple[KMeans, ndarray]:
+    if data.empty:
+        raise ArgumentStructureError(EMPTY_DATA_ERROR)
+    if not isinstance(n_clusters, int):
+        raise ArgumentTypeError(MAX_CLUSTERS_TYPE_ERROR)
+    if n_clusters < 2:
+        raise ArgumentValueError(MIN_CLUSTERS_VALUE_ERROR)
+    if n_clusters > len(data):
+        raise ArgumentValueError(MAX_CLUSTERS_VALUE_ERROR)
+    kmeans_model = KMeans(
+        n_clusters=n_clusters,
+        random_state=random_state,
+        n_init=n_init,
+        max_iter=max_iter,
+        algorithm=algorithm,
+        tol=tol,
+        verbose=verbose,
+    )
+    cluster_labels = kmeans_model.fit_predict(data)
+    return kmeans_model, cluster_labels
 
 
 def kmeans_ncluster_search(
@@ -50,23 +83,6 @@ def kmeans_ncluster_search(
         silhouette_scores.append(score)
         inertia.append(kmeans_clusters.inertia_)
     return silhouette_scores, inertia
-
-
-def kmeans_clustering(
-    data: DataFrame,
-    n_clusters: int,
-    random_state: Optional[int] = 0,
-    n_init: Optional[int] = 10,
-) -> ndarray:
-    if not isinstance(n_clusters, int):
-        raise ArgumentTypeError(MAX_CLUSTERS_TYPE_ERROR)
-    if n_clusters < 2:
-        raise ArgumentValueError(MAX_CLUSTERS_VALUE_ERROR)
-    kmeans_clustering = KMeans(
-        n_clusters=n_clusters, random_state=random_state, n_init=n_init
-    )
-    kmeans_clustering.fit_predict(data)
-    return kmeans_clustering
 
 
 def agglomerative_ncluster_search(
