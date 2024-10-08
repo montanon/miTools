@@ -142,29 +142,29 @@ test_python_module skbuild
 conda install -c conda-forge pybind11 -y
 test_python_module pybind11
 
-sudo rm -rf ~/.racplusplus
-sudo rm -rf ~/.racplusplus/RACplusplus/_skbuild
-sudo rm -rf ~/.racplusplus && mkdir ~/.racplusplus && cd ~/.racplusplus
-git clone git@github.com:porterehunley/RACplusplus.git
-cd RACplusplus
+#sudo rm -rf ~/.racplusplus
+#sudo rm -rf ~/.racplusplus/RACplusplus/_skbuild
+#sudo rm -rf ~/.racplusplus && mkdir ~/.racplusplus && cd ~/.racplusplus
+#git clone git@github.com:porterehunley/RACplusplus.git
+#cd RACplusplus
 # Commented out: `#$PYTHON_PATH -m pip install pybind11` from ./dependencies_mac.sh
 # Avoid package managing conflict errors by `sudo pip`
-sed -i.bak '/$PYTHON_PATH -m pip install pybind11/s/^/#/' ./dependencies_mac.sh
-sudo chmod +x ./dependencies_mac.sh
-sudo ./dependencies_mac.sh
-$PYTHON_PATH setup.py install
-mkdir build && cd build && sudo rm -rf * # Clean out the build directory
-export CC=$(which gcc)
-export CXX=$(which g++)
-C_COMPILER="$(which clang)"
-CXX_COMPILER="$(which clang++)"
-cmake -G Ninja -DCMAKE_MAKE_PROGRAM=$(which ninja) -DCMAKE_C_COMPILER=$(CC) -DCMAKE_CXX_COMPILER=$(CXX) ..
-ninja
-cd ..
-echo PWD:$(pwd)
-$PYTHON_PATH -m pip install .
-test_python_module racplusplus
-cd "$original_path"
+#sed -i.bak '/$PYTHON_PATH -m pip install pybind11/s/^/#/' ./dependencies_mac.sh
+#sudo chmod +x ./dependencies_mac.sh
+#sudo ./dependencies_mac.sh
+#$PYTHON_PATH setup.py install
+#mkdir build && cd build && sudo rm -rf * # Clean out the build directory
+#export CC=$(which gcc)
+#export CXX=$(which g++)
+#C_COMPILER="$(which clang)"
+#CXX_COMPILER="$(which clang++)"
+#cmake -G Ninja -DCMAKE_MAKE_PROGRAM=$(which ninja) -DCMAKE_C_COMPILER=$(CC) -DCMAKE_CXX_COMPILER=$(CXX) ..
+#ninja
+#cd ..
+#echo PWD:$(pwd)
+#$PYTHON_PATH -m pip install .
+#test_python_module racplusplus
+#cd "$original_path"
 
 $PYTHON_PATH -m pip install bertopic
 test_python_module bertopic

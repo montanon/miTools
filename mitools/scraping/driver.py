@@ -8,22 +8,19 @@ from .driver_checkers import *
 from .driver_finders import *
 from .driver_waiters import *
 
-CHROME_DRIVER = '~/WebBrowser_Drivers/chromedriver'
-DOWNLOADS_DIRECTORY = os.path.expanduser('~/Downloads')
-
+CHROME_DRIVER = "~/WebBrowser_Drivers/chromedriver"
+DOWNLOADS_DIRECTORY = os.path.expanduser("~/Downloads")
 
 
 class DriverHandler:
-
     def __init__(self, use_options=False, headless=False, options_prefs=None):
-
         self.prefs = {
-                "download.default_directory": DOWNLOADS_DIRECTORY,
-                "download.prompt_for_download": False,
-                "download.directory_upgrade": True,
-                "plugins.plugins_disabled": "Chrome PDF Viewer",
-                "plugins.always_open_pdf_externally": True
-            }
+            "download.default_directory": DOWNLOADS_DIRECTORY,
+            "download.prompt_for_download": False,
+            "download.directory_upgrade": True,
+            "plugins.plugins_disabled": "Chrome PDF Viewer",
+            "plugins.always_open_pdf_externally": True,
+        }
         if options_prefs:
             self.prefs.update(options_prefs)
 
@@ -41,7 +38,7 @@ class DriverHandler:
         self.init_attributes(PresenceCheckerFactory())
 
     def init_driver(self):
-        driver = Chrome(executable_path=CHROME_DRIVER, options=self.driver_options)
+        driver = Chrome(options=self.driver_options)
         if self.headless:
             driver.set_window_size(1920, 1080)
         return driver
@@ -71,7 +68,7 @@ class DriverHandler:
 
     def _get_callable_methods(self, attribute):
         for method_name in dir(attribute):
-            if not method_name.startswith('__'):
+            if not method_name.startswith("__"):
                 method = getattr(attribute, method_name)
                 if callable(method):
                     yield method_name, method
@@ -79,6 +76,7 @@ class DriverHandler:
     def method_wrapper(self, method):
         def wrapper(*args, method=method, **kwargs):
             return method(self.driver, *args, **kwargs)
+
         return wrapper
 
     def try_load_link_and_wait(self, link, id_to_wait_for=None):
@@ -86,12 +84,12 @@ class DriverHandler:
             self.load_link_and_wait(link, id_to_wait_for)
         except TimeoutException as e:
             raise TimeoutException(e)
-    
+
     def load_link_and_wait(self, link, id_to_wait_for=None):
-            self.link = link
-            self.driver.get(link)
-            if id_to_wait_for:
-                self.wait_for_element_id(id_to_wait_for, wait_time=10)
+        self.link = link
+        self.driver.get(link)
+        if id_to_wait_for:
+            self.wait_for_element_id(id_to_wait_for, wait_time=10)
 
     def switch_to_n_tab(self, n):
         window_handles = self.driver.window_handles
@@ -134,12 +132,12 @@ class DriverHandler:
     def get_element_selected_options(element):
         selector = Select(element)
         return selector.all_selected_options
-        
+
     @staticmethod
     def get_all_element_options(element):
         selector = Select(element)
         return selector.options
-    
+
     @staticmethod
     def deselect_element_options(element):
         selector = Select(element)
@@ -147,16 +145,15 @@ class DriverHandler:
 
 
 def main():
-
     dh = DriverHandler(headless=True)
-    print('='*40)
-    print('Driver Handler attributes:')
-    print('='*40)
+    print("=" * 40)
+    print("Driver Handler attributes:")
+    print("=" * 40)
     for att in dir(dh):
         print(att)
-    print('-'*40)
+    print("-" * 40)
     return dh
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     dh = main()

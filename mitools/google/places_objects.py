@@ -157,6 +157,16 @@ class NewPlace:
     shortFormattedAddress: str
     accessibilityOptions: AccessibilityOptions
     primaryTypeDisplayName: str
+    internationalPhoneNumber: str
+    nationalPhoneNumber: str
+    priceLevel: str
+    rating: float
+    userRatingCount: int
+    websiteUri: str
+    currentOpeningHours: str
+    currentSecondaryOpeningHours: str
+    regularSecondaryOpeningHours: str
+    regularOpeningHours: str
 
     @staticmethod
     def from_json(data: dict) -> 'NewPlace':
@@ -181,7 +191,17 @@ class NewPlace:
             primaryTypeDisplayName=data.get('primaryTypeDisplayName', {}).get('text', ''),
             primaryType=data.get('primaryType', ''),
             shortFormattedAddress=data.get('shortFormattedAddress', ''),
-            accessibilityOptions=AccessibilityOptions(**data.get('accessibilityOptions', {}))
+            accessibilityOptions=AccessibilityOptions(**data.get('accessibilityOptions', {})),
+            internationalPhoneNumber=data.get('internationalPhoneNumber', ''),
+            nationalPhoneNumber=data.get('nationalPhoneNumber', ''),
+            priceLevel=data.get('priceLevel', ''),
+            rating=data.get('rating', -1.0),
+            userRatingCount=data.get('userRatingCount', 0),
+            websiteUri=data.get('websiteUri', ''),
+            regularOpeningHours=str(data.get('regularOpeningHours', '')),
+            regularSecondaryOpeningHours=str(data.get('regularSecondaryOpeningHours', '')),
+            currentOpeningHours=str(data.get('currentOpeningHours', '')),
+            currentSecondaryOpeningHours=str(data.get('currentSecondaryOpeningHours', '')),
         )
     
     @staticmethod

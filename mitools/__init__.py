@@ -4,12 +4,14 @@ def _setup_autoreload():
     """
     try:
         from IPython import get_ipython
+
         ipython = get_ipython()
         if ipython:
-            ipython.run_line_magic('load_ext', 'autoreload')
-            ipython.run_line_magic('autoreload', '2')
+            ipython.run_line_magic("load_ext", "autoreload")
+            ipython.run_line_magic("autoreload", "2")
     except ImportError:
         pass  # Fails silently if not in an IPython environment
+
 
 # Automatically set up autoreload when this module is imported
 _setup_autoreload()
@@ -23,7 +25,7 @@ from tqdm import tqdm
 
 from mitools import clustering as clustering
 from mitools import economic_complexity as ec
-from mitools import etl, files, jupyter_utils, nlp
+from mitools import etl, files, google, jupyter_utils, nlp, scraping, utils
 from mitools import notebooks as nb
 from mitools import pandas as pdf
 from mitools import regressions as reg

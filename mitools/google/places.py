@@ -2,10 +2,10 @@ import itertools
 import math
 import os
 import random
+import time
 from datetime import datetime
 from os import PathLike
 from pathlib import Path
-from time import time
 from typing import Iterable, List, NewType, Optional, Tuple, Union
 
 import folium
@@ -22,13 +22,9 @@ from shapely.geometry import MultiPolygon, Point, Polygon
 from shapely.ops import transform
 from tqdm import tqdm
 
-from mitools.google.places_objects import (
-    CityGeojson,
-    DummyResponse,
-    NewNearbySearchRequest,
-    NewPlace,
-    intersection_condition_factory,
-)
+from mitools.google.places_objects import (CityGeojson, DummyResponse,
+                                           NewNearbySearchRequest, NewPlace,
+                                           intersection_condition_factory)
 
 CircleType = NewType('CircleType', Polygon)
 
@@ -86,7 +82,9 @@ RESTAURANT_TYPES = [
 FIELD_MASK = 'places.accessibilityOptions,places.addressComponents,places.adrFormatAddress,places.businessStatus,' \
         + 'places.displayName,places.formattedAddress,places.googleMapsUri,places.iconBackgroundColor,' \
             + 'places.iconMaskBaseUri,places.id,places.location,places.name,places.primaryType,places.primaryTypeDisplayName,places.plusCode,' \
-                + 'places.shortFormattedAddress,places.subDestinations,places.types,places.utcOffsetMinutes,places.viewport'
+                + 'places.shortFormattedAddress,places.subDestinations,places.types,places.utcOffsetMinutes,places.viewport,'\
+                + 'places.currentOpeningHours,places.currentSecondaryOpeningHours,places.internationalPhoneNumber,places.nationalPhoneNumber,' \
+                + 'places.priceLevel,places.rating,places.regularOpeningHours,places.regularSecondaryOpeningHours,places.userRatingCount,places.websiteUri'
 QUERY_HEADERS = {
     'Content-Type': 'aplication/json',
     'X-Goog-Api-Key': GOOGLE_PLACES_API_KEY,
@@ -354,11 +352,13 @@ def create_dummy_response(query):
         dummy_response['places'] = [create_dummy_place(query) for _ in range(places_n)]
     return dummy_response
 
-def nearby_search_request(circle, radius_in_meters):
+def nearby_search_request(circle, radius_in_meters, query_headers=None, restaurants=False):
     query = NewNearbySearchRequest(circle.geometry, 
                                 distance_in_meters=radius_in_meters, 
-                                included_types=RESTAURANT_TYPES
+                                included_types=RESTAURANT_TYPES if restaurants else None
                                    ).json_query()
+    if query_headers is not None:
+        QUERY_HEADERS = query_headers
     if QUERY_HEADERS['X-Goog-Api-Key'] != '':
         return requests.post(NEW_NEARBY_SEARCH_URL, headers=QUERY_HEADERS, json=query)
     else:
@@ -374,8 +374,8 @@ def get_response_places(response_id, response):
             places_df = pd.concat([places_df, pd.DataFrame(place_series).T], axis=0, ignore_index=True)
     return places_df
 
-def search_and_update_places(circle, radius_in_meters, response_id):
-    response = nearby_search_request(circle, radius_in_meters)
+def search_and_update_places(circle, radius_in_meters, response_id, query_headers=None, restaurants=False):
+    response = nearby_search_request(circle, radius_in_meters, query_headers=query_headers, restaurants=restaurants)
     places_df = None
     if response.reason == 'OK':
         if 'places' in response.json():
@@ -387,18 +387,23 @@ def search_and_update_places(circle, radius_in_meters, response_id):
         time.sleep(30)
     return searched, places_df
     
-def process_circles(circles, radius_in_meters, file_path, circles_path, recalculate=False):
-    global GLOBAL_REQUESTS_COUNTER, GLOBAL_REQUESTS_COUNTER_LIMIT
+def process_circles(circles, radius_in_meters, file_path, circles_path, global_requests_counter=None, global_requests_counter_limit=None, query_headers=None, restaurants=False, recalculate=False):
+    if global_requests_counter is None and global_requests_counter_limit is None:
+        global GLOBAL_REQUESTS_COUNTER, GLOBAL_REQUESTS_COUNTER_LIMIT
+    else:
+        GLOBAL_REQUESTS_COUNTER = global_requests_counter[0]
+        GLOBAL_REQUESTS_COUNTER_LIMIT = global_requests_counter_limit[0]
     if ((~circles['searched']).any() or recalculate) and GLOBAL_REQUESTS_COUNTER <= GLOBAL_REQUESTS_COUNTER_LIMIT:
         circles_search = circles[~circles['searched']]
         found_places = read_or_initialize_places(file_path, recalculate)
         with tqdm(total=len(circles_search), desc="Processing circles") as pbar:
             for response_id, circle in circles_search.iterrows():
-                searched, places_df = search_and_update_places(circle, radius_in_meters, response_id)
+                searched, places_df = search_and_update_places(circle, radius_in_meters, response_id, query_headers=query_headers, restaurants=restaurants)
                 if places_df is not None:
                     found_places = pd.concat([found_places, places_df], axis=0, ignore_index=True)
                 GLOBAL_REQUESTS_COUNTER += 1
                 update_progress_and_save(searched, circles, response_id, found_places, file_path, circles_path, pbar)
+                global_requests_counter[0] = GLOBAL_REQUESTS_COUNTER
                 if GLOBAL_REQUESTS_COUNTER >= GLOBAL_REQUESTS_COUNTER_LIMIT:
                     break
     else:
@@ -421,7 +426,11 @@ def search_places_in_polygon(root_folder,
                                  polygon,
                                  radius_in_meters, 
                                  step_in_degrees, 
-                                 condition_rule, 
+                                 condition_rule,
+                                 global_requests_counter=None,
+                                    global_requests_counter_limit=None,
+                                    query_headers=None,
+                                    restaurants=False,
                                  recalculate=False, 
                                  show=False):
         circles_path = root_folder / Path(f"{tag}_{radius_in_meters}_radius_{step_in_degrees}_step_circles.geojson")
@@ -454,6 +463,10 @@ def search_places_in_polygon(root_folder,
                                     radius_in_meters, 
                                     places_path, 
                                     circles_path, 
+                                    global_requests_counter=global_requests_counter, 
+                                    global_requests_counter_limit=global_requests_counter_limit,
+                                    query_headers=query_headers,
+                                    restaurants=restaurants,
                                     recalculate=recalculate)
         if show or recalculate:
             _ = polygon_plot_with_circles_and_points(polygon=polygon, 
@@ -501,7 +514,7 @@ def get_saturated_area(polygon, saturated_circles, show=False, output_path=None)
             plt.show()
     return saturated_area
 
-def places_search_step(project_folder, plots_folder, tag, polygon, radius_in_meters, step_in_degrees, show=False, recalculate=False):
+def places_search_step(project_folder, plots_folder, tag, polygon, radius_in_meters, step_in_degrees, global_requests_counter=None, global_requests_counter_limit=None, query_headers=None, restaurants=False, show=False, recalculate=False):
     circles, found_places = search_places_in_polygon(project_folder,
                                                      plots_folder,
                                                      tag,
@@ -509,6 +522,10 @@ def places_search_step(project_folder, plots_folder, tag, polygon, radius_in_met
                                                      radius_in_meters,
                                                      step_in_degrees,
                                                      condition_rule='center',
+                                                     global_requests_counter=global_requests_counter,
+                                                    global_requests_counter_limit=global_requests_counter_limit,
+                                                    query_headers=query_headers,
+                                                    restaurants=restaurants,
                                                      recalculate=recalculate,
                                                      show=show)
     saturated_circles_plot_path = plots_folder / f"{tag}_saturated_circles_plot.png"
@@ -524,11 +541,11 @@ def places_search_step(project_folder, plots_folder, tag, polygon, radius_in_met
 
     return found_places, circles, saturated_area, saturated_circles
 
-def calculate_degree_steps(meter_radiuses):
+def calculate_degree_steps(meter_radiuses, step_in_degrees=0.00375):
     degree_steps = []
     for i, radius in enumerate(meter_radiuses):
         if i == 0:  
-            step = STEP_IN_DEGREES
+            step = step_in_degrees
         else:
             step *= (radius / meter_radiuses[i - 1])
         degree_steps.append(step)
@@ -542,7 +559,7 @@ if __name__ == '__main__':
         'tokyo': '/Users/sebastian/Desktop/MontagnaInc/Research/Cities_Restaurants/translated_tokyo_wards.geojson'
     }
 
-    PROJECT_FOLDER = Path('/Users/sebastian/Desktop/MontagnaInc/Research/Cities_Restaurants/Tokyo_Places')
+    PROJECT_FOLDER = Path('/Users/sebastian/Desktop/MontagnaInc/Research/Cities_Restaurants/Tokyo_Places_with_Price')
     PROJECT_FOLDER.mkdir(exist_ok=True)
     PLOTS_FOLDER = PROJECT_FOLDER / 'plots'
     PLOTS_FOLDER.mkdir(exist_ok=True)
@@ -550,9 +567,6 @@ if __name__ == '__main__':
     SHOW = True
     RECALCULATE = False
 
-    GLOBAL_REQUESTS_COUNTER = 0
-    GLOBAL_REQUESTS_COUNTER_LIMIT = 6_000
-    
     city = CityGeojson(cities_geojsons[CITY], CITY)
     city_wards_plot_path = PLOTS_FOLDER / f"{city.name}_wards_polygons_plot.png"
     city_plot_path = PLOTS_FOLDER / f"{city.name}_polygon_plot.png"
@@ -568,7 +582,7 @@ if __name__ == '__main__':
 
     STEP_IN_DEGREES = 0.00375
     meter_radiuses = [250, 100, 50, 25, 12.5, 5, 2.5, 1]
-    degree_steps = calculate_degree_steps(meter_radiuses)
+    degree_steps = calculate_degree_steps(meter_radiuses, step_in_degrees=STEP_IN_DEGREES)
 
     area_polygon = city.merged_polygon
 
@@ -587,6 +601,9 @@ if __name__ == '__main__':
                                                                                     area_polygon,
                                                                                     radius, 
                                                                                     step, 
+                                                                                    global_requests_counter=None,
+                                                                                    global_requests_counter_limit=None,
+                                                                                    restaurants=True,
                                                                                     show=SHOW, 
                                                                                     recalculate=RECALCULATE
                                                                                     )
@@ -595,10 +612,12 @@ if __name__ == '__main__':
         print(f"Found Places: {found_places.shape[0]}, Sampled Circles: {sampled_circles}, Saturated Circles: {saturated_circles.shape[0]}")
         all_places = pd.concat([all_places, found_places], axis=0, ignore_index=True)
 
-    print(f"Total Sampled Circles: {total_sampled_circles}")
+        print(f"Total Sampled Circles: {total_sampled_circles}")
 
     if True:
-        all_places = all_places[[c for c in all_places.columns if c not in ['iconMaskBaseUri', 'googleMapsUri']]].reset_index(drop=True)
+        all_places = all_places[[c for c in all_places.columns if c not in ['iconMaskBaseUri', 
+                                                                            'googleMapsUri',
+                                                                            'websiteUri']]].reset_index(drop=True)
         all_places.to_parquet(all_places_parquet_path)
         all_places.to_excel(all_places_excel_path, index=False)
 
