@@ -1,4 +1,5 @@
-from typing import Any, Dict, List, Literal, Optional, Tuple, Union
+from os import PathLike
+from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Union
 
 import matplotlib.pyplot as plt
 import matplotlib.transforms as transforms
@@ -30,6 +31,8 @@ CLUSTER_COL_NOT_IN_INDEX_ERROR = (
 )
 SINGLE_GROUP_DF_ERROR = "DataFrame provided has a single group!"
 EMPTY_DF_ERROR = "DataFrame provided is empty!"
+WARD_AFFINITY_ERROR = "Ward linkage only allows for euclidean affinity!"
+DISTANCE_THRESHOLD_ERROR = "If distance_threshold is not None, n_clusters must be None and compute_full_tree must be True!"
 
 N_ELEMENTS_COL = "N Elements"
 
@@ -65,6 +68,50 @@ def kmeans_clustering(
     return kmeans_model, cluster_labels
 
 
+def agglomerative_clustering(
+    data: DataFrame,
+    n_clusters: int,
+    metric: Optional[
+        Union[
+            Literal["euclidean", "l1", "l2", "manhattan", "cosine", "precomputed"],
+            Callable,
+        ]
+    ] = "euclidean",
+    memory: Optional[PathLike] = None,
+    connectivity: Optional[Union[ndarray, Callable]] = None,
+    compute_full_tree: Optional[Union[Literal["auto"], bool]] = "auto",
+    linkage: Optional[Literal["ward", "complete", "average", "single"]] = "ward",
+    distance_threshold: Optional[float] = None,
+    compute_distances: Optional[bool] = False,
+) -> Tuple[AgglomerativeClustering, np.ndarray]:
+    if linkage == "ward" and metric != "euclidean":
+        raise ArgumentValueError(WARD_AFFINITY_ERROR)
+    if distance_threshold is not None and (
+        n_clusters is not None or not compute_full_tree
+    ):
+        raise ArgumentValueError(DISTANCE_THRESHOLD_ERROR)
+    if data.empty:
+        raise ArgumentStructureError(EMPTY_DATA_ERROR)
+    if not isinstance(n_clusters, int):
+        raise ArgumentTypeError(MAX_CLUSTERS_TYPE_ERROR)
+    if n_clusters < 2:
+        raise ArgumentValueError(MIN_CLUSTERS_VALUE_ERROR)
+    if n_clusters > len(data):
+        raise ArgumentValueError(MAX_CLUSTERS_VALUE_ERROR)
+    agg_clustering_model = AgglomerativeClustering(
+        n_clusters=n_clusters,
+        metric=metric,
+        memory=memory,
+        connectivity=connectivity,
+        compute_full_tree=compute_full_tree,
+        linkage=linkage,
+        distance_threshold=distance_threshold,
+        compute_distances=compute_distances,
+    )
+    cluster_labels = agg_clustering_model.fit_predict(data)
+    return agg_clustering_model, cluster_labels
+
+
 def kmeans_ncluster_search(
     data: DataFrame,
     max_clusters: Optional[int] = 25,
@@ -98,12 +145,6 @@ def agglomerative_ncluster_search(
         score = silhouette_score(data, agg_clustering.labels_)
         silhouette_scores.append(score)
     return silhouette_scores
-
-
-def agglomerative_clustering(data: DataFrame, n_clusters: int) -> ndarray:
-    agg_clustering = AgglomerativeClustering(n_clusters=n_clusters)
-    agg_clustering.fit_predict(data)
-    return agg_clustering
 
 
 def get_clusters_centroids(data: DataFrame, cluster_col: str) -> DataFrame:
