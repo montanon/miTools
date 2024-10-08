@@ -26,8 +26,6 @@ MIN_CLUSTERS_VALUE_ERROR = "n_clusters must be a number larger or equal than 2."
 MAX_CLUSTERS_VALUE_ERROR = "n_clusters must be a number larger or equal than 2."
 X_Y_SIZE_ERROR = "x values and y values must be the same size."
 
-
-EMPTY_DF_ERROR = "DataFrame provided is empty!"
 WARD_AFFINITY_ERROR = "Ward linkage only allows for euclidean affinity!"
 DISTANCE_THRESHOLD_ERROR = "If distance_threshold is not None, n_clusters must be None and compute_full_tree must be True!"
 
@@ -135,7 +133,7 @@ def clustering_ncluster_search(
 
 def get_clusters_centroids_distances(centroids: DataFrame) -> DataFrame:
     if centroids.empty:
-        raise ArgumentStructureError(EMPTY_DF_ERROR)
+        raise ArgumentStructureError(EMPTY_DATA_ERROR)
     return DataFrame(
         pairwise_distances(centroids), index=centroids.index, columns=centroids.index
     )
