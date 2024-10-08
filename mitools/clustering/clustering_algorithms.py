@@ -127,11 +127,6 @@ def clustering_ncluster_search(
     return silhouette_scores, inertia
 
 
-def get_cosine_similarities(data: DataFrame, cluster_col: str) -> ndarray:
-    cosine_similarities = data.groupby(level=cluster_col).apply(cosine_similarity)
-    return cosine_similarities
-
-
 def plot_clusters_evolution(
     dataframe: DataFrame,
     cluster_col: str,

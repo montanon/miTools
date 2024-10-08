@@ -103,3 +103,28 @@ def get_clusters_size(data: DataFrame, cluster_level: str) -> DataFrame:
         .to_frame(name=N_ELEMENTS_COL)
     )
     return cluster_count
+
+
+def get_cosine_similarities(
+    data: DataFrame, id_level: Union[str, int], as_vector: Optional[bool] = True
+) -> DataFrame:
+    if id_level not in data.index.names and not (
+        isinstance(id_level, int) and id_level < data.index.nlevels
+    ):
+        raise KeyError(f"{CLUSTER_COL_NOT_IN_INDEX_ERROR}")
+    similarity_matrix = cosine_similarity(data.values)
+    if as_vector:
+        upper_tri_indices = np.triu_indices_from(similarity_matrix, k=1)
+        sample_pairs = [
+            (
+                data.index.get_level_values(id_level)[i],
+                data.index.get_level_values(id_level)[j],
+            )
+            for i, j in zip(*upper_tri_indices)
+        ]
+    similarity_df = DataFrame(
+        similarity_matrix[upper_tri_indices] if as_vector else similarity_matrix,
+        index=pd.MultiIndex.from_tuples(sample_pairs) if as_vector else data.index,
+        columns=["cosine_similarity"] if as_vector else data.index,
+    )
+    return similarity_df
