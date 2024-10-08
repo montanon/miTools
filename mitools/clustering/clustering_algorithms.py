@@ -136,20 +136,6 @@ def get_cosine_similarities(data: DataFrame, cluster_col: str) -> ndarray:
     return cosine_similarities
 
 
-def get_distances_to_centroids(
-    data: DataFrame, centroids: DataFrame, cluster_col: str
-) -> DataFrame:
-    distances = []
-    label_pos = data.index.names.index(cluster_col)
-    for idx, values in data.iterrows():
-        cluster = idx[label_pos]
-        centroid = centroids.loc[cluster]
-        distance = euclidean(values, centroid)
-        distances.append(distance)
-    distances = DataFrame(distances, index=data.index)
-    return distances.sort_index()
-
-
 def plot_clusters_evolution(
     dataframe: DataFrame,
     cluster_col: str,

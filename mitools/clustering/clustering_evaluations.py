@@ -1,9 +1,10 @@
 from typing import Literal, Optional, Union
 
 import numpy as np
+import pandas as pd
 from numpy import ndarray
 from pandas import DataFrame
-from scipy.spatial.distance import euclidean
+from scipy.spatial.distance import cdist, euclidean
 from sklearn.metrics.pairwise import cosine_similarity, pairwise_distances
 from sklearn.neighbors import NearestCentroid
 
@@ -41,3 +42,46 @@ def get_distances_between_centroids(centroids: DataFrame) -> DataFrame:
         raise ArgumentStructureError(EMPTY_DATA_ERROR)
     distance_matrix = pairwise_distances(centroids.values)
     return DataFrame(distance_matrix, index=centroids.index, columns=centroids.index)
+
+
+def get_distances_to_centroids(
+    data: DataFrame,
+    centroids: DataFrame,
+    cluster_level: str,
+    metric: Optional[
+        Literal[
+            "braycurtis",
+            "canberra",
+            "chebyshev",
+            "cityblock",
+            "correlation",
+            "cosine",
+            "dice",
+            "euclidean",
+            "hamming",
+            "jaccard",
+            "jensenshannon",
+            "kulczynski1",
+            "mahalanobis",
+            "matching",
+            "minkowski",
+            "rogerstanimoto",
+            "russellrao",
+            "seuclidean",
+            "sokalmichener",
+            "sokalsneath",
+            "sqeuclidean",
+            "yule",
+        ]
+    ] = "euclidean",
+) -> DataFrame:
+    if cluster_level not in data.index.names:
+        raise KeyError(f"{CLUSTER_COL_NOT_IN_INDEX_ERROR}")
+    cluster_labels = data.index.get_level_values(cluster_level)
+    corresponding_centroids = centroids.loc[cluster_labels]
+    distances = cdist(
+        data.values, corresponding_centroids.values, metric="euclidean"
+    ).diagonal()
+    return DataFrame(
+        distances, index=data.index, columns=[f"distance_to_{cluster_level}_centroid"]
+    )
