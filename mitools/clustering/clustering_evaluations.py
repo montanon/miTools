@@ -11,7 +11,7 @@ from sklearn.neighbors import NearestCentroid
 from ..exceptions import ArgumentStructureError, ArgumentTypeError, ArgumentValueError
 
 CLUSTER_COL_NOT_IN_INDEX_ERROR = (
-    "DataFrame provided does not have the {cluster_col} index level!"
+    "DataFrame provided does not have the {cluster_level} index level!"
 )
 SINGLE_GROUP_DF_ERROR = "DataFrame provided has a single group!"
 EMPTY_DATA_ERROR = "Input DataFrame cannot be empty."
