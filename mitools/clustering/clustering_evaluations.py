@@ -16,6 +16,7 @@ CLUSTER_COL_NOT_IN_INDEX_ERROR = (
 SINGLE_GROUP_DF_ERROR = "DataFrame provided has a single group!"
 EMPTY_DATA_ERROR = "Input DataFrame cannot be empty."
 EMPTY_CENTROIDS_ERROR = "Centroids DataFrame cannot be empty."
+N_ELEMENTS_COL = "N Elements"
 
 
 def get_clusters_centroids(
@@ -90,3 +91,15 @@ def get_distances_to_centroids(
     return DataFrame(
         distances, index=data.index, columns=[f"distance_to_{cluster_level}_centroid"]
     )
+
+
+def get_clusters_size(data: DataFrame, cluster_level: str) -> DataFrame:
+    if cluster_level not in data.index.names:
+        raise KeyError(f"{CLUSTER_COL_NOT_IN_INDEX_ERROR}")
+    cluster_count = (
+        data.index.get_level_values(cluster_level)
+        .value_counts()
+        .sort_index()
+        .to_frame(name=N_ELEMENTS_COL)
+    )
+    return cluster_count

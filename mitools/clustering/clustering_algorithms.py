@@ -18,8 +18,6 @@ from tqdm import tqdm
 
 from ..exceptions import ArgumentStructureError, ArgumentTypeError, ArgumentValueError
 
-N_ELEMENTS_COL = "N Elements"
-
 EMPTY_DATA_ERROR = "Input DataFrame cannot be empty."
 MAX_CLUSTERS_TYPE_ERROR = "n_clusters provided must be a positive int larger than 2."
 MIN_CLUSTERS_VALUE_ERROR = "n_clusters must be a number larger or equal than 2."
@@ -28,8 +26,6 @@ X_Y_SIZE_ERROR = "x values and y values must be the same size."
 
 WARD_AFFINITY_ERROR = "Ward linkage only allows for euclidean affinity!"
 DISTANCE_THRESHOLD_ERROR = "If distance_threshold is not None, n_clusters must be None and compute_full_tree must be True!"
-
-N_ELEMENTS_COL = "N Elements"
 
 
 def kmeans_clustering(
@@ -354,12 +350,6 @@ def confidence_ellipse(
     ax.add_patch(ellipse)
 
     return ax
-
-
-def display_clusters_size(data: DataFrame, cluster_col: str) -> DataFrame:
-    cluster_count = data[[cluster_col]].value_counts().sort_index().to_frame()
-    cluster_count.columns = [N_ELEMENTS_COL]
-    return cluster_count
 
 
 def plot_clusters_growth(
