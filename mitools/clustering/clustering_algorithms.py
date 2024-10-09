@@ -296,26 +296,3 @@ def plot_clusters_growth_stacked(
         ax.legend(loc="center left", bbox_to_anchor=(1, 0.5))
 
     return ax
-
-
-def plot_distances_to_centroids(
-    distances: DataFrame, cluster_col: str, colors: Optional[List[Tuple]] = None
-) -> Axes:
-    fig, ax = plt.subplots(1, 1, figsize=(14, 6))
-    if colors is None:
-        colors = sns.color_palette("husl", len(distances.index.unique()))[::1]
-    for cl, distances in tqdm(distances.groupby(cluster_col)):
-        distances = distances[0].values
-        kde = gaussian_kde(distances)
-        x_vals = np.linspace(min(distances), max(distances), 1000)
-        y_vals = kde(x_vals) / max(kde(x_vals))
-        ax.plot(x_vals, y_vals, alpha=1.0, label=cl, color=colors[cl])
-
-    ax.set_title(
-        "Standardized Distribution of Distances to Centroid of Embeddings by Cluster"
-    )
-    ax.set_xlabel("Distance to Centroid")
-    ax.set_ylabel("Density")
-    ax.legend()
-
-    return ax
