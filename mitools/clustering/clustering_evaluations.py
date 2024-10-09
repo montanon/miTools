@@ -1,4 +1,4 @@
-from typing import Literal, Optional, Union
+from typing import Callable, Literal, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -105,26 +105,48 @@ def get_clusters_size(data: DataFrame, cluster_level: str) -> DataFrame:
     return cluster_count
 
 
-def get_cosine_similarities(
-    data: DataFrame, id_level: Union[str, int], as_vector: Optional[bool] = True
+def get_cosine_similarities(data: DataFrame, id_level: Union[str, int]) -> DataFrame:
+    return get_similarities_metric(data, id_level, cosine_similarity)
+
+
+def get_similarities_metric(
+    data: DataFrame, id_level: Union[str, int], metric: Callable
 ) -> DataFrame:
+    if data.empty:
+        raise ArgumentStructureError(EMPTY_DATA_ERROR)
+    if data.shape[0] == 1:
+        raise ArgumentStructureError(SINGLE_GROUP_DF_ERROR)
     if id_level not in data.index.names and not (
         isinstance(id_level, int) and id_level < data.index.nlevels
     ):
         raise KeyError(f"{CLUSTER_COL_NOT_IN_INDEX_ERROR}")
-    similarity_matrix = cosine_similarity(data.values)
-    if as_vector:
-        upper_tri_indices = np.triu_indices_from(similarity_matrix, k=1)
-        sample_pairs = [
-            (
-                data.index.get_level_values(id_level)[i],
-                data.index.get_level_values(id_level)[j],
-            )
-            for i, j in zip(*upper_tri_indices)
-        ]
+    similarity_matrix = metric(data.values)
     similarity_df = DataFrame(
-        similarity_matrix[upper_tri_indices] if as_vector else similarity_matrix,
-        index=pd.MultiIndex.from_tuples(sample_pairs) if as_vector else data.index,
-        columns=["cosine_similarity"] if as_vector else data.index,
+        similarity_matrix,
+        index=data.index,
+        columns=data.index,
     )
     return similarity_df
+
+
+def get_similarities_vector(
+    similarity_df: DataFrame, id_level: Union[str, int]
+) -> DataFrame:
+    if id_level not in similarity_df.index.names and not (
+        isinstance(id_level, int) and id_level < similarity_df.index.nlevels
+    ):
+        raise KeyError(f"{CLUSTER_COL_NOT_IN_INDEX_ERROR}")
+    upper_tri_indices = np.triu_indices_from(similarity_df, k=1)
+    sample_pairs = [
+        (
+            similarity_df.index.get_level_values(id_level)[i],
+            similarity_df.index.get_level_values(id_level)[j],
+        )
+        for i, j in zip(*upper_tri_indices)
+    ]
+    similarity_vector = DataFrame(
+        similarity_df.values[upper_tri_indices],
+        index=pd.MultiIndex.from_tuples(sample_pairs),
+        columns=["cosine_similarity"],
+    )
+    return similarity_vector
