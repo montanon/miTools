@@ -1,4 +1,4 @@
-from typing import Iterable, List, Optional, Tuple, Union
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -135,5 +135,35 @@ def plot_dfs_col_distribution(
             color=color,
             bins=bins,
             ax=ax,
+        )
+    return ax
+
+
+def plot_clusters(
+    data: DataFrame,
+    cluster_level: Union[int, str],
+    x_col: str,
+    y_col: str,
+    ax: Optional[Axes] = None,
+    labels: Optional[List] = None,
+    colors: Optional[List[Tuple]] = None,
+    **kwargs: Dict[str, Any],
+) -> Axes:
+    if ax is None:
+        _, ax = plt.subplots(1, 1, figsize=(14, 10))
+    if kwargs is None:
+        kwargs = dict(alpha=0.75, marker="o", size=5)
+    if labels is None:
+        labels = data.index.get_level_values(cluster_level).unique()
+    if colors is None:
+        colors = sns.color_palette("husl", len(labels))[::1]
+    for i, cls in enumerate(labels):
+        ax.scatter(
+            data[data.index.get_level_values(cluster_level) == cls][x_col],
+            data[data.index.get_level_values(cluster_level) == cls][y_col],
+            color=colors[i],
+            label=cls if labels is not None else None,
+            zorder=99,
+            **kwargs,
         )
     return ax

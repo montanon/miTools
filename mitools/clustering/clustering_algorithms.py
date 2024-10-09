@@ -9,11 +9,9 @@ from matplotlib.axes import Axes
 from matplotlib.patches import Ellipse
 from numpy import ndarray
 from pandas import DataFrame, IndexSlice
-from scipy.spatial.distance import euclidean
 from scipy.stats import gaussian_kde
 from sklearn.cluster import AgglomerativeClustering, KMeans
 from sklearn.metrics import silhouette_score
-from sklearn.metrics.pairwise import cosine_similarity, pairwise_distances
 from tqdm import tqdm
 
 from ..exceptions import ArgumentStructureError, ArgumentTypeError, ArgumentValueError
@@ -221,41 +219,6 @@ def plot_clusters_evolution(
         handle.set_sizes([100.0])
 
     return axes
-
-
-def plot_clusters(
-    data: DataFrame,
-    cluster_col: str,
-    x_col: str,
-    y_col: str,
-    ax: Optional[Axes] = None,
-    labels: Optional[List] = None,
-    colors: Optional[List[Tuple]] = None,
-    **kwargs: Dict[str, Any],
-) -> Axes:
-    if ax is None:
-        _, ax = plt.subplots(1, 1, figsize=(14, 10))
-    if kwargs is None:
-        kwargs = dict(alpha=0.75, marker="o", size=5)
-    if labels is None:
-        labels = data[cluster_col].unique()
-    if colors is None:
-        colors = sns.color_palette("husl", len(labels))[::1]
-
-    for i, cls in enumerate(labels):
-        ax.scatter(
-            data[data[cluster_col] == cls][x_col],
-            data[data[cluster_col] == cls][y_col],
-            color=colors[i],
-            label=cls if labels is not None else None,
-            zorder=99,
-            **kwargs,
-        )
-
-    ax.set_xticks([])
-    ax.set_yticks([])
-
-    return ax
 
 
 def add_clusters_centroids(
