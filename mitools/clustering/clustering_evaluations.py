@@ -123,13 +123,14 @@ def get_similarities_metric(data: DataFrame, metric: Callable) -> DataFrame:
     return similarity_df
 
 
-def get_similarities_vector(
-    similarity_df: DataFrame, id_level: Union[str, int]
+def get_similarities_metric_vector(
+    data: DataFrame, metric: Callable, id_level: Union[str, int]
 ) -> DataFrame:
-    if id_level not in similarity_df.index.names and not (
-        isinstance(id_level, int) and id_level < similarity_df.index.nlevels
+    if id_level not in data.index.names and not (
+        isinstance(id_level, int) and id_level < data.index.nlevels
     ):
         raise KeyError(f"{CLUSTER_COL_NOT_IN_INDEX_ERROR}")
+    similarity_df = get_similarities_metric(data, metric)
     upper_tri_indices = np.triu_indices_from(similarity_df, k=1)
     sample_pairs = [
         (
@@ -138,9 +139,9 @@ def get_similarities_vector(
         )
         for i, j in zip(*upper_tri_indices)
     ]
-    similarity_vector = DataFrame(
+    similarity_vector_df = DataFrame(
         similarity_df.values[upper_tri_indices],
         index=pd.MultiIndex.from_tuples(sample_pairs),
-        columns=["cosine_similarity"],
+        columns=[metric.__name__ if hasattr(metric, "__name__") else "similarity"],
     )
-    return similarity_vector
+    return similarity_vector_df
