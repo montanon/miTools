@@ -107,15 +107,15 @@ def get_clusters_size(data: DataFrame, cluster_level: str) -> DataFrame:
     return cluster_count
 
 
-def get_cosine_similarities(
+def get_cosine_similarities_matrix(
     data: DataFrame, id_level: Optional[Union[str, int, None]] = None
 ) -> DataFrame:
-    return get_similarities_metric(
+    return get_similarities_matrix(
         data=data, metric=cosine_similarity, id_level=id_level
     )
 
 
-def get_similarities_metric(
+def get_similarities_matrix(
     data: DataFrame, metric: Callable, id_level: Optional[Union[str, int, None]] = None
 ) -> DataFrame:
     if data.empty:
@@ -152,7 +152,7 @@ def get_similarities_metric_vector(
         and not (isinstance(id_level, int) and id_level < data.index.nlevels)
     ):
         raise KeyError(f"{CLUSTER_COL_NOT_IN_INDEX_ERROR}")
-    similarity_df = get_similarities_metric(data, metric)
+    similarity_df = get_similarities_matrix(data, metric)
     upper_tri_indices = np.triu_indices_from(similarity_df, k=1)
     sample_pairs = [
         (
@@ -173,7 +173,7 @@ def get_similarities_metric_vector(
     return similarity_vector_df
 
 
-def get_cluster_cosine_similarities(
+def get_cosine_similarities(
     data: DataFrame,
     id_level: Optional[Union[str, int, None]] = None,
     as_vector: Optional[bool] = True,
@@ -183,5 +183,7 @@ def get_cluster_cosine_similarities(
             data=data, id_level=id_level
         )
     else:
-        cosine_similarities = get_cosine_similarities(data=data, id_level=id_level)
+        cosine_similarities = get_cosine_similarities_matrix(
+            data=data, id_level=id_level
+        )
     return cosine_similarities

@@ -20,10 +20,10 @@ from mitools.clustering import (
     clustering_ncluster_search,
     get_clusters_centroids,
     get_clusters_size,
-    get_cosine_similarities,
+    get_cosine_similarities_matrix,
     get_distances_between_centroids,
     get_distances_to_centroids,
-    get_similarities_metric,
+    get_similarities_matrix,
     get_similarities_metric_vector,
     kmeans_clustering,
 )
@@ -43,7 +43,7 @@ class TestKMeansClustering(TestCase):
         # Check that the correct number of labels are generated
         self.assertEqual(len(labels), len(self.data))
         # Verify that the number of unique clusters matches `n_clusters`
-        unique_labels = unique(labels)
+        unique_labels = np.unique(labels)
         self.assertEqual(len(unique_labels), n_clusters)
         # Ensure the model object is of type `KMeans`
         self.assertIsInstance(kmeans_model, KMeans)
@@ -290,8 +290,8 @@ class TestGetClustersCentroids(TestCase):
         expected = DataFrame(expected_data, index=[0, 1, 2])
         # Ensure centroids are computed correctly
         self.assertTrue(
-            array_equal(result.values, expected.values)
-            and array_equal(result.index.values, expected.index.values)
+            np.array_equal(result.values, expected.values)
+            and np.array_equal(result.index.values, expected.index.values)
         )
 
     def test_empty_dataframe(self):
@@ -339,7 +339,7 @@ class TestGetDistancesBetweenCentroids(TestCase):
             columns=self.centroids.index,
         )
         # Use numpy's allclose for floating-point comparisons
-        self.assertTrue(allclose(result.values, expected.values))
+        self.assertTrue(np.allclose(result.values, expected.values))
 
     def test_empty_dataframe(self):
         # Test with an empty DataFrame with appropriate columns
@@ -356,7 +356,7 @@ class TestGetDistancesBetweenCentroids(TestCase):
         # Expected pairwise distance matrix for a single point (1x1 matrix with 0)
         expected = DataFrame([[0]], index=["A"], columns=["A"])
         # Use numpy's allclose for floating-point comparisons
-        self.assertTrue(allclose(result.values, expected.values))
+        self.assertTrue(np.allclose(result.values, expected.values))
 
 
 class TestGetDistancesToCentroids(TestCase):
@@ -450,7 +450,7 @@ class TestGetSimilaritiesMetric(TestCase):
         )
 
     def test_positive_case_cosine_similarity(self):
-        result = get_similarities_metric(self.data, metric=cosine_similarity)
+        result = get_similarities_matrix(self.data, metric=cosine_similarity)
         # Manually calculate the expected cosine similarity matrix
         expected_result = DataFrame(
             cosine_similarity(self.data.values),
@@ -461,7 +461,7 @@ class TestGetSimilaritiesMetric(TestCase):
         assert_frame_equal(result, expected_result)
 
     def test_positive_case_with_id_level(self):
-        result = get_similarities_metric(
+        result = get_similarities_matrix(
             self.data, metric=cosine_similarity, id_level="sample_id"
         )
         # Manually calculate expected cosine similarity using the specified level
@@ -480,7 +480,7 @@ class TestGetSimilaritiesMetric(TestCase):
                 1 / (1 + distance_matrix)
             )  # Convert distances to similarity (higher values indicate higher similarity)
 
-        result = get_similarities_metric(self.data, metric=euclidean_similarity)
+        result = get_similarities_matrix(self.data, metric=euclidean_similarity)
         # Manually calculate the expected Euclidean similarity matrix
         expected_similarity = euclidean_similarity(self.data.values)
         expected_result = DataFrame(
@@ -495,15 +495,15 @@ class TestGetSimilaritiesMetric(TestCase):
             pd.MultiIndex.from_tuples([], names=["cluster", "sample_id"])
         )
         with self.assertRaises(ArgumentStructureError):
-            get_similarities_metric(empty_data, metric=cosine_similarity)
+            get_similarities_matrix(empty_data, metric=cosine_similarity)
 
     def test_single_row_dataframe(self):
         single_row_df = self.data.iloc[[0]]
         with self.assertRaises(ArgumentStructureError):
-            get_similarities_metric(single_row_df, metric=cosine_similarity)
+            get_similarities_matrix(single_row_df, metric=cosine_similarity)
 
     def test_numeric_index_level(self):
-        result = get_similarities_metric(
+        result = get_similarities_matrix(
             self.data, metric=cosine_similarity, id_level=1
         )
         expected_result = DataFrame(
@@ -514,7 +514,7 @@ class TestGetSimilaritiesMetric(TestCase):
         assert_frame_equal(result, expected_result)
 
     def test_no_id_level_provided(self):
-        result = get_similarities_metric(
+        result = get_similarities_matrix(
             self.data, metric=cosine_similarity, id_level=None
         )
         # Calculate expected cosine similarity values using the entire index
@@ -527,7 +527,7 @@ class TestGetSimilaritiesMetric(TestCase):
 
     def test_invalid_index_level(self):
         with self.assertRaises(KeyError):
-            get_similarities_metric(
+            get_similarities_matrix(
                 self.data, metric=cosine_similarity, id_level="invalid_level"
             )
 
@@ -548,7 +548,7 @@ class TestGetCosineSimilarities(TestCase):
         )
 
     def test_positive_case(self):
-        result = get_cosine_similarities(self.data)
+        result = get_cosine_similarities_matrix(self.data)
         # Manually calculate the expected cosine similarity matrix
         expected_result = DataFrame(
             cosine_similarity(self.data.values),
@@ -562,12 +562,12 @@ class TestGetCosineSimilarities(TestCase):
             pd.MultiIndex.from_tuples([], names=["cluster", "sample_id"])
         )
         with self.assertRaises(ArgumentStructureError):
-            get_cosine_similarities(empty_data)
+            get_cosine_similarities_matrix(empty_data)
 
     def test_single_row_dataframe(self):
         single_row_df = self.data.iloc[[0]]
         with self.assertRaises(ArgumentStructureError):
-            get_cosine_similarities(single_row_df)
+            get_cosine_similarities_matrix(single_row_df)
 
 
 class TestGetSimilaritiesMetricVector(TestCase):
