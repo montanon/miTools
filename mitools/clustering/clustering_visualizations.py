@@ -1,11 +1,18 @@
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 import matplotlib.pyplot as plt
+import matplotlib.transforms as transforms
 import numpy as np
 import seaborn as sns
 from matplotlib.axes import Axes
+from matplotlib.patches import Ellipse
+from numpy import ndarray
 from pandas import DataFrame
 from scipy.stats import gaussian_kde
+
+from ..exceptions import ArgumentStructureError
+
+X_Y_SIZE_ERROR = "x values and y values must be the same size."
 
 
 def create_figure(with_inertia: bool) -> Tuple[plt.Figure, List[Axes]]:
@@ -166,4 +173,44 @@ def plot_clusters(
             zorder=99,
             **kwargs,
         )
+    return ax
+
+
+def confidence_ellipse(
+    xvalues: ndarray,
+    yvalues: ndarray,
+    ax: Axes,
+    n_std: Optional[float] = 1.96,
+    facecolor: Optional[Union[str, Tuple[int, float]]] = "none",
+    **kwargs: Dict[str, Any],
+) -> Axes:
+    if xvalues.size != yvalues.size:
+        raise ArgumentStructureError(X_Y_SIZE_ERROR)
+    if "edgecolor" not in kwargs:
+        kwargs["edgecolor"] = "black"
+        kwargs["linestyle"] = "--"
+    cov = np.cov(xvalues.astype(float), yvalues.astype(float), rowvar=False)
+    pearson_corr = cov[0, 1] / np.sqrt(cov[0, 0] * cov[1, 1])
+    ellipse_radius_x = np.sqrt(1 + pearson_corr)
+    ellipse_radius_y = np.sqrt(1 - pearson_corr)
+    ellipse = Ellipse(
+        (0, 0),
+        width=ellipse_radius_x * 2,
+        height=ellipse_radius_y * 2,
+        facecolor=facecolor,
+        **kwargs,
+    )
+    scale_x = np.sqrt(cov[0, 0]) * n_std
+    mean_x = np.mean(xvalues)
+    scale_y = np.sqrt(cov[1, 1]) * n_std
+    mean_y = np.mean(yvalues)
+
+    transformation = (
+        transforms.Affine2D()
+        .rotate_deg(45)
+        .scale(scale_x, scale_y)
+        .translate(mean_x, mean_y)
+    )
+    ellipse.set_transform(transformation + ax.transData)
+    ax.add_patch(ellipse)
     return ax

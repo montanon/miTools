@@ -2,11 +2,9 @@ from os import PathLike
 from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Union
 
 import matplotlib.pyplot as plt
-import matplotlib.transforms as transforms
 import numpy as np
 import seaborn as sns
 from matplotlib.axes import Axes
-from matplotlib.patches import Ellipse
 from numpy import ndarray
 from pandas import DataFrame, IndexSlice
 from scipy.stats import gaussian_kde
@@ -20,7 +18,7 @@ EMPTY_DATA_ERROR = "Input DataFrame cannot be empty."
 MAX_CLUSTERS_TYPE_ERROR = "n_clusters provided must be a positive int larger than 2."
 MIN_CLUSTERS_VALUE_ERROR = "n_clusters must be a number larger or equal than 2."
 MAX_CLUSTERS_VALUE_ERROR = "n_clusters must be a number larger or equal than 2."
-X_Y_SIZE_ERROR = "x values and y values must be the same size."
+
 
 WARD_AFFINITY_ERROR = "Ward linkage only allows for euclidean affinity!"
 DISTANCE_THRESHOLD_ERROR = "If distance_threshold is not None, n_clusters must be None and compute_full_tree must be True!"
@@ -271,42 +269,6 @@ def add_clusters_ellipse(
             edgecolor=colors[i],
             **kwargs,
         )
-    return ax
-
-
-def confidence_ellipse(
-    xvalues, yvalues, ax, n_std=1.96, facecolor="none", **kwargs
-) -> Axes:
-    if xvalues.size != yvalues.size:
-        raise ArgumentStructureError(X_Y_SIZE_ERROR)
-
-    cov = np.cov(xvalues.astype(float), yvalues.astype(float), rowvar=False)
-    pearson_corr = cov[0, 1] / np.sqrt(cov[0, 0] * cov[1, 1])
-    ellipse_radius_x = np.sqrt(1 + pearson_corr)
-    ellipse_radius_y = np.sqrt(1 - pearson_corr)
-    ellipse = Ellipse(
-        (0, 0),
-        width=ellipse_radius_x * 2,
-        height=ellipse_radius_y * 2,
-        facecolor=facecolor,
-        **kwargs,
-    )
-
-    scale_x = np.sqrt(cov[0, 0]) * n_std
-    mean_x = np.mean(xvalues)
-    scale_y = np.sqrt(cov[1, 1]) * n_std
-    mean_y = np.mean(yvalues)
-
-    transformation = (
-        transforms.Affine2D()
-        .rotate_deg(45)
-        .scale(scale_x, scale_y)
-        .translate(mean_x, mean_y)
-    )
-
-    ellipse.set_transform(transformation + ax.transData)
-    ax.add_patch(ellipse)
-
     return ax
 
 
