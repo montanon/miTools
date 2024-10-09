@@ -450,9 +450,7 @@ class TestGetSimilaritiesMetric(unittest.TestCase):
         )
 
     def test_positive_case_cosine_similarity(self):
-        result = get_similarities_metric(
-            self.data, id_level="sample_id", metric=cosine_similarity
-        )
+        result = get_similarities_metric(self.data, metric=cosine_similarity)
         # Manually calculate the expected cosine similarity matrix
         expected_result = DataFrame(
             cosine_similarity(self.data.values),
@@ -470,9 +468,7 @@ class TestGetSimilaritiesMetric(unittest.TestCase):
                 1 / (1 + distance_matrix)
             )  # Convert distances to similarity (higher values indicate higher similarity)
 
-        result = get_similarities_metric(
-            self.data, id_level="sample_id", metric=euclidean_similarity
-        )
+        result = get_similarities_metric(self.data, metric=euclidean_similarity)
         # Manually calculate the expected Euclidean similarity matrix
         expected_similarity = euclidean_similarity(self.data.values)
         expected_result = DataFrame(
@@ -487,27 +483,15 @@ class TestGetSimilaritiesMetric(unittest.TestCase):
             pd.MultiIndex.from_tuples([], names=["cluster", "sample_id"])
         )
         with self.assertRaises(ArgumentStructureError):
-            get_similarities_metric(
-                empty_data, id_level="sample_id", metric=cosine_similarity
-            )
+            get_similarities_metric(empty_data, metric=cosine_similarity)
 
     def test_single_row_dataframe(self):
         single_row_df = self.data.iloc[[0]]
         with self.assertRaises(ArgumentStructureError):
-            get_similarities_metric(
-                single_row_df, id_level="sample_id", metric=cosine_similarity
-            )
-
-    def test_invalid_index_level(self):
-        with self.assertRaises(KeyError):
-            get_similarities_metric(
-                self.data, id_level="invalid_level", metric=cosine_similarity
-            )
+            get_similarities_metric(single_row_df, metric=cosine_similarity)
 
     def test_numeric_index_level(self):
-        result = get_similarities_metric(
-            self.data, id_level=1, metric=cosine_similarity
-        )
+        result = get_similarities_metric(self.data, metric=cosine_similarity)
         # Manually calculate the expected cosine similarity matrix
         expected_result = DataFrame(
             cosine_similarity(self.data.values),
@@ -517,41 +501,56 @@ class TestGetSimilaritiesMetric(unittest.TestCase):
         assert_frame_equal(result, expected_result)
 
 
-class TestGetCosineSimilarities(TestCase):
+class TestGetCosineSimilarities(unittest.TestCase):
     def setUp(self):
-        # Mock data setup
+        # Mock data setup: Create a simple DataFrame with multiple clusters
+        index = pd.MultiIndex.from_tuples(
+            [("A", 1), ("A", 2), ("A", 3), ("B", 4), ("B", 5), ("B", 6)],
+            names=["cluster", "sample_id"],
+        )
         self.data = DataFrame(
             {
-                "x": [1, 0, 0, 1],
-                "y": [0, 1, 0, 0],
-                "z": [0, 0, 1, 1],
-                "cluster": [0, 0, 1, 1],
-            }
-        ).set_index("cluster")
+                "feature1": [0.1, 0.2, 0.3, 0.1, 0.4, 0.5],
+                "feature2": [0.4, 0.5, 0.6, 0.3, 0.7, 0.8],
+            },
+            index=index,
+        )
 
     def test_positive_case(self):
-        result = get_cosine_similarities(self.data, "cluster")
-        # Verify for cluster 0
-        expected_cluster_0 = cosine_similarity(self.data.loc[0])
-        self.assertTrue((result[0] == expected_cluster_0).all())
-        # Verify for cluster 1
-        expected_cluster_1 = cosine_similarity(self.data.loc[1])
-        self.assertTrue((result[1] == expected_cluster_1).all())
+        result = get_cosine_similarities(self.data, id_level="sample_id")
+        # Manually calculate the expected cosine similarity matrix
+        expected_result = DataFrame(
+            cosine_similarity(self.data.values),
+            index=self.data.index,
+            columns=self.data.index,
+        )
+        assert_frame_equal(result, expected_result)
 
     def test_empty_dataframe(self):
-        # Ensure function handles an empty dataframe without errors
-        empty_data = DataFrame(columns=["x", "y", "z", "cluster"]).set_index("cluster")
-        result = get_cosine_similarities(empty_data, "cluster")
-        self.assertTrue(empty_data.equals(result))
+        empty_data = DataFrame(columns=["feature1", "feature2"]).set_index(
+            pd.MultiIndex.from_tuples([], names=["cluster", "sample_id"])
+        )
+        with self.assertRaises(ArgumentStructureError):
+            get_cosine_similarities(empty_data, id_level="sample_id")
 
-    def test_single_item_cluster(self):
-        # Single item in a cluster should return a 1x1 DataFrame with value 1
-        single_item_data = DataFrame(
-            {"x": [1], "y": [0], "z": [0], "cluster": [0]}
-        ).set_index("cluster")
-        result = get_cosine_similarities(single_item_data, "cluster")
-        expected = Series([[[[1.0]]]], name="cluster").astype("object")
-        self.assertTrue(result.equals(expected))
+    def test_single_row_dataframe(self):
+        single_row_df = self.data.iloc[[0]]
+        with self.assertRaises(ArgumentStructureError):
+            get_cosine_similarities(single_row_df, id_level="sample_id")
+
+    def test_invalid_index_level(self):
+        with self.assertRaises(KeyError):
+            get_cosine_similarities(self.data, id_level="invalid_level")
+
+    def test_numeric_index_level(self):
+        result = get_cosine_similarities(self.data, id_level=1)
+        # Manually calculate the expected cosine similarity matrix
+        expected_result = DataFrame(
+            cosine_similarity(self.data.values),
+            index=self.data.index,
+            columns=self.data.index,
+        )
+        assert_frame_equal(result, expected_result)
 
 
 class TestDisplayClustersSize(TestCase):

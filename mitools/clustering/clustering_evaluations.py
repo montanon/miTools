@@ -105,21 +105,15 @@ def get_clusters_size(data: DataFrame, cluster_level: str) -> DataFrame:
     return cluster_count
 
 
-def get_cosine_similarities(data: DataFrame, id_level: Union[str, int]) -> DataFrame:
-    return get_similarities_metric(data, id_level, cosine_similarity)
+def get_cosine_similarities(data: DataFrame) -> DataFrame:
+    return get_similarities_metric(data, cosine_similarity)
 
 
-def get_similarities_metric(
-    data: DataFrame, id_level: Union[str, int], metric: Callable
-) -> DataFrame:
+def get_similarities_metric(data: DataFrame, metric: Callable) -> DataFrame:
     if data.empty:
         raise ArgumentStructureError(EMPTY_DATA_ERROR)
     if data.shape[0] == 1:
         raise ArgumentStructureError(SINGLE_GROUP_DF_ERROR)
-    if id_level not in data.index.names and not (
-        isinstance(id_level, int) and id_level < data.index.nlevels
-    ):
-        raise KeyError(f"{CLUSTER_COL_NOT_IN_INDEX_ERROR}")
     similarity_matrix = metric(data.values)
     similarity_df = DataFrame(
         similarity_matrix,
