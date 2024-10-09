@@ -161,7 +161,7 @@ def plot_clusters(
     if kwargs is None:
         kwargs = dict(alpha=0.75, marker="o", size=5)
     if labels is None:
-        labels = data.index.get_level_values(cluster_level).unique()
+        labels = data.index.get_level_values(cluster_level).unique().sort_values()
     if colors is None:
         colors = sns.color_palette("husl", len(labels))[::1]
     for i, cls in enumerate(labels):
@@ -227,7 +227,7 @@ def add_clusters_ellipse(
     **kwargs: Dict[str, Any],
 ) -> Axes:
     if labels is None:
-        labels = data.index.get_level_values(cluster_level).unique()
+        labels = data.index.get_level_values(cluster_level).unique().sort_values()
     if colors is None:
         colors = sns.color_palette("husl", len(labels))
     for i, cls in enumerate(labels):
@@ -236,6 +236,32 @@ def add_clusters_ellipse(
             data[data.index.get_level_values(cluster_level) == cls][y_col],
             ax,
             edgecolor=colors[i],
+            **kwargs,
+        )
+    return ax
+
+
+def add_clusters_centroids(
+    ax: Axes,
+    centroids: DataFrame,
+    cluster_level: Union[int, str],
+    x_col: str,
+    y_col: str,
+    colors: Optional[List[Tuple]] = None,
+    labels: Optional[List[Tuple]] = None,
+    **kwargs: Dict[str, Any],
+) -> Axes:
+    if labels is None:
+        labels = centroids.index.get_level_values(cluster_level).unique()
+    if colors is None:
+        colors = sns.color_palette("husl", len(labels))
+    if kwargs is None or "zorder" not in kwargs:
+        kwargs["zorder"] = 0
+    for i, cls in enumerate(labels):
+        ax.scatter(
+            centroids[centroids.index.get_level_values(cluster_level) == cls][x_col],
+            centroids[centroids.index.get_level_values(cluster_level) == cls][y_col],
+            color=colors[i],
             **kwargs,
         )
     return ax

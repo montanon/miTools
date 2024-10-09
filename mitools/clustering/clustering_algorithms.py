@@ -219,33 +219,6 @@ def plot_clusters_evolution(
     return axes
 
 
-def add_clusters_centroids(
-    ax: Axes,
-    data: DataFrame,
-    cluster_col: str,
-    x_col: str,
-    y_col: str,
-    colors: Optional[List[Tuple]] = None,
-    labels: Optional[List[Tuple]] = None,
-    **kwargs: Dict[str, Any],
-) -> Axes:
-    if labels is None:
-        labels = data[cluster_col].unique()
-    if colors is None:
-        colors = sns.color_palette("husl", len(labels))[::1]
-    if kwargs is None or "zorder" not in kwargs:
-        kwargs["zorder"] = 0
-
-    for i, cls in enumerate(labels):
-        ax.plot(
-            data[data[cluster_col] == cls][x_col],
-            data[data[cluster_col] == cls][y_col],
-            color=colors[i],
-            **kwargs,
-        )
-    return ax
-
-
 def plot_clusters_growth(
     data: DataFrame,
     time_col: str,
