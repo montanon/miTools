@@ -96,6 +96,8 @@ def get_distances_to_centroids(
 def get_clusters_size(data: DataFrame, cluster_level: str) -> DataFrame:
     if cluster_level not in data.index.names:
         raise KeyError(f"{CLUSTER_COL_NOT_IN_INDEX_ERROR}")
+    if data.empty:
+        raise ArgumentStructureError(EMPTY_DATA_ERROR)
     cluster_count = (
         data.index.get_level_values(cluster_level)
         .value_counts()

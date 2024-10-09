@@ -654,25 +654,23 @@ class TestDisplayClustersSize(TestCase):
         # Mock data setup
         self.data = DataFrame(
             {"value": [10, 20, 30, 40, 50], "cluster": [0, 0, 1, 1, 2]}
-        )
+        ).set_index("cluster", append=True)
 
     def test_positive_case(self):
         result = get_clusters_size(self.data, "cluster")
         expected = DataFrame(
             {N_ELEMENTS_COL: [2, 2, 1]},
-            index=MultiIndex.from_tuples([(0,), (1,), (2,)], names=["cluster"]),
+            index=pd.Index([0, 1, 2], name="cluster"),
         )
-        self.assertTrue(result.equals(expected))
+        assert_frame_equal(result, expected)
 
     def test_empty_dataframe(self):
         # Ensure function handles an empty dataframe without errors and returns an empty dataframe
-        empty_data = DataFrame(columns=["value", "cluster"])
-        result = get_clusters_size(empty_data, "cluster")
-        expected = DataFrame(
-            columns=[N_ELEMENTS_COL],
-            index=MultiIndex(levels=[[]], codes=[[]], names=["cluster"]),
-        ).astype(int)
-        self.assertTrue(result.equals(expected))
+        empty_data = DataFrame(columns=["value", "cluster"]).set_index(
+            "cluster", append=True
+        )
+        with self.assertRaises(ArgumentStructureError):
+            get_clusters_size(empty_data, "cluster")
 
     def test_missing_cluster_column(self):
         # Ensure function raises an error when cluster_col is missing
