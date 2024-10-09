@@ -648,6 +648,24 @@ class TestGetSimilaritiesMetricVector(TestCase):
         )
         assert_frame_equal(result, expected_result)
 
+    def test_no_id_level_provided(self):
+        result = get_similarities_metric_vector(
+            self.data, metric=cosine_similarity, id_level=None
+        )
+        # Calculate expected cosine similarity values using the entire index
+        similarity_matrix = cosine_similarity(self.data.values)
+        upper_tri_indices = np.triu_indices_from(similarity_matrix, k=1)
+        sample_pairs = [
+            (self.data.index[i], self.data.index[j]) for i, j in zip(*upper_tri_indices)
+        ]
+        # Expected similarity vector DataFrame using the full index pairs
+        expected_result = DataFrame(
+            similarity_matrix[upper_tri_indices],
+            index=pd.MultiIndex.from_tuples(sample_pairs),
+            columns=["cosine_similarity"],
+        )
+        assert_frame_equal(result, expected_result)
+
 
 class TestDisplayClustersSize(TestCase):
     def setUp(self):
