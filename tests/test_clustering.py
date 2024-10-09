@@ -25,6 +25,7 @@ from mitools.clustering import (
     get_distances_between_centroids,
     get_distances_to_centroids,
     get_similarities_metric,
+    get_similarities_metric_vector,
     kmeans_clustering,
 )
 
@@ -187,7 +188,7 @@ class TestAgglomerativeClustering(TestCase):
         self.assertEqual(len(labels), len(self.data))
 
 
-class TestClusteringNClusterSearch(unittest.TestCase):
+class TestClusteringNClusterSearch(TestCase):
     def setUp(self):
         # Mock data setup: Create datasets with blobs for clustering
         self.data, _ = make_blobs(n_samples=100, centers=4, random_state=42)
@@ -274,7 +275,7 @@ class TestClusteringNClusterSearch(unittest.TestCase):
         self.assertTrue(all(score == 0.5 for score in silhouette_scores))
 
 
-class TestGetClustersCentroids(unittest.TestCase):
+class TestGetClustersCentroids(TestCase):
     def setUp(self):
         # Mock data setup: Create a simple dataset with a multi-index that includes cluster labels
         self.data = DataFrame({"x": [1, 2, 3, 4, 5], "y": [2, 3, 4, 5, 6]})
@@ -359,7 +360,7 @@ class TestGetDistancesBetweenCentroids(TestCase):
         self.assertTrue(allclose(result.values, expected.values))
 
 
-class TestGetDistancesToCentroids(unittest.TestCase):
+class TestGetDistancesToCentroids(TestCase):
     def setUp(self):
         # Mock data setup: Create a small sample DataFrame with a multi-index and centroids DataFrame
         self.data = DataFrame(
@@ -434,7 +435,7 @@ class TestGetDistancesToCentroids(unittest.TestCase):
         assert_frame_equal(distances, expected_distances, atol=1e-8)
 
 
-class TestGetSimilaritiesMetric(unittest.TestCase):
+class TestGetSimilaritiesMetric(TestCase):
     def setUp(self):
         # Mock data setup: Create a simple DataFrame with multiple clusters
         index = pd.MultiIndex.from_tuples(
@@ -501,7 +502,7 @@ class TestGetSimilaritiesMetric(unittest.TestCase):
         assert_frame_equal(result, expected_result)
 
 
-class TestGetCosineSimilarities(unittest.TestCase):
+class TestGetCosineSimilarities(TestCase):
     def setUp(self):
         # Mock data setup: Create a simple DataFrame with multiple clusters
         index = pd.MultiIndex.from_tuples(
@@ -537,6 +538,115 @@ class TestGetCosineSimilarities(unittest.TestCase):
         single_row_df = self.data.iloc[[0]]
         with self.assertRaises(ArgumentStructureError):
             get_cosine_similarities(single_row_df)
+
+
+class TestGetSimilaritiesMetricVector(TestCase):
+    def setUp(self):
+        # Mock data setup: Create a simple DataFrame with multiple clusters
+        index = pd.MultiIndex.from_tuples(
+            [("A", 1), ("A", 2), ("A", 3), ("B", 4), ("B", 5), ("B", 6)],
+            names=["cluster", "sample_id"],
+        )
+        self.data = DataFrame(
+            {
+                "feature1": [0.1, 0.2, 0.3, 0.1, 0.4, 0.5],
+                "feature2": [0.4, 0.5, 0.6, 0.3, 0.7, 0.8],
+            },
+            index=index,
+        )
+
+    def test_positive_case_cosine_similarity(self):
+        result = get_similarities_metric_vector(
+            self.data, metric=cosine_similarity, id_level="sample_id"
+        )
+        # Calculate expected cosine similarity values and create sample pairs
+        similarity_matrix = cosine_similarity(self.data.values)
+        upper_tri_indices = np.triu_indices_from(similarity_matrix, k=1)
+        sample_pairs = [
+            (
+                self.data.index.get_level_values("sample_id")[i],
+                self.data.index.get_level_values("sample_id")[j],
+            )
+            for i, j in zip(*upper_tri_indices)
+        ]
+        # Expected similarity vector DataFrame
+        expected_result = DataFrame(
+            similarity_matrix[upper_tri_indices],
+            index=pd.MultiIndex.from_tuples(sample_pairs),
+            columns=["cosine_similarity"],
+        )
+        assert_frame_equal(result, expected_result)
+
+    def test_positive_case_euclidean_distance(self):
+        # Define a custom metric function for Euclidean distance similarity
+        def euclidean_similarity(X):
+            distance_matrix = squareform(pdist(X, metric="euclidean"))
+            return 1 / (1 + distance_matrix)  # Convert distances to similarity
+
+        result = get_similarities_metric_vector(
+            self.data, metric=euclidean_similarity, id_level="sample_id"
+        )
+        # Calculate expected Euclidean similarity values and create sample pairs
+        similarity_matrix = euclidean_similarity(self.data.values)
+        upper_tri_indices = np.triu_indices_from(similarity_matrix, k=1)
+        sample_pairs = [
+            (
+                self.data.index.get_level_values("sample_id")[i],
+                self.data.index.get_level_values("sample_id")[j],
+            )
+            for i, j in zip(*upper_tri_indices)
+        ]
+        # Expected similarity vector DataFrame
+        expected_result = DataFrame(
+            similarity_matrix[upper_tri_indices],
+            index=pd.MultiIndex.from_tuples(sample_pairs),
+            columns=["euclidean_similarity"],
+        )
+        assert_frame_equal(result, expected_result)
+
+    def test_empty_dataframe(self):
+        empty_data = DataFrame(columns=["feature1", "feature2"]).set_index(
+            pd.MultiIndex.from_tuples([], names=["cluster", "sample_id"])
+        )
+        with self.assertRaises(ArgumentStructureError):
+            get_similarities_metric_vector(
+                empty_data, metric=cosine_similarity, id_level="sample_id"
+            )
+
+    def test_single_row_dataframe(self):
+        single_row_df = self.data.iloc[[0]]
+        with self.assertRaises(ArgumentStructureError):
+            get_similarities_metric_vector(
+                single_row_df, metric=cosine_similarity, id_level="sample_id"
+            )
+
+    def test_invalid_index_level(self):
+        with self.assertRaises(KeyError):
+            get_similarities_metric_vector(
+                self.data, metric=cosine_similarity, id_level="invalid_level"
+            )
+
+    def test_numeric_index_level(self):
+        result = get_similarities_metric_vector(
+            self.data, metric=cosine_similarity, id_level=1
+        )
+        # Calculate expected cosine similarity values and create sample pairs
+        similarity_matrix = cosine_similarity(self.data.values)
+        upper_tri_indices = np.triu_indices_from(similarity_matrix, k=1)
+        sample_pairs = [
+            (
+                self.data.index.get_level_values(1)[i],
+                self.data.index.get_level_values(1)[j],
+            )
+            for i, j in zip(*upper_tri_indices)
+        ]
+        # Expected similarity vector DataFrame
+        expected_result = DataFrame(
+            similarity_matrix[upper_tri_indices],
+            index=pd.MultiIndex.from_tuples(sample_pairs),
+            columns=["cosine_similarity"],
+        )
+        assert_frame_equal(result, expected_result)
 
 
 class TestDisplayClustersSize(TestCase):
