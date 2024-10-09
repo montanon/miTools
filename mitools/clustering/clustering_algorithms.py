@@ -246,32 +246,6 @@ def add_clusters_centroids(
     return ax
 
 
-def add_clusters_ellipse(
-    ax: Axes,
-    data: DataFrame,
-    cluster_col: str,
-    x_col: str,
-    y_col: str,
-    colors: Optional[List[Tuple]] = None,
-    labels: Optional[List[Tuple]] = None,
-    **kwargs: Dict[str, Any],
-) -> Axes:
-    if labels is None:
-        labels = data[cluster_col].unique()
-    if colors is None:
-        colors = sns.color_palette("husl", len(labels))[::1]
-
-    for i, cls in enumerate(labels):
-        ax = confidence_ellipse(
-            data[data[cluster_col] == cls][x_col],
-            data[data[cluster_col] == cls][y_col],
-            ax,
-            edgecolor=colors[i],
-            **kwargs,
-        )
-    return ax
-
-
 def plot_clusters_growth(
     data: DataFrame,
     time_col: str,

@@ -214,3 +214,28 @@ def confidence_ellipse(
     ellipse.set_transform(transformation + ax.transData)
     ax.add_patch(ellipse)
     return ax
+
+
+def add_clusters_ellipse(
+    ax: Axes,
+    data: DataFrame,
+    cluster_level: Union[int, str],
+    x_col: str,
+    y_col: str,
+    colors: Optional[List[Tuple]] = None,
+    labels: Optional[List[Tuple]] = None,
+    **kwargs: Dict[str, Any],
+) -> Axes:
+    if labels is None:
+        labels = data.index.get_level_values(cluster_level).unique()
+    if colors is None:
+        colors = sns.color_palette("husl", len(labels))
+    for i, cls in enumerate(labels):
+        ax = confidence_ellipse(
+            data[data.index.get_level_values(cluster_level) == cls][x_col],
+            data[data.index.get_level_values(cluster_level) == cls][y_col],
+            ax,
+            edgecolor=colors[i],
+            **kwargs,
+        )
+    return ax
