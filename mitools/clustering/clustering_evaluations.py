@@ -123,6 +123,12 @@ def get_similarities_metric(data: DataFrame, metric: Callable) -> DataFrame:
     return similarity_df
 
 
+def get_cosine_similarities_vector(
+    data: DataFrame, id_level: Union[str, int]
+) -> DataFrame:
+    return get_similarities_metric_vector(data, cosine_similarity, id_level)
+
+
 def get_similarities_metric_vector(
     data: DataFrame, metric: Callable, id_level: Union[str, int]
 ) -> DataFrame:
