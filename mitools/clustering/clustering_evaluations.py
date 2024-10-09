@@ -107,11 +107,17 @@ def get_clusters_size(data: DataFrame, cluster_level: str) -> DataFrame:
     return cluster_count
 
 
-def get_cosine_similarities(data: DataFrame) -> DataFrame:
-    return get_similarities_metric(data, cosine_similarity)
+def get_cosine_similarities(
+    data: DataFrame, id_level: Optional[Union[str, int, None]] = None
+) -> DataFrame:
+    return get_similarities_metric(
+        data=data, metric=cosine_similarity, id_level=id_level
+    )
 
 
-def get_similarities_metric(data: DataFrame, metric: Callable) -> DataFrame:
+def get_similarities_metric(
+    data: DataFrame, metric: Callable, id_level: Optional[Union[str, int, None]] = None
+) -> DataFrame:
     if data.empty:
         raise ArgumentStructureError(EMPTY_DATA_ERROR)
     if data.shape[0] == 1:
@@ -119,16 +125,22 @@ def get_similarities_metric(data: DataFrame, metric: Callable) -> DataFrame:
     similarity_matrix = metric(data.values)
     similarity_df = DataFrame(
         similarity_matrix,
-        index=data.index,
-        columns=data.index,
+        index=data.index.get_level_values(id_level)
+        if id_level is not None
+        else data.index,
+        columns=data.index.get_level_values(id_level)
+        if id_level is not None
+        else data.index,
     )
     return similarity_df
 
 
 def get_cosine_similarities_vector(
-    data: DataFrame, id_level: Union[str, int]
+    data: DataFrame, id_level: Optional[Union[str, int, None]] = None
 ) -> DataFrame:
-    return get_similarities_metric_vector(data, cosine_similarity, id_level)
+    return get_similarities_metric_vector(
+        data=data, metric=cosine_similarity, id_level=id_level
+    )
 
 
 def get_similarities_metric_vector(
@@ -145,10 +157,10 @@ def get_similarities_metric_vector(
     sample_pairs = [
         (
             similarity_df.index.get_level_values(id_level)[i]
-            if id_level
+            if id_level is not None
             else similarity_df.index[i],
             similarity_df.index.get_level_values(id_level)[j]
-            if id_level
+            if id_level is not None
             else similarity_df.index[j],
         )
         for i, j in zip(*upper_tri_indices)
@@ -171,5 +183,5 @@ def get_cluster_cosine_similarities(
             data=data, id_level=id_level
         )
     else:
-        cosine_similarities = get_cosine_similarities(data=data)
+        cosine_similarities = get_cosine_similarities(data=data, id_level=id_level)
     return cosine_similarities

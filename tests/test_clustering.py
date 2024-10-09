@@ -460,6 +460,18 @@ class TestGetSimilaritiesMetric(TestCase):
         # Use pandas built-in function to assert that the matrices are equal
         assert_frame_equal(result, expected_result)
 
+    def test_positive_case_with_id_level(self):
+        result = get_similarities_metric(
+            self.data, metric=cosine_similarity, id_level="sample_id"
+        )
+        # Manually calculate expected cosine similarity using the specified level
+        expected_result = DataFrame(
+            cosine_similarity(self.data.values),
+            index=self.data.index.get_level_values("sample_id"),
+            columns=self.data.index.get_level_values("sample_id"),
+        )
+        assert_frame_equal(result, expected_result)
+
     def test_positive_case_euclidean_distance(self):
         # Define a custom metric function that returns a similarity matrix using Euclidean distance
         def euclidean_similarity(X):
@@ -491,14 +503,33 @@ class TestGetSimilaritiesMetric(TestCase):
             get_similarities_metric(single_row_df, metric=cosine_similarity)
 
     def test_numeric_index_level(self):
-        result = get_similarities_metric(self.data, metric=cosine_similarity)
-        # Manually calculate the expected cosine similarity matrix
+        result = get_similarities_metric(
+            self.data, metric=cosine_similarity, id_level=1
+        )
+        expected_result = DataFrame(
+            cosine_similarity(self.data.values),
+            index=self.data.index.get_level_values(1),
+            columns=self.data.index.get_level_values(1),
+        )
+        assert_frame_equal(result, expected_result)
+
+    def test_no_id_level_provided(self):
+        result = get_similarities_metric(
+            self.data, metric=cosine_similarity, id_level=None
+        )
+        # Calculate expected cosine similarity values using the entire index
         expected_result = DataFrame(
             cosine_similarity(self.data.values),
             index=self.data.index,
             columns=self.data.index,
         )
         assert_frame_equal(result, expected_result)
+
+    def test_invalid_index_level(self):
+        with self.assertRaises(KeyError):
+            get_similarities_metric(
+                self.data, metric=cosine_similarity, id_level="invalid_level"
+            )
 
 
 class TestGetCosineSimilarities(TestCase):
