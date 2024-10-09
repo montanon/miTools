@@ -517,7 +517,7 @@ class TestGetCosineSimilarities(unittest.TestCase):
         )
 
     def test_positive_case(self):
-        result = get_cosine_similarities(self.data, id_level="sample_id")
+        result = get_cosine_similarities(self.data)
         # Manually calculate the expected cosine similarity matrix
         expected_result = DataFrame(
             cosine_similarity(self.data.values),
@@ -531,26 +531,12 @@ class TestGetCosineSimilarities(unittest.TestCase):
             pd.MultiIndex.from_tuples([], names=["cluster", "sample_id"])
         )
         with self.assertRaises(ArgumentStructureError):
-            get_cosine_similarities(empty_data, id_level="sample_id")
+            get_cosine_similarities(empty_data)
 
     def test_single_row_dataframe(self):
         single_row_df = self.data.iloc[[0]]
         with self.assertRaises(ArgumentStructureError):
-            get_cosine_similarities(single_row_df, id_level="sample_id")
-
-    def test_invalid_index_level(self):
-        with self.assertRaises(KeyError):
-            get_cosine_similarities(self.data, id_level="invalid_level")
-
-    def test_numeric_index_level(self):
-        result = get_cosine_similarities(self.data, id_level=1)
-        # Manually calculate the expected cosine similarity matrix
-        expected_result = DataFrame(
-            cosine_similarity(self.data.values),
-            index=self.data.index,
-            columns=self.data.index,
-        )
-        assert_frame_equal(result, expected_result)
+            get_cosine_similarities(single_row_df)
 
 
 class TestDisplayClustersSize(TestCase):
