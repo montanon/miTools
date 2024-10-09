@@ -426,46 +426,6 @@ def plot_clusters_growth_stacked(
     return ax
 
 
-def plot_cosine_similarities(
-    cosine_similarities: Dict[int, DataFrame],
-    normed: Optional[bool] = False,
-    colors: Optional[List[Tuple]] = None,
-    bins: Optional[bool] = False,
-) -> Axes:
-    fig, ax = plt.subplots(1, 1, figsize=(14, 6))
-
-    if colors is None:
-        colors = sns.color_palette("husl", len(cosine_similarities))[::-1]
-    for cl, similarities in tqdm(cosine_similarities.items()):
-        upper_tri_vals = similarities[np.triu_indices(similarities.shape[0], k=1)]
-        if not normed:
-            if bins:
-                ax = sns.histplot(
-                    upper_tri_vals,
-                    bins=30,
-                    ax=ax,
-                    alpha=0.05,
-                    stat="density",
-                    color=colors[cl],
-                    legend=False,
-                )
-            ax = sns.kdeplot(
-                upper_tri_vals, ax=ax, color=colors[cl], label=f"Cluster {cl}"
-            )
-        else:
-            kde = gaussian_kde(upper_tri_vals)
-            x_vals = np.linspace(min(upper_tri_vals), max(upper_tri_vals), 1000)
-            y_vals = kde(x_vals) / max(kde(x_vals))
-            ax.plot(x_vals, y_vals, alpha=1.0, label=f"Cluster {cl}", color=colors[cl])
-
-    ax.set_title("Distributions of Cosine Similarities per Cluster")
-    ax.set_xlabel("Cosine Similarity")
-    ax.set_ylabel("Frequency")
-    ax.legend()
-
-    return ax
-
-
 def plot_distances_to_centroids(
     distances: DataFrame, cluster_col: str, colors: Optional[List[Tuple]] = None
 ) -> Axes:

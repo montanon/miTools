@@ -1,8 +1,11 @@
-from typing import List, Optional, Tuple
+from typing import Iterable, List, Optional, Tuple, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns
 from matplotlib.axes import Axes
+from pandas import DataFrame
+from scipy.stats import gaussian_kde
 
 
 def create_figure(with_inertia: bool) -> Tuple[plt.Figure, List[Axes]]:
@@ -68,3 +71,69 @@ def plot_clustering_ncluster_search(
 
     plt.tight_layout()
     return axes
+
+
+def plot_df_col_distribution(
+    dataframe: DataFrame,
+    column: Union[str, int],
+    normed: Optional[bool] = False,
+    color: Optional[Union[str, Tuple[float], Tuple[int]]] = None,
+    bins: Optional[Union[int, None]] = None,
+    ax: Optional[Axes] = None,
+) -> Axes:
+    if ax is None:
+        fig, ax = plt.subplots(1, 1, figsize=(14, 6))
+    if color is None:
+        color = sns.color_palette("husl", 1)
+    df_values = dataframe.iloc[:, column].values
+    col_name = (
+        dataframe.columns[0].title().replace("_", " ")
+        if isinstance(column, int)
+        else column
+    )
+    if not normed:
+        if bins:
+            ax = sns.histplot(
+                df_values,
+                bins=bins,
+                ax=ax,
+                alpha=0.5,
+                stat="density",
+                color=color,
+                legend=False,
+            )
+        ax = sns.kdeplot(df_values, ax=ax, color=color)
+    else:
+        kde = gaussian_kde(df_values)
+        x_vals = np.linspace(min(df_values), max(df_values), 1000)
+        y_vals = kde(x_vals) / max(kde(x_vals))
+        ax.plot(x_vals, y_vals, alpha=1.0, color=color)
+    ax.set_title(f"Distributions of {col_name}")
+    ax.set_xlabel(col_name)
+    ax.set_ylabel("Frequency")
+    ax.legend()
+    return ax
+
+
+def plot_dfs_col_distribution(
+    dataframes: Iterable[DataFrame],
+    column: Union[str, int],
+    normed: Optional[bool] = False,
+    colors: Optional[Union[str, Tuple[float], Tuple[int]]] = None,
+    bins: Optional[Union[int, None]] = None,
+    ax: Optional[Axes] = None,
+) -> Axes:
+    if ax is None:
+        fig, ax = plt.subplots(1, 1, figsize=(14, 6))
+    if colors is None:
+        colors = sns.color_palette("husl", len(dataframes))
+    for dataframe, color in zip(dataframes, colors):
+        plot_df_col_distribution(
+            dataframe=dataframe,
+            column=column,
+            normed=normed,
+            color=color,
+            bins=bins,
+            ax=ax,
+        )
+    return ax
