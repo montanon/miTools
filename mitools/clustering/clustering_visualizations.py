@@ -15,7 +15,7 @@ from ..exceptions import ArgumentStructureError
 X_Y_SIZE_ERROR = "x values and y values must be the same size."
 
 
-def create_figure(with_inertia: bool) -> Tuple[plt.Figure, List[Axes]]:
+def _create_figure(with_inertia: bool) -> Tuple[plt.Figure, List[Axes]]:
     if with_inertia:
         fig, axes = plt.subplots(nrows=2, ncols=1, figsize=(14, 10))
         return fig, axes
@@ -69,7 +69,7 @@ def plot_clustering_ncluster_search(
     max_clusters: Optional[int] = 25,
     algorithm_name: Optional[str] = "Clustering Algorithm",
 ) -> List[Axes]:
-    fig, axes = create_figure(inertia is not None)
+    fig, axes = _create_figure(inertia is not None)
 
     plot_silhouette_scores(axes[0], silhouette_scores, algorithm_name)
 
