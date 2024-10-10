@@ -180,7 +180,7 @@ test_python_module PyPDF2
 
 $PYTHON_PATH -m pip install xlsxwriter country_converter pycountry
 
-$PYTHON_PATH -m pip install spacy
+$PYTHON_PATH -m pip install spacy==3.7.4
 $PYTHON_PATH -m spacy download en_core_web_sm
 $PYTHON_PATH -m spacy download es_core_news_sm
 test_python_module spacy
@@ -193,6 +193,10 @@ $PYTHON_PATH -m pip install stata_setup
 $PYTHON_PATH -m pip install pystata
 
 $PYTHON_PATH -m pip install adapters
+
+$PYTHON_PATH -m pip install chardet
+$PYTHON_PATH -m pip install cairosvg
+$PYTHON_PATH -m pip install selenium-requests
 
 $PYTHON_PATH -m pip install treelib
 treelib_path=$($PYTHON_PATH -m pip show treelib | grep -E '^Location: ' | awk '{print $2}')
