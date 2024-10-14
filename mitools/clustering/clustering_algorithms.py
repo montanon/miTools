@@ -1,13 +1,9 @@
 from os import PathLike
-from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Union
+from typing import Callable, List, Literal, Optional, Tuple, Union
 
-import matplotlib.pyplot as plt
 import numpy as np
-import seaborn as sns
-from matplotlib.axes import Axes
 from numpy import ndarray
-from pandas import DataFrame, IndexSlice
-from scipy.stats import gaussian_kde
+from pandas import DataFrame
 from sklearn.cluster import AgglomerativeClustering, KMeans
 from sklearn.metrics import silhouette_score
 from tqdm import tqdm
@@ -121,82 +117,3 @@ def clustering_ncluster_search(
         if inertia is not None:
             inertia.append(model.inertia_)
     return silhouette_scores, inertia
-
-
-def plot_clusters_growth(
-    data: DataFrame,
-    time_col: str,
-    cluster_col: str,
-    colors: Optional[List[Tuple]] = None,
-) -> Axes:
-    clusters_count = (
-        data.groupby(time_col)[cluster_col]
-        .value_counts()
-        .to_frame()
-        .sort_index(axis=1, level=1)
-    )
-
-    fig, ax = plt.subplots(1, 1, figsize=(21, 7))
-
-    clusters = clusters_count.index.get_level_values(1).unique().sort_values()
-    times = clusters_count.index.get_level_values(0).unique().sort_values()
-
-    if colors is None:
-        colors = sns.color_palette("husl", len(clusters))
-
-    for cl in clusters:
-        cluster_papers = clusters_count.loc[IndexSlice[:, cl], :]
-        cluster_papers.index = cluster_papers.index.droplevel(1)
-        cluster_papers = cluster_papers.reindex(times, fill_value=0)
-        ax.plot(
-            cluster_papers.index[:-1], cluster_papers["count"].values[:-1], c=colors[cl]
-        )
-
-    ax.set_title("Cluster Size Evolution")
-    ax.set_ylabel("N° Elements")
-    ax.set_xlabel("Year")
-    ax.legend(loc="upper left")
-
-    return ax
-
-
-def plot_clusters_growth_stacked(
-    data: DataFrame,
-    time_col: str,
-    cluster_col: str,
-    colors: Optional[Dict[str, Tuple]] = None,
-    filtered_clusters: Optional[List[str]] = None,
-    share_pct: Optional[bool] = False,
-) -> Axes:
-    topics = data[cluster_col].unique()
-    clusters_count = data.groupby([time_col, cluster_col]).size().unstack(fill_value=0)
-    clusters_count = clusters_count[topics]
-
-    if filtered_clusters:
-        clusters_count = clusters_count[
-            [c for c in clusters_count.columns if c not in filtered_clusters]
-        ]
-    if share_pct:
-        clusters_count = clusters_count.div(clusters_count.sum(axis=1), axis=0) * 100
-
-    _, ax = plt.subplots(figsize=(21, 7))
-
-    if colors is None:
-        colors = sns.color_palette("husl", len(clusters_count.columns))
-    else:
-        colors = [colors[c] for c in clusters_count.columns]
-
-    times = clusters_count.index
-    cluster_values = [clusters_count[cluster].values for cluster in clusters_count]
-
-    ax.stackplot(times, cluster_values, labels=clusters_count.columns, colors=colors)
-
-    ax.set_title("Stacked Cluster Size Evolution")
-    ax.set_ylabel("N° Elements")
-    ax.set_xlabel("Year")
-    if not share_pct:
-        ax.legend(loc="upper left")
-    else:
-        ax.legend(loc="center left", bbox_to_anchor=(1, 0.5))
-
-    return ax
