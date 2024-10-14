@@ -1,8 +1,7 @@
 import contextlib
 import functools
 import os
-import time
-from typing import Callable, ClassVar, Dict, List, Literal, Optional, Tuple, TypeVar
+from typing import ClassVar, Dict, List, Optional, Tuple, TypeVar
 
 ShapeType = Tuple[int, ...]
 T = TypeVar("T")
