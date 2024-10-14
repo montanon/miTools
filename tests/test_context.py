@@ -1,5 +1,6 @@
 import json
 import os
+import tempfile
 import time
 import unittest
 from io import StringIO
@@ -394,29 +395,29 @@ class TestSavePlotContext(TestCase):
                 ctx.axes = ax
 
 
-# class TestSavePlot(TestCase):
-#     def test_save_plot_single_axes(self):
-#         with tempfile.TemporaryDirectory() as tmpdirname:
-#             file_path = Path(tmpdirname) / "test.png"
-#             with save_plot(file_path) as context:
-#                 fig, ax = plt.subplots()
-#                 context.axes = ax
-#             self.assertTrue(file_path.is_file())
+class TestSavePlot(TestCase):
+    def test_save_plot_single_axes(self):
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            file_path = Path(tmpdirname) / "test.png"
+            with save_plot(file_path) as context:
+                fig, ax = plt.subplots()
+                context.axes = ax
+            self.assertTrue(file_path.is_file())
 
-#     def test_save_plot_multiple_axes(self):
-#         with tempfile.TemporaryDirectory() as tmpdirname:
-#             file_path = Path(tmpdirname) / "test.png"
-#             with save_plot(file_path) as context:
-#                 fig, axes = plt.subplots(2, 2)
-#                 context.axes = axes
-#             self.assertTrue(file_path.is_file())
+    def test_save_plot_multiple_axes(self):
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            file_path = Path(tmpdirname) / "test.png"
+            with save_plot(file_path) as context:
+                fig, axes = plt.subplots(2, 2)
+                context.axes = axes
+            self.assertTrue(file_path.is_file())
 
-#     def test_save_plot_invalid_axes(self):
-#         with tempfile.TemporaryDirectory() as tmpdirname:
-#             file_path = Path(tmpdirname) / "test.png"
-#             with self.assertRaises(TypeError):
-#                 with save_plot(file_path) as context:
-#                     context.axes = "invalid"
+    def test_save_plot_invalid_axes(self):
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            file_path = Path(tmpdirname) / "test.png"
+            with self.assertRaises(TypeError):
+                with save_plot(file_path) as context:
+                    context.axes = "invalid"
 
 
 if __name__ == "__main__":
