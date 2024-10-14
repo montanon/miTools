@@ -176,6 +176,86 @@ def plot_clusters(
     return ax
 
 
+def plot_clusters_groupings(
+    data: DataFrame,
+    cluster_level: str,
+    x_col: str,
+    y_col: str,
+    group_level: str,
+    group_value_ranges: Tuple,
+    labels: Optional[List[Union[str, int]]] = None,
+    colors: Optional[List[Tuple]] = None,
+    **plots_kwargs: Dict[str, Dict],
+) -> Axes:
+    fig, axes = plt.subplot_mosaic(
+        [["a", "a"], ["a", "a"], ["b", "c"]], layout="constrained", figsize=(14, 14)
+    )
+
+    if labels is None:
+        labels = data.index.get_level_values(cluster_level).unique().sort_values()
+
+    plot_clusters(
+        data,
+        cluster_level,
+        x_col,
+        y_col,
+        labels=labels,
+        ax=axes["a"],
+        colors=colors,
+        **plots_kwargs.get("a", {}) if plots_kwargs is not None else {},
+    )
+    axes["a"].set_xlabel("")
+    axes["a"].set_ylabel("")
+    axes["a"].set_xticks([])
+    axes["a"].set_yticks([])
+
+    first_group_df = data.loc[
+        (data.index.get_level_values(group_level) < group_value_ranges[1])
+        & (data.index.get_level_values(group_level) >= group_value_ranges[0])
+    ].copy()
+
+    plot_clusters(
+        first_group_df,
+        cluster_level,
+        x_col,
+        y_col,
+        labels=labels,
+        colors=colors,
+        ax=axes["b"],
+        **plots_kwargs.get("b", {}) if plots_kwargs is not None else {},
+    )
+    axes["b"].set_ylabel("")
+    axes["b"].set_xticks([])
+    axes["b"].set_yticks([])
+
+    second_group_df = data.loc[
+        data.index.get_level_values(group_level) >= group_value_ranges[1]
+    ]
+    plot_clusters(
+        second_group_df,
+        cluster_level,
+        x_col,
+        y_col,
+        labels=labels,
+        colors=colors,
+        ax=axes["c"],
+        **plots_kwargs.get("c", {}) if plots_kwargs is not None else {},
+    )
+    axes["c"].set_ylabel("")
+    axes["c"].set_xticks([])
+    axes["c"].set_yticks([])
+
+    handles, labels = axes["c"].get_legend_handles_labels()
+
+    lgnd = fig.legend(
+        handles, labels, loc="center right", bbox_to_anchor=(1.2525, 0.52)
+    )
+    for handle in lgnd.legend_handles:
+        handle.set_sizes([100.0])
+
+    return axes
+
+
 def confidence_ellipse(
     xvalues: ndarray,
     yvalues: ndarray,
