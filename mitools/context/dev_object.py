@@ -33,6 +33,8 @@ class Dev:
         self.variables.clear()
 
     def save_variables(self, filepath: str) -> None:
+        if not self.variables:
+            raise ValueError("No variables to store!")
         with open(filepath, "w") as f:
             json.dump(self.variables, f)
         print(f"Variables saved to {filepath}")
