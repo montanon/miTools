@@ -2,13 +2,12 @@ from typing import Callable, Literal, Optional, Union
 
 import numpy as np
 import pandas as pd
-from numpy import ndarray
 from pandas import DataFrame
-from scipy.spatial.distance import cdist, euclidean
+from scipy.spatial.distance import cdist
 from sklearn.metrics.pairwise import cosine_similarity, pairwise_distances
 from sklearn.neighbors import NearestCentroid
 
-from ..exceptions import ArgumentStructureError, ArgumentTypeError, ArgumentValueError
+from ..exceptions import ArgumentStructureError
 
 CLUSTER_COL_NOT_IN_INDEX_ERROR = (
     "DataFrame provided does not have the {cluster_level} index level!"
