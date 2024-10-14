@@ -1,6 +1,12 @@
 import contextlib
 import time
+from contextlib import contextmanager
+from os import PathLike
+from pathlib import Path
 from typing import Callable, Literal, Optional
+
+import matplotlib.pyplot as plt
+import numpy as np
 
 
 class Timing(contextlib.ContextDecorator):
@@ -40,3 +46,63 @@ class Timing(contextlib.ContextDecorator):
             if self.on_exit:
                 output += self.on_exit(elapsed_time_ns)
             print(output)
+
+
+class SavePlotContext:
+    def __init__(
+        self,
+        file_path: PathLike,
+        dpi: Optional[int] = 300,
+        file_format: Literal["png", "jpg", "svg"] = "png",
+    ):
+        self.file_path = Path(file_path)  # Ensure we have a Path object
+        self.axes = None
+        self.dpi = dpi
+        self.file_format = file_format  # Default to "png"
+        # Check if the directory exists
+        if not self.file_path.parent.exists():
+            raise FileNotFoundError(
+                f"Directory {self.file_path.parent} does not exist."
+            )
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        # Check if self.axes is a single Axes object
+        if isinstance(self.axes, plt.Axes):
+            self.axes.figure.savefig(
+                self.file_path, dpi=self.dpi, format=self.file_format
+            )
+        # Check if self.axes is an array or list of Axes objects
+        elif isinstance(self.axes, np.ndarray):
+            if all(
+                isinstance(ax, plt.Axes) for ax in self.axes.flat
+            ):  # Handle np.ndarray of Axes
+                self.axes.flat[0].figure.savefig(
+                    self.file_path, dpi=self.dpi, format=self.file_format
+                )
+            else:
+                raise TypeError(
+                    "All elements of the ndarray must be matplotlib Axes objects."
+                )
+        elif isinstance(self.axes, list):
+            if all(isinstance(ax, plt.Axes) for ax in self.axes):  # Handle list of Axes
+                self.axes[0].figure.savefig(
+                    self.file_path, dpi=self.dpi, format=self.file_format
+                )
+            else:
+                raise TypeError(
+                    "All elements of the list must be matplotlib Axes objects."
+                )
+        else:
+            raise TypeError(
+                "Must assign a matplotlib Axes, or an array/list of Axes to 'axes' attribute."
+            )
+
+
+@contextmanager
+def save_plot(file_path: PathLike):
+    context = SavePlotContext(file_path)
+    yield context
+    context.__exit__(None, None, None)
