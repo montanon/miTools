@@ -11,6 +11,7 @@ from ..exceptions.custom_exceptions import (
 GROWTH_COLUMN_NAME = "growth_{:d}"
 GROWTH_PCT_COLUMN_NAME = "growth%_{:d}"
 SHIFTED_COLUMN_NAME = "shifted_{:d}"
+ADDED_COLUMN_NAME = "+_{:d}"
 
 INVALID_COLUMN_ERROR = "One or more of {} are not in DataFrame."
 INVALID_TRANSFORMATION_ERROR = "Transformation {} provided is not Callable."
@@ -191,7 +192,6 @@ def shift_columns(
     if not isinstance(t, int):
         raise ArgumentTypeError("Provided 't' must be an integer.")
     selected_columns = select_columns(dataframe=dataframe, columns=columns, level=level)
-
     try:
         shifted_columns = selected_columns.shift(t)
     except Exception as e:
@@ -216,22 +216,40 @@ def shift_columns(
 
 
 def add_columns(
-    dataframe: DataFrame, column1: str, column2: str, new_name: str
+    dataframe: DataFrame,
+    columns: Iterable[Union[str, Tuple]],
+    column_to_add: Union[str, Tuple],
+    level: Optional[Union[str, int]] = None,
+    rename: Optional[Union[str, bool]] = True,
 ) -> DataFrame:
-    if isinstance(dataframe.index, Index):
-        columns1 = dataframe.loc[:, [column1]]
-        columns2 = dataframe.loc[:, [column2]]
-    else:
-        columns1 = dataframe.loc[:, IndexSlice[:, column1]]
-        columns2 = dataframe.loc[:, IndexSlice[:, column2]]
-    plus_columns = columns1 + columns2.values
-    if isinstance(dataframe.index, Index):
-        plus_columns.columns = [new_name]
-    else:
-        plus_columns.columns = MultiIndex.from_tuples(
-            [(col_0, new_name) for col_0, _ in plus_columns.columns.values],
-            names=dataframe.columns.names,
+    selected_columns = select_columns(dataframe=dataframe, columns=columns, level=level)
+    column_to_add = select_columns(
+        dataframe=dataframe, columns=column_to_add, level=level
+    )
+    if column_to_add.shape[1] > 1:
+        raise ArgumentValueError(
+            f"Column to add '{column_to_add}' with 'level={level}' must be a single column."
         )
+    try:
+        plus_columns = selected_columns + column_to_add.values
+    except Exception as e:
+        raise ArgumentValueError(
+            f"Error while adding column '{column_to_add}' to columns '{columns}': {e}"
+        )
+    if rename:
+        added_name = (
+            ADDED_COLUMN_NAME.format(column_to_add)
+            if not isinstance(rename, str)
+            else rename
+        )
+        if isinstance(dataframe.columns, MultiIndex):
+            plus_columns.columns = MultiIndex.from_tuples(
+                [
+                    (*col[:-1], f"{col[-1]}_{added_name}")
+                    for col in plus_columns.columns
+                ],
+                names=dataframe.columns.names,
+            )
     return plus_columns
 
 
