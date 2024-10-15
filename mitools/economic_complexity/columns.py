@@ -116,7 +116,12 @@ def transform_columns(
     if transformation_name in {"ln", "log"}:
         selected_columns = selected_columns.replace(0, 1e-6)
         print("Replaced 0.0 values for 1e-6 to avoid -inf values!")
-    transformed_columns = selected_columns.apply(transformation)
+    try:
+        transformed_columns = selected_columns.apply(transformation)
+    except Exception as e:
+        raise ArgumentValueError(
+            f"Error while applying '{transformation_name}' transformation: {e}"
+        )
     if rename:
         transformation_name = (
             transformation_name if not isinstance(rename, str) else rename

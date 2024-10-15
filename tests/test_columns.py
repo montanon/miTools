@@ -268,14 +268,14 @@ class TestTransformColumns(unittest.TestCase):
         self.assertListEqual(list(result.columns), expected_columns)
 
     def test_transform_with_invalid_column(self):
-        with self.assertRaises(ArgumentKeyError):
+        with self.assertRaises(ArgumentValueError):
             transform_columns(self.multiidx_df, log, ["four"])
 
     def test_transform_with_invalid_function(self):
         def invalid_function(x):
             return x + "invalid"
 
-        with self.assertRaises(ArgumentTypeError):
+        with self.assertRaises(ArgumentValueError):
             transform_columns(self.multiidx_df, invalid_function, ["one"])
 
     def test_transform_multiidx_with_level_positional(self):
