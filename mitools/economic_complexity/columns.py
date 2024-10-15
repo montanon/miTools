@@ -2,7 +2,11 @@ from typing import Callable, Iterable, List, Optional, Tuple, Union
 
 from pandas import DataFrame, Index, IndexSlice, MultiIndex
 
-from ..exceptions.custom_exceptions import ArgumentKeyError, ArgumentTypeError
+from ..exceptions.custom_exceptions import (
+    ArgumentKeyError,
+    ArgumentTypeError,
+    ArgumentValueError,
+)
 
 GROWTH_COLUMN_NAME = "_growth_{:d}"
 GROWTH_PCT_COLUMN_NAME = "_growth%_{:d}"
@@ -18,34 +22,38 @@ def select_index(
     level: Optional[Union[str, int]] = None,
 ) -> DataFrame:
     if level is not None and not isinstance(level, (str, int)):
-        raise TypeError(
+        raise ArgumentTypeError(
             f"The 'level' must be a string (for named levels) or an integer (for positional levels), not {type(level)}."
         )
     has_multi_index = isinstance(dataframe.index, MultiIndex)
     if level is not None:
         if not has_multi_index:
-            raise ValueError(
+            raise ArgumentValueError(
                 "level can only be specified for DataFrames with multi-index index"
             )
         if isinstance(level, str) and level not in dataframe.index.names:
-            raise ValueError(f"Invalid level name: {level}")
+            raise ArgumentValueError(f"Invalid level name: {level}")
         if isinstance(level, int) and (abs(level) >= dataframe.index.nlevels):
-            raise ValueError(f"Invalid level index: {level}")
+            raise ArgumentValueError(f"Invalid level index: {level}")
         if any(isinstance(col, tuple) for col in index):
-            raise ValueError("Cannot use tuples in index when level is specified")
+            raise ArgumentValueError(
+                "Cannot use tuples in index when level is specified"
+            )
     index = [index] if isinstance(index, (str, tuple, int)) else index
     if not isinstance(index, list):
-        raise TypeError("Provided 'index' must be a string, tuple, int, or list.")
+        raise ArgumentTypeError(
+            "Provided 'index' must be a string, tuple, int, or list."
+        )
     if level is not None:
         level_index = (
             level if isinstance(level, int) else dataframe.index.names.index(level)
         )
         index = [idx for idx in dataframe.index if idx[level_index] in index]
         if not index:
-            raise ValueError(f"No 'index' provided are in 'level={level}'!")
+            raise ArgumentValueError(f"No 'index' provided are in 'level={level}'!")
     invalid_index = set(index) - set(dataframe.index)
     if invalid_index:
-        raise ValueError(f"Invalid index: {invalid_index}")
+        raise ArgumentValueError(f"Invalid index: {invalid_index}")
     return dataframe.loc[index, :]
 
 
@@ -55,34 +63,38 @@ def select_columns(
     level: Optional[Union[str, int]] = None,
 ) -> DataFrame:
     if level is not None and not isinstance(level, (str, int)):
-        raise TypeError(
+        raise ArgumentTypeError(
             f"The 'level' must be a string (for named levels) or an integer (for positional levels), not {type(level)}."
         )
     has_multi_index = isinstance(dataframe.columns, MultiIndex)
     if level is not None:
         if not has_multi_index:
-            raise ValueError(
+            raise ArgumentValueError(
                 "level can only be specified for DataFrames with multi-index columns"
             )
         if isinstance(level, str) and level not in dataframe.columns.names:
-            raise ValueError(f"Invalid level name: {level}")
+            raise ArgumentValueError(f"Invalid level name: {level}")
         if isinstance(level, int) and (abs(level) >= dataframe.columns.nlevels):
-            raise ValueError(f"Invalid level index: {level}")
+            raise ArgumentValueError(f"Invalid level index: {level}")
         if any(isinstance(col, tuple) for col in columns):
-            raise ValueError("Cannot use tuples in columns when level is specified")
+            raise ArgumentValueError(
+                "Cannot use tuples in columns when level is specified"
+            )
     columns = [columns] if isinstance(columns, (str, tuple, int)) else columns
     if not isinstance(columns, list):
-        raise TypeError("Provided 'columns' must be a string, tuple, int, or list.")
+        raise ArgumentTypeError(
+            "Provided 'columns' must be a string, tuple, int, or list."
+        )
     if level is not None:
         level_index = (
             level if isinstance(level, int) else dataframe.columns.names.index(level)
         )
         columns = [col for col in dataframe.columns if col[level_index] in columns]
         if not columns:
-            raise ValueError(f"No 'columns' provided are in 'level={level}'!")
+            raise ArgumentValueError(f"No 'columns' provided are in 'level={level}'!")
     invalid_columns = set(columns) - set(dataframe.columns)
     if invalid_columns:
-        raise ValueError(f"Invalid columns: {invalid_columns}")
+        raise ArgumentValueError(f"Invalid columns: {invalid_columns}")
     return dataframe.loc[:, columns]
 
 
@@ -91,15 +103,8 @@ def transform_columns(
     transformation: Callable,
     columns: Iterable[Union[str, Tuple]],
     level: Optional[Union[str, int]] = None,
+    rename: Optional[Union[str, bool]] = True,
 ) -> DataFrame:
-    if isinstance(dataframe.columns, MultiIndex):
-        columns_to_select = [
-            col if isinstance(col, Tuple) else (col, "") for col in columns_names
-        ]
-
-    if not all([c in dataframe.columns.get_level_values(-1) for c in columns_names]):
-        raise ArgumentKeyError(INVALID_COLUMN_ERROR.format(columns_names))
-
     if not callable(transformation):
         raise ArgumentTypeError(INVALID_TRANSFORMATION_ERROR.format(transformation))
     transformation_name = (
@@ -107,29 +112,27 @@ def transform_columns(
         if hasattr(transformation, "__name__")
         else "transformation"
     )
-    if isinstance(dataframe.columns, MultiIndex):
-        selected_columns = dataframe.loc[:, IndexSlice[:, columns_names]]
-    else:
-        selected_columns = dataframe.loc[:, columns_names]
+    selected_columns = select_columns(dataframe=dataframe, columns=columns, level=level)
     if transformation_name in {"ln", "log"}:
         selected_columns = selected_columns.replace(0, 1e-6)
         print("Replaced 0.0 values for 1e-6 to avoid -inf values!")
     transformed_columns = selected_columns.apply(transformation)
-    if isinstance(dataframe.columns, MultiIndex):
-        transformed_columns.columns = MultiIndex.from_tuples(
-            [
-                (col_0, f"{col_1}_{transformation_name}")
-                if col_1 in columns_names
-                else (col_0, col_1)
-                for col_0, col_1 in transformed_columns.columns.values
-            ],
-            names=dataframe.columns.names,
+    if rename:
+        transformation_name = (
+            transformation_name if not isinstance(rename, str) else rename
         )
-    else:
-        transformed_columns.columns = [
-            f"{col}_{transformation_name}" if col in columns_names else col
-            for col in transformed_columns.columns
-        ]
+        if isinstance(dataframe.columns, MultiIndex):
+            transformed_columns.columns = MultiIndex.from_tuples(
+                [
+                    (*col[:-1], f"{col[-1]}_{transformation_name}")
+                    for col in transformed_columns.columns
+                ],
+                names=dataframe.columns.names,
+            )
+        else:
+            transformed_columns.columns = [
+                f"{col}_{transformation_name}" for col in transformed_columns.columns
+            ]
     return transformed_columns
 
 

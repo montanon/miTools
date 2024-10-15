@@ -3,6 +3,7 @@ from unittest import TestCase
 
 import numpy as np
 import pandas as pd
+from numpy import log
 from pandas import DataFrame, Index, IndexSlice, MultiIndex, testing
 from pandas.api.types import is_numeric_dtype
 
@@ -19,7 +20,11 @@ from mitools.economic_complexity.columns import (
     transform_columns,
     variation_columns,
 )
-from mitools.exceptions.custom_exceptions import ArgumentKeyError, ArgumentTypeError
+from mitools.exceptions.custom_exceptions import (
+    ArgumentKeyError,
+    ArgumentTypeError,
+    ArgumentValueError,
+)
 
 
 class TestSelectIndex(TestCase):
@@ -44,12 +49,12 @@ class TestSelectIndex(TestCase):
         self.assertListEqual(list(result.columns), list(self.df_single.columns))
 
     def test_invalid_column_single_level(self):
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(ArgumentValueError) as context:
             select_index(self.df_single, "D")
         self.assertIn("Invalid index", str(context.exception))
 
     def test_mix_columns_single_level(self):
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(ArgumentValueError) as context:
             select_index(self.df_single, ["A", "D"])
         self.assertIn("Invalid index", str(context.exception))
 
@@ -77,39 +82,39 @@ class TestSelectIndex(TestCase):
         self.assertListEqual(list(result.index), [("A", "X"), ("A", "Y")])
 
     def test_invalid_level_name(self):
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(ArgumentValueError) as context:
             select_index(self.df_multi, ["X"], level="invalid")
         self.assertIn("Invalid level name", str(context.exception))
 
     def test_invalid_level_index(self):
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(ArgumentValueError) as context:
             select_index(self.df_multi, ["X"], level=2)
         self.assertIn("Invalid level index", str(context.exception))
 
     def test_tuple_column_mismatch(self):
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(ArgumentValueError) as context:
             select_index(self.df_multi, [("A", "X", "extra")])
         self.assertIn("Invalid index", str(context.exception))
 
     def test_level_in_single_level_dataframe(self):
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(ArgumentValueError) as context:
             select_index(self.df_single, ["A"], level=0)
         self.assertIn("level can only be specified", str(context.exception))
 
     def test_empty_dataframe_single_level(self):
-        empty_df = pd.DataFrame(index=["A", "B", "C"])
+        empty_df = DataFrame(index=["A", "B", "C"])
         result = select_index(empty_df, ["A", "B"])
         self.assertEqual(result.shape, (2, 0))
 
     def test_empty_dataframe_multiindex(self):
         arrays = [["A", "A", "B"], ["X", "Y", "Z"]]
         index = MultiIndex.from_arrays(arrays, names=["upper", "lower"])
-        empty_multi_df = pd.DataFrame(index=index)
+        empty_multi_df = DataFrame(index=index)
         result = select_index(empty_multi_df, [("A", "X"), ("B", "Z")])
         self.assertEqual(result.shape, (2, 0))
 
     def test_invalid_column_type(self):
-        with self.assertRaises(TypeError) as context:
+        with self.assertRaises(ArgumentTypeError) as context:
             select_index(self.df_single, {})
         self.assertIn(
             "Provided 'index' must be a string, tuple, int, or list.",
@@ -139,12 +144,12 @@ class TestSelectColumns(TestCase):
         self.assertListEqual(list(result.index), list(self.df_single.index))
 
     def test_invalid_column_single_level(self):
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(ArgumentValueError) as context:
             select_columns(self.df_single, "D")
         self.assertIn("Invalid columns", str(context.exception))
 
     def test_mix_columns_single_level(self):
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(ArgumentValueError) as context:
             select_columns(self.df_single, ["A", "D"])
         self.assertIn("Invalid columns", str(context.exception))
 
@@ -172,39 +177,39 @@ class TestSelectColumns(TestCase):
         self.assertListEqual(list(result.columns), [("A", "X"), ("A", "Y")])
 
     def test_invalid_level_name(self):
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(ArgumentValueError) as context:
             select_columns(self.df_multi, ["X"], level="invalid")
         self.assertIn("Invalid level name", str(context.exception))
 
     def test_invalid_level_index(self):
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(ArgumentValueError) as context:
             select_columns(self.df_multi, ["X"], level=2)
         self.assertIn("Invalid level index", str(context.exception))
 
     def test_tuple_column_mismatch(self):
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(ArgumentValueError) as context:
             select_columns(self.df_multi, [("A", "X", "extra")])
         self.assertIn("Invalid columns", str(context.exception))
 
     def test_level_in_single_level_dataframe(self):
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(ArgumentValueError) as context:
             select_columns(self.df_single, ["A"], level=0)
         self.assertIn("level can only be specified", str(context.exception))
 
     def test_empty_dataframe_single_level(self):
-        empty_df = pd.DataFrame(columns=["A", "B", "C"])
+        empty_df = DataFrame(columns=["A", "B", "C"])
         result = select_columns(empty_df, ["A", "B"])
         self.assertEqual(result.shape, (0, 2))
 
     def test_empty_dataframe_multiindex(self):
         arrays = [["A", "A", "B"], ["X", "Y", "Z"]]
         columns = MultiIndex.from_arrays(arrays, names=["upper", "lower"])
-        empty_multi_df = pd.DataFrame(columns=columns)
+        empty_multi_df = DataFrame(columns=columns)
         result = select_columns(empty_multi_df, [("A", "X"), ("B", "Z")])
         self.assertEqual(result.shape, (0, 2))
 
     def test_invalid_column_type(self):
-        with self.assertRaises(TypeError) as context:
+        with self.assertRaises(ArgumentTypeError) as context:
             select_columns(self.df_single, {})
         self.assertIn(
             "Provided 'columns' must be a string, tuple, int, or list.",
@@ -215,7 +220,7 @@ class TestSelectColumns(TestCase):
 class TestTransformColumns(unittest.TestCase):
     def setUp(self):
         # Setup a DataFrame with MultiIndex columns for testing
-        self.multiidx_df = DataFrame(
+        self.multiidx_df = pd.DataFrame(
             {
                 ("A", "one"): [1, 2, 3],
                 ("A", "two"): [4, 5, 6],
@@ -223,64 +228,74 @@ class TestTransformColumns(unittest.TestCase):
             }
         )
         self.multiidx_df.columns = MultiIndex.from_tuples(self.multiidx_df.columns)
-        self.singleidx_df = DataFrame(
+
+        # Single-index DataFrame
+        self.singleidx_df = pd.DataFrame(
             {
-                ("one"): [1, 2, 3],
-                ("two"): [4, 5, 6],
-                ("three"): [7, 8, 9],
+                "one": [1, 2, 3],
+                "two": [4, 5, 6],
+                "three": [7, 8, 9],
             }
         )
 
-    def test_with_multiidx(self):
-        # Testing with a log transformation
-        from numpy import log
-
-        result = transform_columns(self.multiidx_df, ["one", "three"], log)
-        # Check if the transformation was applied correctly
+    def test_transform_multiidx_log(self):
+        result = transform_columns(self.multiidx_df, log, ["one", "three"], level=-1)
+        expected_columns = [("A", "one_log"), ("B", "three_log")]
+        self.assertListEqual(list(result.columns), expected_columns)
         for col in result.columns:
-            if col[1].endswith("_log"):
-                self.assertTrue(is_numeric_dtype(result[col]))
-                # Check if the transformed columns have correct values
-                original_col = (col[0], col[1].replace("_log", ""))
-                self.assertTrue(
-                    all(
-                        result[col]
-                        == log(self.multiidx_df[original_col].replace(0, 1e-6))
-                    )
-                )
+            original_col = (col[0], col[1].replace("_log", ""))
+            self.assertTrue(is_numeric_dtype(result[col]))
+            self.assertTrue(
+                all(result[col] == log(self.multiidx_df[original_col].replace(0, 1e-6)))
+            )
 
-    def test_with_singleidx(self):
-        # Testing with a log transformation
-        from numpy import log
-
-        result = transform_columns(self.singleidx_df, ["one", "three"], log)
-        # Check if the transformation was applied correctly
+    def test_transform_singleidx_log(self):
+        result = transform_columns(self.singleidx_df, log, ["one", "three"])
+        expected_columns = ["one_log", "three_log"]
+        self.assertListEqual(list(result.columns), expected_columns)
         for col in result.columns:
-            if col.endswith("_log"):
-                self.assertTrue(is_numeric_dtype(result[col]))
-                # Check if the transformed columns have correct values
-                original_col = col.replace("_log", "")
-                self.assertTrue(
-                    all(
-                        result[col]
-                        == log(self.singleidx_df[original_col].replace(0, 1e-6))
-                    )
+            original_col = col.replace("_log", "")
+            self.assertTrue(is_numeric_dtype(result[col]))
+            self.assertTrue(
+                all(
+                    result[col] == log(self.singleidx_df[original_col].replace(0, 1e-6))
                 )
+            )
+
+    def test_transform_with_custom_rename(self):
+        result = transform_columns(self.singleidx_df, log, ["one"], rename="custom")
+        expected_columns = ["one_custom"]
+        self.assertListEqual(list(result.columns), expected_columns)
 
     def test_transform_with_invalid_column(self):
-        # Testing with a column that doesn't exist
-        from numpy import log
-
         with self.assertRaises(ArgumentKeyError):
-            transform_columns(self.multiidx_df, ["four"], log)
+            transform_columns(self.multiidx_df, log, ["four"])
 
     def test_transform_with_invalid_function(self):
-        # Testing with an invalid transformation
         def invalid_function(x):
             return x + "invalid"
 
         with self.assertRaises(ArgumentTypeError):
-            transform_columns(self.multiidx_df, ["one"], invalid_function)
+            transform_columns(self.multiidx_df, invalid_function, ["one"])
+
+    def test_transform_multiidx_with_level_positional(self):
+        result = transform_columns(self.multiidx_df, log, ["one", "three"], level=1)
+        expected_columns = [("A", "one_log"), ("B", "three_log")]
+        self.assertListEqual(list(result.columns), expected_columns)
+        for col in result.columns:
+            original_col = (col[0], col[1].replace("_log", ""))
+            self.assertTrue(is_numeric_dtype(result[col]))
+            self.assertTrue(
+                all(result[col] == log(self.multiidx_df[original_col].replace(0, 1e-6)))
+            )
+
+    def test_transform_with_non_callable_transformation(self):
+        with self.assertRaises(ArgumentTypeError):
+            transform_columns(self.singleidx_df, "not_callable", ["one"])
+
+    def test_transform_with_tuple_column_not_matching_multiindex(self):
+        with self.assertRaises(ValueError):
+            transform_columns(self.multiidx_df, log, [("A", "invalid")])
 
 
 class TestVariationColumns(unittest.TestCase):
