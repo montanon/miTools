@@ -10,7 +10,7 @@ from ..exceptions.custom_exceptions import (
 
 GROWTH_COLUMN_NAME = "growth_{:d}"
 GROWTH_PCT_COLUMN_NAME = "growth%_{:d}"
-SHIFTED_COLUMN_NAME = "{}_shifted_by_{}"
+SHIFTED_COLUMN_NAME = "shifted_by_{:d}"
 
 INVALID_COLUMN_ERROR = "One or more of {} are not in DataFrame."
 INVALID_TRANSFORMATION_ERROR = "Transformation {} provided is not Callable."
@@ -181,17 +181,36 @@ def variation_columns(
     return variation_columns
 
 
-def shift_columns(dataframe: DataFrame, columns_names: List[str], t: int) -> DataFrame:
-    shifted_columns = dataframe.loc[:, IndexSlice[:, columns_names]].shift(-t)
-    shifted_columns.columns = MultiIndex.from_tuples(
-        [
-            (col_0, SHIFTED_COLUMN_NAME.format(col_1, t))
-            if col_1 in columns_names
-            else (col_0, col_1)
-            for col_0, col_1 in shifted_columns.columns.values
-        ],
-        names=dataframe.columns.names,
-    )
+def shift_columns(
+    dataframe: DataFrame,
+    columns: Iterable[Union[str, Tuple]],
+    t: int,
+    level: Optional[Union[str, int]] = None,
+    rename: Optional[Union[str, bool]] = True,
+) -> DataFrame:
+    if not isinstance(t, int):
+        raise ArgumentTypeError("Provided 't' must be an integer.")
+    selected_columns = select_columns(dataframe=dataframe, columns=columns, level=level)
+    try:
+        shifted_columns = selected_columns.shift(t)
+    except Exception as e:
+        raise ArgumentValueError(f"Error while calculating variation with 't={t}': {e}")
+    if rename:
+        shifted_name = (
+            SHIFTED_COLUMN_NAME.format(t) if not isinstance(rename, str) else rename
+        )
+        if isinstance(dataframe.columns, MultiIndex):
+            shifted_columns.columns = MultiIndex.from_tuples(
+                [
+                    (*col[:-1], f"{col[-1]}_{shifted_name}")
+                    for col in shifted_columns.columns
+                ],
+                names=dataframe.columns.names,
+            )
+        else:
+            shifted_columns.columns = [
+                f"{col}_{shifted_name}" for col in shifted_columns.columns
+            ]
     return shifted_columns
 
 
