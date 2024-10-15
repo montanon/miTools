@@ -14,12 +14,12 @@ from mitools.economic_complexity.columns import (
     GROWTH_PCT_COLUMN_NAME,
     add_columns,
     divide_columns,
+    growth_columns,
     multiply_columns,
     select_columns,
     select_index,
     shift_columns,
     transform_columns,
-    variation_columns,
 )
 from mitools.exceptions.custom_exceptions import (
     ArgumentKeyError,
@@ -218,7 +218,7 @@ class TestSelectColumns(TestCase):
         )
 
 
-class TestTransformColumns(unittest.TestCase):
+class TestTransformColumns(TestCase):
     def setUp(self):
         # Setup a DataFrame with MultiIndex columns for testing
         self.multiidx_df = pd.DataFrame(
@@ -318,7 +318,7 @@ class TestVariationColumns(TestCase):
         )
 
     def test_variation_singleidx_absolute(self):
-        result = variation_columns(self.singleidx_df, ["one", "three"], t=1)
+        result = growth_columns(self.singleidx_df, ["one", "three"], t=1)
         expected_columns = ["one_growth_1", "three_growth_1"]
         self.assertListEqual(list(result.columns), expected_columns)
         expected_values = pd.DataFrame(
@@ -327,7 +327,7 @@ class TestVariationColumns(TestCase):
         assert_frame_equal(result.reset_index(drop=True), expected_values)
 
     def test_variation_singleidx_pct(self):
-        result = variation_columns(self.singleidx_df, ["one", "three"], t=1, pct=True)
+        result = growth_columns(self.singleidx_df, ["one", "three"], t=1, pct=True)
         expected_columns = ["one_growth%_1", "three_growth%_1"]
         self.assertListEqual(list(result.columns), expected_columns)
         expected_values = pd.DataFrame(
@@ -339,7 +339,7 @@ class TestVariationColumns(TestCase):
         assert_frame_equal(result.reset_index(drop=True), expected_values)
 
     def test_variation_multiidx_absolute(self):
-        result = variation_columns(self.multiidx_df, ["one", "three"], t=1, level=-1)
+        result = growth_columns(self.multiidx_df, ["one", "three"], t=1, level=-1)
         expected_columns = [("A", "one_growth_1"), ("B", "three_growth_1")]
         self.assertListEqual(list(result.columns), expected_columns)
         expected_values = pd.DataFrame(
@@ -351,7 +351,7 @@ class TestVariationColumns(TestCase):
         assert_frame_equal(result.reset_index(drop=True), expected_values)
 
     def test_variation_multiidx_pct(self):
-        result = variation_columns(
+        result = growth_columns(
             self.multiidx_df, ["one", "three"], t=1, pct=True, level=-1
         )
         expected_columns = [
@@ -373,85 +373,93 @@ class TestVariationColumns(TestCase):
 
     def test_variation_with_invalid_t(self):
         with self.assertRaises(ArgumentTypeError):
-            variation_columns(self.singleidx_df, ["one"], t="invalid")
+            growth_columns(self.singleidx_df, ["one"], t="invalid")
 
     def test_variation_with_invalid_columns(self):
         with self.assertRaises(ArgumentValueError):
-            variation_columns(self.singleidx_df, ["invalid_column"], t=1)
+            growth_columns(self.singleidx_df, ["invalid_column"], t=1)
 
     def test_variation_with_custom_rename(self):
-        result = variation_columns(
-            self.singleidx_df, ["one"], t=1, rename="custom_name"
-        )
+        result = growth_columns(self.singleidx_df, ["one"], t=1, rename="custom_name")
         expected_columns = ["one_custom_name"]
         self.assertListEqual(list(result.columns), expected_columns)
 
     def test_variation_multiidx_with_positional_level(self):
-        result = variation_columns(self.multiidx_df, ["one", "three"], t=1, level=1)
+        result = growth_columns(self.multiidx_df, ["one", "three"], t=1, level=1)
         expected_columns = [("A", "one_growth_1"), ("B", "three_growth_1")]
         self.assertListEqual(list(result.columns), expected_columns)
 
     def test_variation_non_numeric_data(self):
         df_non_numeric = pd.DataFrame({"A": ["a", "b", "c"], "B": ["x", "y", "z"]})
         with self.assertRaises(ArgumentValueError):
-            variation_columns(df_non_numeric, ["A"], t=1)
+            growth_columns(df_non_numeric, ["A"], t=1)
 
 
-class TestShiftColumns(unittest.TestCase):
+class TestShiftColumns(TestCase):
     def setUp(self):
-        # Create a DataFrame with MultiIndex columns for testing
-        self.dataframe = DataFrame(
+        self.multiidx_df = pd.DataFrame(
             {
-                ("Country1", "Indicator1"): [1, 2, 3, 4, 5],
-                ("Country1", "Indicator2"): [6, 7, 8, 9, 10],
-                ("Country2", "Indicator1"): [11, 12, 13, 14, 15],
-                ("Country2", "Indicator2"): [16, 17, 18, 19, 20],
+                ("A", "one"): [1, 2, 3],
+                ("A", "two"): [4, 5, 6],
+                ("B", "three"): [7, 8, 9],
             }
         )
-        self.dataframe.columns = MultiIndex.from_tuples(self.dataframe.columns)
+        self.multiidx_df.columns = MultiIndex.from_tuples(self.multiidx_df.columns)
+        self.singleidx_df = pd.DataFrame(
+            {
+                "one": [1, 2, 3],
+                "two": [4, 5, 6],
+                "three": [7, 8, 9],
+            }
+        )
 
-    def test_positive_shift(self):
-        t = 1
-        columns_to_shift = ["Indicator1"]
-        shifted_df = shift_columns(self.dataframe, columns_to_shift, t)
-        # Test if the columns are shifted down by t
-        for col in shifted_df.columns:
-            if col[1].startswith("Indicator1_shifted_by"):
-                self.assertTrue(
-                    shifted_df[col].equals(
-                        self.dataframe[col[0], "Indicator1"].shift(-t)
-                    )
-                )
+    def test_shift_singleidx(self):
+        result = shift_columns(self.singleidx_df, ["one", "three"], t=1)
+        expected_columns = ["one_shifted_1", "three_shifted_1"]
+        self.assertListEqual(list(result.columns), expected_columns)
+        expected_values = pd.DataFrame(
+            {"one_shifted_1": [None, 1, 2], "three_shifted_1": [None, 7, 8]}
+        )
+        pd.testing.assert_frame_equal(result.reset_index(drop=True), expected_values)
 
-    def test_negative_shift(self):
-        t = -1
-        columns_to_shift = ["Indicator2"]
-        shifted_df = shift_columns(self.dataframe, columns_to_shift, t)
-        # Test if the columns are shifted up by t
-        for col in shifted_df.columns:
-            if col[1].startswith("Indicator2_shifted_by"):
-                self.assertTrue(
-                    shifted_df[col].equals(
-                        self.dataframe[col[0], "Indicator2"].shift(-t)
-                    )
-                )
+    def test_shift_multiidx(self):
+        result = shift_columns(self.multiidx_df, ["one", "three"], t=1, level=-1)
+        expected_columns = [("A", "one_shifted_1"), ("B", "three_shifted_1")]
+        self.assertListEqual(list(result.columns), expected_columns)
+        expected_values = pd.DataFrame(
+            {
+                ("A", "one_shifted_1"): [None, 1, 2],
+                ("B", "three_shifted_1"): [None, 7, 8],
+            }
+        )
+        assert_frame_equal(result.reset_index(drop=True), expected_values)
 
-    def test_shift_with_nonexistent_column(self):
-        t = 1
-        columns_to_shift = ["NonexistentColumn"]
-        with self.assertRaises(KeyError):
-            shift_columns(self.dataframe, columns_to_shift, t)
+    def test_shift_singleidx_with_custom_rename(self):
+        result = shift_columns(self.singleidx_df, ["one"], t=1, rename="custom_name")
+        expected_columns = ["one_custom_name"]
+        self.assertListEqual(list(result.columns), expected_columns)
+        expected_values = pd.DataFrame({"one_custom_name": [None, 1, 2]})
+        assert_frame_equal(result.reset_index(drop=True), expected_values)
 
-    def test_zero_shift(self):
-        t = 0
-        columns_to_shift = ["Indicator1"]
-        shifted_df = shift_columns(self.dataframe, columns_to_shift, t)
-        # Test if the columns are not shifted (remain the same)
-        for col in shifted_df.columns:
-            if col[1].startswith("Indicator1_shifted_by"):
-                self.assertTrue(
-                    shifted_df[col].equals(self.dataframe[col[0], "Indicator1"])
-                )
+    def test_shift_multiidx_with_positional_level(self):
+        result = shift_columns(self.multiidx_df, ["one", "three"], t=1, level=1)
+        expected_columns = [("A", "one_shifted_1"), ("B", "three_shifted_1")]
+        self.assertListEqual(list(result.columns), expected_columns)
+        expected_values = pd.DataFrame(
+            {
+                ("A", "one_shifted_1"): [None, 1, 2],
+                ("B", "three_shifted_1"): [None, 7, 8],
+            }
+        )
+        assert_frame_equal(result.reset_index(drop=True), expected_values)
+
+    def test_shift_with_invalid_t(self):
+        with self.assertRaises(ArgumentTypeError):
+            shift_columns(self.singleidx_df, ["one"], t="invalid")
+
+    def test_shift_with_invalid_column(self):
+        with self.assertRaises(ArgumentValueError):
+            shift_columns(self.singleidx_df, ["invalid_column"], t=1)
 
 
 class TestAddColumns(unittest.TestCase):

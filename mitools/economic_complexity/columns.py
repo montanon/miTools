@@ -10,7 +10,7 @@ from ..exceptions.custom_exceptions import (
 
 GROWTH_COLUMN_NAME = "growth_{:d}"
 GROWTH_PCT_COLUMN_NAME = "growth%_{:d}"
-SHIFTED_COLUMN_NAME = "shifted_by_{:d}"
+SHIFTED_COLUMN_NAME = "shifted_{:d}"
 
 INVALID_COLUMN_ERROR = "One or more of {} are not in DataFrame."
 INVALID_TRANSFORMATION_ERROR = "Transformation {} provided is not Callable."
@@ -141,7 +141,7 @@ def transform_columns(
     return transformed_columns
 
 
-def variation_columns(
+def growth_columns(
     dataframe: DataFrame,
     columns: Iterable[Union[str, Tuple]],
     t: int,
@@ -191,6 +191,7 @@ def shift_columns(
     if not isinstance(t, int):
         raise ArgumentTypeError("Provided 't' must be an integer.")
     selected_columns = select_columns(dataframe=dataframe, columns=columns, level=level)
+
     try:
         shifted_columns = selected_columns.shift(t)
     except Exception as e:
