@@ -4,8 +4,9 @@ from unittest import TestCase
 import numpy as np
 import pandas as pd
 from numpy import log
-from pandas import DataFrame, Index, IndexSlice, MultiIndex, testing
+from pandas import DataFrame, Index, IndexSlice, MultiIndex
 from pandas.api.types import is_numeric_dtype
+from pandas.testing import assert_frame_equal
 
 # Assuming the provided function is imported or defined here
 from mitools.economic_complexity.columns import (
@@ -298,64 +299,102 @@ class TestTransformColumns(unittest.TestCase):
             transform_columns(self.multiidx_df, log, [("A", "invalid")])
 
 
-class TestVariationColumns(unittest.TestCase):
+class TestVariationColumns(TestCase):
     def setUp(self):
-        # Create a DataFrame with MultiIndex columns for testing
-        index = Index(range(1995, 2021), name="Year")
-        iterables = [["CountryA", "CountryB"], ["Indicator1", "Indicator2"]]
-        columns = MultiIndex.from_product(iterables, names=["Country", "Indicator"])
-        self.data = DataFrame(
-            [[float(i + j) for j in range(4)] for i in range(26)],
-            index=index,
-            columns=columns,
+        self.multiidx_df = pd.DataFrame(
+            {
+                ("A", "one"): [1, 2, 3],
+                ("A", "two"): [4, 5, 6],
+                ("B", "three"): [7, 8, 9],
+            }
+        )
+        self.multiidx_df.columns = MultiIndex.from_tuples(self.multiidx_df.columns)
+        self.singleidx_df = pd.DataFrame(
+            {
+                "one": [1, 2, 3],
+                "two": [4, 5, 6],
+                "three": [7, 8, 9],
+            }
         )
 
-    def test_absolute_variation(self):
-        # Test the function with absolute variation
-        t = 1
-        result = variation_columns(self.data, ["Indicator1"], t, pct=False)
-        expected_change_name = GROWTH_COLUMN_NAME.format(t)
-        self.assertTrue(
-            "Indicator1" + expected_change_name in result.columns.get_level_values(-1)
+    def test_variation_singleidx_absolute(self):
+        result = variation_columns(self.singleidx_df, ["one", "three"], t=1)
+        expected_columns = ["one_growth_1", "three_growth_1"]
+        self.assertListEqual(list(result.columns), expected_columns)
+        expected_values = pd.DataFrame(
+            {"one_growth_1": [None, 1, 1], "three_growth_1": [None, 1, 1]}
         )
-        # Test the correctness of calculations
-        old_value = ("CountryA", "Indicator1")
-        new_value = ("CountryA", f"Indicator1{expected_change_name}")
-        original_values = self.data.loc[:, [old_value]]
-        shifted_values = original_values.shift(t)
-        expected_values = original_values - shifted_values
-        new_tuples = [
-            (new_value if old == old_value else old) for old in expected_values.columns
-        ]
-        expected_values.columns = MultiIndex.from_tuples(
-            new_tuples, names=expected_values.columns.names
-        )
-        testing.assert_frame_equal(result[[new_value]], expected_values)
+        assert_frame_equal(result.reset_index(drop=True), expected_values)
 
-    def test_percentage_variation(self):
-        # Test the function with percentage variation
-        t = 1
-        result = variation_columns(self.data, ["Indicator1"], t, pct=True).copy(
-            deep=True
+    def test_variation_singleidx_pct(self):
+        result = variation_columns(self.singleidx_df, ["one", "three"], t=1, pct=True)
+        expected_columns = ["one_growth%_1", "three_growth%_1"]
+        self.assertListEqual(list(result.columns), expected_columns)
+        expected_values = pd.DataFrame(
+            {
+                "one_growth%_1": [None, 50.0, 33.333333],
+                "three_growth%_1": [None, 12.5, 11.111111],  # Rounded for clarity
+            }
         )
-        expected_change_name = GROWTH_PCT_COLUMN_NAME.format(t)
-        self.assertTrue(
-            f"Indicator1{expected_change_name}" in result.columns.get_level_values(1)
+        assert_frame_equal(result.reset_index(drop=True), expected_values)
+
+    def test_variation_multiidx_absolute(self):
+        result = variation_columns(self.multiidx_df, ["one", "three"], t=1, level=-1)
+        expected_columns = [("A", "one_growth_1"), ("B", "three_growth_1")]
+        self.assertListEqual(list(result.columns), expected_columns)
+        expected_values = pd.DataFrame(
+            {
+                ("A", "one_growth_1"): [None, 1, 1],
+                ("B", "three_growth_1"): [None, 1, 1],
+            }
         )
-        # Test the correctness of calculations
-        old_values = [("CountryA", "Indicator1"), ("CountryB", "Indicator1")]
-        new_values = [
-            ("CountryA", f"Indicator1{expected_change_name}"),
-            ("CountryB", f"Indicator1{expected_change_name}"),
+        assert_frame_equal(result.reset_index(drop=True), expected_values)
+
+    def test_variation_multiidx_pct(self):
+        result = variation_columns(
+            self.multiidx_df, ["one", "three"], t=1, pct=True, level=-1
+        )
+        expected_columns = [
+            ("A", "one_growth%_1"),
+            ("B", "three_growth%_1"),
         ]
-        original_values = self.data.loc[:, IndexSlice[:, "Indicator1"]]
-        shifted_values = original_values.shift(t)
-        variation_cols = original_values - shifted_values
-        expected_values = (variation_cols / original_values) * 100.0
-        expected_values.columns = MultiIndex.from_tuples(
-            new_values, names=expected_values.columns.names
+        self.assertListEqual(list(result.columns), expected_columns)
+        expected_values = pd.DataFrame(
+            {
+                ("A", "one_growth%_1"): [None, 50.0, 33.333333],
+                ("B", "three_growth%_1"): [
+                    None,
+                    12.5,
+                    11.111111,
+                ],  # Rounded for clarity
+            }
         )
-        testing.assert_frame_equal(result, expected_values)
+        assert_frame_equal(result.reset_index(drop=True), expected_values)
+
+    def test_variation_with_invalid_t(self):
+        with self.assertRaises(ArgumentTypeError):
+            variation_columns(self.singleidx_df, ["one"], t="invalid")
+
+    def test_variation_with_invalid_columns(self):
+        with self.assertRaises(ArgumentValueError):
+            variation_columns(self.singleidx_df, ["invalid_column"], t=1)
+
+    def test_variation_with_custom_rename(self):
+        result = variation_columns(
+            self.singleidx_df, ["one"], t=1, rename="custom_name"
+        )
+        expected_columns = ["one_custom_name"]
+        self.assertListEqual(list(result.columns), expected_columns)
+
+    def test_variation_multiidx_with_positional_level(self):
+        result = variation_columns(self.multiidx_df, ["one", "three"], t=1, level=1)
+        expected_columns = [("A", "one_growth_1"), ("B", "three_growth_1")]
+        self.assertListEqual(list(result.columns), expected_columns)
+
+    def test_variation_non_numeric_data(self):
+        df_non_numeric = pd.DataFrame({"A": ["a", "b", "c"], "B": ["x", "y", "z"]})
+        with self.assertRaises(ArgumentValueError):
+            variation_columns(df_non_numeric, ["A"], t=1)
 
 
 class TestShiftColumns(unittest.TestCase):

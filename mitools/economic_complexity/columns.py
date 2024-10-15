@@ -8,8 +8,8 @@ from ..exceptions.custom_exceptions import (
     ArgumentValueError,
 )
 
-GROWTH_COLUMN_NAME = "_growth_{:d}"
-GROWTH_PCT_COLUMN_NAME = "_growth%_{:d}"
+GROWTH_COLUMN_NAME = "growth_{:d}"
+GROWTH_PCT_COLUMN_NAME = "growth%_{:d}"
 SHIFTED_COLUMN_NAME = "{}_shifted_by_{}"
 
 INVALID_COLUMN_ERROR = "One or more of {} are not in DataFrame."
