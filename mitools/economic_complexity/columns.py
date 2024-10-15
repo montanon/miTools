@@ -142,26 +142,42 @@ def transform_columns(
 
 
 def variation_columns(
-    dataframe: DataFrame, columns_names: List[str], t: int, pct: Optional[bool] = False
+    dataframe: DataFrame,
+    columns: Iterable[Union[str, Tuple]],
+    t: int,
+    level: Optional[Union[str, int]] = None,
+    pct: Optional[bool] = False,
+    rename: Optional[Union[str, bool]] = True,
 ) -> DataFrame:
-    selected_columns = dataframe.loc[:, IndexSlice[:, columns_names]]
-    shifted_columns = selected_columns.shift(t)
-    variation_columns = selected_columns - shifted_columns
+    if not isinstance(t, int):
+        raise ArgumentTypeError("Provided 't' must be an integer.")
+    selected_columns = select_columns(dataframe=dataframe, columns=columns, level=level)
+    try:
+        shifted_columns = selected_columns.shift(t)
+        variation_columns = selected_columns - shifted_columns
+    except Exception as e:
+        raise ArgumentValueError(f"Error while calculating variation with 't={t}': {e}")
     variation_columns = (
         (variation_columns / selected_columns) * 100.0 if pct else variation_columns
     )
-    growth_name = (
-        GROWTH_PCT_COLUMN_NAME.format(t) if pct else GROWTH_COLUMN_NAME.format(t)
-    )
-    variation_columns.columns = MultiIndex.from_tuples(
-        [
-            (col_0, f"{col_1}{growth_name}")
-            if col_1 in columns_names
-            else (col_0, col_1)
-            for col_0, col_1 in variation_columns.columns.values
-        ],
-        names=dataframe.columns.names,
-    )
+    if rename:
+        variation_name = (
+            (GROWTH_PCT_COLUMN_NAME.format(t) if pct else GROWTH_COLUMN_NAME.format(t))
+            if not isinstance(rename, str)
+            else rename
+        )
+        if isinstance(dataframe.columns, MultiIndex):
+            variation_columns.columns = MultiIndex.from_tuples(
+                [
+                    (*col[:-1], f"{col[-1]}_{variation_name}")
+                    for col in variation_columns.columns
+                ],
+                names=dataframe.columns.names,
+            )
+        else:
+            variation_columns.columns = [
+                f"{col}_{variation_name}" for col in variation_columns.columns
+            ]
     return variation_columns
 
 
