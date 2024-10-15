@@ -14,11 +14,107 @@ from mitools.economic_complexity.columns import (
     divide_columns,
     multiply_columns,
     select_columns,
+    select_index,
     shift_columns,
     transform_columns,
     variation_columns,
 )
 from mitools.exceptions.custom_exceptions import ArgumentKeyError, ArgumentTypeError
+
+
+class TestSelectIndex(TestCase):
+    def setUp(self):
+        self.df_single = DataFrame({"A": [1, 2, 3], "B": [4, 5, 6], "C": [7, 8, 9]}).T
+        arrays = [["A", "A", "B"], ["X", "Y", "Z"]]
+        columns = MultiIndex.from_arrays(arrays, names=["upper", "lower"])
+        self.df_multi = DataFrame(
+            [[1, 2, 3], [4, 5, 6], [7, 8, 9]], columns=columns, index=columns
+        ).T
+
+    def test_single_column_single_level(self):
+        result = select_index(self.df_single, "A")
+        self.assertListEqual(list(result.index), ["A"])
+        self.assertEqual(result.shape, (1, 3))
+        self.assertListEqual(list(result.columns), list(self.df_single.columns))
+
+    def test_multiple_columns_single_level(self):
+        result = select_index(self.df_single, ["A", "C"])
+        self.assertListEqual(list(result.index), ["A", "C"])
+        self.assertEqual(result.shape, (2, 3))
+        self.assertListEqual(list(result.columns), list(self.df_single.columns))
+
+    def test_invalid_column_single_level(self):
+        with self.assertRaises(ValueError) as context:
+            select_index(self.df_single, "D")
+        self.assertIn("Invalid index", str(context.exception))
+
+    def test_mix_columns_single_level(self):
+        with self.assertRaises(ValueError) as context:
+            select_index(self.df_single, ["A", "D"])
+        self.assertIn("Invalid index", str(context.exception))
+
+    def test_empty_column_selection_single_level(self):
+        result = select_index(self.df_single, [])
+        self.assertEqual(result.shape, (0, 3))
+        self.assertListEqual(list(result.columns), list(self.df_single.columns))
+
+    def test_select_all_columns_single_level(self):
+        result = select_index(self.df_single, list(self.df_single.index))
+        self.assertListEqual(list(result.index), list(self.df_single.index))
+        self.assertListEqual(list(result.columns), list(self.df_single.columns))
+
+    def test_multiindex_column_selection(self):
+        result = select_index(self.df_multi, [("A", "X"), ("B", "Z")])
+        self.assertListEqual(list(result.index), [("A", "X"), ("B", "Z")])
+        self.assertEqual(result.shape, (2, 3))
+
+    def test_multiindex_with_level_positional(self):
+        result = select_index(self.df_multi, ["X", "Y"], level=1)
+        self.assertListEqual(list(result.index), [("A", "X"), ("A", "Y")])
+
+    def test_multiindex_with_level_name(self):
+        result = select_index(self.df_multi, ["X", "Y"], level="lower")
+        self.assertListEqual(list(result.index), [("A", "X"), ("A", "Y")])
+
+    def test_invalid_level_name(self):
+        with self.assertRaises(ValueError) as context:
+            select_index(self.df_multi, ["X"], level="invalid")
+        self.assertIn("Invalid level name", str(context.exception))
+
+    def test_invalid_level_index(self):
+        with self.assertRaises(ValueError) as context:
+            select_index(self.df_multi, ["X"], level=2)
+        self.assertIn("Invalid level index", str(context.exception))
+
+    def test_tuple_column_mismatch(self):
+        with self.assertRaises(ValueError) as context:
+            select_index(self.df_multi, [("A", "X", "extra")])
+        self.assertIn("Invalid index", str(context.exception))
+
+    def test_level_in_single_level_dataframe(self):
+        with self.assertRaises(ValueError) as context:
+            select_index(self.df_single, ["A"], level=0)
+        self.assertIn("level can only be specified", str(context.exception))
+
+    def test_empty_dataframe_single_level(self):
+        empty_df = pd.DataFrame(index=["A", "B", "C"])
+        result = select_index(empty_df, ["A", "B"])
+        self.assertEqual(result.shape, (2, 0))
+
+    def test_empty_dataframe_multiindex(self):
+        arrays = [["A", "A", "B"], ["X", "Y", "Z"]]
+        index = MultiIndex.from_arrays(arrays, names=["upper", "lower"])
+        empty_multi_df = pd.DataFrame(index=index)
+        result = select_index(empty_multi_df, [("A", "X"), ("B", "Z")])
+        self.assertEqual(result.shape, (2, 0))
+
+    def test_invalid_column_type(self):
+        with self.assertRaises(TypeError) as context:
+            select_index(self.df_single, {})
+        self.assertIn(
+            "Provided 'index' must be a string, tuple, int, or list.",
+            str(context.exception),
+        )
 
 
 class TestSelectColumns(TestCase):

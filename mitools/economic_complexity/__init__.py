@@ -2,6 +2,7 @@ from .columns import (
     add_columns,
     multiply_columns,
     select_columns,
+    select_index,
     shift_columns,
     subtract_columns,
     transform_columns,
