@@ -12,6 +12,43 @@ INVALID_COLUMN_ERROR = "One or more of {} are not in DataFrame."
 INVALID_TRANSFORMATION_ERROR = "Transformation {} provided is not Callable."
 
 
+def select_index(
+    dataframe: DataFrame,
+    index: Union[str, Tuple, int, List[Union[str, Tuple, int]]],
+    level: Optional[Union[str, int]] = None,
+) -> DataFrame:
+    if level is not None and not isinstance(level, (str, int)):
+        raise TypeError(
+            f"The 'level' must be a string (for named levels) or an integer (for positional levels), not {type(level)}."
+        )
+    has_multi_index = isinstance(dataframe.index, MultiIndex)
+    if level is not None:
+        if not has_multi_index:
+            raise ValueError(
+                "level can only be specified for DataFrames with multi-index index"
+            )
+        if isinstance(level, str) and level not in dataframe.index.names:
+            raise ValueError(f"Invalid level name: {level}")
+        if isinstance(level, int) and (abs(level) >= dataframe.index.nlevels):
+            raise ValueError(f"Invalid level index: {level}")
+        if any(isinstance(col, tuple) for col in index):
+            raise ValueError("Cannot use tuples in index when level is specified")
+    index = [index] if isinstance(index, (str, tuple, int)) else index
+    if not isinstance(index, list):
+        raise TypeError("Provided 'index' must be a string, tuple, int, or list.")
+    if level is not None:
+        level_index = (
+            level if isinstance(level, int) else dataframe.index.names.index(level)
+        )
+        index = [idx for idx in dataframe.index if idx[level_index] in index]
+        if not index:
+            raise ValueError(f"No 'index' provided are in 'level={level}'!")
+    invalid_index = set(index) - set(dataframe.index)
+    if invalid_index:
+        raise ValueError(f"Invalid index: {invalid_index}")
+    return dataframe.loc[index, :]
+
+
 def select_columns(
     dataframe: DataFrame,
     columns: Union[str, Tuple, int, List[Union[str, Tuple, int]]],
@@ -46,8 +83,7 @@ def select_columns(
     invalid_columns = set(columns) - set(dataframe.columns)
     if invalid_columns:
         raise ValueError(f"Invalid columns: {invalid_columns}")
-    result = dataframe.loc[:, columns]
-    return result
+    return dataframe.loc[:, columns]
 
 
 def transform_columns(
