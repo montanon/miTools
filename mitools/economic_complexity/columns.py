@@ -11,7 +11,7 @@ from ..exceptions.custom_exceptions import (
 GROWTH_COLUMN_NAME = "growth_{:d}"
 GROWTH_PCT_COLUMN_NAME = "growth%_{:d}"
 SHIFTED_COLUMN_NAME = "shifted_{:d}"
-ADDED_COLUMN_NAME = "+_{:d}"
+ADDED_COLUMN_NAME = "+_{}"
 
 INVALID_COLUMN_ERROR = "One or more of {} are not in DataFrame."
 INVALID_TRANSFORMATION_ERROR = "Transformation {} provided is not Callable."
@@ -238,7 +238,11 @@ def add_columns(
         )
     if rename:
         added_name = (
-            ADDED_COLUMN_NAME.format(column_to_add)
+            ADDED_COLUMN_NAME.format(
+                column_to_add
+                if isinstance(column_to_add, str)
+                else ",".join(*column_to_add)
+            )
             if not isinstance(rename, str)
             else rename
         )
@@ -250,6 +254,10 @@ def add_columns(
                 ],
                 names=dataframe.columns.names,
             )
+        else:
+            plus_columns.columns = [
+                f"{col}_{added_name}" for col in plus_columns.columns
+            ]
     return plus_columns
 
 

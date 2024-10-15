@@ -462,47 +462,66 @@ class TestShiftColumns(TestCase):
             shift_columns(self.singleidx_df, ["invalid_column"], t=1)
 
 
-class TestAddColumns(unittest.TestCase):
+class TestAddColumns(TestCase):
     def setUp(self):
-        # Create a DataFrame with MultiIndex columns for testing
-        self.dataframe = DataFrame(
+        self.df_single = pd.DataFrame({"A": [1, 2, 3], "B": [4, 5, 6], "C": [7, 8, 9]})
+        arrays = [["A", "A", "B"], ["one", "two", "three"]]
+        self.df_multi = pd.DataFrame(
             {
-                ("Country1", "Indicator1"): [1, 2, 3, 4, 5],
-                ("Country1", "Indicator2"): [6, 7, 8, 9, 10],
-                ("Country2", "Indicator1"): [11, 12, 13, 14, 15],
-                ("Country2", "Indicator2"): [16, 17, 18, 19, 20],
+                ("A", "one"): [1, 2, 3],
+                ("A", "two"): [4, 5, 6],
+                ("B", "three"): [7, 8, 9],
             }
         )
-        self.dataframe.columns = MultiIndex.from_tuples(self.dataframe.columns)
+        self.df_multi.columns = MultiIndex.from_arrays(arrays)
 
-    def test_addition(self):
-        new_name = "Sum_Indicator"
-        added_df = add_columns(self.dataframe, "Indicator1", "Indicator2", new_name)
-        # Verify the addition is correct
-        for country in self.dataframe.columns.levels[0]:
-            self.assertTrue(
-                all(
-                    added_df[(country, new_name)]
-                    == self.dataframe[(country, "Indicator1")]
-                    + self.dataframe[(country, "Indicator2")]
-                )
-            )
+    def test_add_singleidx(self):
+        result = add_columns(self.df_single, ["A", "B"], "C")
+        expected_columns = ["A_+_C", "B_+_C"]
 
-    def test_column_names(self):
-        new_name = "Sum_Indicator"
-        added_df = add_columns(self.dataframe, "Indicator1", "Indicator2", new_name)
-        # Check if the new column names are correctly assigned
-        expected_columns = [
-            (country, new_name) for country in self.dataframe.columns.levels[0]
-        ]
-        self.assertEqual(added_df.columns.tolist(), expected_columns)
+        self.assertListEqual(list(result.columns), expected_columns)
+        expected_values = DataFrame({"A_+_C": [8, 10, 12], "B_+_C": [11, 13, 15]})
+        assert_frame_equal(result, expected_values)
 
-    def test_nonexistent_columns(self):
-        # Attempt to add non-existent columns
-        with self.assertRaises(KeyError):
-            add_columns(
-                self.dataframe, "NonexistentColumn1", "NonexistentColumn2", "Result"
-            )
+    def test_add_multiidx(self):
+        result = add_columns(
+            self.df_multi, [("A", "one"), ("A", "two")], ("B", "three")
+        )
+        expected_columns = [("A", "one_+_B,three"), ("A", "two_+_B,three")]
+        self.assertListEqual(list(result.columns), expected_columns)
+        expected_values = DataFrame(
+            {("A", "one_+_B,three"): [8, 10, 12], ("A", "two_+_B,three"): [11, 13, 15]}
+        )
+        assert_frame_equal(result, expected_values)
+
+    def test_add_with_custom_rename(self):
+        result = add_columns(self.df_single, ["A"], "C", rename="added_custom")
+        expected_columns = ["A_added_custom"]
+        self.assertListEqual(list(result.columns), expected_columns)
+        expected_values = DataFrame({"A_added_custom": [8, 10, 12]})
+        assert_frame_equal(result, expected_values)
+
+    def test_add_multiidx_with_positional_level(self):
+        result = add_columns(self.df_multi, ["one", "two"], "three", level=-1)
+        expected_columns = [("A", "one_+_B,three"), ("A", "two_+_B,three")]
+        self.assertListEqual(list(result.columns), expected_columns)
+        expected_values = DataFrame(
+            {("A", "one_+_B,three"): [8, 10, 12], ("A", "two_+_B,three"): [11, 13, 15]}
+        )
+        assert_frame_equal(result, expected_values)
+
+    def test_add_with_invalid_column_to_add(self):
+        with self.assertRaises(ArgumentValueError):
+            add_columns(self.df_single, ["A", "B"], ["C", "B"])
+
+    def test_add_with_invalid_columns(self):
+        with self.assertRaises(ArgumentValueError):
+            add_columns(self.df_single, ["A"], "D")
+
+    def test_add_non_numeric_data(self):
+        df_non_numeric = pd.DataFrame({"A": ["x", "y", "z"], "B": [1, 2, 3]})
+        with self.assertRaises(ArgumentValueError):
+            add_columns(df_non_numeric, ["B"], "A")
 
 
 class TestDivideColumns(unittest.TestCase):
