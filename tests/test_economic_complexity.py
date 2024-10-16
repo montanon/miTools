@@ -18,6 +18,9 @@ from mitools.economic_complexity import (
     get_file_encoding,
     mask_matrix,
 )
+from mitools.economic_complexity.economic_complexity import (
+    calculate_economic_complexity,
+)
 from mitools.exceptions.custom_exceptions import ArgumentValueError
 
 
@@ -368,6 +371,64 @@ class TestCalculateRelatednessMatrix(TestCase):
         proximity_with_nan.loc["Product A", "Product B"] = None
         with self.assertRaises(ArgumentValueError):
             calculate_relatedness_matrix(proximity_with_nan, self.rca_matrix)
+
+
+class TestCalculateEconomicComplexity(TestCase):
+    def setUp(self):
+        self.rca_matrix = DataFrame(
+            {"Product A": [10, 5, 1], "Product B": [0, 5, 3], "Product C": [15, 5, 0]},
+            index=["USA", "CAN", "MEX"],
+        )
+
+    def test_valid_economic_complexity(self):
+        eci_df, pci_df = calculate_economic_complexity(self.rca_matrix)
+        expected_eci = DataFrame(
+            {"ECI": [1.176965, 0.090536, -1.267500]}, index=["USA", "CAN", "MEX"]
+        )
+        expected_pci = DataFrame(
+            {"PCI": [0.889001, 0.508001, -1.397001]},
+            index=["Product C", "Product A", "Product B"],
+        )
+        assert_frame_equal(eci_df, expected_eci)
+        assert_frame_equal(pci_df, expected_pci)
+
+    def test_standardization(self):
+        eci_df, pci_df = calculate_economic_complexity(
+            self.rca_matrix, standardize=False
+        )
+        self.assertNotAlmostEqual(eci_df["ECI"].mean(), 0.0, places=2)
+        self.assertNotAlmostEqual(eci_df["ECI"].std(), 1.0, places=2)
+        self.assertNotAlmostEqual(pci_df["PCI"].mean(), 0.0, places=2)
+        self.assertNotAlmostEqual(pci_df["PCI"].std(), 1.0, places=2)
+
+    def test_empty_rca_matrix(self):
+        empty_rca = DataFrame()
+        with self.assertRaises(ArgumentValueError):
+            calculate_economic_complexity(empty_rca)
+
+    def test_nan_handling(self):
+        rca_with_nan = self.rca_matrix.copy()
+        rca_with_nan.loc["USA", "Product B"] = np.nan
+        with self.assertRaises(ArgumentValueError):
+            calculate_economic_complexity(rca_with_nan)
+
+    def test_single_country_and_product(self):
+        single_rca = DataFrame({"Product A": [10]}, index=["USA"])
+        with self.assertRaises(ArgumentValueError):
+            calculate_economic_complexity(single_rca)
+
+    def test_double_country_and_product(self):
+        single_rca = DataFrame(
+            {"Product A": [10, 5], "Product B": [2, 3]}, index=["USA", "CHN"]
+        )
+        eci_df, pci_df = calculate_economic_complexity(single_rca)
+        expected_eci = DataFrame({"ECI": [1.0, -1.0]}, index=["USA", "CHN"])
+        expected_pci = DataFrame(
+            {"PCI": [1.0, -1.0]},
+            index=["Product A", "Product B"],
+        )
+        assert_frame_equal(eci_df, expected_eci)
+        assert_frame_equal(pci_df, expected_pci)
 
 
 class TestStringMapper(TestCase):
