@@ -4,6 +4,7 @@ import unittest
 from unittest import TestCase
 from unittest.mock import mock_open, patch
 
+import numpy as np
 from pandas import DataFrame
 from pandas.testing import assert_frame_equal
 
@@ -11,6 +12,7 @@ from mitools.economic_complexity import (
     StringMapper,
     all_can_be_ints,
     calculate_exports_matrix_rca,
+    calculate_proximity_matrix,
     exports_data_to_matrix,
     get_file_encoding,
     mask_matrix,
@@ -256,6 +258,57 @@ class TestMaskMatrix(TestCase):
     def test_mask_with_invalid_threshold(self):
         with self.assertRaises(ArgumentValueError):
             mask_matrix(self.matrix, threshold="invalid_threshold")
+
+
+class TestCalculateProximityMatrix(unittest.TestCase):
+    def setUp(self):
+        self.dataframe = DataFrame(
+            {"Product A": [1, 0, 0], "Product B": [0, 1, 1], "Product C": [1, 1, 0]},
+            index=["USA", "CAN", "MEX"],
+        )
+
+    def test_valid_proximity_matrix(self):
+        result = calculate_proximity_matrix(self.dataframe, symmetric=True)
+        expected = DataFrame(
+            {
+                "Product A": [0.0, 0.0, 0.5],
+                "Product B": [0.0, 0.0, 0.5],
+                "Product C": [0.5, 0.5, 0.0],
+            },
+            index=["Product A", "Product B", "Product C"],
+        )
+        assert_frame_equal(result, expected)
+
+    def test_asymmetric_proximity_matrix(self):
+        result = calculate_proximity_matrix(self.dataframe, symmetric=False)
+        expected = DataFrame(
+            {
+                "Product A": [0.0, 0.0, 1.0],
+                "Product B": [0.0, 0.0, 0.5],
+                "Product C": [0.5, 0.5, 0.0],
+            },
+            index=["Product A", "Product B", "Product C"],
+        )
+        assert_frame_equal(result, expected)
+
+    def test_empty_dataframe(self):
+        empty_df = DataFrame()
+        result = calculate_proximity_matrix(empty_df)
+        self.assertTrue(result.empty)
+
+    def test_single_product(self):
+        single_product_df = DataFrame(
+            {"Product A": [1, 0, 1]}, index=["USA", "CAN", "MEX"]
+        )
+        result = calculate_proximity_matrix(single_product_df)
+        expected = DataFrame({"Product A": [0.0]}, index=["Product A"])
+        assert_frame_equal(result, expected)
+
+    def test_nan_handling(self):
+        dataframe_with_nan = self.dataframe.copy()
+        dataframe_with_nan.loc["USA", "Product B"] = np.nan
+        with self.assertRaises(ArgumentValueError):
+            calculate_proximity_matrix(dataframe_with_nan)
 
 
 class TestStringMapper(TestCase):

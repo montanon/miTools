@@ -109,6 +109,19 @@ def mask_matrix(matrix: DataFrame, threshold: Union[float, int]) -> DataFrame:
     return masked_matrix
 
 
+def calculate_proximity_matrix(dataframe: DataFrame, symmetric: Optional[bool] = True):
+    if dataframe.isna().any().any():
+        raise ArgumentValueError("The dataframe must not contain non-numeric values!")
+    ubiquity = dataframe.sum(axis=0)
+    proximity_matrix = dataframe.T @ dataframe
+    proximity_matrix = proximity_matrix / ubiquity.values
+    np.fill_diagonal(proximity_matrix.values, 0)
+    proximity_matrix = proximity_matrix.fillna(0.0)
+    if symmetric:
+        proximity_matrix = np.minimum(proximity_matrix, proximity_matrix.T)
+    return proximity_matrix
+
+
 def create_time_id(time_values: Union[str, int, Sequence]) -> str:
     if isinstance(time_values, (str, int)):
         return str(time_values)
@@ -128,21 +141,6 @@ def create_data_id(id: str, time: Union[str, int, Sequence]) -> str:
 
 def create_data_name(data_id, tag):
     return f"{data_id}_{tag}"
-
-
-def calculate_proximity_matrix(dataframe: DataFrame, symmetric: Optional[bool] = True):
-    ubiquity = dataframe.sum(axis=0)
-
-    proximity_matrix = dataframe.T @ dataframe
-    proximity_matrix = proximity_matrix / ubiquity.values
-
-    np.fill_diagonal(proximity_matrix.values, 0)
-    proximity_matrix = proximity_matrix.fillna(0.0)
-
-    if symmetric:
-        proximity_matrix = np.minimum(proximity_matrix, proximity_matrix.T)
-
-    return proximity_matrix
 
 
 def calculate_relatedness_matrix(
