@@ -189,9 +189,14 @@ class TestCalculateExportsMatrixRCA(unittest.TestCase):
     def test_nan_values_handling(self):
         matrix_with_nan = self.exports_matrix.copy()
         matrix_with_nan.loc["USA", "Product B"] = None
-
         result = calculate_exports_matrix_rca(matrix_with_nan)
         self.assertEqual(result.loc["USA", "Product B"], 0.0)
+
+    def test_non_numeric_values(self):
+        matrix_with_non_numeric = self.exports_matrix.copy()
+        matrix_with_non_numeric.loc["USA", "Product B"] = "invalid"
+        with self.assertRaises(ArgumentValueError):
+            calculate_exports_matrix_rca(matrix_with_non_numeric)
 
 
 class TestStringMapper(TestCase):

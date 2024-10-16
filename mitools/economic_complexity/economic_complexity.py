@@ -82,6 +82,8 @@ def exports_data_to_matrix(
 
 
 def calculate_exports_matrix_rca(exports_matrix: DataFrame) -> DataFrame:
+    if not np.issubdtype(exports_matrix.values.dtype, np.number):
+        raise ArgumentValueError("The exports matrix must contain only numeric values")
     xcp = exports_matrix.copy()
     x = exports_matrix.sum().sum()
     xc = exports_matrix.sum(axis=1)
