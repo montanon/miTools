@@ -147,7 +147,7 @@ class TestExportsDataToMatrix(TestCase):
             )
 
 
-class TestCalculateExportsMatrixRCA(unittest.TestCase):
+class TestCalculateExportsMatrixRCA(TestCase):
     def setUp(self):
         self.exports_matrix = DataFrame(
             {
@@ -199,7 +199,7 @@ class TestCalculateExportsMatrixRCA(unittest.TestCase):
             calculate_exports_matrix_rca(matrix_with_non_numeric)
 
 
-class TestMaskMatrix(unittest.TestCase):
+class TestMaskMatrix(TestCase):
     def setUp(self):
         self.matrix = DataFrame(
             {"A": [0.2, 0.5, 0.8], "B": [0.3, 0.6, 0.9], "C": [0.1, 0.4, 0.7]}
