@@ -1,9 +1,8 @@
 from typing import Callable, Iterable, List, Optional, Tuple, Union
 
-from pandas import DataFrame, Index, IndexSlice, MultiIndex
+from pandas import DataFrame, MultiIndex
 
 from ..exceptions.custom_exceptions import (
-    ArgumentKeyError,
     ArgumentTypeError,
     ArgumentValueError,
 )
