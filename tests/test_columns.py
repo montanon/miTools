@@ -13,6 +13,7 @@ from mitools.economic_complexity.columns import (
     ADDED_COLUMN_NAME,
     GROWTH_COLUMN_NAME,
     GROWTH_PCT_COLUMN_NAME,
+    MULTIPLIED_COLUMN_NAME,
     SHIFTED_COLUMN_NAME,
     SUBTRACTED_COLUMN_NAME,
     add_columns,
@@ -583,7 +584,7 @@ class TestAddColumns(TestCase):
             add_columns(df_non_numeric, ["B"], "A")
 
 
-class TestSubtractColumns(unittest.TestCase):
+class TestSubtractColumns(TestCase):
     def setUp(self):
         self.df_single = pd.DataFrame({"A": [1, 2, 3], "B": [4, 5, 6], "C": [7, 8, 9]})
         arrays = [["A", "A", "B"], ["one", "two", "three"]]
@@ -666,6 +667,84 @@ class TestSubtractColumns(unittest.TestCase):
             subtract_columns(df_non_numeric, ["B"], "A")
 
 
+class TestMultiplyColumns(TestCase):
+    def setUp(self):
+        self.df_single = DataFrame({"A": [1, 2, 3], "B": [4, 5, 6], "C": [2, 2, 2]})
+        arrays = [["A", "A", "B"], ["one", "two", "three"]]
+        self.df_multi = DataFrame(
+            {
+                ("A", "one"): [1, 2, 3],
+                ("A", "two"): [4, 5, 6],
+                ("B", "three"): [2, 2, 2],
+            }
+        )
+        self.df_multi.columns = MultiIndex.from_arrays(arrays)
+
+    def test_multiply_singleidx(self):
+        result = multiply_columns(self.df_single, ["A", "B"], "C")
+        expected_columns = [
+            f"A_{MULTIPLIED_COLUMN_NAME.format('C')}",
+            f"B_{MULTIPLIED_COLUMN_NAME.format('C')}",
+        ]
+        self.assertListEqual(list(result.columns), expected_columns)
+        expected_values = DataFrame(
+            {
+                f"A_{MULTIPLIED_COLUMN_NAME.format('C')}": [2, 4, 6],
+                f"B_{MULTIPLIED_COLUMN_NAME.format('C')}": [8, 10, 12],
+            }
+        )
+        assert_frame_equal(result, expected_values)
+
+    def test_multiply_multiidx(self):
+        result = multiply_columns(
+            self.df_multi, [("A", "one"), ("A", "two")], ("B", "three")
+        )
+        expected_columns = [
+            ("A", f"one_{MULTIPLIED_COLUMN_NAME.format('B')},three"),
+            ("A", f"two_{MULTIPLIED_COLUMN_NAME.format('B')},three"),
+        ]
+        self.assertListEqual(list(result.columns), expected_columns)
+        expected_values = DataFrame(
+            {
+                ("A", f"one_{MULTIPLIED_COLUMN_NAME.format('B')},three"): [2, 4, 6],
+                ("A", f"two_{MULTIPLIED_COLUMN_NAME.format('B')},three"): [8, 10, 12],
+            }
+        )
+        assert_frame_equal(result, expected_values)
+
+    def test_multiply_with_custom_rename(self):
+        result = multiply_columns(
+            self.df_single, ["A"], "C", rename="multiplied_custom"
+        )
+        expected_columns = ["A_multiplied_custom"]
+        self.assertListEqual(list(result.columns), expected_columns)
+        expected_values = DataFrame({"A_multiplied_custom": [2, 4, 6]})
+        assert_frame_equal(result, expected_values)
+
+    def test_multiply_multiidx_with_positional_level(self):
+        result = multiply_columns(self.df_multi, ["one", "two"], "three", level=-1)
+        expected_columns = [
+            ("A", f"one_{MULTIPLIED_COLUMN_NAME.format('B')},three"),
+            ("A", f"two_{MULTIPLIED_COLUMN_NAME.format('B')},three"),
+        ]
+        self.assertListEqual(list(result.columns), expected_columns)
+        expected_values = DataFrame(
+            {
+                ("A", f"one_{MULTIPLIED_COLUMN_NAME.format('B')},three"): [2, 4, 6],
+                ("A", f"two_{MULTIPLIED_COLUMN_NAME.format('B')},three"): [8, 10, 12],
+            }
+        )
+        assert_frame_equal(result, expected_values)
+
+    def test_multiply_with_invalid_column_to_multiply(self):
+        with self.assertRaises(ArgumentValueError):
+            multiply_columns(self.df_single, ["A", "B"], ["C", "B"])
+
+    def test_multiply_with_invalid_columns(self):
+        with self.assertRaises(ArgumentValueError):
+            multiply_columns(self.df_single, ["A"], "D")
+
+
 class TestDivideColumns(unittest.TestCase):
     def setUp(self):
         # Create a DataFrame with MultiIndex columns for testing
@@ -720,55 +799,6 @@ class TestDivideColumns(unittest.TestCase):
         divided_df = divide_columns(zero_df, "Indicator1", "Indicator2", new_name)
         # Check if division by zero results in infinity)
         self.assertTrue(np.isnan(divided_df.loc[5, ("Country1", new_name)]))
-
-
-class TestMultiplyColumns(unittest.TestCase):
-    def setUp(self):
-        # Create a DataFrame with MultiIndex columns for testing
-        self.dataframe = DataFrame(
-            {
-                ("Country1", "Indicator1"): [1, 2, 3, 4, 5],
-                ("Country1", "Indicator2"): [6, 7, 8, 9, 10],
-                ("Country2", "Indicator1"): [11, 12, 13, 14, 15],
-                ("Country2", "Indicator2"): [16, 17, 18, 19, 20],
-            }
-        )
-        self.dataframe.columns = MultiIndex.from_tuples(self.dataframe.columns)
-
-    def test_multiplication(self):
-        new_name = "Product_Indicator"
-        multiplied_df = multiply_columns(
-            self.dataframe, "Indicator1", "Indicator2", new_name
-        )
-
-        # Verify the multiplication is correct
-        for country in self.dataframe.columns.levels[0]:
-            expected_result = (
-                self.dataframe[(country, "Indicator1")]
-                * self.dataframe[(country, "Indicator2")]
-            )
-            self.assertTrue(
-                np.allclose(multiplied_df[(country, new_name)], expected_result)
-            )
-
-    def test_column_names(self):
-        new_name = "Product_Indicator"
-        multiplied_df = multiply_columns(
-            self.dataframe, "Indicator1", "Indicator2", new_name
-        )
-
-        # Check if the new column names are correctly assigned
-        expected_columns = [
-            (country, new_name) for country in self.dataframe.columns.levels[0]
-        ]
-        self.assertEqual(multiplied_df.columns.tolist(), expected_columns)
-
-    def test_nonexistent_columns(self):
-        # Attempt to multiply non-existent columns
-        with self.assertRaises(KeyError):
-            multiply_columns(
-                self.dataframe, "NonexistentColumn1", "NonexistentColumn2", "Result"
-            )
 
 
 if __name__ == "__main__":
