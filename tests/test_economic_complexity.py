@@ -5,7 +5,7 @@ from unittest import TestCase
 from unittest.mock import mock_open, patch
 
 import numpy as np
-from pandas import DataFrame
+from pandas import DataFrame, Series
 from pandas.testing import assert_frame_equal
 
 from mitools.economic_complexity import (
@@ -13,6 +13,7 @@ from mitools.economic_complexity import (
     all_can_be_ints,
     calculate_exports_matrix_rca,
     calculate_proximity_matrix,
+    calculate_relatedness_matrix,
     exports_data_to_matrix,
     get_file_encoding,
     mask_matrix,
@@ -309,6 +310,64 @@ class TestCalculateProximityMatrix(TestCase):
         dataframe_with_nan.loc["USA", "Product B"] = np.nan
         with self.assertRaises(ArgumentValueError):
             calculate_proximity_matrix(dataframe_with_nan)
+
+
+class TestCalculateRelatednessMatrix(TestCase):
+    def setUp(self):
+        self.proximity_matrix = DataFrame(
+            {
+                "Product A": [1.0, 0.5, 0.2],
+                "Product B": [0.5, 1.0, 0.3],
+                "Product C": [0.2, 0.3, 1.0],
+            },
+            index=["Product A", "Product B", "Product C"],
+        )
+        self.rca_matrix = DataFrame(
+            {"Product A": [1, 0, 1], "Product B": [0, 1, 1], "Product C": [1, 1, 0]},
+            index=["USA", "CAN", "MEX"],
+        )
+
+    def test_valid_relatedness_matrix(self):
+        result = calculate_relatedness_matrix(self.proximity_matrix, self.rca_matrix)
+        expected_data = {
+            ("Product A", "USA"): 0.705882,
+            ("Product A", "CAN"): 0.411765,
+            ("Product A", "MEX"): 0.882353,
+            ("Product B", "USA"): 0.444444,
+            ("Product B", "CAN"): 0.722222,
+            ("Product B", "MEX"): 0.833333,
+            ("Product C", "USA"): 0.800000,
+            ("Product C", "CAN"): 0.866667,
+            ("Product C", "MEX"): 0.333333,
+        }
+        expected = Series(expected_data, name="relatedness").to_frame()
+        assert_frame_equal(result, expected)
+
+    def test_relatedness_col(self):
+        result = calculate_relatedness_matrix(
+            self.proximity_matrix, self.rca_matrix, relatedness_col="w"
+        )
+        self.assertListEqual(list(result.columns), ["w"])
+
+    def test_empty_matrices(self):
+        empty_proximity = DataFrame()
+        empty_rca = DataFrame()
+        result = calculate_relatedness_matrix(empty_proximity, empty_rca)
+        self.assertTrue(result.empty)
+
+    def test_mismatched_indices(self):
+        mismatched_rca = DataFrame(
+            {"Product X": [1, 0, 1], "Product Y": [0, 1, 1], "Product Z": [1, 1, 0]},
+            index=["USA", "CAN", "MEX"],
+        )
+        with self.assertRaises(ArgumentValueError):
+            calculate_relatedness_matrix(self.proximity_matrix, mismatched_rca)
+
+    def test_nan_handling(self):
+        proximity_with_nan = self.proximity_matrix.copy()
+        proximity_with_nan.loc["Product A", "Product B"] = None
+        with self.assertRaises(ArgumentValueError):
+            calculate_relatedness_matrix(proximity_with_nan, self.rca_matrix)
 
 
 class TestStringMapper(TestCase):
