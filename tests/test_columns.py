@@ -19,6 +19,7 @@ from mitools.economic_complexity.columns import (
     select_columns,
     select_index,
     shift_columns,
+    subtract_columns,
     transform_columns,
 )
 from mitools.exceptions.custom_exceptions import (
@@ -522,6 +523,69 @@ class TestAddColumns(TestCase):
         df_non_numeric = DataFrame({"A": ["x", "y", "z"], "B": [1, 2, 3]})
         with self.assertRaises(ArgumentValueError):
             add_columns(df_non_numeric, ["B"], "A")
+
+
+class TestSubtractColumns(unittest.TestCase):
+    def setUp(self):
+        self.df_single = pd.DataFrame({"A": [1, 2, 3], "B": [4, 5, 6], "C": [7, 8, 9]})
+        arrays = [["A", "A", "B"], ["one", "two", "three"]]
+        self.df_multi = pd.DataFrame(
+            {
+                ("A", "one"): [1, 2, 3],
+                ("A", "two"): [4, 5, 6],
+                ("B", "three"): [7, 8, 9],
+            }
+        )
+        self.df_multi.columns = MultiIndex.from_arrays(arrays)
+
+    def test_subtract_singleidx(self):
+        result = subtract_columns(self.df_single, ["A", "B"], "C")
+        expected_columns = ["A_-_C", "B_-_C"]
+        self.assertListEqual(list(result.columns), expected_columns)
+        expected_values = DataFrame({"A_-_C": [-6, -6, -6], "B_-_C": [-3, -3, -3]})
+        assert_frame_equal(result, expected_values)
+
+    def test_subtract_multiidx(self):
+        result = subtract_columns(
+            self.df_multi, [("A", "one"), ("A", "two")], ("B", "three")
+        )
+        expected_columns = [("A", "one_-_B,three"), ("A", "two_-_B,three")]
+        self.assertListEqual(list(result.columns), expected_columns)
+        expected_values = DataFrame(
+            {("A", "one_-_B,three"): [-6, -6, -6], ("A", "two_-_B,three"): [-3, -3, -3]}
+        )
+        assert_frame_equal(result, expected_values)
+
+    def test_subtract_with_custom_rename(self):
+        result = subtract_columns(
+            self.df_single, ["A"], "C", rename="subtracted_custom"
+        )
+        expected_columns = ["A_subtracted_custom"]
+        self.assertListEqual(list(result.columns), expected_columns)
+        expected_values = DataFrame({"A_subtracted_custom": [-6, -6, -6]})
+        assert_frame_equal(result, expected_values)
+
+    def test_subtract_multiidx_with_positional_level(self):
+        result = subtract_columns(self.df_multi, ["one", "two"], "three", level=-1)
+        expected_columns = [("A", "one_-_B,three"), ("A", "two_-_B,three")]
+        self.assertListEqual(list(result.columns), expected_columns)
+        expected_values = DataFrame(
+            {("A", "one_-_B,three"): [-6, -6, -6], ("A", "two_-_B,three"): [-3, -3, -3]}
+        )
+        assert_frame_equal(result, expected_values)
+
+    def test_subtract_with_invalid_column_to_subtract(self):
+        with self.assertRaises(ArgumentValueError):
+            subtract_columns(self.df_single, ["A", "B"], ["C", "B"])
+
+    def test_subtract_with_invalid_columns(self):
+        with self.assertRaises(ArgumentValueError):
+            subtract_columns(self.df_single, ["A"], "D")
+
+    def test_subtract_non_numeric_data(self):
+        df_non_numeric = DataFrame({"A": ["x", "y", "z"], "B": [1, 2, 3]})
+        with self.assertRaises(ArgumentValueError):
+            subtract_columns(df_non_numeric, ["B"], "A")
 
 
 class TestDivideColumns(unittest.TestCase):
