@@ -4,7 +4,16 @@ import unittest
 from unittest import TestCase
 from unittest.mock import mock_open, patch
 
-from mitools.economic_complexity import StringMapper, all_can_be_ints, get_file_encoding
+from pandas import DataFrame
+from pandas.testing import assert_frame_equal
+
+from mitools.economic_complexity import (
+    StringMapper,
+    all_can_be_ints,
+    exports_data_to_matrix,
+    get_file_encoding,
+)
+from mitools.exceptions.custom_exceptions import ArgumentValueError
 
 
 class TestAllCanBeInts(TestCase):
@@ -65,6 +74,75 @@ class TestGetFileEncoding(TestCase):
     def test_io_error(self, mock_file):
         with self.assertRaises(IOError):
             get_file_encoding("dummy_file.txt")
+
+
+class TestExportsDataToMatrix(unittest.TestCase):
+    def setUp(self):
+        self.dataframe = DataFrame(
+            {
+                "origin": ["USA", "USA", "CAN", "CAN"],
+                "product_code": ["A", "B", "A", "C"],
+                "export_value": [100, 200, 300, 400],
+            }
+        )
+        self.products_codes = DataFrame({"product_code": ["A", "B", "C"]})
+
+    def test_valid_data(self):
+        result = exports_data_to_matrix(
+            self.dataframe,
+            origin_col="origin",
+            products_cols=["product_code"],
+            value_col="export_value",
+            products_codes=self.products_codes,
+        )
+        self.assertEqual(result.shape, (2, 3))
+        self.assertEqual(result.loc["USA", "A"], 100)
+        self.assertEqual(result.loc["USA", "B"], 200)
+        self.assertEqual(result.loc["CAN", "A"], 300)
+        self.assertEqual(result.loc["CAN", "C"], 400)
+
+    def test_missing_product_codes(self):
+        products_codes = DataFrame({"product_code": ["A", "B", "C", "D"]})
+        result = exports_data_to_matrix(
+            self.dataframe,
+            origin_col="origin",
+            products_cols=["product_code"],
+            value_col="export_value",
+            products_codes=products_codes,
+        )
+        self.assertEqual(result.loc["USA", "D"], 0)
+        self.assertEqual(result.loc["CAN", "D"], 0)
+
+    def test_total_value_consistency(self):
+        result = exports_data_to_matrix(
+            self.dataframe,
+            origin_col="origin",
+            products_cols=["product_code"],
+            value_col="export_value",
+            products_codes=self.products_codes,
+        )
+        self.assertEqual(self.dataframe["export_value"].sum(), result.values.sum())
+
+    def test_invalid_columns(self):
+        with self.assertRaises(AssertionError):
+            exports_data_to_matrix(
+                self.dataframe.drop(columns=["export_value"]),
+                origin_col="origin",
+                products_cols=["product_code"],
+                value_col="export_value",
+                products_codes=self.products_codes,
+            )
+
+    def test_empty_dataframe(self):
+        empty_df = DataFrame(columns=["origin", "product_code", "export_value"])
+        with self.assertRaises(ArgumentValueError):
+            result = exports_data_to_matrix(
+                empty_df,
+                origin_col="origin",
+                products_cols=["product_code"],
+                value_col="export_value",
+                products_codes=self.products_codes,
+            )
 
 
 class TestStringMapper(TestCase):

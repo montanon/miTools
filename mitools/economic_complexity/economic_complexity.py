@@ -9,6 +9,7 @@ from numba import jit
 from pandas import DataFrame
 
 from mitools.context import ASSERT
+from mitools.exceptions import ArgumentValueError
 
 
 def all_can_be_ints(items: Sequence) -> bool:
@@ -36,6 +37,62 @@ def get_file_encoding(file: PathLike, fallback: str = "utf-8") -> str:
         raise IOError(f"An error occurred while reading the file '{file}': {e}")
 
 
+def exports_data_to_matrix(
+    dataframe: DataFrame,
+    origin_col: str,
+    products_cols: List[str],
+    value_col: str,
+    products_codes: DataFrame,
+) -> DataFrame:
+    if dataframe.empty:
+        raise ArgumentValueError("Dataframe must not be empty")
+    required_columns = {origin_col, value_col}.union(products_cols)
+    if ASSERT == 1:
+        assert required_columns.issubset(
+            dataframe.columns
+        ), "Dataframe must contain all required columns"
+    exports = dataframe[[origin_col, *products_cols, value_col]].reset_index(drop=True)
+    origins = exports[origin_col].unique()
+    exports = exports.set_index([origin_col, *products_cols])
+    initial_total_value = exports[value_col].sum()
+    new_index = pd.concat(
+        [
+            products_codes[products_cols]
+            .assign(**{origin_col: origin})
+            .set_index([origin_col, *products_cols])
+            for origin in origins
+        ]
+    ).index
+    exports = exports.reindex(new_index.drop_duplicates(), fill_value=0)
+    reindexed_total_value = exports[value_col].sum()
+    if ASSERT == 1:
+        assert (
+            initial_total_value == reindexed_total_value
+        ), "Total export values must be consistent before and after reindexing"
+    index_levels = exports.index.nlevels
+    exports_matrix = exports.unstack(level=[i for i in range(1, index_levels)])
+    exports_matrix.columns = exports_matrix.columns.droplevel(0)
+    if ASSERT == 1:
+        all_origins = dataframe[origin_col].unique()
+        assert set(all_origins) == set(
+            exports_matrix.index.unique()
+        ), "All origins must be equal between products_codes DataFrame"
+
+        all_products = set(
+            [tuple(row) for _, row in products_codes[products_cols].iterrows()]
+        )
+        matrix_products = set([tuple(c) for c in exports_matrix.columns])
+        assert (
+            all_products == matrix_products
+        ), "All product codes must be represented in the exports matrix"
+
+        matrix_origins = set(exports_matrix.index)
+        assert (
+            set(origins) == matrix_origins
+        ), "All origins must be represented in the exports matrix"
+    return exports_matrix
+
+
 def create_time_id(time_values: Union[str, int, Sequence]) -> str:
     if isinstance(time_values, (str, int)):
         return str(time_values)
@@ -55,68 +112,6 @@ def create_data_id(id: str, time: Union[str, int, Sequence]) -> str:
 
 def create_data_name(data_id, tag):
     return f"{data_id}_{tag}"
-
-
-def exports_data_to_matrix(
-    dataframe: DataFrame,
-    origin_col: str,
-    products_cols: List[str],
-    value_col: str,
-    products_codes: DataFrame,
-) -> DataFrame:
-    required_columns = {origin_col, value_col}.union(products_cols)
-    if ASSERT == 1:
-        assert required_columns.issubset(
-            dataframe.columns
-        ), "Dataframe must contain all required columns"
-
-    exports = dataframe[[origin_col, *products_cols, value_col]].reset_index(drop=True)
-    origins = exports[origin_col].unique()
-
-    exports = exports.set_index([origin_col, *products_cols])
-    initial_total_value = exports[value_col].sum()
-
-    new_index = pd.concat(
-        [
-            products_codes[products_cols]
-            .assign(**{origin_col: origin})
-            .set_index([origin_col, *products_cols])
-            for origin in origins
-        ]
-    ).index
-
-    exports = exports.reindex(new_index.drop_duplicates(), fill_value=0)
-
-    reindexed_total_value = exports[value_col].sum()
-    if ASSERT == 1:
-        assert (
-            initial_total_value == reindexed_total_value
-        ), "Total export values must be consistent before and after reindexing"
-
-    index_levels = exports.index.nlevels
-    exports_matrix = exports.unstack(level=[i for i in range(1, index_levels)])
-    exports_matrix.columns = exports_matrix.columns.droplevel(0)
-
-    if ASSERT == 1:
-        all_origins = dataframe[origin_col].unique()
-        assert set(all_origins) == set(
-            exports_matrix.index.unique()
-        ), "All origins must be equal between products_codes DataFrame"
-
-        all_products = set(
-            [tuple(row) for _, row in products_codes[products_cols].iterrows()]
-        )
-        matrix_products = set([c for c in exports_matrix.columns])
-        assert (
-            all_products == matrix_products
-        ), "All product codes must be represented in the exports matrix"
-
-        matrix_origins = set(exports_matrix.index)
-        assert (
-            set(origins) == matrix_origins
-        ), "All origins must be represented in the exports matrix"
-
-    return exports_matrix
 
 
 def calculate_exports_matrix_rca(exports_matrix: DataFrame) -> DataFrame:
