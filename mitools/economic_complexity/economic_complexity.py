@@ -122,6 +122,33 @@ def calculate_proximity_matrix(dataframe: DataFrame, symmetric: Optional[bool] =
     return proximity_matrix
 
 
+def calculate_relatedness_matrix(
+    proximity_matrix: DataFrame,
+    rca_matrix: DataFrame,
+    relatedness_col: Optional[str] = "relatedness",
+) -> DataFrame:
+    if proximity_matrix.isna().any().any():
+        raise ArgumentValueError(
+            "The 'proximity_matrix' must not contain non-numeric values!"
+        )
+    if rca_matrix.isna().any().any():
+        raise ArgumentValueError(
+            "The 'rca_matrix' must not contain non-numeric values!"
+        )
+    row_sums = proximity_matrix.sum(axis=1)
+    try:
+        wcp = rca_matrix.dot(proximity_matrix)
+    except ValueError as e:
+        raise ArgumentValueError(
+            f"Mismatched indexes in 'rca_matrix' and 'proximity_matrix': {e}"
+        )
+    wcp.columns = row_sums.index
+    wcp = wcp / row_sums
+    wcp = wcp.unstack().to_frame()
+    wcp.columns = [relatedness_col]
+    return wcp
+
+
 def create_time_id(time_values: Union[str, int, Sequence]) -> str:
     if isinstance(time_values, (str, int)):
         return str(time_values)
@@ -141,20 +168,6 @@ def create_data_id(id: str, time: Union[str, int, Sequence]) -> str:
 
 def create_data_name(data_id, tag):
     return f"{data_id}_{tag}"
-
-
-def calculate_relatedness_matrix(
-    proximity_matrix: DataFrame, rca_matrix: DataFrame, year: int
-) -> DataFrame:
-    row_sums = proximity_matrix.sum(axis=1)
-    wcp = rca_matrix.dot(proximity_matrix)
-    wcp.columns = row_sums.index
-    wcp = wcp / row_sums
-    wcp = wcp.unstack().to_frame()
-    wcp["Year"] = year
-    wcp = wcp.set_index("Year", append=True)
-    wcp.columns = ["Relatedness"]
-    return wcp
 
 
 @jit(nopython=True)
