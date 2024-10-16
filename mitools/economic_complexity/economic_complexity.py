@@ -1,3 +1,4 @@
+from os import PathLike
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple, Union
 
@@ -6,6 +7,24 @@ import numpy as np
 import pandas as pd
 from numba import jit
 from pandas import DataFrame
+
+
+def all_can_be_ints(items: Sequence) -> bool:
+    try:
+        return all(int(item) is not None for item in items)
+    except (ValueError, TypeError):
+        return False
+
+
+def get_encoding(file: PathLike) -> str:
+    try:
+        with open(file, "rb") as f:
+            result = chardet.detect(f.read())
+        return result["encoding"] or "utf-8"
+    except FileNotFoundError:
+        raise FileNotFoundError(f"The file '{file}' was not found.")
+    except IOError as e:
+        raise IOError(f"An error occurred while reading the file '{file}': {e}")
 
 
 def create_time_id(time_values: Union[str, int, Sequence]) -> str:
@@ -20,13 +39,6 @@ def create_time_id(time_values: Union[str, int, Sequence]) -> str:
         return f"{str(time_values[0])}{str(time_values[-1])[-2:]}"
 
 
-def all_can_be_ints(items: Sequence) -> bool:
-    try:
-        return all(int(item) is not None for item in items)
-    except (ValueError, TypeError):
-        return False
-
-
 def create_data_id(id: str, time: Union[str, int, Sequence]) -> str:
     time = create_time_id(time)
     return f"{id}_{time}"
@@ -34,12 +46,6 @@ def create_data_id(id: str, time: Union[str, int, Sequence]) -> str:
 
 def create_data_name(data_id, tag):
     return f"{data_id}_{tag}"
-
-
-def get_encoding(file):
-    with open(file, "rb") as f:
-        result = chardet.detect(f.read())
-    return result["encoding"]
 
 
 def exports_data_to_matrix(
