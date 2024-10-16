@@ -98,6 +98,17 @@ def calculate_exports_matrix_rca(exports_matrix: DataFrame) -> DataFrame:
     return rca_matrix
 
 
+def mask_matrix(matrix: DataFrame, threshold: Union[float, int]) -> DataFrame:
+    if not np.issubdtype(matrix.values.dtype, np.number):
+        raise ArgumentValueError("The exports matrix must contain only numeric values")
+    if not isinstance(threshold, (float, int)):
+        raise ArgumentValueError("Threshold must be a float or an integer")
+    masked_matrix = matrix.copy()
+    masked_matrix[masked_matrix < threshold] = 0.0
+    masked_matrix[masked_matrix >= threshold] = 1.0
+    return masked_matrix
+
+
 def create_time_id(time_values: Union[str, int, Sequence]) -> str:
     if isinstance(time_values, (str, int)):
         return str(time_values)
@@ -117,13 +128,6 @@ def create_data_id(id: str, time: Union[str, int, Sequence]) -> str:
 
 def create_data_name(data_id, tag):
     return f"{data_id}_{tag}"
-
-
-def mask_matrix(matrix: DataFrame, threshold: float) -> DataFrame:
-    masked_matrix = matrix.copy()
-    masked_matrix[masked_matrix < threshold] = 0.0
-    masked_matrix[masked_matrix >= threshold] = 1.0
-    return masked_matrix
 
 
 def calculate_proximity_matrix(dataframe: DataFrame, symmetric: Optional[bool] = True):

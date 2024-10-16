@@ -13,6 +13,7 @@ from mitools.economic_complexity import (
     calculate_exports_matrix_rca,
     exports_data_to_matrix,
     get_file_encoding,
+    mask_matrix,
 )
 from mitools.exceptions.custom_exceptions import ArgumentValueError
 
@@ -148,7 +149,6 @@ class TestExportsDataToMatrix(TestCase):
 
 class TestCalculateExportsMatrixRCA(unittest.TestCase):
     def setUp(self):
-        # Setup a sample exports matrix for testing
         self.exports_matrix = DataFrame(
             {
                 "Product A": [100, 200, 300],
@@ -197,6 +197,65 @@ class TestCalculateExportsMatrixRCA(unittest.TestCase):
         matrix_with_non_numeric.loc["USA", "Product B"] = "invalid"
         with self.assertRaises(ArgumentValueError):
             calculate_exports_matrix_rca(matrix_with_non_numeric)
+
+
+class TestMaskMatrix(unittest.TestCase):
+    def setUp(self):
+        self.matrix = DataFrame(
+            {"A": [0.2, 0.5, 0.8], "B": [0.3, 0.6, 0.9], "C": [0.1, 0.4, 0.7]}
+        )
+
+    def test_mask_with_valid_threshold(self):
+        result = mask_matrix(self.matrix, threshold=0.5)
+        expected = DataFrame(
+            {"A": [0.0, 1.0, 1.0], "B": [0.0, 1.0, 1.0], "C": [0.0, 0.0, 1.0]}
+        )
+        assert_frame_equal(result, expected)
+
+    def test_mask_with_zero_threshold(self):
+        result = mask_matrix(self.matrix, threshold=0.0)
+        expected = DataFrame(
+            {"A": [1.0, 1.0, 1.0], "B": [1.0, 1.0, 1.0], "C": [1.0, 1.0, 1.0]}
+        )
+        assert_frame_equal(result, expected)
+
+    def test_mask_with_high_threshold(self):
+        result = mask_matrix(self.matrix, threshold=1.0)
+        expected = DataFrame(
+            {"A": [0.0, 0.0, 0.0], "B": [0.0, 0.0, 0.0], "C": [0.0, 0.0, 0.0]}
+        )
+        assert_frame_equal(result, expected)
+
+    def test_mask_with_negative_threshold(self):
+        result = mask_matrix(self.matrix, threshold=-1.0)
+        expected = DataFrame(
+            {"A": [1.0, 1.0, 1.0], "B": [1.0, 1.0, 1.0], "C": [1.0, 1.0, 1.0]}
+        )
+        assert_frame_equal(result, expected)
+
+    def test_mask_on_empty_matrix(self):
+        empty_matrix = DataFrame()
+        result = mask_matrix(empty_matrix, threshold=0.5)
+        assert_frame_equal(result, empty_matrix)
+
+    def test_mask_with_nan_values(self):
+        matrix_with_nan = self.matrix.copy()
+        matrix_with_nan.loc[0, "A"] = None
+        result = mask_matrix(matrix_with_nan, threshold=0.5)
+        expected = DataFrame(
+            {"A": [None, 1.0, 1.0], "B": [0.0, 1.0, 1.0], "C": [0.0, 0.0, 1.0]}
+        )
+        assert_frame_equal(result, expected)
+
+    def test_mask_with_non_numeric_values(self):
+        matrix_with_non_numeric = self.matrix.copy()
+        matrix_with_non_numeric.loc[0, "A"] = "invalid"
+        with self.assertRaises(ArgumentValueError):
+            mask_matrix(matrix_with_non_numeric, threshold=0.5)
+
+    def test_mask_with_invalid_threshold(self):
+        with self.assertRaises(ArgumentValueError):
+            mask_matrix(self.matrix, threshold="invalid_threshold")
 
 
 class TestStringMapper(TestCase):
