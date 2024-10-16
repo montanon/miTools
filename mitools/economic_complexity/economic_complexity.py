@@ -88,8 +88,8 @@ def calculate_exports_matrix_rca(exports_matrix: DataFrame) -> DataFrame:
     xp = exports_matrix.sum(axis=0)
 
     rca_matrix = xcp * x
-    rca_matrix = rca_matrix.div(xp)
-    rca_matrix = rca_matrix.T.div(xc).T
+    rca_matrix = rca_matrix.div(xp, axis=1)
+    rca_matrix = rca_matrix.div(xc, axis=0)
 
     rca_matrix = rca_matrix.fillna(0.0)
 
