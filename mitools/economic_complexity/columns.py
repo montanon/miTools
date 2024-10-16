@@ -13,6 +13,7 @@ GROWTH_PCT_COLUMN_NAME = "growth%_{:d}"
 SHIFTED_COLUMN_NAME = "shifted_{:d}"
 ADDED_COLUMN_NAME = "+_{}"
 SUBTRACTED_COLUMN_NAME = "-_{}"
+MULTIPLIED_COLUMN_NAME = "*_{:s}"
 
 INVALID_COLUMN_ERROR = "One or more of {} are not in DataFrame."
 INVALID_TRANSFORMATION_ERROR = "Transformation {} provided is not Callable."
@@ -329,20 +330,46 @@ def divide_columns(
 
 
 def multiply_columns(
-    dataframe: DataFrame, column1: str, column2: str, new_name: str
+    dataframe: DataFrame,
+    columns: Iterable[Union[str, Tuple]],
+    column_to_multiply: Union[str, Tuple],
+    level: Optional[Union[str, int]] = None,
+    rename: Optional[Union[str, bool]] = True,
 ) -> DataFrame:
-    if isinstance(dataframe.index, Index):
-        columns1 = dataframe.loc[:, [column1]]
-        columns2 = dataframe.loc[:, [column2]]
-    else:
-        columns1 = dataframe.loc[:, IndexSlice[:, column1]]
-        columns2 = dataframe.loc[:, IndexSlice[:, column2]]
-    mul_columns = columns1 * columns2.values
-    if isinstance(dataframe.index, Index):
-        mul_columns.columns = [new_name]
-    else:
-        mul_columns.columns = MultiIndex.from_tuples(
-            [(col_0, new_name) for col_0, _ in mul_columns.columns.values],
-            names=dataframe.columns.names,
+    selected_columns = select_columns(dataframe=dataframe, columns=columns, level=level)
+    column_to_multiply = select_columns(
+        dataframe=dataframe, columns=column_to_multiply, level=level
+    )
+    if column_to_multiply.shape[1] > 1:
+        raise ArgumentValueError(
+            f"Column to multiply '{column_to_multiply}' with 'level={level}' must be a single column."
         )
-    return mul_columns
+    try:
+        multiplied_columns = selected_columns * column_to_multiply.values
+    except Exception as e:
+        raise ArgumentValueError(
+            f"Error while multiplying column '{column_to_multiply}' with columns '{columns}': {e}"
+        )
+    if rename:
+        multiplied_name = (
+            MULTIPLIED_COLUMN_NAME.format(
+                column_to_multiply
+                if isinstance(column_to_multiply, str)
+                else ",".join(*column_to_multiply)
+            )
+            if not isinstance(rename, str)
+            else rename
+        )
+        if isinstance(dataframe.columns, MultiIndex):
+            multiplied_columns.columns = MultiIndex.from_tuples(
+                [
+                    (*col[:-1], f"{col[-1]}_{multiplied_name}")
+                    for col in multiplied_columns.columns
+                ],
+                names=dataframe.columns.names,
+            )
+        else:
+            multiplied_columns.columns = [
+                f"{col}_{multiplied_name}" for col in multiplied_columns.columns
+            ]
+    return multiplied_columns
