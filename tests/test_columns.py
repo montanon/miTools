@@ -516,20 +516,34 @@ class TestAddColumns(TestCase):
 
     def test_add_singleidx(self):
         result = add_columns(self.df_single, ["A", "B"], "C")
-        expected_columns = ["A_+_C", "B_+_C"]
+        expected_columns = [
+            f"A_{ADDED_COLUMN_NAME.format('C')}",
+            f"B_{ADDED_COLUMN_NAME.format('C')}",
+        ]
 
         self.assertListEqual(list(result.columns), expected_columns)
-        expected_values = DataFrame({"A_+_C": [8, 10, 12], "B_+_C": [11, 13, 15]})
+        expected_values = DataFrame(
+            {
+                f"A_{ADDED_COLUMN_NAME.format('C')}": [8, 10, 12],
+                f"B_{ADDED_COLUMN_NAME.format('C')}": [11, 13, 15],
+            }
+        )
         assert_frame_equal(result, expected_values)
 
     def test_add_multiidx(self):
         result = add_columns(
             self.df_multi, [("A", "one"), ("A", "two")], ("B", "three")
         )
-        expected_columns = [("A", "one_+_B,three"), ("A", "two_+_B,three")]
+        expected_columns = [
+            ("A", f"one_{ADDED_COLUMN_NAME.format('B')},three"),
+            ("A", f"two_{ADDED_COLUMN_NAME.format('B')},three"),
+        ]
         self.assertListEqual(list(result.columns), expected_columns)
         expected_values = DataFrame(
-            {("A", "one_+_B,three"): [8, 10, 12], ("A", "two_+_B,three"): [11, 13, 15]}
+            {
+                ("A", f"one_{ADDED_COLUMN_NAME.format('B')},three"): [8, 10, 12],
+                ("A", f"two_{ADDED_COLUMN_NAME.format('B')},three"): [11, 13, 15],
+            }
         )
         assert_frame_equal(result, expected_values)
 
@@ -542,10 +556,16 @@ class TestAddColumns(TestCase):
 
     def test_add_multiidx_with_positional_level(self):
         result = add_columns(self.df_multi, ["one", "two"], "three", level=-1)
-        expected_columns = [("A", "one_+_B,three"), ("A", "two_+_B,three")]
+        expected_columns = [
+            ("A", f"one_{ADDED_COLUMN_NAME.format('B')},three"),
+            ("A", f"two_{ADDED_COLUMN_NAME.format('B')},three"),
+        ]
         self.assertListEqual(list(result.columns), expected_columns)
         expected_values = DataFrame(
-            {("A", "one_+_B,three"): [8, 10, 12], ("A", "two_+_B,three"): [11, 13, 15]}
+            {
+                ("A", f"one_{ADDED_COLUMN_NAME.format('B')},three"): [8, 10, 12],
+                ("A", f"two_{ADDED_COLUMN_NAME.format('B')},three"): [11, 13, 15],
+            }
         )
         assert_frame_equal(result, expected_values)
 
