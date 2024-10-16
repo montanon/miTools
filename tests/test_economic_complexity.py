@@ -260,7 +260,7 @@ class TestMaskMatrix(TestCase):
             mask_matrix(self.matrix, threshold="invalid_threshold")
 
 
-class TestCalculateProximityMatrix(unittest.TestCase):
+class TestCalculateProximityMatrix(TestCase):
     def setUp(self):
         self.dataframe = DataFrame(
             {"Product A": [1, 0, 0], "Product B": [0, 1, 1], "Product C": [1, 1, 0]},
