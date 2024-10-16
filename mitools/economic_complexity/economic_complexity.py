@@ -12,7 +12,7 @@ def create_time_id(time_values: Union[str, int, Sequence]) -> str:
     if isinstance(time_values, (str, int)):
         return str(time_values)
     else:
-        if not all_items_can_be_ints(time_values):
+        if not all_can_be_ints(time_values):
             raise ValueError("Some time values provided can't be converted to int")
         if len(time_values) == 1:
             return str(time_values[0])
@@ -20,7 +20,7 @@ def create_time_id(time_values: Union[str, int, Sequence]) -> str:
         return f"{str(time_values[0])}{str(time_values[-1])[-2:]}"
 
 
-def all_items_can_be_ints(items: Sequence) -> bool:
+def all_can_be_ints(items: Sequence) -> bool:
     try:
         return all(int(item) is not None for item in items)
     except (ValueError, TypeError):

@@ -1,36 +1,36 @@
 import unittest
 from unittest import TestCase
 
-from mitools.economic_complexity import StringMapper, all_items_can_be_ints
+from mitools.economic_complexity import StringMapper, all_can_be_ints
 
 
 class TestAllItemsCanBeInts(TestCase):
     def test_all_ints(self):
-        self.assertTrue(all_items_can_be_ints([1, 2, 3]))
+        self.assertTrue(all_can_be_ints([1, 2, 3]))
 
     def test_all_strings_representing_ints(self):
-        self.assertTrue(all_items_can_be_ints(["1", "2", "3"]))
+        self.assertTrue(all_can_be_ints(["1", "2", "3"]))
 
     def test_mixed_types(self):
-        self.assertTrue(all_items_can_be_ints(["1", 2, 3.0]))
+        self.assertTrue(all_can_be_ints(["1", 2, 3.0]))
 
     def test_non_convertible_item(self):
-        self.assertFalse(all_items_can_be_ints(["1", "a", "3"]))
+        self.assertFalse(all_can_be_ints(["1", "a", "3"]))
 
     def test_with_empty_list(self):
-        self.assertTrue(all_items_can_be_ints([]))
+        self.assertTrue(all_can_be_ints([]))
 
     def test_with_none(self):
-        self.assertFalse(all_items_can_be_ints([None]))
+        self.assertFalse(all_can_be_ints([None]))
 
     def test_with_non_numeric_types(self):
-        self.assertFalse(all_items_can_be_ints([1, 2, "three"]))
+        self.assertFalse(all_can_be_ints([1, 2, "three"]))
 
     def test_with_nested_list(self):
-        self.assertFalse(all_items_can_be_ints([[1, 2], 3]))
+        self.assertFalse(all_can_be_ints([[1, 2], 3]))
 
     def test_with_boolean_values(self):
-        self.assertTrue(all_items_can_be_ints([True, False]))
+        self.assertTrue(all_can_be_ints([True, False]))
 
 
 class TestStringMapper(TestCase):
