@@ -67,5 +67,5 @@ class ContextVar:
 # * Needs to be updated through context
 DEBUG = ContextVar("DEBUG", 0)  # DEBUG levels could be similar to logging.debug levels.
 DISPLAY = ContextVar("DISPLAY", 0)
-ASSERT = ContextVar("ASSERT", 0)
+ASSERT = ContextVar("ASSERT", 1)
 RANDOMSTATE = ContextVar("RANDOMSTATE", 0)

@@ -8,6 +8,8 @@ import pandas as pd
 from numba import jit
 from pandas import DataFrame
 
+from mitools.context import ASSERT
+
 
 def all_can_be_ints(items: Sequence) -> bool:
     try:
@@ -63,9 +65,10 @@ def exports_data_to_matrix(
     products_codes: DataFrame,
 ) -> DataFrame:
     required_columns = {origin_col, value_col}.union(products_cols)
-    assert required_columns.issubset(
-        dataframe.columns
-    ), "Dataframe must contain all required columns"
+    if ASSERT == 1:
+        assert required_columns.issubset(
+            dataframe.columns
+        ), "Dataframe must contain all required columns"
 
     exports = dataframe[[origin_col, *products_cols, value_col]].reset_index(drop=True)
     origins = exports[origin_col].unique()
@@ -85,31 +88,33 @@ def exports_data_to_matrix(
     exports = exports.reindex(new_index.drop_duplicates(), fill_value=0)
 
     reindexed_total_value = exports[value_col].sum()
-    assert (
-        initial_total_value == reindexed_total_value
-    ), "Total export values must be consistent before and after reindexing"
+    if ASSERT == 1:
+        assert (
+            initial_total_value == reindexed_total_value
+        ), "Total export values must be consistent before and after reindexing"
 
     index_levels = exports.index.nlevels
     exports_matrix = exports.unstack(level=[i for i in range(1, index_levels)])
     exports_matrix.columns = exports_matrix.columns.droplevel(0)
 
-    all_origins = dataframe[origin_col].unique()
-    assert set(all_origins) == set(
-        exports_matrix.index.unique()
-    ), "All origins must be equal between products_codes DataFrame"
+    if ASSERT == 1:
+        all_origins = dataframe[origin_col].unique()
+        assert set(all_origins) == set(
+            exports_matrix.index.unique()
+        ), "All origins must be equal between products_codes DataFrame"
 
-    all_products = set(
-        [tuple(row) for _, row in products_codes[products_cols].iterrows()]
-    )
-    matrix_products = set([c for c in exports_matrix.columns])
-    assert (
-        all_products == matrix_products
-    ), "All product codes must be represented in the exports matrix"
+        all_products = set(
+            [tuple(row) for _, row in products_codes[products_cols].iterrows()]
+        )
+        matrix_products = set([c for c in exports_matrix.columns])
+        assert (
+            all_products == matrix_products
+        ), "All product codes must be represented in the exports matrix"
 
-    matrix_origins = set(exports_matrix.index)
-    assert (
-        set(origins) == matrix_origins
-    ), "All origins must be represented in the exports matrix"
+        matrix_origins = set(exports_matrix.index)
+        assert (
+            set(origins) == matrix_origins
+        ), "All origins must be represented in the exports matrix"
 
     return exports_matrix
 
