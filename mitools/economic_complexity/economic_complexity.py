@@ -16,11 +16,18 @@ def all_can_be_ints(items: Sequence) -> bool:
         return False
 
 
-def get_encoding(file: PathLike) -> str:
+def get_file_encoding(file: PathLike, fallback: str = "utf-8") -> str:
     try:
         with open(file, "rb") as f:
-            result = chardet.detect(f.read())
-        return result["encoding"] or "utf-8"
+            raw_data = f.read()
+            result = chardet.detect(raw_data)
+        encoding = result.get("encoding")
+        confidence = result.get("confidence", 0.0)
+        if not encoding or confidence < 0.8:
+            return fallback
+        if encoding.lower() == "ascii":
+            return "utf-8"
+        return encoding
     except FileNotFoundError:
         raise FileNotFoundError(f"The file '{file}' was not found.")
     except IOError as e:
