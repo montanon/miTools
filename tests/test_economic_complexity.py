@@ -10,6 +10,7 @@ from pandas.testing import assert_frame_equal
 from mitools.economic_complexity import (
     StringMapper,
     all_can_be_ints,
+    calculate_exports_matrix_rca,
     exports_data_to_matrix,
     get_file_encoding,
 )
@@ -76,7 +77,7 @@ class TestGetFileEncoding(TestCase):
             get_file_encoding("dummy_file.txt")
 
 
-class TestExportsDataToMatrix(unittest.TestCase):
+class TestExportsDataToMatrix(TestCase):
     def setUp(self):
         self.dataframe = DataFrame(
             {
@@ -143,6 +144,54 @@ class TestExportsDataToMatrix(unittest.TestCase):
                 value_col="export_value",
                 products_codes=self.products_codes,
             )
+
+
+class TestCalculateExportsMatrixRCA(unittest.TestCase):
+    def setUp(self):
+        # Setup a sample exports matrix for testing
+        self.exports_matrix = DataFrame(
+            {
+                "Product A": [100, 200, 300],
+                "Product B": [400, 500, 600],
+                "Product C": [700, 800, 900],
+            },
+            index=["USA", "CAN", "MEX"],
+        )
+
+    def test_valid_rca_calculation(self):
+        result = calculate_exports_matrix_rca(self.exports_matrix)
+        total_exports = self.exports_matrix.sum().sum()
+        origin_totals = self.exports_matrix.sum(axis=1)
+        product_totals = self.exports_matrix.sum(axis=0)
+        expected_rca = self.exports_matrix * total_exports
+        expected_rca = expected_rca.div(product_totals, axis=1)
+        expected_rca = expected_rca.div(origin_totals, axis=0)
+        expected_rca = expected_rca.fillna(0.0)
+        assert_frame_equal(result, expected_rca)
+
+    def test_rca_with_zeros(self):
+        exports_matrix_with_zeros = self.exports_matrix.copy()
+        exports_matrix_with_zeros.loc["USA", "Product A"] = 0
+        result = calculate_exports_matrix_rca(exports_matrix_with_zeros)
+        self.assertFalse(result.isna().any().any())
+
+    def test_empty_exports_matrix(self):
+        empty_matrix = DataFrame()
+        result = calculate_exports_matrix_rca(empty_matrix)
+        self.assertTrue(result.empty)
+
+    def test_single_origin_and_product(self):
+        single_matrix = DataFrame({"Product A": [100]}, index=["USA"])
+        result = calculate_exports_matrix_rca(single_matrix)
+        expected = DataFrame({"Product A": [1.0]}, index=["USA"])
+        assert_frame_equal(result, expected)
+
+    def test_nan_values_handling(self):
+        matrix_with_nan = self.exports_matrix.copy()
+        matrix_with_nan.loc["USA", "Product B"] = None
+
+        result = calculate_exports_matrix_rca(matrix_with_nan)
+        self.assertEqual(result.loc["USA", "Product B"], 0.0)
 
 
 class TestStringMapper(TestCase):

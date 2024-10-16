@@ -81,6 +81,21 @@ def exports_data_to_matrix(
     return exports_matrix
 
 
+def calculate_exports_matrix_rca(exports_matrix: DataFrame) -> DataFrame:
+    xcp = exports_matrix.copy()
+    x = exports_matrix.sum().sum()
+    xc = exports_matrix.sum(axis=1)
+    xp = exports_matrix.sum(axis=0)
+
+    rca_matrix = xcp * x
+    rca_matrix = rca_matrix.div(xp)
+    rca_matrix = rca_matrix.T.div(xc).T
+
+    rca_matrix = rca_matrix.fillna(0.0)
+
+    return rca_matrix
+
+
 def create_time_id(time_values: Union[str, int, Sequence]) -> str:
     if isinstance(time_values, (str, int)):
         return str(time_values)
@@ -100,21 +115,6 @@ def create_data_id(id: str, time: Union[str, int, Sequence]) -> str:
 
 def create_data_name(data_id, tag):
     return f"{data_id}_{tag}"
-
-
-def calculate_exports_matrix_rca(exports_matrix: DataFrame) -> DataFrame:
-    xcp = exports_matrix.copy()
-    x = exports_matrix.sum().sum()
-    xc = exports_matrix.sum(axis=1)
-    xp = exports_matrix.sum(axis=0)
-
-    rca_matrix = xcp * x
-    rca_matrix = rca_matrix.div(xp)
-    rca_matrix = rca_matrix.T.div(xc).T
-
-    rca_matrix = rca_matrix.fillna(0.0)
-
-    return rca_matrix
 
 
 def mask_matrix(matrix: DataFrame, threshold: float) -> DataFrame:
