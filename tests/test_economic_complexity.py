@@ -1,5 +1,6 @@
 import os
 import tempfile
+import time
 import unittest
 from unittest import TestCase
 from unittest.mock import mock_open, patch
@@ -8,18 +9,17 @@ import numpy as np
 from pandas import DataFrame, Series
 from pandas.testing import assert_frame_equal
 
+from mitools.context import Timing
 from mitools.economic_complexity import (
     StringMapper,
     all_can_be_ints,
+    calculate_economic_complexity,
     calculate_exports_matrix_rca,
     calculate_proximity_matrix,
     calculate_relatedness_matrix,
     exports_data_to_matrix,
     get_file_encoding,
     mask_matrix,
-)
-from mitools.economic_complexity.economic_complexity import (
-    calculate_economic_complexity,
 )
 from mitools.exceptions.custom_exceptions import ArgumentValueError
 
@@ -429,6 +429,36 @@ class TestCalculateEconomicComplexity(TestCase):
         )
         assert_frame_equal(eci_df, expected_eci)
         assert_frame_equal(pci_df, expected_pci)
+
+    def test_fast_option(self):
+        _N = 4
+        large_rca = DataFrame(np.random.rand(100, 100))
+        fast_times = []
+        for _ in range(_N):
+            start_time = time.time()
+            calculate_economic_complexity(large_rca, fast=True)
+            fast_times.append(time.time() - start_time)
+        fast_time = np.mean(fast_times[1:])
+        standard_times = []
+        for _ in range(_N):
+            start_time = time.time()
+            calculate_economic_complexity(large_rca, fast=False)
+            standard_times.append(time.time() - start_time)
+        standard_time = np.mean(standard_times)
+        self.assertLess(
+            fast_time,
+            standard_time / 2,
+            f"Fast version ({fast_time:.4f}s) is not significantly faster than standard version ({standard_time:.4f}s)",
+        )
+        eci_fast, pci_fast = calculate_economic_complexity(self.rca_matrix, fast=True)
+        eci_standard, pci_standard = calculate_economic_complexity(
+            self.rca_matrix, fast=False
+        )
+        assert_frame_equal(eci_fast, eci_standard)
+        assert_frame_equal(pci_fast, pci_standard)
+        print(f"Uncompiled Fast version time: {fast_times[0]:.4f}s")
+        print(f"Fast version time: {fast_time:.4f}s")
+        print(f"Standard version time: {standard_time:.4f}s")
 
 
 class TestStringMapper(TestCase):

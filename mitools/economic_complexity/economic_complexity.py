@@ -148,20 +148,10 @@ def calculate_relatedness_matrix(
     return wcp
 
 
-def calculate_economic_complexity(
-    rca_matrix: DataFrame,
-    standardize: Optional[bool] = True,
-    eci_col: Optional[str] = "ECI",
-    pci_col: Optional[str] = "PCI",
-) -> Tuple[DataFrame, DataFrame]:
-    if rca_matrix.empty:
-        raise ArgumentValueError("The RCA matrix must not be empty!")
-    if rca_matrix.isna().any().any():
-        raise ArgumentValueError(
-            "The 'rca_matrix' must not contain non-numeric values!"
-        )
-    if rca_matrix.shape[0] < 2:
-        raise ArgumentValueError("The RCA matrix must have at least two rows")
+@jit(nopython=True)
+def _calculate_economic_complexity(
+    rca_matrix: np.ndarray,
+) -> Tuple[np.ndarray, np.ndarray]:
     diversity = rca_matrix.sum(axis=1)
     ubiquity = rca_matrix.sum(axis=0)
 
@@ -169,10 +159,8 @@ def calculate_economic_complexity(
     M1 = np.nan_to_num(M1)
     M2 = np.divide(rca_matrix, ubiquity)
     M2 = np.nan_to_num(M2)
-    M2_t = M2.T.copy()
 
-    # Mcc = M1.dot(M2_t) # Commented out because it is not used
-    Mpp = M2_t.dot(M1)
+    Mpp = M2.T.dot(M1)
 
     eigen_values, eigen_vectors = np.linalg.eig(Mpp)
     eigen_vectors = np.real(eigen_vectors)
@@ -182,19 +170,65 @@ def calculate_economic_complexity(
     kc = M1.dot(kp)
 
     signature = np.sign(np.corrcoef(diversity, kc)[0, 1])
-    eci_t = signature * kc
-    pci_t = signature * kp
+    eci = signature * kc
+    pci = signature * kp
+
+    return eci, pci
+
+
+def calculate_economic_complexity(
+    rca_matrix: DataFrame,
+    standardize: Optional[bool] = True,
+    eci_col: Optional[str] = "ECI",
+    pci_col: Optional[str] = "PCI",
+    fast: Optional[bool] = False,
+) -> Tuple[DataFrame, DataFrame]:
+    if rca_matrix.empty:
+        raise ArgumentValueError("The RCA matrix must not be empty!")
+    if rca_matrix.isna().any().any():
+        raise ArgumentValueError(
+            "The 'rca_matrix' must not contain non-numeric values!"
+        )
+    if rca_matrix.shape[0] < 2:
+        raise ArgumentValueError("The RCA matrix must have at least two rows")
+
+    if fast:
+        rca_np = rca_matrix.values
+        eci, pci = _calculate_economic_complexity(rca_np)
+    else:
+        diversity = rca_matrix.sum(axis=1)
+        ubiquity = rca_matrix.sum(axis=0)
+
+        M1 = np.divide(rca_matrix.T, diversity).T
+        M1 = np.nan_to_num(M1)
+        M2 = np.divide(rca_matrix, ubiquity)
+        M2 = np.nan_to_num(M2)
+        M2_t = M2.T.copy()
+
+        # Mcc = M1.dot(M2_t) # Commented out because it is not used
+        Mpp = M2_t.dot(M1)
+
+        eigen_values, eigen_vectors = np.linalg.eig(Mpp)
+        eigen_vectors = np.real(eigen_vectors)
+
+        eigen_vector_index = eigen_values.argsort()[-2]
+        kp = eigen_vectors[:, eigen_vector_index]
+        kc = M1.dot(kp)
+
+        signature = np.sign(np.corrcoef(diversity, kc)[0, 1])
+        eci = signature * kc
+        pci = signature * kp
 
     if standardize:
-        pci_t = (pci_t - pci_t.mean()) / pci_t.std()
-        eci_t = (eci_t - eci_t.mean()) / eci_t.std()
+        pci = (pci - pci.mean()) / pci.std()
+        eci = (eci - eci.mean()) / eci.std()
 
-    eci_df = pd.DataFrame(eci_t, columns=[eci_col], index=rca_matrix.index).sort_values(
+    eci_df = pd.DataFrame(eci, columns=[eci_col], index=rca_matrix.index).sort_values(
         by=eci_col, ascending=False
     )
-    pci_df = pd.DataFrame(
-        pci_t, columns=[pci_col], index=rca_matrix.columns
-    ).sort_values(by=pci_col, ascending=False)
+    pci_df = pd.DataFrame(pci, columns=[pci_col], index=rca_matrix.columns).sort_values(
+        by=pci_col, ascending=False
+    )
 
     return eci_df, pci_df
 
@@ -218,41 +252,6 @@ def create_data_id(id: str, time: Union[str, int, Sequence]) -> str:
 
 def create_data_name(data_id, tag):
     return f"{data_id}_{tag}"
-
-
-@jit(nopython=True)
-def fast_calculate_economic_complexity(
-    rca_matrix: np.ndarray,
-    diversity: np.ndarray,
-    ubiquity: np.ndarray,
-    standardize: bool,
-) -> Tuple[np.ndarray, np.ndarray]:
-    print("Fast Calculation of ECI/PCI!")
-    M1 = np.divide(rca_matrix.T, diversity).T
-    M1 = np.nan_to_num(M1)
-    M2 = np.divide(rca_matrix, ubiquity)
-    M2 = np.nan_to_num(M2)
-    M2_t = M2.T.copy()
-
-    # Mcc = M1.dot(M2_t)
-    Mpp = M2_t.dot(M1)
-
-    eigen_values, eigen_vectors = np.linalg.eig(Mpp)
-    eigen_vectors = np.real(eigen_vectors)
-
-    eigen_vector_index = eigen_values.argsort()[-2]
-    kp = eigen_vectors[:, eigen_vector_index]
-    kc = M1.dot(kp)
-
-    signature = np.sign(np.corrcoef(diversity, kc)[0, 1])
-    eci_t = signature * kc
-    pci_t = signature * kp
-
-    if standardize:
-        pci_t = (pci_t - pci_t.mean()) / pci_t.std()
-        eci_t = (eci_t - eci_t.mean()) / eci_t.std()
-
-    return eci_t, pci_t
 
 
 def store_dataframe_sequence(
