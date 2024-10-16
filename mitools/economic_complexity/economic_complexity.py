@@ -8,7 +8,6 @@ import pandas as pd
 from numba import jit
 from pandas import DataFrame
 
-from mitools.context import ASSERT
 from mitools.exceptions import ArgumentValueError
 
 
