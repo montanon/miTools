@@ -11,6 +11,7 @@ from pandas.testing import assert_frame_equal
 # Assuming the provided function is imported or defined here
 from mitools.economic_complexity.columns import (
     ADDED_COLUMN_NAME,
+    DIVIDED_COLUMN_NAME,
     GROWTH_COLUMN_NAME,
     GROWTH_PCT_COLUMN_NAME,
     MULTIPLIED_COLUMN_NAME,
@@ -226,7 +227,7 @@ class TestSelectColumns(TestCase):
 class TestTransformColumns(TestCase):
     def setUp(self):
         # Setup a DataFrame with MultiIndex columns for testing
-        self.multiidx_df = pd.DataFrame(
+        self.multiidx_df = DataFrame(
             {
                 ("A", "one"): [1, 2, 3],
                 ("A", "two"): [4, 5, 6],
@@ -236,7 +237,7 @@ class TestTransformColumns(TestCase):
         self.multiidx_df.columns = MultiIndex.from_tuples(self.multiidx_df.columns)
 
         # Single-index DataFrame
-        self.singleidx_df = pd.DataFrame(
+        self.singleidx_df = DataFrame(
             {
                 "one": [1, 2, 3],
                 "two": [4, 5, 6],
@@ -306,7 +307,7 @@ class TestTransformColumns(TestCase):
 
 class TestVariationColumns(TestCase):
     def setUp(self):
-        self.multiidx_df = pd.DataFrame(
+        self.multiidx_df = DataFrame(
             {
                 ("A", "one"): [1, 2, 3],
                 ("A", "two"): [4, 5, 6],
@@ -314,7 +315,7 @@ class TestVariationColumns(TestCase):
             }
         )
         self.multiidx_df.columns = MultiIndex.from_tuples(self.multiidx_df.columns)
-        self.singleidx_df = pd.DataFrame(
+        self.singleidx_df = DataFrame(
             {
                 "one": [1, 2, 3],
                 "two": [4, 5, 6],
@@ -329,7 +330,7 @@ class TestVariationColumns(TestCase):
             f"three_{GROWTH_COLUMN_NAME.format(1)}",
         ]
         self.assertListEqual(list(result.columns), expected_columns)
-        expected_values = pd.DataFrame(
+        expected_values = DataFrame(
             {
                 f"one_{GROWTH_COLUMN_NAME.format(1)}": [None, 1, 1],
                 f"three_{GROWTH_COLUMN_NAME.format(1)}": [None, 1, 1],
@@ -344,7 +345,7 @@ class TestVariationColumns(TestCase):
             f"three_{GROWTH_PCT_COLUMN_NAME.format(1)}",
         ]
         self.assertListEqual(list(result.columns), expected_columns)
-        expected_values = pd.DataFrame(
+        expected_values = DataFrame(
             {
                 f"one_{GROWTH_PCT_COLUMN_NAME.format(1)}": [None, 50.0, 33.333333],
                 f"three_{GROWTH_PCT_COLUMN_NAME.format(1)}": [
@@ -363,7 +364,7 @@ class TestVariationColumns(TestCase):
             ("B", f"three_{GROWTH_COLUMN_NAME.format(1)}"),
         ]
         self.assertListEqual(list(result.columns), expected_columns)
-        expected_values = pd.DataFrame(
+        expected_values = DataFrame(
             {
                 ("A", f"one_{GROWTH_COLUMN_NAME.format(1)}"): [None, 1, 1],
                 ("B", f"three_{GROWTH_COLUMN_NAME.format(1)}"): [None, 1, 1],
@@ -380,7 +381,7 @@ class TestVariationColumns(TestCase):
             ("B", f"three_{GROWTH_PCT_COLUMN_NAME.format(1)}"),
         ]
         self.assertListEqual(list(result.columns), expected_columns)
-        expected_values = pd.DataFrame(
+        expected_values = DataFrame(
             {
                 ("A", f"one_{GROWTH_PCT_COLUMN_NAME.format(1)}"): [
                     None,
@@ -418,14 +419,14 @@ class TestVariationColumns(TestCase):
         self.assertListEqual(list(result.columns), expected_columns)
 
     def test_variation_non_numeric_data(self):
-        df_non_numeric = pd.DataFrame({"A": ["a", "b", "c"], "B": ["x", "y", "z"]})
+        df_non_numeric = DataFrame({"A": ["a", "b", "c"], "B": ["x", "y", "z"]})
         with self.assertRaises(ArgumentValueError):
             growth_columns(df_non_numeric, ["A"], t=1)
 
 
 class TestShiftColumns(TestCase):
     def setUp(self):
-        self.multiidx_df = pd.DataFrame(
+        self.multiidx_df = DataFrame(
             {
                 ("A", "one"): [1, 2, 3],
                 ("A", "two"): [4, 5, 6],
@@ -433,7 +434,7 @@ class TestShiftColumns(TestCase):
             }
         )
         self.multiidx_df.columns = MultiIndex.from_tuples(self.multiidx_df.columns)
-        self.singleidx_df = pd.DataFrame(
+        self.singleidx_df = DataFrame(
             {
                 "one": [1, 2, 3],
                 "two": [4, 5, 6],
@@ -448,13 +449,13 @@ class TestShiftColumns(TestCase):
             f"three_{SHIFTED_COLUMN_NAME.format(1)}",
         ]
         self.assertListEqual(list(result.columns), expected_columns)
-        expected_values = pd.DataFrame(
+        expected_values = DataFrame(
             {
                 f"one_{SHIFTED_COLUMN_NAME.format(1)}": [None, 1, 2],
                 f"three_{SHIFTED_COLUMN_NAME.format(1)}": [None, 7, 8],
             }
         )
-        pd.testing.assert_frame_equal(result.reset_index(drop=True), expected_values)
+        assert_frame_equal(result.reset_index(drop=True), expected_values)
 
     def test_shift_multiidx(self):
         result = shift_columns(self.multiidx_df, ["one", "three"], t=1, level=-1)
@@ -463,7 +464,7 @@ class TestShiftColumns(TestCase):
             ("B", f"three_{SHIFTED_COLUMN_NAME.format(1)}"),
         ]
         self.assertListEqual(list(result.columns), expected_columns)
-        expected_values = pd.DataFrame(
+        expected_values = DataFrame(
             {
                 ("A", f"one_{SHIFTED_COLUMN_NAME.format(1)}"): [None, 1, 2],
                 ("B", f"three_{SHIFTED_COLUMN_NAME.format(1)}"): [None, 7, 8],
@@ -475,7 +476,7 @@ class TestShiftColumns(TestCase):
         result = shift_columns(self.singleidx_df, ["one"], t=1, rename="custom_name")
         expected_columns = ["one_custom_name"]
         self.assertListEqual(list(result.columns), expected_columns)
-        expected_values = pd.DataFrame({"one_custom_name": [None, 1, 2]})
+        expected_values = DataFrame({"one_custom_name": [None, 1, 2]})
         assert_frame_equal(result.reset_index(drop=True), expected_values)
 
     def test_shift_multiidx_with_positional_level(self):
@@ -485,7 +486,7 @@ class TestShiftColumns(TestCase):
             ("B", f"three_{SHIFTED_COLUMN_NAME.format(1)}"),
         ]
         self.assertListEqual(list(result.columns), expected_columns)
-        expected_values = pd.DataFrame(
+        expected_values = DataFrame(
             {
                 ("A", f"one_{SHIFTED_COLUMN_NAME.format(1)}"): [None, 1, 2],
                 ("B", f"three_{SHIFTED_COLUMN_NAME.format(1)}"): [None, 7, 8],
@@ -504,9 +505,9 @@ class TestShiftColumns(TestCase):
 
 class TestAddColumns(TestCase):
     def setUp(self):
-        self.df_single = pd.DataFrame({"A": [1, 2, 3], "B": [4, 5, 6], "C": [7, 8, 9]})
+        self.df_single = DataFrame({"A": [1, 2, 3], "B": [4, 5, 6], "C": [7, 8, 9]})
         arrays = [["A", "A", "B"], ["one", "two", "three"]]
-        self.df_multi = pd.DataFrame(
+        self.df_multi = DataFrame(
             {
                 ("A", "one"): [1, 2, 3],
                 ("A", "two"): [4, 5, 6],
@@ -586,9 +587,9 @@ class TestAddColumns(TestCase):
 
 class TestSubtractColumns(TestCase):
     def setUp(self):
-        self.df_single = pd.DataFrame({"A": [1, 2, 3], "B": [4, 5, 6], "C": [7, 8, 9]})
+        self.df_single = DataFrame({"A": [1, 2, 3], "B": [4, 5, 6], "C": [7, 8, 9]})
         arrays = [["A", "A", "B"], ["one", "two", "three"]]
-        self.df_multi = pd.DataFrame(
+        self.df_multi = DataFrame(
             {
                 ("A", "one"): [1, 2, 3],
                 ("A", "two"): [4, 5, 6],
@@ -745,60 +746,86 @@ class TestMultiplyColumns(TestCase):
             multiply_columns(self.df_single, ["A"], "D")
 
 
-class TestDivideColumns(unittest.TestCase):
+class TestDivideColumns(TestCase):
     def setUp(self):
-        # Create a DataFrame with MultiIndex columns for testing
-        self.dataframe = DataFrame(
+        self.df_single = DataFrame({"A": [2, 4, 6], "B": [8, 10, 12], "C": [2, 2, 2]})
+        arrays = [["A", "A", "B"], ["one", "two", "three"]]
+        self.df_multi = DataFrame(
             {
-                ("Country1", "Indicator1"): [2, 4, 6, 8, 10],
-                ("Country1", "Indicator2"): [1, 2, 3, 4, 5],
-                ("Country2", "Indicator1"): [20, 40, 60, 80, 100],
-                ("Country2", "Indicator2"): [10, 20, 30, 40, 50],
+                ("A", "one"): [2, 4, 6],
+                ("A", "two"): [8, 10, 12],
+                ("B", "three"): [2, 2, 2],
             }
         )
-        self.dataframe.columns = MultiIndex.from_tuples(self.dataframe.columns)
+        self.df_multi.columns = MultiIndex.from_arrays(arrays)
 
-    def test_division(self):
-        new_name = "Ratio_Indicator"
-        divided_df = divide_columns(
-            self.dataframe, "Indicator1", "Indicator2", new_name
-        )
-        # Verify the division is correct
-        for country in self.dataframe.columns.levels[0]:
-            expected_result = (
-                self.dataframe[(country, "Indicator1")]
-                / self.dataframe[(country, "Indicator2")]
-            )
-            self.assertTrue(
-                np.allclose(divided_df[(country, new_name)], expected_result)
-            )
-
-    def test_column_names(self):
-        new_name = "Ratio_Indicator"
-        divided_df = divide_columns(
-            self.dataframe, "Indicator1", "Indicator2", new_name
-        )
-        # Check if the new column names are correctly assigned
+    def test_divide_singleidx(self):
+        result = divide_columns(self.df_single, ["A", "B"], "C")
         expected_columns = [
-            (country, new_name) for country in self.dataframe.columns.levels[0]
+            f"A_{DIVIDED_COLUMN_NAME.format('C')}",
+            f"B_{DIVIDED_COLUMN_NAME.format('C')}",
         ]
-        self.assertEqual(divided_df.columns.tolist(), expected_columns)
 
-    def test_nonexistent_columns(self):
-        # Attempt to divide non-existent columns
-        with self.assertRaises(KeyError):
-            divide_columns(
-                self.dataframe, "NonexistentColumn1", "NonexistentColumn2", "Result"
-            )
+        self.assertListEqual(list(result.columns), expected_columns)
+        expected_values = DataFrame(
+            {
+                f"A_{DIVIDED_COLUMN_NAME.format('C')}": [1.0, 2.0, 3.0],
+                f"B_{DIVIDED_COLUMN_NAME.format('C')}": [4.0, 5.0, 6.0],
+            }
+        )
+        assert_frame_equal(result, expected_values)
 
-    def test_division_by_zero(self):
-        # Add a row with zero to test division by zero
-        zero_row = pd.DataFrame({("Country1", "Indicator2"): [0]}, index=[5])
-        zero_df = pd.concat([self.dataframe, zero_row])
-        new_name = "Ratio_Indicator"
-        divided_df = divide_columns(zero_df, "Indicator1", "Indicator2", new_name)
-        # Check if division by zero results in infinity)
-        self.assertTrue(np.isnan(divided_df.loc[5, ("Country1", new_name)]))
+    def test_divide_multiidx(self):
+        result = divide_columns(
+            self.df_multi, [("A", "one"), ("A", "two")], ("B", "three")
+        )
+        expected_columns = [
+            ("A", f"one_{DIVIDED_COLUMN_NAME.format('B')},three"),
+            ("A", f"two_{DIVIDED_COLUMN_NAME.format('B')},three"),
+        ]
+        self.assertListEqual(list(result.columns), expected_columns)
+        expected_values = DataFrame(
+            {
+                ("A", f"one_{DIVIDED_COLUMN_NAME.format('B')},three"): [1.0, 2.0, 3.0],
+                ("A", f"two_{DIVIDED_COLUMN_NAME.format('B')},three"): [4.0, 5.0, 6.0],
+            }
+        )
+        assert_frame_equal(result, expected_values)
+
+    def test_divide_with_custom_rename(self):
+        result = divide_columns(self.df_single, ["A"], "C", rename="divided_custom")
+        expected_columns = ["A_divided_custom"]
+        self.assertListEqual(list(result.columns), expected_columns)
+        expected_values = DataFrame({"A_divided_custom": [1.0, 2.0, 3.0]})
+        assert_frame_equal(result, expected_values)
+
+    def test_divide_multiidx_with_positional_level(self):
+        result = divide_columns(self.df_multi, ["one", "two"], "three", level=-1)
+        expected_columns = [
+            ("A", f"one_{DIVIDED_COLUMN_NAME.format('B')},three"),
+            ("A", f"two_{DIVIDED_COLUMN_NAME.format('B')},three"),
+        ]
+        self.assertListEqual(list(result.columns), expected_columns)
+        expected_values = DataFrame(
+            {
+                ("A", f"one_{DIVIDED_COLUMN_NAME.format('B')},three"): [1.0, 2.0, 3.0],
+                ("A", f"two_{DIVIDED_COLUMN_NAME.format('B')},three"): [4.0, 5.0, 6.0],
+            }
+        )
+        assert_frame_equal(result, expected_values)
+
+    def test_divide_with_invalid_column_to_divide(self):
+        with self.assertRaises(ArgumentValueError):
+            divide_columns(self.df_single, ["A", "B"], ["C", "B"])
+
+    def test_divide_with_invalid_columns(self):
+        with self.assertRaises(ArgumentValueError):
+            divide_columns(self.df_single, ["A"], "D")
+
+    def test_divide_non_numeric_data(self):
+        df_non_numeric = DataFrame({"A": ["x", "y", "z"], "B": [1, 2, 3]})
+        with self.assertRaises(ArgumentValueError):
+            divide_columns(df_non_numeric, ["B"], "A")
 
 
 if __name__ == "__main__":
