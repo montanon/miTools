@@ -143,9 +143,8 @@ def calculate_relatedness_matrix(
             f"Mismatched indexes in 'rca_matrix' and 'proximity_matrix': {e}"
         )
     wcp.columns = row_sums.index
-    wcp = wcp / row_sums
-    wcp = wcp.unstack().to_frame()
-    wcp.columns = [relatedness_col]
+    wcp = wcp.div(row_sums, axis=1)
+    wcp = wcp.unstack().to_frame(name=relatedness_col)
     return wcp
 
 
