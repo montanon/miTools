@@ -55,14 +55,10 @@ def exports_data_to_matrix(
     origins = exports[origin_col].unique()
     exports = exports.set_index([origin_col, *products_cols])
     initial_total_value = exports[value_col].sum()
-    new_index = pd.concat(
-        [
-            products_codes[products_cols]
-            .assign(**{origin_col: origin})
-            .set_index([origin_col, *products_cols])
-            for origin in origins
-        ]
-    ).index
+    new_index = pd.MultiIndex.from_product(
+        [origins, *[products_codes[col].unique() for col in products_cols]],
+        names=[origin_col, *products_cols],
+    )
     exports = exports.reindex(new_index.drop_duplicates(), fill_value=0)
     reindexed_total_value = exports[value_col].sum()
     if ASSERT == 1:
