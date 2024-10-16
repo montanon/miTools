@@ -23,7 +23,7 @@ from pandas import DataFrame
 from PIL import Image
 from scipy.spatial.distance import squareform
 
-from ..country_converter import cc
+from ..country_converter import country_converter
 from ..pandas import idxslice, quantize_group
 from ..utils import stretch_string
 from ..visuals import (
@@ -1427,7 +1427,7 @@ def extract_svg_country_mapping(html_content):
     for div in container.find_all("div"):
         img = div.find("img")
         country = div.find("p").get_text(strip=True).split(" (")[0].strip()
-        country = cc.convert(country, to="name_short")
+        country = country_converter.convert(country, to="name_short")
         svg_file = Path(img["src"]).name
         svg_country_dict[country] = svg_file
 
