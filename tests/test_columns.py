@@ -10,8 +10,11 @@ from pandas.testing import assert_frame_equal
 
 # Assuming the provided function is imported or defined here
 from mitools.economic_complexity.columns import (
+    ADDED_COLUMN_NAME,
     GROWTH_COLUMN_NAME,
     GROWTH_PCT_COLUMN_NAME,
+    SHIFTED_COLUMN_NAME,
+    SUBTRACTED_COLUMN_NAME,
     add_columns,
     divide_columns,
     growth_columns,
@@ -320,33 +323,49 @@ class TestVariationColumns(TestCase):
 
     def test_variation_singleidx_absolute(self):
         result = growth_columns(self.singleidx_df, ["one", "three"], t=1)
-        expected_columns = ["one_growth_1", "three_growth_1"]
+        expected_columns = [
+            f"one_{GROWTH_COLUMN_NAME.format(1)}",
+            f"three_{GROWTH_COLUMN_NAME.format(1)}",
+        ]
         self.assertListEqual(list(result.columns), expected_columns)
         expected_values = pd.DataFrame(
-            {"one_growth_1": [None, 1, 1], "three_growth_1": [None, 1, 1]}
+            {
+                f"one_{GROWTH_COLUMN_NAME.format(1)}": [None, 1, 1],
+                f"three_{GROWTH_COLUMN_NAME.format(1)}": [None, 1, 1],
+            }
         )
         assert_frame_equal(result.reset_index(drop=True), expected_values)
 
     def test_variation_singleidx_pct(self):
         result = growth_columns(self.singleidx_df, ["one", "three"], t=1, pct=True)
-        expected_columns = ["one_growth%_1", "three_growth%_1"]
+        expected_columns = [
+            f"one_{GROWTH_PCT_COLUMN_NAME.format(1)}",
+            f"three_{GROWTH_PCT_COLUMN_NAME.format(1)}",
+        ]
         self.assertListEqual(list(result.columns), expected_columns)
         expected_values = pd.DataFrame(
             {
-                "one_growth%_1": [None, 50.0, 33.333333],
-                "three_growth%_1": [None, 12.5, 11.111111],  # Rounded for clarity
+                f"one_{GROWTH_PCT_COLUMN_NAME.format(1)}": [None, 50.0, 33.333333],
+                f"three_{GROWTH_PCT_COLUMN_NAME.format(1)}": [
+                    None,
+                    12.5,
+                    11.111111,
+                ],  # Rounded for clarity
             }
         )
         assert_frame_equal(result.reset_index(drop=True), expected_values)
 
     def test_variation_multiidx_absolute(self):
         result = growth_columns(self.multiidx_df, ["one", "three"], t=1, level=-1)
-        expected_columns = [("A", "one_growth_1"), ("B", "three_growth_1")]
+        expected_columns = [
+            ("A", f"one_{GROWTH_COLUMN_NAME.format(1)}"),
+            ("B", f"three_{GROWTH_COLUMN_NAME.format(1)}"),
+        ]
         self.assertListEqual(list(result.columns), expected_columns)
         expected_values = pd.DataFrame(
             {
-                ("A", "one_growth_1"): [None, 1, 1],
-                ("B", "three_growth_1"): [None, 1, 1],
+                ("A", f"one_{GROWTH_COLUMN_NAME.format(1)}"): [None, 1, 1],
+                ("B", f"three_{GROWTH_COLUMN_NAME.format(1)}"): [None, 1, 1],
             }
         )
         assert_frame_equal(result.reset_index(drop=True), expected_values)
@@ -356,14 +375,18 @@ class TestVariationColumns(TestCase):
             self.multiidx_df, ["one", "three"], t=1, pct=True, level=-1
         )
         expected_columns = [
-            ("A", "one_growth%_1"),
-            ("B", "three_growth%_1"),
+            ("A", f"one_{GROWTH_PCT_COLUMN_NAME.format(1)}"),
+            ("B", f"three_{GROWTH_PCT_COLUMN_NAME.format(1)}"),
         ]
         self.assertListEqual(list(result.columns), expected_columns)
         expected_values = pd.DataFrame(
             {
-                ("A", "one_growth%_1"): [None, 50.0, 33.333333],
-                ("B", "three_growth%_1"): [
+                ("A", f"one_{GROWTH_PCT_COLUMN_NAME.format(1)}"): [
+                    None,
+                    50.0,
+                    33.333333,
+                ],
+                ("B", f"three_{GROWTH_PCT_COLUMN_NAME.format(1)}"): [
                     None,
                     12.5,
                     11.111111,
@@ -387,7 +410,10 @@ class TestVariationColumns(TestCase):
 
     def test_variation_multiidx_with_positional_level(self):
         result = growth_columns(self.multiidx_df, ["one", "three"], t=1, level=1)
-        expected_columns = [("A", "one_growth_1"), ("B", "three_growth_1")]
+        expected_columns = [
+            ("A", f"one_{GROWTH_COLUMN_NAME.format(1)}"),
+            ("B", f"three_{GROWTH_COLUMN_NAME.format(1)}"),
+        ]
         self.assertListEqual(list(result.columns), expected_columns)
 
     def test_variation_non_numeric_data(self):
