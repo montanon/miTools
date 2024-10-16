@@ -1,10 +1,8 @@
 import unittest
 from unittest import TestCase
 
-import numpy as np
-import pandas as pd
 from numpy import log
-from pandas import DataFrame, Index, IndexSlice, MultiIndex
+from pandas import DataFrame, MultiIndex
 from pandas.api.types import is_numeric_dtype
 from pandas.testing import assert_frame_equal
 
@@ -28,7 +26,6 @@ from mitools.economic_complexity.columns import (
     transform_columns,
 )
 from mitools.exceptions.custom_exceptions import (
-    ArgumentKeyError,
     ArgumentTypeError,
     ArgumentValueError,
 )
