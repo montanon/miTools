@@ -442,21 +442,30 @@ class TestShiftColumns(TestCase):
 
     def test_shift_singleidx(self):
         result = shift_columns(self.singleidx_df, ["one", "three"], t=1)
-        expected_columns = ["one_shifted_1", "three_shifted_1"]
+        expected_columns = [
+            f"one_{SHIFTED_COLUMN_NAME.format(1)}",
+            f"three_{SHIFTED_COLUMN_NAME.format(1)}",
+        ]
         self.assertListEqual(list(result.columns), expected_columns)
         expected_values = pd.DataFrame(
-            {"one_shifted_1": [None, 1, 2], "three_shifted_1": [None, 7, 8]}
+            {
+                f"one_{SHIFTED_COLUMN_NAME.format(1)}": [None, 1, 2],
+                f"three_{SHIFTED_COLUMN_NAME.format(1)}": [None, 7, 8],
+            }
         )
         pd.testing.assert_frame_equal(result.reset_index(drop=True), expected_values)
 
     def test_shift_multiidx(self):
         result = shift_columns(self.multiidx_df, ["one", "three"], t=1, level=-1)
-        expected_columns = [("A", "one_shifted_1"), ("B", "three_shifted_1")]
+        expected_columns = [
+            ("A", f"one_{SHIFTED_COLUMN_NAME.format(1)}"),
+            ("B", f"three_{SHIFTED_COLUMN_NAME.format(1)}"),
+        ]
         self.assertListEqual(list(result.columns), expected_columns)
         expected_values = pd.DataFrame(
             {
-                ("A", "one_shifted_1"): [None, 1, 2],
-                ("B", "three_shifted_1"): [None, 7, 8],
+                ("A", f"one_{SHIFTED_COLUMN_NAME.format(1)}"): [None, 1, 2],
+                ("B", f"three_{SHIFTED_COLUMN_NAME.format(1)}"): [None, 7, 8],
             }
         )
         assert_frame_equal(result.reset_index(drop=True), expected_values)
@@ -470,12 +479,15 @@ class TestShiftColumns(TestCase):
 
     def test_shift_multiidx_with_positional_level(self):
         result = shift_columns(self.multiidx_df, ["one", "three"], t=1, level=1)
-        expected_columns = [("A", "one_shifted_1"), ("B", "three_shifted_1")]
+        expected_columns = [
+            ("A", f"one_{SHIFTED_COLUMN_NAME.format(1)}"),
+            ("B", f"three_{SHIFTED_COLUMN_NAME.format(1)}"),
+        ]
         self.assertListEqual(list(result.columns), expected_columns)
         expected_values = pd.DataFrame(
             {
-                ("A", "one_shifted_1"): [None, 1, 2],
-                ("B", "three_shifted_1"): [None, 7, 8],
+                ("A", f"one_{SHIFTED_COLUMN_NAME.format(1)}"): [None, 1, 2],
+                ("B", f"three_{SHIFTED_COLUMN_NAME.format(1)}"): [None, 7, 8],
             }
         )
         assert_frame_equal(result.reset_index(drop=True), expected_values)
