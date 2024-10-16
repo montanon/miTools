@@ -14,6 +14,7 @@ SHIFTED_COLUMN_NAME = "shifted_{:d}"
 ADDED_COLUMN_NAME = "+_{}"
 SUBTRACTED_COLUMN_NAME = "-_{}"
 MULTIPLIED_COLUMN_NAME = "*_{:s}"
+DIVIDED_COLUMN_NAME = "/_{:s}"
 
 INVALID_COLUMN_ERROR = "One or more of {} are not in DataFrame."
 INVALID_TRANSFORMATION_ERROR = "Transformation {} provided is not Callable."
@@ -310,23 +311,52 @@ def subtract_columns(
 
 
 def divide_columns(
-    dataframe: DataFrame, num_column: str, den_column: str, new_name: str
+    dataframe: DataFrame,
+    columns: Iterable[Union[str, Tuple]],
+    column_to_divide: Union[str, Tuple],
+    level: Optional[Union[str, int]] = None,
+    rename: Optional[Union[str, bool]] = True,
 ) -> DataFrame:
-    if isinstance(dataframe.index, Index):
-        num_columns = dataframe.loc[:, [num_column]]
-        den_columns = dataframe.loc[:, [den_column]]
-    else:
-        num_columns = dataframe.loc[:, IndexSlice[:, num_column]]
-        den_columns = dataframe.loc[:, IndexSlice[:, den_column]]
-    div_columns = num_columns / den_columns.values
-    if isinstance(dataframe.index, Index):
-        div_columns.columns = [new_name]
-    else:
-        div_columns.columns = MultiIndex.from_tuples(
-            [(col_0, new_name) for col_0, _ in div_columns.columns.values],
-            names=dataframe.columns.names,
+    selected_columns = select_columns(dataframe=dataframe, columns=columns, level=level)
+    column_to_divide = select_columns(
+        dataframe=dataframe, columns=column_to_divide, level=level
+    )
+    if column_to_divide.shape[1] > 1:
+        raise ArgumentValueError(
+            f"Column to divide '{column_to_divide}' with 'level={level}' must be a single column."
         )
-    return div_columns
+    try:
+        divided_columns = selected_columns / column_to_divide.values
+    except ZeroDivisionError:
+        raise ArgumentValueError("Division by zero encountered.")
+    except Exception as e:
+        raise ArgumentValueError(
+            f"Error while dividing columns '{columns}' by '{column_to_divide}': {e}"
+        )
+    if rename:
+        divided_name = (
+            DIVIDED_COLUMN_NAME.format(
+                column_to_divide
+                if isinstance(column_to_divide, str)
+                else ",".join(*column_to_divide)
+            )
+            if not isinstance(rename, str)
+            else rename
+        )
+        if isinstance(dataframe.columns, MultiIndex):
+            divided_columns.columns = MultiIndex.from_tuples(
+                [
+                    (*col[:-1], f"{col[-1]}_{divided_name}")
+                    for col in divided_columns.columns
+                ],
+                names=dataframe.columns.names,
+            )
+        else:
+            divided_columns.columns = [
+                f"{col}_{divided_name}" for col in divided_columns.columns
+            ]
+
+    return divided_columns
 
 
 def multiply_columns(
