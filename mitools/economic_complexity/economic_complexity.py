@@ -22,8 +22,8 @@ def create_time_id(time_values: Union[str, int, Sequence]) -> str:
 
 def all_items_can_be_ints(items: Sequence) -> bool:
     try:
-        return all(isinstance(int(item), int) for item in items)
-    except ValueError:
+        return all(int(item) is not None for item in items)
+    except (ValueError, TypeError):
         return False
 
 
