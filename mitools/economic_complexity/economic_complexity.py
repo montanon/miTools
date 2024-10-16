@@ -171,7 +171,7 @@ def calculate_economic_complexity(
     M2 = np.nan_to_num(M2)
     M2_t = M2.T.copy()
 
-    Mcc = M1.dot(M2_t)
+    # Mcc = M1.dot(M2_t) # Commented out because it is not used
     Mpp = M2_t.dot(M1)
 
     eigen_values, eigen_vectors = np.linalg.eig(Mpp)
