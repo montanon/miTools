@@ -598,19 +598,33 @@ class TestSubtractColumns(unittest.TestCase):
 
     def test_subtract_singleidx(self):
         result = subtract_columns(self.df_single, ["A", "B"], "C")
-        expected_columns = ["A_-_C", "B_-_C"]
+        expected_columns = [
+            f"A_{SUBTRACTED_COLUMN_NAME.format('C')}",
+            f"B_{SUBTRACTED_COLUMN_NAME.format('C')}",
+        ]
         self.assertListEqual(list(result.columns), expected_columns)
-        expected_values = DataFrame({"A_-_C": [-6, -6, -6], "B_-_C": [-3, -3, -3]})
+        expected_values = DataFrame(
+            {
+                f"A_{SUBTRACTED_COLUMN_NAME.format('C')}": [-6, -6, -6],
+                f"B_{SUBTRACTED_COLUMN_NAME.format('C')}": [-3, -3, -3],
+            }
+        )
         assert_frame_equal(result, expected_values)
 
     def test_subtract_multiidx(self):
         result = subtract_columns(
             self.df_multi, [("A", "one"), ("A", "two")], ("B", "three")
         )
-        expected_columns = [("A", "one_-_B,three"), ("A", "two_-_B,three")]
+        expected_columns = [
+            ("A", f"one_{SUBTRACTED_COLUMN_NAME.format('B')},three"),
+            ("A", f"two_{SUBTRACTED_COLUMN_NAME.format('B')},three"),
+        ]
         self.assertListEqual(list(result.columns), expected_columns)
         expected_values = DataFrame(
-            {("A", "one_-_B,three"): [-6, -6, -6], ("A", "two_-_B,three"): [-3, -3, -3]}
+            {
+                ("A", f"one_{SUBTRACTED_COLUMN_NAME.format('B')},three"): [-6, -6, -6],
+                ("A", f"two_{SUBTRACTED_COLUMN_NAME.format('B')},three"): [-3, -3, -3],
+            }
         )
         assert_frame_equal(result, expected_values)
 
@@ -625,10 +639,16 @@ class TestSubtractColumns(unittest.TestCase):
 
     def test_subtract_multiidx_with_positional_level(self):
         result = subtract_columns(self.df_multi, ["one", "two"], "three", level=-1)
-        expected_columns = [("A", "one_-_B,three"), ("A", "two_-_B,three")]
+        expected_columns = [
+            ("A", f"one_{SUBTRACTED_COLUMN_NAME.format('B')},three"),
+            ("A", f"two_{SUBTRACTED_COLUMN_NAME.format('B')},three"),
+        ]
         self.assertListEqual(list(result.columns), expected_columns)
         expected_values = DataFrame(
-            {("A", "one_-_B,three"): [-6, -6, -6], ("A", "two_-_B,three"): [-3, -3, -3]}
+            {
+                ("A", f"one_{SUBTRACTED_COLUMN_NAME.format('B')},three"): [-6, -6, -6],
+                ("A", f"two_{SUBTRACTED_COLUMN_NAME.format('B')},three"): [-3, -3, -3],
+            }
         )
         assert_frame_equal(result, expected_values)
 
