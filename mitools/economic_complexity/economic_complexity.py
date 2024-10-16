@@ -47,10 +47,11 @@ def exports_data_to_matrix(
     if dataframe.empty:
         raise ArgumentValueError("Dataframe must not be empty")
     required_columns = {origin_col, value_col}.union(products_cols)
-    if ASSERT == 1:
-        assert required_columns.issubset(
-            dataframe.columns
-        ), "Dataframe must contain all required columns"
+    missing_columns = required_columns - set(dataframe.columns)
+    if missing_columns:
+        raise ArgumentValueError(
+            f"Dataframe is missing required columns: {missing_columns}"
+        )
     exports = dataframe[[origin_col, *products_cols, value_col]].reset_index(drop=True)
     origins = exports[origin_col].unique()
     exports = exports.set_index([origin_col, *products_cols])
@@ -61,31 +62,23 @@ def exports_data_to_matrix(
     )
     exports = exports.reindex(new_index.drop_duplicates(), fill_value=0)
     reindexed_total_value = exports[value_col].sum()
-    if ASSERT == 1:
-        assert (
-            initial_total_value == reindexed_total_value
-        ), "Total export values must be consistent before and after reindexing"
-    index_levels = exports.index.nlevels
-    exports_matrix = exports.unstack(level=[i for i in range(1, index_levels)])
+    if not pd.isna(initial_total_value) and not pd.isna(reindexed_total_value):
+        if not np.isclose(initial_total_value, reindexed_total_value):
+            raise ArgumentValueError(
+                "Total export values are inconsistent before and after reindexing"
+            )
+    exports_matrix = exports.unstack(level=products_cols)
     exports_matrix.columns = exports_matrix.columns.droplevel(0)
-    if ASSERT == 1:
-        all_origins = dataframe[origin_col].unique()
-        assert set(all_origins) == set(
-            exports_matrix.index.unique()
-        ), "All origins must be equal between products_codes DataFrame"
-
-        all_products = set(
-            [tuple(row) for _, row in products_codes[products_cols].iterrows()]
-        )
-        matrix_products = set([tuple(c) for c in exports_matrix.columns])
-        assert (
-            all_products == matrix_products
-        ), "All product codes must be represented in the exports matrix"
-
-        matrix_origins = set(exports_matrix.index)
-        assert (
-            set(origins) == matrix_origins
-        ), "All origins must be represented in the exports matrix"
+    all_origins = set(dataframe[origin_col].unique())
+    matrix_origins = set(exports_matrix.index)
+    if all_origins != matrix_origins:
+        raise ArgumentValueError("Mismatch in origins between input and output")
+    all_products = set(
+        map(tuple, products_codes[products_cols].itertuples(index=False))
+    )
+    matrix_products = set(map(tuple, exports_matrix.columns))
+    if all_products != matrix_products:
+        raise ArgumentValueError("Mismatch in product codes between input and output")
     return exports_matrix
 
 

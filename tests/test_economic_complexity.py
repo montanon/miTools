@@ -124,7 +124,7 @@ class TestExportsDataToMatrix(unittest.TestCase):
         self.assertEqual(self.dataframe["export_value"].sum(), result.values.sum())
 
     def test_invalid_columns(self):
-        with self.assertRaises(AssertionError):
+        with self.assertRaises(ArgumentValueError):
             exports_data_to_matrix(
                 self.dataframe.drop(columns=["export_value"]),
                 origin_col="origin",
