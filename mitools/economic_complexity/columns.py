@@ -12,6 +12,7 @@ GROWTH_COLUMN_NAME = "growth_{:d}"
 GROWTH_PCT_COLUMN_NAME = "growth%_{:d}"
 SHIFTED_COLUMN_NAME = "shifted_{:d}"
 ADDED_COLUMN_NAME = "+_{}"
+SUBTRACTED_COLUMN_NAME = "-_{}"
 
 INVALID_COLUMN_ERROR = "One or more of {} are not in DataFrame."
 INVALID_TRANSFORMATION_ERROR = "Transformation {} provided is not Callable."
@@ -262,23 +263,49 @@ def add_columns(
 
 
 def subtract_columns(
-    dataframe: DataFrame, column1: str, column2: str, new_name: str
+    dataframe: DataFrame,
+    columns: Iterable[Union[str, Tuple]],
+    column_to_subtract: Union[str, Tuple],
+    level: Optional[Union[str, int]] = None,
+    rename: Optional[Union[str, bool]] = True,
 ) -> DataFrame:
-    if isinstance(dataframe.index, Index):
-        columns1 = dataframe.loc[:, [column1]]
-        columns2 = dataframe.loc[:, [column2]]
-    else:
-        columns1 = dataframe.loc[:, IndexSlice[:, column1]]
-        columns2 = dataframe.loc[:, IndexSlice[:, column2]]
-    minus_columns = columns1 - columns2.values
-    if isinstance(dataframe.index, Index):
-        minus_columns.columns = [new_name]
-    else:
-        minus_columns.columns = MultiIndex.from_tuples(
-            [(col_0, new_name) for col_0, _ in minus_columns.columns.values],
-            names=dataframe.columns.names,
+    selected_columns = select_columns(dataframe=dataframe, columns=columns, level=level)
+    column_to_subtract = select_columns(
+        dataframe=dataframe, columns=column_to_subtract, level=level
+    )
+    if column_to_subtract.shape[1] > 1:
+        raise ArgumentValueError(
+            f"Column to subtract '{column_to_subtract}' with 'level={level}' must be a single column."
         )
-    return minus_columns
+    try:
+        subtracted_columns = selected_columns - column_to_subtract.values
+    except Exception as e:
+        raise ArgumentValueError(
+            f"Error while subtracting column '{column_to_subtract}' from columns '{columns}': {e}"
+        )
+    if rename:
+        subtracted_name = (
+            SUBTRACTED_COLUMN_NAME.format(
+                column_to_subtract
+                if isinstance(column_to_subtract, str)
+                else ",".join(*column_to_subtract)
+            )
+            if not isinstance(rename, str)
+            else rename
+        )
+        if isinstance(dataframe.columns, MultiIndex):
+            subtracted_columns.columns = MultiIndex.from_tuples(
+                [
+                    (*col[:-1], f"{col[-1]}_{subtracted_name}")
+                    for col in subtracted_columns.columns
+                ],
+                names=dataframe.columns.names,
+            )
+        else:
+            subtracted_columns.columns = [
+                f"{col}_{subtracted_name}" for col in subtracted_columns.columns
+            ]
+    return subtracted_columns
 
 
 def divide_columns(

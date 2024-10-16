@@ -519,7 +519,7 @@ class TestAddColumns(TestCase):
             add_columns(self.df_single, ["A"], "D")
 
     def test_add_non_numeric_data(self):
-        df_non_numeric = pd.DataFrame({"A": ["x", "y", "z"], "B": [1, 2, 3]})
+        df_non_numeric = DataFrame({"A": ["x", "y", "z"], "B": [1, 2, 3]})
         with self.assertRaises(ArgumentValueError):
             add_columns(df_non_numeric, ["B"], "A")
 
