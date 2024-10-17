@@ -20,6 +20,7 @@ from mitools.economic_complexity import (
     calculate_relatedness_matrix,
     exports_data_to_matrix,
     get_file_encoding,
+    load_dataframe_sequence,
     mask_matrix,
     store_dataframe_sequence,
 )
@@ -506,6 +507,45 @@ class TestStoreDataFrameSequence(TestCase):
             filename = f"testsequence_{seq_val}.parquet"
             filepath = self.temp_dir / "test sequence" / filename
             self.assertTrue(filepath.exists())
+
+
+class TestLoadDataFrameSequence(TestCase):
+    def setUp(self):
+        self.temp_dir = Path("./tests/.test_assets/.data")
+        self.sequence_name = "test_sequence"
+        self.sequence_dir = self.temp_dir / self.sequence_name
+        self.sequence_dir.mkdir(parents=True, exist_ok=True)
+        self.dataframes = {
+            1: DataFrame({"A": [1, 2, 3]}),
+            2: DataFrame({"B": [4, 5, 6]}),
+        }
+        store_dataframe_sequence(self.dataframes, self.sequence_name, self.temp_dir)
+
+    def tearDown(self):
+        if self.temp_dir.exists():
+            shutil.rmtree(self.temp_dir)
+
+    def test_load_all_dataframes(self):
+        result = load_dataframe_sequence(self.temp_dir, self.sequence_name)
+        for seq_val, df in self.dataframes.items():
+            assert_frame_equal(result[seq_val], df)
+
+    def test_load_specific_sequence_values(self):
+        result = load_dataframe_sequence(
+            self.temp_dir, self.sequence_name, sequence_values=[1]
+        )
+        self.assertEqual(len(result), 1)
+        assert_frame_equal(result[1], self.dataframes[1])
+
+    def test_directory_not_found(self):
+        with self.assertRaises(ArgumentValueError):
+            load_dataframe_sequence(Path("non_existent_dir"), self.sequence_name)
+
+    def test_empty_directory(self):
+        empty_dir = self.temp_dir / "empty_sequence"
+        empty_dir.mkdir(parents=True, exist_ok=True)
+        with self.assertRaises(ArgumentValueError):
+            load_dataframe_sequence(self.temp_dir, "empty_sequence")
 
 
 class TestStringMapper(TestCase):

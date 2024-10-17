@@ -265,8 +265,14 @@ def load_dataframe_sequence(
             seq_value = int(seq_value) if seq_value.isdigit() else seq_value
             if sequence_values is None or seq_value in sequence_values:
                 dataframes[seq_value] = pd.read_parquet(file)
-        except ArgumentValueError:
-            raise ArgumentValueError(f"Invalid sequence value in file: {file.name}")
+        except (ValueError, TypeError) as e:
+            raise ArgumentValueError(
+                f"Invalid sequence value in file: {file.name}"
+            ) from e
+    if not dataframes:
+        raise ArgumentValueError(
+            f"No dataframes were loaded from the provided 'sequence_values={sequence_values}'"
+        )
     return dataframes
 
 
