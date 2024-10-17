@@ -6,6 +6,7 @@ from typing import Dict, List, Tuple, Union
 import networkx as nx
 import numpy as np
 import pandas as pd
+from networkx import Graph
 from pandas import DataFrame
 from pyvis.network import Network
 
@@ -110,7 +111,7 @@ def build_nx_graph(
     proximity_vectors: DataFrame,
     orig_product: str = "product_i",
     dest_product: str = "product_j",
-) -> nx.Graph:
+) -> Graph:
     required_columns = {orig_product, dest_product}
     if not required_columns.issubset(proximity_vectors.columns):
         missing_cols = required_columns - set(proximity_vectors.columns)
@@ -128,7 +129,7 @@ def build_nx_graphs(
     value_col: str,
     networks_folder: PathLike,
     recalculate: bool = False,
-) -> Tuple[Dict[Union[str, int], nx.Graph], Dict[Union[str, int], Path]]:
+) -> Tuple[Dict[Union[str, int], Graph], Dict[Union[str, int], Path]]:
     networks_folder = Path(networks_folder)
     if not networks_folder.exists():
         raise ArgumentValueError(f"Folder '{networks_folder}' does not exist.")
@@ -149,39 +150,45 @@ def build_nx_graphs(
 
 
 def build_mst_graph(
-    G,
-    proximity_vectors,
-    weight="weight",
-    weights_th=None,
-    n_extra_edges=None,
-    pct_extra_edges=None,
-):
-    proximity_vectors = proximity_vectors.sort_values(by="weight", ascending=False)
-
-    MST = nx.maximum_spanning_tree(G, weight=weight)
-
+    proximity_vectors: DataFrame,
+    orig_product: str = "product_i",
+    dest_product: str = "product_j",
+    attribute: str = "weight",
+    attribute_th: float = None,
+    n_extra_edges: int = None,
+    pct_extra_edges: float = None,
+) -> Graph:
+    required_columns = {orig_product, dest_product, attribute}
+    if not required_columns.issubset(proximity_vectors.columns):
+        missing_cols = required_columns - set(proximity_vectors.columns)
+        raise ArgumentValueError(f"Missing columns in DataFrame: {missing_cols}")
+    sorted_vectors = proximity_vectors.sort_values(by=attribute, ascending=False)
+    G = build_nx_graph(
+        sorted_vectors, orig_product=orig_product, dest_product=dest_product
+    )
+    MST = nx.maximum_spanning_tree(G, weight=attribute)
     extra_edges = None
-    if weights_th is not None:
-        extra_edges = proximity_vectors.query("weight >= @weights_th")
+    if attribute_th is not None:
+        extra_edges = sorted_vectors.query(f"{attribute} >= @attribute_th")
     elif n_extra_edges is not None:
-        n_extra_edges += len(MST.edges)
-        extra_edges = proximity_vectors.iloc[:n_extra_edges, :]
+        n_total_edges = len(MST.edges) + n_extra_edges
+        extra_edges = sorted_vectors.iloc[:n_total_edges]
     elif pct_extra_edges is not None:
-        n_extra_edges = int(
-            (proximity_vectors.shape[0] - len(MST.edges)) * pct_extra_edges
+        n_total_edges = int(
+            (sorted_vectors.shape[0] - len(MST.edges)) * pct_extra_edges
         )
-        extra_edges = proximity_vectors.iloc[:n_extra_edges, :]
-
+        extra_edges = sorted_vectors.iloc[
+            len(MST.edges) : len(MST.edges) + n_total_edges
+        ]
     if extra_edges is not None:
-        exG = build_nx_graph(extra_edges)
-
-        _G = nx.compose(MST, exG)
-
-        for u, v, d in G.edges(data=True):
-            if _G.has_edge(u, v):
-                _G[u][v]["weight"] = d["weight"]
-
-        return _G
+        extra_graph = build_nx_graph(
+            extra_edges, orig_product=orig_product, dest_product=dest_product
+        )
+        combined_graph = nx.compose(MST, extra_graph)
+        for u, v, data in G.edges(data=True):
+            if combined_graph.has_edge(u, v):
+                combined_graph[u][v][attribute] = data[attribute]
+        MST = combined_graph
     return MST
 
 
@@ -521,7 +528,7 @@ def display_country_nodes(net, country, masked_rca_matrix, export_matrix, bins=3
 
 
 def pyvis_to_networkx(pyvis_network):
-    nx_graph = nx.DiGraph() if pyvis_network.directed else nx.Graph()
+    nx_graph = nx.DiGraph() if pyvis_network.directed else Graph()
 
     for node in pyvis_network.nodes:
         node_id = node["id"]
