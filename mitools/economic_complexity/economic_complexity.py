@@ -233,27 +233,6 @@ def calculate_economic_complexity(
     return eci_df, pci_df
 
 
-def create_time_id(time_values: Union[str, int, Sequence]) -> str:
-    if isinstance(time_values, (str, int)):
-        return str(time_values)
-    else:
-        if not all_can_be_ints(time_values):
-            raise ValueError("Some time values provided can't be converted to int")
-        if len(time_values) == 1:
-            return str(time_values[0])
-        time_values = sorted(int(v) for v in time_values)
-        return f"{str(time_values[0])}{str(time_values[-1])[-2:]}"
-
-
-def create_data_id(id: str, time: Union[str, int, Sequence]) -> str:
-    time = create_time_id(time)
-    return f"{id}_{time}"
-
-
-def create_data_name(data_id, tag):
-    return f"{data_id}_{tag}"
-
-
 def store_dataframe_sequence(
     dataframes: Dict[Union[str, int], DataFrame], name: str, data_dir: PathLike
 ) -> None:
@@ -289,6 +268,27 @@ def load_dataframe_sequence(
         except ArgumentValueError:
             raise ArgumentValueError(f"Invalid sequence value in file: {file.name}")
     return dataframes
+
+
+def create_time_id(time_values: Union[str, int, Sequence]) -> str:
+    if isinstance(time_values, (str, int)):
+        return str(time_values)
+    else:
+        if not all_can_be_ints(time_values):
+            raise ValueError("Some time values provided can't be converted to int")
+        if len(time_values) == 1:
+            return str(time_values[0])
+        time_values = sorted(int(v) for v in time_values)
+        return f"{str(time_values[0])}{str(time_values[-1])[-2:]}"
+
+
+def create_data_id(id: str, time: Union[str, int, Sequence]) -> str:
+    time = create_time_id(time)
+    return f"{id}_{time}"
+
+
+def create_data_name(data_id, tag):
+    return f"{data_id}_{tag}"
 
 
 def check_if_sequence(
