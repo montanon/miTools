@@ -255,13 +255,19 @@ def create_data_name(data_id, tag):
 
 
 def store_dataframe_sequence(
-    dataframes: Dict[Union[str, int], DataFrame], name: str, data_dir: Path
+    dataframes: Dict[Union[str, int], DataFrame], name: str, data_dir: PathLike
 ) -> None:
     sequence_dir = data_dir / name
-    sequence_dir.mkdir(exist_ok=True, parents=True)
-    for seq_val, dataframe in dataframes.items():
-        seq_val_name = f"{name}_{seq_val}".replace(" ", "")
-        dataframe.to_parquet(sequence_dir / f"{seq_val_name}.parquet")
+    if not all(isinstance(df, DataFrame) for df in dataframes.values()):
+        raise ValueError("All values in 'dataframes' must be pandas DataFrames")
+    try:
+        sequence_dir.mkdir(exist_ok=True, parents=True)
+        for seq_val, dataframe in dataframes.items():
+            seq_val_name = f"{name}_{seq_val}".replace(" ", "")
+            filepath = sequence_dir / f"{seq_val_name}.parquet"
+            dataframe.to_parquet(filepath)
+    except (IOError, OSError) as e:
+        raise IOError(f"Error storing DataFrame sequence: {e}")
 
 
 def load_dataframe_sequence(
