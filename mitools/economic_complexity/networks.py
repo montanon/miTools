@@ -145,8 +145,8 @@ def build_nx_graphs(
             nx.write_gml(G, gml_path)  # Store the graph in GML format
         else:
             G = nx.read_gml(gml_path)  # Load the graph from disk
-        graph_files[key] = str(gml_path)
         graphs[key] = G
+        graph_files[key] = str(gml_path)
 
     return graphs, graph_files
 
@@ -196,28 +196,28 @@ def build_mst_graph(
 
 def build_mst_graphs(
     proximity_vectors: Dict[Union[str, int], DataFrame],
-    id_col: str,
-    value_col: str,
     networks_folder: PathLike,
-    recalculate: bool = False,
+    orig_product: str = "product_i",
+    dest_product: str = "product_j",
     attribute: str = "weight",
     attribute_th: float = None,
     n_extra_edges: int = None,
     pct_extra_edges: float = None,
-) -> Tuple[Dict[Union[str, int], nx.Graph], Dict[Union[str, int], Path]]:
+    recalculate: bool = False,
+) -> Tuple[Dict[Union[str, int], Graph], Dict[Union[str, int], Path]]:
     networks_folder = Path(networks_folder)
     if not networks_folder.exists():
         raise ArgumentValueError(f"Folder '{networks_folder}' does not exist.")
     graphs = {}
     graph_files = {}
     for key, vectors in proximity_vectors.items():
-        gml_name = f"{key}_{id_col}_{value_col}_MST_graph.gml".replace(" ", "_")
+        gml_name = f"{key}_MST_graph.gml".replace(" ", "_")
         gml_path = networks_folder / gml_name
         if not gml_path.exists() or recalculate:
             MST = build_mst_graph(
                 vectors,
-                orig_product=id_col,
-                dest_product=value_col,
+                orig_product=orig_product,
+                dest_product=dest_product,
                 attribute=attribute,
                 attribute_th=attribute_th,
                 n_extra_edges=n_extra_edges,
