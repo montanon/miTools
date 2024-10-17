@@ -28,11 +28,13 @@ def vectors_from_proximity_matrix(
         raise ArgumentValueError(
             f"Column '{sort_by}' not available in output DataFrame."
         )
+    is_symmetric = proximity_matrix.equals(proximity_matrix.T)
     proximity_vectors = proximity_matrix.unstack().reset_index()
     proximity_vectors.columns = [orig_product, dest_product, proximity_column]
-    proximity_vectors = proximity_vectors[
-        proximity_vectors[orig_product] <= proximity_vectors[dest_product]
-    ]
+    if is_symmetric:
+        proximity_vectors = proximity_vectors[
+            proximity_vectors[orig_product] <= proximity_vectors[dest_product]
+        ]
     proximity_vectors = proximity_vectors.loc[proximity_vectors[proximity_column] > 0]
     proximity_vectors = proximity_vectors.drop_duplicates()
     proximity_vectors = proximity_vectors.sort_values(
