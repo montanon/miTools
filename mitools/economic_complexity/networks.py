@@ -3,32 +3,44 @@ import os
 import networkx as nx
 import numpy as np
 import pandas as pd
+from pandas import DataFrame
 from pyvis.network import Network
 
 from mitools.etl import check_if_table, read_sql_table
+from mitools.exceptions import ArgumentValueError
 
 
 def vectors_from_proximity_matrix(
-    proximity_matrix,
-    orig_product="product_i",
-    dest_product="product_j",
-    value="proximity",
-):
-    proximity_vectors = proximity_matrix.unstack()
-    proximity_vectors.index = proximity_vectors.index.set_names(
-        [orig_product, dest_product]
-    )
-    proximity_vectors = proximity_vectors.reset_index()
-    proximity_vectors.columns = [orig_product, dest_product, value]
+    proximity_matrix: DataFrame,
+    orig_product: str = "product_i",
+    dest_product: str = "product_j",
+    proximity_column: str = "weight",
+    sort_by: str = None,
+    sort_ascending: bool = False,
+) -> DataFrame:
+    if not isinstance(proximity_matrix, DataFrame):
+        raise ArgumentValueError("Input must be a pandas DataFrame.")
+    if sort_by is not None and sort_by not in [
+        orig_product,
+        dest_product,
+        proximity_column,
+    ]:
+        raise ArgumentValueError(
+            f"Column '{sort_by}' not available in output DataFrame."
+        )
+    proximity_vectors = proximity_matrix.unstack().reset_index()
+    proximity_vectors.columns = [orig_product, dest_product, proximity_column]
     proximity_vectors = proximity_vectors[
         proximity_vectors[orig_product] <= proximity_vectors[dest_product]
     ]
-    proximity_vectors = proximity_vectors.loc[proximity_vectors[value] > 0]
+    proximity_vectors = proximity_vectors.loc[proximity_vectors[proximity_column] > 0]
     proximity_vectors = proximity_vectors.drop_duplicates()
     proximity_vectors = proximity_vectors.sort_values(
-        by=value, ascending=False
+        by=proximity_column if sort_by is None else sort_by, ascending=sort_ascending
     ).reset_index(drop=True)
-    proximity_vectors = proximity_vectors.rename(columns={value: "weight"})
+    proximity_vectors = proximity_vectors.rename(
+        columns={proximity_column: proximity_column}
+    )
     proximity_vectors[orig_product] = proximity_vectors[orig_product].astype(str)
     proximity_vectors[dest_product] = proximity_vectors[dest_product].astype(str)
 
