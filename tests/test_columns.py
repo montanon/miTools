@@ -6,7 +6,6 @@ from pandas import DataFrame, MultiIndex
 from pandas.api.types import is_numeric_dtype
 from pandas.testing import assert_frame_equal
 
-# Assuming the provided function is imported or defined here
 from mitools.economic_complexity.columns import (
     ADDED_COLUMN_NAME,
     DIVIDED_COLUMN_NAME,
@@ -223,7 +222,6 @@ class TestSelectColumns(TestCase):
 
 class TestTransformColumns(TestCase):
     def setUp(self):
-        # Setup a DataFrame with MultiIndex columns for testing
         self.multiidx_df = DataFrame(
             {
                 ("A", "one"): [1, 2, 3],
@@ -232,8 +230,6 @@ class TestTransformColumns(TestCase):
             }
         )
         self.multiidx_df.columns = MultiIndex.from_tuples(self.multiidx_df.columns)
-
-        # Single-index DataFrame
         self.singleidx_df = DataFrame(
             {
                 "one": [1, 2, 3],
