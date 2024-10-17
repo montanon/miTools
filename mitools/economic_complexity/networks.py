@@ -1,6 +1,6 @@
 import os
 from os import PathLike
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import networkx as nx
 import numpy as np
@@ -103,6 +103,22 @@ def proximity_vectors_sequence(
                 proximity_vectors, data_dir=data_dir, name=sequence_name
             )
     return proximity_vectors
+
+
+def build_nx_graph(
+    proximity_vectors: DataFrame,
+    orig_product: str = "product_i",
+    dest_product: str = "product_j",
+) -> nx.Graph:
+    required_columns = {orig_product, dest_product}
+    if not required_columns.issubset(proximity_vectors.columns):
+        missing_cols = required_columns - set(proximity_vectors.columns)
+        raise ArgumentValueError(f"Missing columns in DataFrame: {missing_cols}")
+    G = nx.from_pandas_edgelist(
+        proximity_vectors, source=orig_product, target=dest_product, edge_attr=True
+    )
+
+    return G
 
 
 def build_mst_graph(
@@ -272,16 +288,6 @@ def build_nx_graphs(
         graphs[temp_id] = G
 
     return graph_files, graphs
-
-
-def build_nx_graph(
-    proximity_vectors, orig_product="product_i", dest_product="product_j"
-):
-    G = nx.from_pandas_edgelist(
-        proximity_vectors, source=orig_product, target=dest_product, edge_attr=True
-    )
-
-    return G
 
 
 def build_mst_graphs(
