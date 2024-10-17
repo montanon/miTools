@@ -271,16 +271,24 @@ def store_dataframe_sequence(
 
 
 def load_dataframe_sequence(
-    data_dir: Path, name: str, sequence_values: Optional[List] = None
+    data_dir: PathLike,
+    name: str,
+    sequence_values: Optional[List[Union[str, int]]] = None,
 ) -> Dict[Union[str, int], DataFrame]:
     sequence_dir = data_dir / name
+    if not sequence_dir.exists():
+        raise ArgumentValueError(f"The directory '{sequence_dir}' does not exist.")
     sequence_files = sequence_dir.glob("*.parquet")
-    # TODO: So far it only handles ints as sequence values
-    return {
-        int(file.stem.split("_")[-1]): pd.read_parquet(file)
-        for file in sequence_files
-        if sequence_values is None or int(file.stem.split("_")[-1]) in sequence_values
-    }
+    dataframes = {}
+    for file in sequence_files:
+        try:
+            seq_value = file.stem.split("_")[-1]
+            seq_value = int(seq_value) if seq_value.isdigit() else seq_value
+            if sequence_values is None or seq_value in sequence_values:
+                dataframes[seq_value] = pd.read_parquet(file)
+        except ArgumentValueError:
+            raise ArgumentValueError(f"Invalid sequence value in file: {file.name}")
+    return dataframes
 
 
 def check_if_sequence(
