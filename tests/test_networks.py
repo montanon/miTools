@@ -206,8 +206,8 @@ class TestBuildNxGraphs(TestCase):
     def test_build_and_store_graphs(self):
         graphs, graph_files = build_nx_graphs(
             self.proximity_vectors,
-            id_col="product_i",
-            value_col="weight",
+            orig_product="product_i",
+            dest_product="product_j",
             networks_folder=self.networks_folder,
             recalculate=True,
         )
@@ -225,15 +225,15 @@ class TestBuildNxGraphs(TestCase):
     def test_load_existing_graphs(self):
         build_nx_graphs(
             self.proximity_vectors,
-            id_col="product_i",
-            value_col="weight",
+            orig_product="product_i",
+            dest_product="product_j",
             networks_folder=self.networks_folder,
             recalculate=True,
         )
         graphs, graph_files = build_nx_graphs(
             self.proximity_vectors,
-            id_col="product_i",
-            value_col="weight",
+            orig_product="product_i",
+            dest_product="product_j",
             networks_folder=self.networks_folder,
             recalculate=False,
         )
@@ -252,8 +252,8 @@ class TestBuildNxGraphs(TestCase):
         with self.assertRaises(ArgumentValueError):
             build_nx_graphs(
                 self.proximity_vectors,
-                id_col="product_i",
-                value_col="weight",
+                orig_product="product_i",
+                dest_product="product_j",
                 networks_folder="non_existent_folder",
                 recalculate=False,
             )
@@ -261,8 +261,8 @@ class TestBuildNxGraphs(TestCase):
     def test_empty_proximity_vectors(self):
         graphs, graph_files = build_nx_graphs(
             {},
-            id_col="product_i",
-            value_col="weight",
+            orig_product="product_i",
+            dest_product="product_j",
             networks_folder=self.networks_folder,
             recalculate=True,
         )
