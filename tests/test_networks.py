@@ -4,11 +4,13 @@ from pathlib import Path
 from unittest import TestCase
 
 import networkx as nx
+from networkx import Graph
 from pandas import DataFrame
 from pandas.testing import assert_frame_equal
 
 from mitools.economic_complexity import (
     build_mst_graph,
+    build_mst_graphs,
     build_nx_graph,
     build_nx_graphs,
     check_if_dataframe_sequence,
@@ -320,6 +322,127 @@ class TestBuildMSTGraph(TestCase):
         vectors_with_attr = self.proximity_vectors.assign(year=[2020, 2021, 2022, 2023])
         mst = build_mst_graph(vectors_with_attr, attribute="year")
         self.assertTrue(all("year" in data for _, _, data in mst.edges(data=True)))
+
+
+class TestBuildMSTGraphs(unittest.TestCase):
+    def setUp(self):
+        self.networks_folder = Path("./tests/.test_assets/.data")
+        self.networks_folder.mkdir(parents=True, exist_ok=True)
+        self.proximity_vectors = {
+            1: DataFrame(
+                {
+                    "product_i": ["A", "A", "B", "C", "D"],
+                    "product_j": ["B", "C", "C", "D", "A"],
+                    "weight": [0.8, 0.4, 0.5, 0.6, 0.1],
+                }
+            ),
+            2: DataFrame(
+                {
+                    "product_i": ["A", "A", "B", "C", "D"],
+                    "product_j": ["B", "C", "C", "D", "A"],
+                    "weight": [0.8, 0.4, 0.5, 0.6, 0.1],
+                }
+            ),
+        }
+
+    def tearDown(self):
+        if self.networks_folder.exists():
+            shutil.rmtree(self.networks_folder)
+
+    def test_build_and_store_mst_graphs(self):
+        graphs, graph_files = build_mst_graphs(
+            self.proximity_vectors,
+            networks_folder=self.networks_folder,
+            orig_product="product_i",
+            dest_product="product_j",
+            attribute="weight",
+            recalculate=True,
+        )
+        for key, gml_path in graph_files.items():
+            self.assertTrue(Path(gml_path).exists())
+            self.assertIsInstance(graphs[key], Graph)
+
+    def test_load_existing_mst_graphs(self):
+        build_mst_graphs(
+            self.proximity_vectors,
+            networks_folder=self.networks_folder,
+            orig_product="product_i",
+            dest_product="product_j",
+            attribute="weight",
+            recalculate=True,
+        )
+        graphs, graph_files = build_mst_graphs(
+            self.proximity_vectors,
+            networks_folder=self.networks_folder,
+            orig_product="product_i",
+            dest_product="product_j",
+            attribute="weight",
+            recalculate=False,
+        )
+        for key, graph in graphs.items():
+            self.assertIsInstance(graph, Graph)
+
+    def test_with_n_extra_edges(self):
+        graphs, _ = build_mst_graphs(
+            self.proximity_vectors,
+            networks_folder=self.networks_folder,
+            orig_product="product_i",
+            dest_product="product_j",
+            attribute="weight",
+            n_extra_edges=1,
+            recalculate=True,
+        )
+        for graph in graphs.values():
+            self.assertEqual(len(graph.edges), 4)  # 2 MST edges + 1 extra edge
+
+    def test_attribute_threshold(self):
+        graphs, _ = build_mst_graphs(
+            self.proximity_vectors,
+            networks_folder=self.networks_folder,
+            orig_product="product_i",
+            dest_product="product_j",
+            attribute="weight",
+            attribute_th=0.4,
+            recalculate=True,
+        )
+        for graph in graphs.values():
+            for _, _, data in graph.edges(data=True):
+                self.assertGreaterEqual(data["weight"], 0.4)
+
+    def test_with_pct_extra_edges(self):
+        graphs, _ = build_mst_graphs(
+            self.proximity_vectors,
+            networks_folder=self.networks_folder,
+            orig_product="product_i",
+            dest_product="product_j",
+            attribute="weight",
+            pct_extra_edges=0.0,
+            recalculate=True,
+        )
+        for graph in graphs.values():
+            self.assertEqual(len(graph.edges), 3)  # 0% of remaining edges added
+
+    def test_missing_network_folder(self):
+        with self.assertRaises(ArgumentValueError):
+            build_mst_graphs(
+                self.proximity_vectors,
+                networks_folder="non_existent_folder",
+                orig_product="product_i",
+                dest_product="product_j",
+                attribute="weight",
+            )
+
+    def test_empty_proximity_vectors(self):
+        graphs, graph_files = build_mst_graphs(
+            {},
+            networks_folder=self.networks_folder,
+            orig_product="product_i",
+            dest_product="product_j",
+            attribute="weight",
+            recalculate=True,
+        )
+        self.assertEqual(len(graphs), 0)  # No graphs should be built
+        self.assertEqual(len(graph_files), 0)
 
 
 if __name__ == "__main__":
