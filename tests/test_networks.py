@@ -7,6 +7,8 @@ from pandas import DataFrame
 from pandas.testing import assert_frame_equal
 
 from mitools.economic_complexity import (
+    build_nx_graph,
+    build_nx_graphs,
     check_if_dataframe_sequence,
     proximity_vectors_sequence,
     store_dataframe_sequence,
@@ -143,6 +145,45 @@ class TestProximityVectorsSequence(TestCase):
                 self.temp_dir, "proximity_vectors", list(self.proximity_matrices.keys())
             )
         )
+
+
+class TestBuildNxGraph(TestCase):
+    def setUp(self):
+        self.proximity_vectors = DataFrame(
+            {
+                "product_i": ["A", "A", "B"],
+                "product_j": ["B", "C", "C"],
+                "weight": [0.8, 0.4, 0.5],
+            }
+        )
+
+    def test_valid_graph(self):
+        G = build_nx_graph(self.proximity_vectors)
+        self.assertEqual(len(G.nodes), 3)
+        self.assertEqual(len(G.edges), 3)
+        self.assertAlmostEqual(G["A"]["B"]["weight"], 0.8)
+        self.assertAlmostEqual(G["A"]["C"]["weight"], 0.4)
+        self.assertAlmostEqual(G["B"]["C"]["weight"], 0.5)
+
+    def test_missing_column(self):
+        with self.assertRaises(ArgumentValueError):
+            invalid_vectors = self.proximity_vectors.drop(columns=["product_i"])
+            build_nx_graph(invalid_vectors)
+
+    def test_empty_dataframe(self):
+        empty_df = DataFrame(columns=["product_i", "product_j", "weight"])
+        G = build_nx_graph(empty_df)
+        self.assertEqual(len(G.nodes), 0)
+        self.assertEqual(len(G.edges), 0)
+
+    def test_graph_with_additional_attributes(self):
+        vectors_with_extra_attr = self.proximity_vectors.assign(year=[2020, 2021, 2022])
+        G = build_nx_graph(vectors_with_extra_attr)
+        self.assertEqual(len(G.nodes), 3)
+        self.assertEqual(len(G.edges), 3)
+        self.assertEqual(G["A"]["B"]["year"], 2020)
+        self.assertEqual(G["A"]["C"]["year"], 2021)
+        self.assertEqual(G["B"]["C"]["year"], 2022)
 
 
 if __name__ == "__main__":
