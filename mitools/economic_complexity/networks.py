@@ -125,9 +125,9 @@ def build_nx_graph(
 
 def build_nx_graphs(
     proximity_vectors: Dict[Union[str, int], DataFrame],
-    id_col: str,
-    value_col: str,
     networks_folder: PathLike,
+    orig_product: str = "product_i",
+    dest_product: str = "product_j",
     recalculate: bool = False,
 ) -> Tuple[Dict[Union[str, int], Graph], Dict[Union[str, int], Path]]:
     networks_folder = Path(networks_folder)
@@ -135,11 +135,13 @@ def build_nx_graphs(
         raise ArgumentValueError(f"Folder '{networks_folder}' does not exist.")
     graphs = {}
     graph_files = {}
-    for key, proximity_vectors in proximity_vectors.items():
-        gml_name = f"{key}_{id_col}_{value_col}_G_graph.gml".replace(" ", "_")
+    for key, vectors in proximity_vectors.items():
+        gml_name = f"{key}_G_graph.gml".replace(" ", "_")
         gml_path = networks_folder / gml_name
         if not gml_path.exists() or recalculate:
-            G = build_nx_graph(proximity_vectors)
+            G = build_nx_graph(
+                vectors, orig_product=orig_product, dest_product=dest_product
+            )
             nx.write_gml(G, gml_path)  # Store the graph in GML format
         else:
             G = nx.read_gml(gml_path)  # Load the graph from disk
@@ -190,6 +192,88 @@ def build_mst_graph(
                 combined_graph[u][v][attribute] = data[attribute]
         MST = combined_graph
     return MST
+
+
+def build_mst_graphs(
+    proximity_vectors: Dict[Union[str, int], DataFrame],
+    id_col: str,
+    value_col: str,
+    networks_folder: PathLike,
+    recalculate: bool = False,
+    attribute: str = "weight",
+    attribute_th: float = None,
+    n_extra_edges: int = None,
+    pct_extra_edges: float = None,
+) -> Tuple[Dict[Union[str, int], nx.Graph], Dict[Union[str, int], Path]]:
+    networks_folder = Path(networks_folder)
+    if not networks_folder.exists():
+        raise ArgumentValueError(f"Folder '{networks_folder}' does not exist.")
+    graphs = {}
+    graph_files = {}
+    for key, vectors in proximity_vectors.items():
+        gml_name = f"{key}_{id_col}_{value_col}_MST_graph.gml".replace(" ", "_")
+        gml_path = networks_folder / gml_name
+        if not gml_path.exists() or recalculate:
+            MST = build_mst_graph(
+                vectors,
+                orig_product=id_col,
+                dest_product=value_col,
+                attribute=attribute,
+                attribute_th=attribute_th,
+                n_extra_edges=n_extra_edges,
+                pct_extra_edges=pct_extra_edges,
+            )
+            nx.write_gml(MST, gml_path)
+        else:
+            MST = nx.read_gml(gml_path)
+        graphs[key] = MST
+        graph_files[key] = str(gml_path)
+
+    return graphs, graph_files
+
+
+def build_mst_graphs(
+    proximity_vectors_dfs,
+    graphs,
+    id_col,
+    value_col,
+    networks_folder,
+    thresholds=None,
+    recalculate=False,
+):
+    weights_th = thresholds["weights_th"]
+    n_extra_edges = thresholds["n_extra_edges"]
+    pct_extra_edges = thresholds["pct_extra_edges"]
+
+    mst_files = {}
+    mst_graphs = {}
+
+    for (temp_id, G), (_, proximity_vectors) in zip(
+        graphs.items(), proximity_vectors_dfs.items()
+    ):
+        mst_gml_name = f"{temp_id}_{id_col}_{value_col}_mst"
+        mst_gml_name += f"_{str(weights_th).replace('.', '')}_{str(n_extra_edges).replace('.', '')}_{str(pct_extra_edges).replace('.', '')}.gml"
+        mst_gml_name = mst_gml_name.replace(" ", "_")
+        mst_gml_path = os.path.join(networks_folder, mst_gml_name)
+
+        create_mst_network = not os.path.exists(mst_gml_path)
+
+        if create_mst_network or recalculate:
+            MST = build_mst_graph(
+                G,
+                proximity_vectors,
+                weights_th=weights_th,
+                n_extra_edges=n_extra_edges,
+                pct_extra_edges=pct_extra_edges,
+            )
+            nx.write_gml(MST, mst_gml_path)
+        else:
+            MST = nx.read_gml(mst_gml_path)
+
+        mst_files[temp_id] = mst_gml_path
+        mst_graphs[temp_id] = MST
+
+    return mst_files, mst_graphs
 
 
 def build_vis_graph(
@@ -298,50 +382,6 @@ def average_strength_of_links_from_communities(G, communities):
         "max": np.max(strenghts),
         "min": np.min(strenghts),
     }
-
-
-def build_mst_graphs(
-    proximity_vectors_dfs,
-    graphs,
-    id_col,
-    value_col,
-    networks_folder,
-    thresholds=None,
-    recalculate=False,
-):
-    weights_th = thresholds["weights_th"]
-    n_extra_edges = thresholds["n_extra_edges"]
-    pct_extra_edges = thresholds["pct_extra_edges"]
-
-    mst_files = {}
-    mst_graphs = {}
-
-    for (temp_id, G), (_, proximity_vectors) in zip(
-        graphs.items(), proximity_vectors_dfs.items()
-    ):
-        mst_gml_name = f"{temp_id}_{id_col}_{value_col}_mst"
-        mst_gml_name += f"_{str(weights_th).replace('.', '')}_{str(n_extra_edges).replace('.', '')}_{str(pct_extra_edges).replace('.', '')}.gml"
-        mst_gml_name = mst_gml_name.replace(" ", "_")
-        mst_gml_path = os.path.join(networks_folder, mst_gml_name)
-
-        create_mst_network = not os.path.exists(mst_gml_path)
-
-        if create_mst_network or recalculate:
-            MST = build_mst_graph(
-                G,
-                proximity_vectors,
-                weights_th=weights_th,
-                n_extra_edges=n_extra_edges,
-                pct_extra_edges=pct_extra_edges,
-            )
-            nx.write_gml(MST, mst_gml_path)
-        else:
-            MST = nx.read_gml(mst_gml_path)
-
-        mst_files[temp_id] = mst_gml_path
-        mst_graphs[temp_id] = MST
-
-    return mst_files, mst_graphs
 
 
 def build_vis_graphs(
