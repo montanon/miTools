@@ -1,6 +1,7 @@
 import os
 from os import PathLike
-from typing import Dict, List, Optional, Tuple, Union
+from pathlib import Path
+from typing import Dict, List, Tuple, Union
 
 import networkx as nx
 import numpy as np
@@ -81,7 +82,7 @@ def proximity_vectors_sequence(
     data_dir: PathLike = None,
     recalculate: bool = False,
     sequence_name: str = "proximity_vectors",
-):
+) -> Dict[Union[str, int], DataFrame]:
     sequence_values = list(proximity_matrices.keys())
     if (
         not recalculate
@@ -119,6 +120,32 @@ def build_nx_graph(
     )
 
     return G
+
+
+def build_nx_graphs(
+    proximity_vectors: Dict[Union[str, int], DataFrame],
+    id_col: str,
+    value_col: str,
+    networks_folder: PathLike,
+    recalculate: bool = False,
+) -> Tuple[Dict[Union[str, int], nx.Graph], Dict[Union[str, int], Path]]:
+    networks_folder = Path(networks_folder)
+    if not networks_folder.exists():
+        raise ArgumentValueError(f"Folder '{networks_folder}' does not exist.")
+    graphs = {}
+    graph_files = {}
+    for key, proximity_vectors in proximity_vectors.items():
+        gml_name = f"{key}_{id_col}_{value_col}_G_graph.gml".replace(" ", "_")
+        gml_path = networks_folder / gml_name
+        if not gml_path.exists() or recalculate:
+            G = build_nx_graph(proximity_vectors)
+            nx.write_gml(G, gml_path)  # Store the graph in GML format
+        else:
+            G = nx.read_gml(gml_path)  # Load the graph from disk
+        graph_files[key] = str(gml_path)
+        graphs[key] = G
+
+    return graphs, graph_files
 
 
 def build_mst_graph(
@@ -264,30 +291,6 @@ def average_strength_of_links_from_communities(G, communities):
         "max": np.max(strenghts),
         "min": np.min(strenghts),
     }
-
-
-def build_nx_graphs(
-    proximity_vectors_dfs, id_col, value_col, networks_folder, recalculate=False
-):
-    graph_files = {}
-    graphs = {}
-
-    for temp_id, proximity_vectors in proximity_vectors_dfs.items():
-        gml_name = f"{temp_id}_{id_col}_{value_col}_G_graph.gml".replace(" ", "_")
-        gml_path = os.path.join(networks_folder, gml_name)
-
-        create_graph_network = not os.path.exists(gml_path)
-
-        if create_graph_network or recalculate:
-            G = build_nx_graph(proximity_vectors)
-            nx.write_gml(G, gml_path)
-        else:
-            G = nx.read_gml(gml_path)
-
-        graph_files[temp_id] = gml_path
-        graphs[temp_id] = G
-
-    return graph_files, graphs
 
 
 def build_mst_graphs(
