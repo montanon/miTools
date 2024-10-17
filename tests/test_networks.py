@@ -30,15 +30,42 @@ class TestVectorsFromProximityMatrix(TestCase):
         )
         assert_frame_equal(result, expected)
 
+    def test_valid_asymmetric_conversion(self):
+        asymmetric_matrix = self.proximity_matrix.copy()
+        asymmetric_matrix.loc["Product B", "Product A"] = 0.3
+        result = vectors_from_proximity_matrix(
+            asymmetric_matrix,
+            sort_by=["product_i", "product_j"],
+            sort_ascending=True,
+        )
+        expected = DataFrame(
+            {
+                "product_i": [
+                    "Product A",
+                    "Product A",
+                    "Product B",
+                    "Product B",
+                    "Product C",
+                    "Product C",
+                ],
+                "product_j": [
+                    "Product B",
+                    "Product C",
+                    "Product A",
+                    "Product C",
+                    "Product A",
+                    "Product B",
+                ],
+                "weight": [0.3, 0.4, 0.8, 0.5, 0.4, 0.5],
+            }
+        )
+        assert_frame_equal(result, expected)
+
     def test_empty_matrix(self):
         empty_matrix = DataFrame(dtype=float)
         result = vectors_from_proximity_matrix(empty_matrix)
         expected = DataFrame(columns=["product_i", "product_j", "weight"], dtype=float)
         assert_frame_equal(result, expected, check_dtype=False)
-
-    def test_non_dataframe_input(self):
-        with self.assertRaises(ArgumentValueError):
-            vectors_from_proximity_matrix([1, 2, 3])
 
     def test_valid_conversion_with_renames(self):
         result = vectors_from_proximity_matrix(
@@ -59,6 +86,12 @@ class TestVectorsFromProximityMatrix(TestCase):
     def test_invalid_sort_by(self):
         with self.assertRaises(ArgumentValueError):
             vectors_from_proximity_matrix(self.proximity_matrix, sort_by="invalid")
+
+    def test_invalid_sort_ascending(self):
+        with self.assertRaises(ArgumentValueError):
+            vectors_from_proximity_matrix(
+                self.proximity_matrix, sort_ascending="invalid"
+            )
 
 
 if __name__ == "__main__":

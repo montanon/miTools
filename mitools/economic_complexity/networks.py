@@ -1,4 +1,5 @@
 import os
+from typing import List, Tuple, Union
 
 import networkx as nx
 import numpy as np
@@ -15,19 +16,39 @@ def vectors_from_proximity_matrix(
     orig_product: str = "product_i",
     dest_product: str = "product_j",
     proximity_column: str = "weight",
-    sort_by: str = None,
-    sort_ascending: bool = False,
+    sort_by: Union[str, List[str], Tuple[str]] = None,
+    sort_ascending: Union[bool, List[bool], Tuple[bool]] = False,
 ) -> DataFrame:
-    if not isinstance(proximity_matrix, DataFrame):
-        raise ArgumentValueError("Input must be a pandas DataFrame.")
-    if sort_by is not None and sort_by not in [
-        orig_product,
-        dest_product,
-        proximity_column,
-    ]:
-        raise ArgumentValueError(
-            f"Column '{sort_by}' not available in output DataFrame."
-        )
+    if sort_by is not None:
+        if isinstance(sort_by, str) and sort_by not in [
+            orig_product,
+            dest_product,
+            proximity_column,
+        ]:
+            raise ArgumentValueError(
+                f"Column '{sort_by}' not available in output DataFrame."
+            )
+        elif isinstance(sort_by, (list, tuple)) and not all(
+            [
+                col
+                in [
+                    orig_product,
+                    dest_product,
+                    proximity_column,
+                ]
+                for col in sort_by
+            ]
+        ):
+            raise ArgumentValueError(
+                f"Columns '{sort_by}' not available in output DataFrame."
+            )
+    if sort_ascending is not None:
+        if not isinstance(sort_ascending, bool) or not all(
+            isinstance(b, bool) for b in sort_ascending
+        ):
+            raise ArgumentValueError(
+                "sort_ascending must be a boolean or a list of booleans."
+            )
     is_symmetric = proximity_matrix.equals(proximity_matrix.T)
     proximity_vectors = proximity_matrix.unstack().reset_index()
     proximity_vectors.columns = [orig_product, dest_product, proximity_column]
