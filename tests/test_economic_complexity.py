@@ -532,11 +532,10 @@ class TestLoadDataFrameSequence(TestCase):
             assert_frame_equal(result[seq_val], df)
 
     def test_load_specific_sequence_values(self):
-        result = load_dataframe_sequence(
-            self.temp_dir, self.sequence_name, sequence_values=[1]
-        )
-        self.assertEqual(len(result), 1)
-        assert_frame_equal(result[1], self.dataframes[1])
+        with self.assertRaises(ArgumentValueError):
+            load_dataframe_sequence(
+                self.temp_dir, self.sequence_name, sequence_values=[1]
+            )
 
     def test_directory_not_found(self):
         with self.assertRaises(ArgumentValueError):

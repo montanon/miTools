@@ -245,6 +245,8 @@ def store_dataframe_sequence(
             seq_val_name = f"{name}_{seq_val}".replace(" ", "")
             filepath = sequence_dir / f"{seq_val_name}.parquet"
             dataframe.to_parquet(filepath)
+        if not check_if_dataframe_sequence(data_dir, name, list(dataframes.keys())):
+            raise IOError(f"Failed to store all DataFrames for '{name}' sequence")
     except (IOError, OSError) as e:
         raise IOError(f"Error storing DataFrame sequence: {e}")
 
@@ -255,8 +257,12 @@ def load_dataframe_sequence(
     sequence_values: Optional[List[Union[str, int]]] = None,
 ) -> Dict[Union[str, int], DataFrame]:
     sequence_dir = data_dir / name
-    if not sequence_dir.exists():
-        raise ArgumentValueError(f"The directory '{sequence_dir}' does not exist.")
+    if sequence_values and not check_if_dataframe_sequence(
+        data_dir, name, sequence_values
+    ):
+        raise ArgumentValueError(
+            f"Sequence '{name}' is missing required values: {sequence_values}"
+        )
     sequence_files = sequence_dir.glob("*.parquet")
     dataframes = {}
     for file in sequence_files:
