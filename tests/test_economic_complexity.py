@@ -1,7 +1,9 @@
 import os
+import shutil
 import tempfile
 import time
 import unittest
+from pathlib import Path
 from unittest import TestCase
 from unittest.mock import mock_open, patch
 
@@ -9,7 +11,6 @@ import numpy as np
 from pandas import DataFrame, Series
 from pandas.testing import assert_frame_equal
 
-from mitools.context import Timing
 from mitools.economic_complexity import (
     StringMapper,
     all_can_be_ints,
@@ -20,6 +21,7 @@ from mitools.economic_complexity import (
     exports_data_to_matrix,
     get_file_encoding,
     mask_matrix,
+    store_dataframe_sequence,
 )
 from mitools.exceptions.custom_exceptions import ArgumentValueError
 
@@ -459,6 +461,51 @@ class TestCalculateEconomicComplexity(TestCase):
         print(f"Uncompiled Fast version time: {fast_times[0]:.4f}s")
         print(f"Fast version time: {fast_time:.4f}s")
         print(f"Standard version time: {standard_time:.4f}s")
+
+
+class TestStoreDataFrameSequence(TestCase):
+    def setUp(self):
+        self.temp_dir = Path("./tests/.test_assets/.data")
+        self.temp_dir.mkdir(exist_ok=True)
+        self.dataframes = {
+            1: DataFrame({"A": [1, 2, 3]}),
+            2: DataFrame({"B": [4, 5, 6]}),
+        }
+
+    def tearDown(self):
+        if self.temp_dir.exists():
+            shutil.rmtree(self.temp_dir)
+
+    def test_valid_storage(self):
+        store_dataframe_sequence(self.dataframes, "test_sequence", self.temp_dir)
+        for seq_val in self.dataframes:
+            filename = f"test_sequence_{seq_val}.parquet"
+            filepath = self.temp_dir / "test_sequence" / filename
+            self.assertTrue(filepath.exists())
+
+    def test_non_dataframe_value(self):
+        invalid_dataframes = {1: DataFrame({"A": [1, 2, 3]}), 2: "not a dataframe"}
+        with self.assertRaises(ValueError):
+            store_dataframe_sequence(invalid_dataframes, "test_sequence", self.temp_dir)
+
+    def test_empty_dataframes(self):
+        store_dataframe_sequence({}, "empty_sequence", self.temp_dir)
+        sequence_dir = self.temp_dir / "empty_sequence"
+        self.assertTrue(sequence_dir.exists())
+        self.assertEqual(len(list(sequence_dir.iterdir())), 0)
+
+    def test_io_error_handling(self):
+        self.temp_dir.chmod(0o444)  # Read-only
+        with self.assertRaises(IOError):
+            store_dataframe_sequence(self.dataframes, "test_sequence", self.temp_dir)
+        self.temp_dir.chmod(0o755)
+
+    def test_filename_formatting(self):
+        store_dataframe_sequence(self.dataframes, "test sequence", self.temp_dir)
+        for seq_val in self.dataframes:
+            filename = f"testsequence_{seq_val}.parquet"
+            filepath = self.temp_dir / "test sequence" / filename
+            self.assertTrue(filepath.exists())
 
 
 class TestStringMapper(TestCase):
