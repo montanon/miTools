@@ -187,7 +187,7 @@ class TestBuildNxGraph(TestCase):
         self.assertEqual(G["B"]["C"]["year"], 2022)
 
 
-class TestBuildNxGraphs(unittest.TestCase):
+class TestBuildNxGraphs(TestCase):
     def setUp(self):
         self.networks_folder = Path("./tests/.test_assets/.data")
         self.networks_folder.mkdir(parents=True, exist_ok=True)
