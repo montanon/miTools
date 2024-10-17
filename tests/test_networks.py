@@ -1,10 +1,17 @@
+import shutil
 import unittest
+from pathlib import Path
 from unittest import TestCase
 
 from pandas import DataFrame
 from pandas.testing import assert_frame_equal
 
-from mitools.economic_complexity import vectors_from_proximity_matrix
+from mitools.economic_complexity import (
+    check_if_dataframe_sequence,
+    proximity_vectors_sequence,
+    store_dataframe_sequence,
+    vectors_from_proximity_matrix,
+)
 from mitools.exceptions import ArgumentValueError
 
 
@@ -92,6 +99,50 @@ class TestVectorsFromProximityMatrix(TestCase):
             vectors_from_proximity_matrix(
                 self.proximity_matrix, sort_ascending="invalid"
             )
+
+
+class TestProximityVectorsSequence(TestCase):
+    def setUp(self):
+        self.temp_dir = Path("./tests/.test_assets/.data")
+        self.temp_dir.mkdir(parents=True, exist_ok=True)
+        self.proximity_matrices = {
+            1: DataFrame({"A": [0, 0.8], "B": [0.8, 0]}, index=["A", "B"]),
+            2: DataFrame({"A": [0, 0.4], "B": [0.4, 0]}, index=["A", "B"]),
+        }
+
+    def tearDown(self):
+        if self.temp_dir.exists():
+            shutil.rmtree(self.temp_dir)
+
+    def test_load_existing_vectors(self):
+        vectors = {
+            key: vectors_from_proximity_matrix(matrix)
+            for key, matrix in self.proximity_matrices.items()
+        }
+        store_dataframe_sequence(vectors, "proximity_vectors", self.temp_dir)
+        result = proximity_vectors_sequence(
+            self.proximity_matrices, data_dir=self.temp_dir, recalculate=False
+        )
+        for key, vector in vectors.items():
+            assert_frame_equal(result[key], vector)
+
+    def test_recalculate_vectors(self):
+        result = proximity_vectors_sequence(
+            self.proximity_matrices, data_dir=self.temp_dir, recalculate=True
+        )
+        for key, matrix in self.proximity_matrices.items():
+            expected = vectors_from_proximity_matrix(matrix)
+            assert_frame_equal(result[key], expected)
+
+    def test_store_vectors_after_calculation(self):
+        proximity_vectors_sequence(
+            self.proximity_matrices, data_dir=self.temp_dir, recalculate=True
+        )
+        self.assertTrue(
+            check_if_dataframe_sequence(
+                self.temp_dir, "proximity_vectors", list(self.proximity_matrices.keys())
+            )
+        )
 
 
 if __name__ == "__main__":
