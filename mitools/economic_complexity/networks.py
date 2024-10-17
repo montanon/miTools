@@ -1,5 +1,6 @@
 import os
-from typing import List, Tuple, Union
+from os import PathLike
+from typing import Dict, List, Tuple, Union
 
 import networkx as nx
 import numpy as np
@@ -7,7 +8,11 @@ import pandas as pd
 from pandas import DataFrame
 from pyvis.network import Network
 
-from mitools.etl import check_if_table, read_sql_table
+from mitools.economic_complexity import (
+    check_if_dataframe_sequence,
+    load_dataframe_sequence,
+    store_dataframe_sequence,
+)
 from mitools.exceptions import ArgumentValueError
 
 
@@ -43,8 +48,9 @@ def vectors_from_proximity_matrix(
                 f"Columns '{sort_by}' not available in output DataFrame."
             )
     if sort_ascending is not None:
-        if not isinstance(sort_ascending, bool) or not all(
-            isinstance(b, bool) for b in sort_ascending
+        if not isinstance(sort_ascending, bool) or (
+            isinstance(sort_ascending, list)
+            and all(isinstance(b, bool) for b in sort_ascending)
         ):
             raise ArgumentValueError(
                 "sort_ascending must be a boolean or a list of booleans."
@@ -67,6 +73,35 @@ def vectors_from_proximity_matrix(
     proximity_vectors[orig_product] = proximity_vectors[orig_product].astype(str)
     proximity_vectors[dest_product] = proximity_vectors[dest_product].astype(str)
 
+    return proximity_vectors
+
+
+def proximity_vectors_sequence(
+    proximity_matrices: Dict[Union[str, int], DataFrame],
+    data_dir: PathLike = None,
+    recalculate: bool = False,
+    sequence_name: str = "proximity_vectors",
+):
+    sequence_values = list(proximity_matrices.keys())
+    if (
+        not recalculate
+        and data_dir is not None
+        and check_if_dataframe_sequence(
+            data_dir=data_dir, name=sequence_name, sequence_values=sequence_values
+        )
+    ):
+        proximity_vectors = load_dataframe_sequence(
+            data_dir=data_dir, name=sequence_name, sequence_values=sequence_values
+        )
+    else:
+        proximity_vectors = {
+            key: vectors_from_proximity_matrix(proximity_matrix)
+            for key, proximity_matrix in proximity_matrices.items()
+        }
+        if data_dir is not None:
+            store_dataframe_sequence(
+                proximity_vectors, data_dir=data_dir, name=sequence_name
+            )
     return proximity_vectors
 
 
@@ -213,27 +248,6 @@ def average_strength_of_links_from_communities(G, communities):
         "max": np.max(strenghts),
         "min": np.min(strenghts),
     }
-
-
-def vectors_from_proximity_matrices(
-    proximity_matrices, tablenames, conn, recalculate=False
-):
-    proximity_vectors_dfs = {}
-
-    for (temp_id, proximity_matrix), (_, tablename) in zip(
-        proximity_matrices.items(), tablenames.items()
-    ):
-        if not check_if_table(conn, tablename) or recalculate:
-            proximity_vectors = vectors_from_proximity_matrix(proximity_matrix)
-
-            proximity_vectors.to_sql(tablename, conn, if_exists="replace")
-
-        else:
-            proximity_vectors = read_sql_table(tablename, conn)
-
-        proximity_vectors_dfs[temp_id] = proximity_vectors
-
-    return proximity_vectors_dfs
 
 
 def build_nx_graphs(
