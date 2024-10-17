@@ -265,7 +265,7 @@ def load_dataframe_sequence(
             seq_value = int(seq_value) if seq_value.isdigit() else seq_value
             if sequence_values is None or seq_value in sequence_values:
                 dataframes[seq_value] = pd.read_parquet(file)
-        except (ValueError, TypeError) as e:
+        except (ValueError, TypeError, IndexError) as e:
             raise ArgumentValueError(
                 f"Invalid sequence value in file: {file.name}"
             ) from e
@@ -274,6 +274,30 @@ def load_dataframe_sequence(
             f"No dataframes were loaded from the provided 'sequence_values={sequence_values}'"
         )
     return dataframes
+
+
+def check_if_dataframe_sequence(
+    data_dir: PathLike,
+    name: str,
+    sequence_values: Optional[List[Union[str, int]]] = None,
+) -> bool:
+    sequence_dir = data_dir / name
+    if not sequence_dir.exists():
+        return False
+    if sequence_values is not None:
+        try:
+            sequence_files = [
+                int(file.stem.split("_")[-1])
+                if file.stem.split("_")[-1].isdigit()
+                else file.stem.split("_")[-1]
+                for file in sequence_dir.glob("*.parquet")
+            ]
+        except (ValueError, TypeError, IndexError) as e:
+            raise ArgumentValueError(f"Invalid sequence value in filenames: {e}")
+        sequence_files = sequence_dir.glob("*.parquet")
+        sequence_files = [int(file.stem.split("_")[-1]) for file in sequence_files]
+        return set(sequence_values) == set(sequence_files)
+    return False
 
 
 def create_time_id(time_values: Union[str, int, Sequence]) -> str:
@@ -295,14 +319,3 @@ def create_data_id(id: str, time: Union[str, int, Sequence]) -> str:
 
 def create_data_name(data_id, tag):
     return f"{data_id}_{tag}"
-
-
-def check_if_sequence(
-    data_dir: Path, name: str, sequence_values: Optional[List] = None
-) -> bool:
-    sequence_dir = data_dir / name
-    if sequence_values:
-        sequence_files = sequence_dir.glob("*.parquet")
-        sequence_files = [int(file.stem.split("_")[-1]) for file in sequence_files]
-        return set(sequence_values) == set(sequence_files)
-    return sequence_dir.exists()
