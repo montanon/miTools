@@ -148,7 +148,7 @@ class TestExportsDataToMatrix(TestCase):
     def test_empty_dataframe(self):
         empty_df = DataFrame(columns=["origin", "product_code", "export_value"])
         with self.assertRaises(ArgumentValueError):
-            result = exports_data_to_matrix(
+            exports_data_to_matrix(
                 empty_df,
                 origin_col="origin",
                 products_cols=["product_code"],
