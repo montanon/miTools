@@ -69,3 +69,4 @@ DEBUG = ContextVar("DEBUG", 0)  # DEBUG levels could be similar to logging.debug
 DISPLAY = ContextVar("DISPLAY", 0)
 ASSERT = ContextVar("ASSERT", 1)
 RANDOMSTATE = ContextVar("RANDOMSTATE", 0)
+RECALCULATE = ContextVar("RECALCULATE", 0)
