@@ -233,6 +233,79 @@ def calculate_economic_complexity(
     return eci_df, pci_df
 
 
+def store_dataframe_sequence(
+    dataframes: Dict[Union[str, int], DataFrame], name: str, data_dir: PathLike
+) -> None:
+    sequence_dir = data_dir / name
+    if not all(isinstance(df, DataFrame) for df in dataframes.values()):
+        raise ValueError("All values in 'dataframes' must be pandas DataFrames")
+    try:
+        sequence_dir.mkdir(exist_ok=True, parents=True)
+        for seq_val, dataframe in dataframes.items():
+            seq_val_name = f"{name}_{seq_val}".replace(" ", "")
+            filepath = sequence_dir / f"{seq_val_name}.parquet"
+            dataframe.to_parquet(filepath)
+        if not check_if_dataframe_sequence(data_dir, name, list(dataframes.keys())):
+            raise IOError(f"Failed to store all DataFrames for '{name}' sequence")
+    except (IOError, OSError) as e:
+        raise IOError(f"Error storing DataFrame sequence: {e}")
+
+
+def load_dataframe_sequence(
+    data_dir: PathLike,
+    name: str,
+    sequence_values: Optional[List[Union[str, int]]] = None,
+) -> Dict[Union[str, int], DataFrame]:
+    sequence_dir = data_dir / name
+    if sequence_values and not check_if_dataframe_sequence(
+        data_dir, name, sequence_values
+    ):
+        raise ArgumentValueError(
+            f"Sequence '{name}' is missing required values: {sequence_values}"
+        )
+    sequence_files = sequence_dir.glob("*.parquet")
+    dataframes = {}
+    for file in sequence_files:
+        try:
+            seq_value = file.stem.split("_")[-1]
+            seq_value = int(seq_value) if seq_value.isdigit() else seq_value
+            if sequence_values is None or seq_value in sequence_values:
+                dataframes[seq_value] = pd.read_parquet(file)
+        except (ValueError, TypeError, IndexError) as e:
+            raise ArgumentValueError(
+                f"Invalid sequence value in file: {file.name}"
+            ) from e
+    if not dataframes:
+        raise ArgumentValueError(
+            f"No dataframes were loaded from the provided 'sequence_values={sequence_values}'"
+        )
+    return dataframes
+
+
+def check_if_dataframe_sequence(
+    data_dir: PathLike,
+    name: str,
+    sequence_values: Optional[List[Union[str, int]]] = None,
+) -> bool:
+    sequence_dir = data_dir / name
+    if not sequence_dir.exists():
+        return False
+    if sequence_values is not None:
+        try:
+            sequence_files = [
+                int(file.stem.split("_")[-1])
+                if file.stem.split("_")[-1].isdigit()
+                else file.stem.split("_")[-1]
+                for file in sequence_dir.glob("*.parquet")
+            ]
+        except (ValueError, TypeError, IndexError) as e:
+            raise ArgumentValueError(f"Invalid sequence value in filenames: {e}")
+        sequence_files = sequence_dir.glob("*.parquet")
+        sequence_files = [int(file.stem.split("_")[-1]) for file in sequence_files]
+        return set(sequence_values) == set(sequence_files)
+    return False
+
+
 def create_time_id(time_values: Union[str, int, Sequence]) -> str:
     if isinstance(time_values, (str, int)):
         return str(time_values)
@@ -252,37 +325,3 @@ def create_data_id(id: str, time: Union[str, int, Sequence]) -> str:
 
 def create_data_name(data_id, tag):
     return f"{data_id}_{tag}"
-
-
-def store_dataframe_sequence(
-    dataframes: Dict[Union[str, int], DataFrame], name: str, data_dir: Path
-) -> None:
-    sequence_dir = data_dir / name
-    sequence_dir.mkdir(exist_ok=True, parents=True)
-    for seq_val, dataframe in dataframes.items():
-        seq_val_name = f"{name}_{seq_val}".replace(" ", "")
-        dataframe.to_parquet(sequence_dir / f"{seq_val_name}.parquet")
-
-
-def load_dataframe_sequence(
-    data_dir: Path, name: str, sequence_values: Optional[List] = None
-) -> Dict[Union[str, int], DataFrame]:
-    sequence_dir = data_dir / name
-    sequence_files = sequence_dir.glob("*.parquet")
-    # TODO: So far it only handles ints as sequence values
-    return {
-        int(file.stem.split("_")[-1]): pd.read_parquet(file)
-        for file in sequence_files
-        if sequence_values is None or int(file.stem.split("_")[-1]) in sequence_values
-    }
-
-
-def check_if_sequence(
-    data_dir: Path, name: str, sequence_values: Optional[List] = None
-) -> bool:
-    sequence_dir = data_dir / name
-    if sequence_values:
-        sequence_files = sequence_dir.glob("*.parquet")
-        sequence_files = [int(file.stem.split("_")[-1]) for file in sequence_files]
-        return set(sequence_values) == set(sequence_files)
-    return sequence_dir.exists()

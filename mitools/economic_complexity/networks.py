@@ -1,75 +1,235 @@
 import os
+from os import PathLike
+from pathlib import Path
+from typing import Dict, List, Tuple, Union
 
 import networkx as nx
 import numpy as np
 import pandas as pd
+from networkx import Graph
+from pandas import DataFrame
 from pyvis.network import Network
 
-from mitools.etl import check_if_table, read_sql_table
+from mitools.economic_complexity import (
+    check_if_dataframe_sequence,
+    load_dataframe_sequence,
+    store_dataframe_sequence,
+)
+from mitools.exceptions import ArgumentValueError
 
 
 def vectors_from_proximity_matrix(
-    proximity_matrix,
-    orig_product="product_i",
-    dest_product="product_j",
-    value="proximity",
-):
-    proximity_vectors = proximity_matrix.unstack()
-    proximity_vectors.index = proximity_vectors.index.set_names(
-        [orig_product, dest_product]
-    )
-    proximity_vectors = proximity_vectors.reset_index()
-    proximity_vectors.columns = [orig_product, dest_product, value]
-    proximity_vectors = proximity_vectors[
-        proximity_vectors[orig_product] <= proximity_vectors[dest_product]
-    ]
-    proximity_vectors = proximity_vectors.loc[proximity_vectors[value] > 0]
+    proximity_matrix: DataFrame,
+    orig_product: str = "product_i",
+    dest_product: str = "product_j",
+    proximity_column: str = "weight",
+    sort_by: Union[str, List[str], Tuple[str]] = None,
+    sort_ascending: Union[bool, List[bool], Tuple[bool]] = False,
+) -> DataFrame:
+    if sort_by is not None:
+        if isinstance(sort_by, str) and sort_by not in [
+            orig_product,
+            dest_product,
+            proximity_column,
+        ]:
+            raise ArgumentValueError(
+                f"Column '{sort_by}' not available in output DataFrame."
+            )
+        elif isinstance(sort_by, (list, tuple)) and not all(
+            [
+                col
+                in [
+                    orig_product,
+                    dest_product,
+                    proximity_column,
+                ]
+                for col in sort_by
+            ]
+        ):
+            raise ArgumentValueError(
+                f"Columns '{sort_by}' not available in output DataFrame."
+            )
+    if sort_ascending is not None:
+        if not isinstance(sort_ascending, bool) or (
+            isinstance(sort_ascending, list)
+            and all(isinstance(b, bool) for b in sort_ascending)
+        ):
+            raise ArgumentValueError(
+                "sort_ascending must be a boolean or a list of booleans."
+            )
+    is_symmetric = proximity_matrix.equals(proximity_matrix.T)
+    proximity_vectors = proximity_matrix.unstack().reset_index()
+    proximity_vectors.columns = [orig_product, dest_product, proximity_column]
+    if is_symmetric:
+        proximity_vectors = proximity_vectors[
+            proximity_vectors[orig_product] <= proximity_vectors[dest_product]
+        ]
+    proximity_vectors = proximity_vectors.loc[proximity_vectors[proximity_column] > 0]
     proximity_vectors = proximity_vectors.drop_duplicates()
     proximity_vectors = proximity_vectors.sort_values(
-        by=value, ascending=False
+        by=proximity_column if sort_by is None else sort_by, ascending=sort_ascending
     ).reset_index(drop=True)
-    proximity_vectors = proximity_vectors.rename(columns={value: "weight"})
+    proximity_vectors = proximity_vectors.rename(
+        columns={proximity_column: proximity_column}
+    )
     proximity_vectors[orig_product] = proximity_vectors[orig_product].astype(str)
     proximity_vectors[dest_product] = proximity_vectors[dest_product].astype(str)
 
     return proximity_vectors
 
 
-def build_mst_graph(
-    G,
-    proximity_vectors,
-    weight="weight",
-    weights_th=None,
-    n_extra_edges=None,
-    pct_extra_edges=None,
-):
-    proximity_vectors = proximity_vectors.sort_values(by="weight", ascending=False)
-
-    MST = nx.maximum_spanning_tree(G, weight=weight)
-
-    extra_edges = None
-    if weights_th is not None:
-        extra_edges = proximity_vectors.query("weight >= @weights_th")
-    elif n_extra_edges is not None:
-        n_extra_edges += len(MST.edges)
-        extra_edges = proximity_vectors.iloc[:n_extra_edges, :]
-    elif pct_extra_edges is not None:
-        n_extra_edges = int(
-            (proximity_vectors.shape[0] - len(MST.edges)) * pct_extra_edges
+def proximity_vectors_sequence(
+    proximity_matrices: Dict[Union[str, int], DataFrame],
+    data_dir: PathLike = None,
+    recalculate: bool = False,
+    sequence_name: str = "proximity_vectors",
+) -> Dict[Union[str, int], DataFrame]:
+    sequence_values = list(proximity_matrices.keys())
+    if (
+        not recalculate
+        and data_dir is not None
+        and check_if_dataframe_sequence(
+            data_dir=data_dir, name=sequence_name, sequence_values=sequence_values
         )
-        extra_edges = proximity_vectors.iloc[:n_extra_edges, :]
+    ):
+        proximity_vectors = load_dataframe_sequence(
+            data_dir=data_dir, name=sequence_name, sequence_values=sequence_values
+        )
+    else:
+        proximity_vectors = {
+            key: vectors_from_proximity_matrix(proximity_matrix)
+            for key, proximity_matrix in proximity_matrices.items()
+        }
+        if data_dir is not None:
+            store_dataframe_sequence(
+                proximity_vectors, data_dir=data_dir, name=sequence_name
+            )
+    return proximity_vectors
 
+
+def build_nx_graph(
+    proximity_vectors: DataFrame,
+    orig_product: str = "product_i",
+    dest_product: str = "product_j",
+) -> Graph:
+    required_columns = {orig_product, dest_product}
+    if not required_columns.issubset(proximity_vectors.columns):
+        missing_cols = required_columns - set(proximity_vectors.columns)
+        raise ArgumentValueError(f"Missing columns in DataFrame: {missing_cols}")
+    G = nx.from_pandas_edgelist(
+        proximity_vectors, source=orig_product, target=dest_product, edge_attr=True
+    )
+
+    return G
+
+
+def build_nx_graphs(
+    proximity_vectors: Dict[Union[str, int], DataFrame],
+    networks_folder: PathLike,
+    orig_product: str = "product_i",
+    dest_product: str = "product_j",
+    recalculate: bool = False,
+) -> Tuple[Dict[Union[str, int], Graph], Dict[Union[str, int], Path]]:
+    networks_folder = Path(networks_folder)
+    if not networks_folder.exists():
+        raise ArgumentValueError(f"Folder '{networks_folder}' does not exist.")
+    graphs = {}
+    graph_files = {}
+    for key, vectors in proximity_vectors.items():
+        gml_name = f"{key}_G_graph.gml".replace(" ", "_")
+        gml_path = networks_folder / gml_name
+        if not gml_path.exists() or recalculate:
+            G = build_nx_graph(
+                vectors, orig_product=orig_product, dest_product=dest_product
+            )
+            nx.write_gml(G, gml_path)  # Store the graph in GML format
+        else:
+            G = nx.read_gml(gml_path)  # Load the graph from disk
+        graphs[key] = G
+        graph_files[key] = str(gml_path)
+
+    return graphs, graph_files
+
+
+def build_mst_graph(
+    proximity_vectors: DataFrame,
+    orig_product: str = "product_i",
+    dest_product: str = "product_j",
+    attribute: str = "weight",
+    attribute_th: float = None,
+    n_extra_edges: int = None,
+    pct_extra_edges: float = None,
+) -> Graph:
+    required_columns = {orig_product, dest_product, attribute}
+    if not required_columns.issubset(proximity_vectors.columns):
+        missing_cols = required_columns - set(proximity_vectors.columns)
+        raise ArgumentValueError(f"Missing columns in DataFrame: {missing_cols}")
+    sorted_vectors = proximity_vectors.sort_values(by=attribute, ascending=False)
+    G = build_nx_graph(
+        sorted_vectors, orig_product=orig_product, dest_product=dest_product
+    )
+    MST = nx.maximum_spanning_tree(G, weight=attribute)
+    extra_edges = None
+    if attribute_th is not None:
+        extra_edges = sorted_vectors.query(f"{attribute} >= @attribute_th")
+    elif n_extra_edges is not None:
+        n_total_edges = len(MST.edges) + n_extra_edges
+        extra_edges = sorted_vectors.iloc[:n_total_edges]
+    elif pct_extra_edges is not None:
+        n_total_edges = int(
+            (sorted_vectors.shape[0] - len(MST.edges)) * pct_extra_edges
+        )
+        extra_edges = sorted_vectors.iloc[
+            len(MST.edges) : len(MST.edges) + n_total_edges
+        ]
     if extra_edges is not None:
-        exG = build_nx_graph(extra_edges)
-
-        _G = nx.compose(MST, exG)
-
-        for u, v, d in G.edges(data=True):
-            if _G.has_edge(u, v):
-                _G[u][v]["weight"] = d["weight"]
-
-        return _G
+        extra_graph = build_nx_graph(
+            extra_edges, orig_product=orig_product, dest_product=dest_product
+        )
+        combined_graph = nx.compose(MST, extra_graph)
+        for u, v, data in G.edges(data=True):
+            if combined_graph.has_edge(u, v):
+                combined_graph[u][v][attribute] = data[attribute]
+        MST = combined_graph
     return MST
+
+
+def build_mst_graphs(
+    proximity_vectors: Dict[Union[str, int], DataFrame],
+    networks_folder: PathLike,
+    orig_product: str = "product_i",
+    dest_product: str = "product_j",
+    attribute: str = "weight",
+    attribute_th: float = None,
+    n_extra_edges: int = None,
+    pct_extra_edges: float = None,
+    recalculate: bool = False,
+) -> Tuple[Dict[Union[str, int], Graph], Dict[Union[str, int], Path]]:
+    networks_folder = Path(networks_folder)
+    if not networks_folder.exists():
+        raise ArgumentValueError(f"Folder '{networks_folder}' does not exist.")
+    graphs = {}
+    graph_files = {}
+    for key, vectors in proximity_vectors.items():
+        gml_name = f"{key}_MST_graph.gml".replace(" ", "_")
+        gml_path = networks_folder / gml_name
+        if not gml_path.exists() or recalculate:
+            MST = build_mst_graph(
+                vectors,
+                orig_product=orig_product,
+                dest_product=dest_product,
+                attribute=attribute,
+                attribute_th=attribute_th,
+                n_extra_edges=n_extra_edges,
+                pct_extra_edges=pct_extra_edges,
+            )
+            nx.write_gml(MST, gml_path)
+        else:
+            MST = nx.read_gml(gml_path)
+        graphs[key] = MST
+        graph_files[key] = str(gml_path)
+
+    return graphs, graph_files
 
 
 def build_vis_graph(
@@ -178,105 +338,6 @@ def average_strength_of_links_from_communities(G, communities):
         "max": np.max(strenghts),
         "min": np.min(strenghts),
     }
-
-
-def vectors_from_proximity_matrices(
-    proximity_matrices, tablenames, conn, recalculate=False
-):
-    proximity_vectors_dfs = {}
-
-    for (temp_id, proximity_matrix), (_, tablename) in zip(
-        proximity_matrices.items(), tablenames.items()
-    ):
-        if not check_if_table(conn, tablename) or recalculate:
-            proximity_vectors = vectors_from_proximity_matrix(proximity_matrix)
-
-            proximity_vectors.to_sql(tablename, conn, if_exists="replace")
-
-        else:
-            proximity_vectors = read_sql_table(tablename, conn)
-
-        proximity_vectors_dfs[temp_id] = proximity_vectors
-
-    return proximity_vectors_dfs
-
-
-def build_nx_graphs(
-    proximity_vectors_dfs, id_col, value_col, networks_folder, recalculate=False
-):
-    graph_files = {}
-    graphs = {}
-
-    for temp_id, proximity_vectors in proximity_vectors_dfs.items():
-        gml_name = f"{temp_id}_{id_col}_{value_col}_G_graph.gml".replace(" ", "_")
-        gml_path = os.path.join(networks_folder, gml_name)
-
-        create_graph_network = not os.path.exists(gml_path)
-
-        if create_graph_network or recalculate:
-            G = build_nx_graph(proximity_vectors)
-            nx.write_gml(G, gml_path)
-        else:
-            G = nx.read_gml(gml_path)
-
-        graph_files[temp_id] = gml_path
-        graphs[temp_id] = G
-
-    return graph_files, graphs
-
-
-def build_nx_graph(
-    proximity_vectors, orig_product="product_i", dest_product="product_j"
-):
-    G = nx.from_pandas_edgelist(
-        proximity_vectors, source=orig_product, target=dest_product, edge_attr=True
-    )
-
-    return G
-
-
-def build_mst_graphs(
-    proximity_vectors_dfs,
-    graphs,
-    id_col,
-    value_col,
-    networks_folder,
-    thresholds=None,
-    recalculate=False,
-):
-    weights_th = thresholds["weights_th"]
-    n_extra_edges = thresholds["n_extra_edges"]
-    pct_extra_edges = thresholds["pct_extra_edges"]
-
-    mst_files = {}
-    mst_graphs = {}
-
-    for (temp_id, G), (_, proximity_vectors) in zip(
-        graphs.items(), proximity_vectors_dfs.items()
-    ):
-        mst_gml_name = f"{temp_id}_{id_col}_{value_col}_mst"
-        mst_gml_name += f"_{str(weights_th).replace('.', '')}_{str(n_extra_edges).replace('.', '')}_{str(pct_extra_edges).replace('.', '')}.gml"
-        mst_gml_name = mst_gml_name.replace(" ", "_")
-        mst_gml_path = os.path.join(networks_folder, mst_gml_name)
-
-        create_mst_network = not os.path.exists(mst_gml_path)
-
-        if create_mst_network or recalculate:
-            MST = build_mst_graph(
-                G,
-                proximity_vectors,
-                weights_th=weights_th,
-                n_extra_edges=n_extra_edges,
-                pct_extra_edges=pct_extra_edges,
-            )
-            nx.write_gml(MST, mst_gml_path)
-        else:
-            MST = nx.read_gml(mst_gml_path)
-
-        mst_files[temp_id] = mst_gml_path
-        mst_graphs[temp_id] = MST
-
-    return mst_files, mst_graphs
 
 
 def build_vis_graphs(
@@ -463,7 +524,7 @@ def display_country_nodes(net, country, masked_rca_matrix, export_matrix, bins=3
 
 
 def pyvis_to_networkx(pyvis_network):
-    nx_graph = nx.DiGraph() if pyvis_network.directed else nx.Graph()
+    nx_graph = nx.DiGraph() if pyvis_network.directed else Graph()
 
     for node in pyvis_network.nodes:
         node_id = node["id"]

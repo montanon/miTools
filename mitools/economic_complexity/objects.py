@@ -16,18 +16,6 @@ class Product:
     value: float
 
 
-class HS2Product(Product):
-    pass
-
-
-class HS4Product(Product):
-    pass
-
-
-class HS6Product(Product):
-    pass
-
-
 @dataclass(frozen=True)
 class ProductsBasket:
     products: List[Product]
