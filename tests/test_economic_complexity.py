@@ -18,6 +18,7 @@ from mitools.economic_complexity import (
     calculate_exports_matrix_rca,
     calculate_proximity_matrix,
     calculate_relatedness_matrix,
+    check_if_dataframe_sequence,
     exports_data_to_matrix,
     get_file_encoding,
     load_dataframe_sequence,
@@ -546,6 +547,49 @@ class TestLoadDataFrameSequence(TestCase):
         empty_dir.mkdir(parents=True, exist_ok=True)
         with self.assertRaises(ArgumentValueError):
             load_dataframe_sequence(self.temp_dir, "empty_sequence")
+
+
+class TestCheckIfDataFrameSequence(TestCase):
+    def setUp(self):
+        self.temp_dir = Path("./tests/.test_assets/.data")
+        self.sequence_name = "test_sequence"
+        self.sequence_dir = self.temp_dir / self.sequence_name
+        self.sequence_dir.mkdir(parents=True, exist_ok=True)
+        self.dataframes = {
+            1: DataFrame({"A": [1, 2, 3]}),
+            2: DataFrame({"B": [4, 5, 6]}),
+        }
+        store_dataframe_sequence(self.dataframes, self.sequence_name, self.temp_dir)
+
+    def tearDown(self):
+        if self.temp_dir.exists():
+            shutil.rmtree(self.temp_dir)
+
+    def test_sequence_exists_and_matches(self):
+        result = check_if_dataframe_sequence(
+            self.temp_dir, self.sequence_name, sequence_values=[1, 2]
+        )
+        self.assertTrue(result)
+
+    def test_sequence_partial_match(self):
+        result = check_if_dataframe_sequence(
+            self.temp_dir, self.sequence_name, sequence_values=[1, 3]
+        )
+        self.assertFalse(result)
+
+    def test_nonexistent_directory(self):
+        result = check_if_dataframe_sequence(
+            Path("non_existent_dir"), self.sequence_name, sequence_values=[1]
+        )
+        self.assertFalse(result)
+
+    def test_empty_directory(self):
+        empty_dir = self.temp_dir / "empty_sequence"
+        empty_dir.mkdir(parents=True, exist_ok=True)
+        result = check_if_dataframe_sequence(
+            empty_dir, "empty_sequence", sequence_values=[1]
+        )
+        self.assertFalse(result)
 
 
 class TestStringMapper(TestCase):
