@@ -3,6 +3,7 @@ import unittest
 from pathlib import Path
 from unittest import TestCase
 
+import networkx as nx
 from pandas import DataFrame
 from pandas.testing import assert_frame_equal
 
@@ -184,6 +185,88 @@ class TestBuildNxGraph(TestCase):
         self.assertEqual(G["A"]["B"]["year"], 2020)
         self.assertEqual(G["A"]["C"]["year"], 2021)
         self.assertEqual(G["B"]["C"]["year"], 2022)
+
+
+class TestBuildNxGraphs(unittest.TestCase):
+    def setUp(self):
+        self.networks_folder = Path("./tests/.test_assets/.data")
+        self.networks_folder.mkdir(parents=True, exist_ok=True)
+        self.proximity_vectors = {
+            1: DataFrame(
+                {"product_i": ["A", "A"], "product_j": ["B", "C"], "weight": [0.8, 0.4]}
+            ),
+            2: DataFrame({"product_i": ["B"], "product_j": ["C"], "weight": [0.5]}),
+        }
+
+    def tearDown(self):
+        if self.networks_folder.exists():
+            shutil.rmtree(self.networks_folder)
+
+    def test_build_and_store_graphs(self):
+        graphs, graph_files = build_nx_graphs(
+            self.proximity_vectors,
+            id_col="product_i",
+            value_col="weight",
+            networks_folder=self.networks_folder,
+            recalculate=True,
+        )
+        for key, gml_path in graph_files.items():
+            self.assertTrue(Path(gml_path).exists())
+            self.assertTrue(isinstance(graphs[key], nx.Graph))
+        self.assertEqual(len(graphs[1].nodes), 3)
+        self.assertEqual(len(graphs[1].edges), 2)
+        self.assertAlmostEqual(graphs[1]["A"]["B"]["weight"], 0.8)
+        self.assertAlmostEqual(graphs[1]["A"]["C"]["weight"], 0.4)
+        self.assertEqual(len(graphs[2].nodes), 2)
+        self.assertEqual(len(graphs[2].edges), 1)
+        self.assertAlmostEqual(graphs[2]["B"]["C"]["weight"], 0.5)
+
+    def test_load_existing_graphs(self):
+        build_nx_graphs(
+            self.proximity_vectors,
+            id_col="product_i",
+            value_col="weight",
+            networks_folder=self.networks_folder,
+            recalculate=True,
+        )
+        graphs, graph_files = build_nx_graphs(
+            self.proximity_vectors,
+            id_col="product_i",
+            value_col="weight",
+            networks_folder=self.networks_folder,
+            recalculate=False,
+        )
+        for key, gml_path in graph_files.items():
+            self.assertTrue(Path(gml_path).exists())
+            self.assertTrue(isinstance(graphs[key], nx.Graph))
+        self.assertEqual(len(graphs[1].nodes), 3)
+        self.assertEqual(len(graphs[1].edges), 2)
+        self.assertAlmostEqual(graphs[1]["A"]["B"]["weight"], 0.8)
+        self.assertAlmostEqual(graphs[1]["A"]["C"]["weight"], 0.4)
+        self.assertEqual(len(graphs[2].nodes), 2)
+        self.assertEqual(len(graphs[2].edges), 1)
+        self.assertAlmostEqual(graphs[2]["B"]["C"]["weight"], 0.5)
+
+    def test_missing_network_folder(self):
+        with self.assertRaises(ArgumentValueError):
+            build_nx_graphs(
+                self.proximity_vectors,
+                id_col="product_i",
+                value_col="weight",
+                networks_folder="non_existent_folder",
+                recalculate=False,
+            )
+
+    def test_empty_proximity_vectors(self):
+        graphs, graph_files = build_nx_graphs(
+            {},
+            id_col="product_i",
+            value_col="weight",
+            networks_folder=self.networks_folder,
+            recalculate=True,
+        )
+        self.assertEqual(len(graphs), 0)
+        self.assertEqual(len(graph_files), 0)
 
 
 if __name__ == "__main__":
