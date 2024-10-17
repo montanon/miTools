@@ -8,6 +8,7 @@ from pandas import DataFrame
 from pandas.testing import assert_frame_equal
 
 from mitools.economic_complexity import (
+    build_mst_graph,
     build_nx_graph,
     build_nx_graphs,
     check_if_dataframe_sequence,
@@ -267,6 +268,58 @@ class TestBuildNxGraphs(TestCase):
         )
         self.assertEqual(len(graphs), 0)
         self.assertEqual(len(graph_files), 0)
+
+
+class TestBuildMSTGraph(TestCase):
+    def setUp(self):
+        self.proximity_vectors = DataFrame(
+            {
+                "product_i": ["A", "A", "B", "C"],
+                "product_j": ["B", "C", "C", "D"],
+                "weight": [0.8, 0.4, 0.5, 0.6],
+            }
+        )
+        self.G = build_nx_graph(self.proximity_vectors)
+
+    def test_mst_no_extra_edges(self):
+        mst = build_mst_graph(self.proximity_vectors)
+        self.assertEqual(len(mst.edges), 3)  # Expected 3 edges in the MST
+
+    def test_mst_with_attribute_threshold(self):
+        mst = build_mst_graph(self.proximity_vectors, attribute_th=0.5)
+        self.assertEqual(len(mst.edges), 3)  # All edges with weight >= 0.5
+
+    def test_mst_with_n_extra_edges(self):
+        mst = build_mst_graph(self.proximity_vectors, n_extra_edges=1)
+        self.assertEqual(len(mst.edges), 4)  # 3 MST edges + 1 extra edge
+
+    def test_mst_with_pct_extra_edges(self):
+        mst = build_mst_graph(self.proximity_vectors, pct_extra_edges=1.0)
+        self.assertEqual(len(mst.edges), 4)  # 50% of remaining edges added
+
+    def test_mst_with_all_extra_edges(self):
+        mst = build_mst_graph(self.proximity_vectors, pct_extra_edges=1.0)
+        self.assertEqual(len(mst.edges), 4)  # All edges added to the MST
+
+    def test_missing_columns(self):
+        invalid_vectors = self.proximity_vectors.drop(columns=["weight"])
+        with self.assertRaises(ArgumentValueError):
+            build_mst_graph(invalid_vectors)
+
+    def test_empty_proximity_vectors(self):
+        empty_vectors = DataFrame(columns=["product_i", "product_j", "weight"])
+        mst = build_mst_graph(empty_vectors)
+        self.assertEqual(len(mst.edges), 0)
+
+    def test_preserve_original_weights(self):
+        mst = build_mst_graph(self.proximity_vectors, n_extra_edges=1)
+        self.assertAlmostEqual(mst["A"]["B"]["weight"], 0.8)
+        self.assertAlmostEqual(mst["C"]["D"]["weight"], 0.6)
+
+    def test_graph_with_custom_attributes(self):
+        vectors_with_attr = self.proximity_vectors.assign(year=[2020, 2021, 2022, 2023])
+        mst = build_mst_graph(vectors_with_attr, attribute="year")
+        self.assertTrue(all("year" in data for _, _, data in mst.edges(data=True)))
 
 
 if __name__ == "__main__":
