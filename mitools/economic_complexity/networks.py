@@ -233,7 +233,7 @@ def build_mst_graphs(
 
 
 def build_vis_graph(
-    mst: nx.Graph,
+    mst: Graph,
     proximity_vectors: DataFrame,
     label_col: str,
     product_code_col: str,
