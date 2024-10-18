@@ -163,7 +163,7 @@ def build_mst_graph(
     required_columns = {orig_product, dest_product, attribute}
     if not required_columns.issubset(proximity_vectors.columns):
         missing_cols = required_columns - set(proximity_vectors.columns)
-        raise ArgumentValueError(f"Missing columns in DataFrame: {missing_cols}")
+        raise (f"Missing columns in DataFrame: {missing_cols}")
     sorted_vectors = proximity_vectors.sort_values(by=attribute, ascending=False)
     G = build_nx_graph(
         sorted_vectors, orig_product=orig_product, dest_product=dest_product
@@ -243,7 +243,6 @@ def build_vis_graph(
     node_size=10,
     label_size=20,
 ):
-    # , filter_menu=True)#, select_menu=True)
     net = Network(height="700px", notebook=True)
     net.from_nx(mst)
 
@@ -273,6 +272,51 @@ def build_vis_graph(
         net.show_buttons(filter_=["physics"])
 
     return net
+
+
+def set_net_nodes_size(net, size=10):
+    for node in net.nodes:
+        node["size"] = size
+
+
+def set_net_nodes_labels_size(net, size=20):
+    for node in net.nodes:
+        node["font"] = f"{size}px arial black"
+
+
+def set_net_nodes_color(
+    net, sitc_codes, color_bins, product_code_col="sitc_product_code"
+):
+    if color_bins is not None:
+        for node in net.nodes:
+            sitc_id = sitc_codes.loc[
+                sitc_codes[product_code_col] == int(node["id"]), product_code_col
+            ].values[0]
+            for b, c in color_bins.items():
+                if int(sitc_id) in b:
+                    node["color"] = c
+                    continue
+
+
+def set_net_edges_width(net, width_bins):
+    for edge in net.edges:
+        for b, w in width_bins.items():
+            if edge["width"] in b:
+                edge["width"] = w
+                continue
+
+
+def set_net_nodes_label(
+    net,
+    sitc_codes,
+    label_col="sitc_product_name_short_en",
+    product_code_col="sitc_product_code",
+):
+    for node in net.nodes:
+        product_label = sitc_codes.loc[
+            sitc_codes[product_code_col] == int(node["id"]), label_col
+        ].values[0]
+        node["label"] = product_label
 
 
 def distribute_products_in_communities(series, n_communities):
@@ -390,51 +434,6 @@ def build_width_bins(proximity_vectors, widths=[2, 5, 10, 15, 30]):
     bins = bins.unique()
 
     return {b: w for w, b in zip(widths, bins)}
-
-
-def set_net_nodes_size(net, size=10):
-    for node in net.nodes:
-        node["size"] = size
-
-
-def set_net_nodes_labels_size(net, size=20):
-    for node in net.nodes:
-        node["font"] = f"{size}px arial black"
-
-
-def set_net_nodes_color(
-    net, sitc_codes, color_bins, product_code_col="sitc_product_code"
-):
-    if color_bins is not None:
-        for node in net.nodes:
-            sitc_id = sitc_codes.loc[
-                sitc_codes[product_code_col] == int(node["id"]), product_code_col
-            ].values[0]
-            for b, c in color_bins.items():
-                if int(sitc_id) in b:
-                    node["color"] = c
-                    continue
-
-
-def set_net_edges_width(net, width_bins):
-    for edge in net.edges:
-        for b, w in width_bins.items():
-            if edge["width"] in b:
-                edge["width"] = w
-                continue
-
-
-def set_net_nodes_label(
-    net,
-    sitc_codes,
-    label_col="sitc_product_name_short_en",
-    product_code_col="sitc_product_code",
-):
-    for node in net.nodes:
-        product_label = sitc_codes.loc[
-            sitc_codes[product_code_col] == int(node["id"]), label_col
-        ].values[0]
-        node["label"] = product_label
 
 
 def create_nx_nodes_color_dict(G, color_bins, sitc_codes):
