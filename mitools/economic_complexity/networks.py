@@ -235,29 +235,49 @@ def build_mst_graphs(
 def build_vis_graph(
     mst,
     proximity_vectors,
-    product_name_col,
-    id_col,
+    label_col,
+    product_code_col,
     products_codes=None,
     color_bins=None,
     physics=False,
     node_size=10,
     label_size=20,
+    widths=[2, 5, 10, 15, 30],
 ):
     net = Network(height="700px", notebook=True)
     net.from_nx(mst)
 
-    set_net_nodes_size(net, size=node_size)
-    set_net_nodes_labels_size(net, size=label_size)
+    for node in net.nodes:
+        node["size"] = node_size
+    for node in net.nodes:
+        node["font"] = f"{label_size}px arial black"
 
-    width_bins = build_width_bins(proximity_vectors)
+    width_bins = pd.cut(
+        proximity_vectors.sort_values(by="weight", ascending=True)["weight"], 5
+    )
+    width_bins = width_bins.unique()
+    width_bins = {b: w for w, b in zip(widths, width_bins)}
 
     if products_codes is not None and color_bins is not None:
-        set_net_nodes_color(net, products_codes, color_bins, product_code_col=id_col)
-    set_net_edges_width(net, width_bins)
+        for node in net.nodes:
+            sitc_id = products_codes.loc[
+                products_codes[product_code_col] == int(node["id"]), product_code_col
+            ].values[0]
+            for b, c in color_bins.items():
+                if int(sitc_id) in b:
+                    node["color"] = c
+                    continue
+    for edge in net.edges:
+        for b, w in width_bins.items():
+            if edge["width"] in b:
+                edge["width"] = w
+                continue
     if products_codes is not None:
-        set_net_nodes_label(
-            net, products_codes, label_col=product_name_col, product_code_col=id_col
-        )
+        for node in net.nodes:
+            product_label = products_codes.loc[
+                products_codes[product_code_col] == int(node["id"]), label_col
+            ].values[0]
+            node["label"] = product_label
 
     net.barnes_hut(
         gravity=-1000000,
@@ -272,51 +292,6 @@ def build_vis_graph(
         net.show_buttons(filter_=["physics"])
 
     return net
-
-
-def set_net_nodes_size(net, size=10):
-    for node in net.nodes:
-        node["size"] = size
-
-
-def set_net_nodes_labels_size(net, size=20):
-    for node in net.nodes:
-        node["font"] = f"{size}px arial black"
-
-
-def set_net_nodes_color(
-    net, sitc_codes, color_bins, product_code_col="sitc_product_code"
-):
-    if color_bins is not None:
-        for node in net.nodes:
-            sitc_id = sitc_codes.loc[
-                sitc_codes[product_code_col] == int(node["id"]), product_code_col
-            ].values[0]
-            for b, c in color_bins.items():
-                if int(sitc_id) in b:
-                    node["color"] = c
-                    continue
-
-
-def set_net_edges_width(net, width_bins):
-    for edge in net.edges:
-        for b, w in width_bins.items():
-            if edge["width"] in b:
-                edge["width"] = w
-                continue
-
-
-def set_net_nodes_label(
-    net,
-    sitc_codes,
-    label_col="sitc_product_name_short_en",
-    product_code_col="sitc_product_code",
-):
-    for node in net.nodes:
-        product_label = sitc_codes.loc[
-            sitc_codes[product_code_col] == int(node["id"]), label_col
-        ].values[0]
-        node["label"] = product_label
 
 
 def distribute_products_in_communities(series, n_communities):
@@ -425,15 +400,6 @@ def build_color_bins(id_col):
         return bins["color"], bins["names"]
     else:
         return None, None
-
-
-def build_width_bins(proximity_vectors, widths=[2, 5, 10, 15, 30]):
-    bins = pd.cut(
-        proximity_vectors.sort_values(by="weight", ascending=True)["weight"], 5
-    )
-    bins = bins.unique()
-
-    return {b: w for w, b in zip(widths, bins)}
 
 
 def create_nx_nodes_color_dict(G, color_bins, sitc_codes):
