@@ -348,6 +348,55 @@ def assign_net_nodes_attributes(
             )
 
 
+def build_vis_graphs(
+    graphs_data: Dict[Union[str, int], Graph],
+    networks_folder: PathLike,
+    nodes_sizes: Union[NodesSizes, int, float] = None,
+    nodes_colors: Union[NodesColors, NodeColor] = None,
+    nodes_labels: Union[NodesLabels, str] = None,
+    node_label_size: Union[Dict[NodeID, int], int] = None,
+    edges_widths: EdgesWidthsBins = None,
+    net_height: int = 700,
+    notebook: bool = True,
+    physics: bool = False,
+    physics_kwargs: Dict[str, Any] = None,
+    recalculate: bool = False,
+) -> Tuple[Dict[Union[str, int], VisNetwork], Dict[Union[str, int], str]]:
+    networks_folder = Path(networks_folder)
+    if not networks_folder.exists():
+        raise ArgumentValueError(f"Folder '{networks_folder}' does not exist.")
+
+    vis_graphs = {}
+    graph_files = {}
+
+    for key, graph in graphs_data.items():
+        gml_name = f"{key}_vis_graph.html".replace(" ", "_")
+        gml_path = networks_folder / gml_name
+
+        if not gml_path.exists() or recalculate:
+            net = build_vis_graph(
+                graph=graph,
+                nodes_sizes=nodes_sizes,
+                nodes_colors=nodes_colors,
+                nodes_labels=nodes_labels,
+                node_label_size=node_label_size,
+                edges_widths=edges_widths,
+                net_height=net_height,
+                notebook=notebook,
+                physics=physics,
+                physics_kwargs=physics_kwargs,
+            )
+            net.save_graph(str(gml_path))  # Save the graph as an HTML file
+        else:
+            net = VisNetwork(height=f"{net_height}px", notebook=notebook)
+            net.load_graph(str(gml_path))  # Load the graph from the HTML file
+
+        vis_graphs[key] = net
+        graph_files[key] = str(gml_path)
+
+    return vis_graphs, graph_files
+
+
 def distribute_products_in_communities(series, n_communities):
     values = series.tolist()
     np.random.shuffle(values)
@@ -411,40 +460,6 @@ def average_strength_of_links_from_communities(G, communities):
         "max": np.max(strenghts),
         "min": np.min(strenghts),
     }
-
-
-def build_vis_graphs(
-    mst_graphs,
-    proximity_vectors_dfs,
-    id_col,
-    product_name_col,
-    products_codes,
-    physics=False,
-    node_size=10,
-    label_size=20,
-):
-    nets = {}
-
-    color_bins, bins_names = build_color_bins(id_col)
-
-    for (temp_id, MST), (_, proximity_vectors) in zip(
-        mst_graphs.items(), proximity_vectors_dfs.items()
-    ):
-        net = build_vis_graph(
-            MST,
-            proximity_vectors,
-            product_name_col,
-            id_col,
-            products_codes,
-            color_bins,
-            physics=physics,
-            node_size=node_size,
-            node_label_size=label_size,
-        )
-
-        nets[temp_id] = net
-
-    return nets
 
 
 def build_color_bins(id_col):
