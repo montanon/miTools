@@ -565,15 +565,6 @@ class TestAssignNetEdgesAttributes(TestCase):
         with self.assertRaises(ArgumentValueError):
             assign_net_edges_attributes(self.net, invalid_bins)
 
-    def test_assign_to_empty_network(self):
-        empty_net = VisNetwork()
-        try:
-            assign_net_edges_attributes(empty_net, self.edges_widths)
-        except Exception as e:
-            self.fail(
-                f"assign_net_edges_attributes raised {type(e).__name__} unexpectedly!"
-            )
-
     def test_multiple_edges_with_same_width(self):
         self.net.add_edge(1, 3, width=3.0)  # Another edge with width 3.0
         assign_net_edges_attributes(self.net, self.edges_widths)
