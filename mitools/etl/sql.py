@@ -48,20 +48,18 @@ def get_conn_db_folder(conn: Connection) -> PathLike:
     return db_path.parent
 
 
-def check_if_table(conn: Connection, tablename: str) -> bool:
-    c = conn.cursor()
+def check_if_table(conn: Connection, table_name: str) -> bool:
+    query = (
+        f'SELECT name FROM sqlite_master WHERE type="table" AND name="{table_name}";'
+    )
+    cursor = conn.cursor()
     try:
-        _ = conn.cursor().execute("SELECT name FROM sqlite_master")
-        c.execute(f'SELECT * FROM "{tablename}"')
-        return True if c.fetchone() else False
+        return cursor.execute(query).fetchone() is not None
     except OperationalError:
-        _ = conn.cursor().execute("SELECT name FROM sqlite_master")
         try:
-            db_folder = get_conn_db_folder(conn)
-            parquet_folder = os.path.join(db_folder, "parquet")
-            table_file = os.path.join(parquet_folder, f"{tablename}.parquet")
-            return True if os.path.exists(table_file) else False
-        except Exception:
+            parquet_folder = get_conn_db_folder(conn) / "parquet"
+            return (parquet_folder / f"{table_name}.parquet").exists()
+        except Exception as e:
             return False
 
 
