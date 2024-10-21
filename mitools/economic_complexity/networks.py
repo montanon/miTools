@@ -240,14 +240,14 @@ def build_mst_graphs(
 
 def build_vis_graph(
     graph: Graph,
-    physics: bool = False,
-    notebook: bool = True,
-    net_height: int = 700,
     nodes_sizes: Union[NodesSizes, int, float] = None,
     nodes_colors: Union[NodesColors, NodeColor] = None,
     nodes_labels: Union[NodesLabels, str] = None,
     node_label_size: Union[Dict[NodeID, int], int] = None,
     edges_widths: EdgesWidthsBins = None,
+    net_height: int = 700,
+    notebook: bool = True,
+    physics: bool = False,
     physics_kwargs: Dict[str, Any] = None,
 ) -> VisNetwork:
     if physics_kwargs is None:
@@ -279,17 +279,15 @@ def build_vis_graph(
 
 
 def assign_net_edges_attributes(net: VisNetwork, edges_widths: EdgesWidthsBins):
-    if not all(node["id"] in edges_widths for node in net.nodes):
-        raise ArgumentValueError(
-            "Some node ids are not present in the corresponding 'nodes_colors' argument."
-        )
     for edge in net.edges:
         try:
             edge["width"] = next(
                 w for b, w in edges_widths.items() if edge["width"] in b
             )
         except StopIteration:
-            edge["width"] = edges_widths[max(edges_widths)]  # Default to max width
+            raise ArgumentValueError(
+                "Some edge width values are not present in the corresponding 'edges_widths' argument."
+            )
 
 
 def assign_net_nodes_attributes(
