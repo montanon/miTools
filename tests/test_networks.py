@@ -4,7 +4,7 @@ from pathlib import Path
 from unittest import TestCase
 
 import networkx as nx
-from networkx import Graph
+from networkx import DiGraph, Graph
 from pandas import DataFrame, Interval
 from pandas.testing import assert_frame_equal
 from pyvis.network import Network as VisNetwork
@@ -24,6 +24,7 @@ from mitools.economic_complexity import (
     build_vis_graphs,
     check_if_dataframe_sequence,
     proximity_vectors_sequence,
+    pyvis_to_networkx,
     store_dataframe_sequence,
     vectors_from_proximity_matrix,
 )
@@ -750,6 +751,46 @@ class TestBuildVisGraphs(TestCase):
             physics_kwargs=physics_kwargs,
         )
         self.assertIsInstance(vis_graphs[1], VisNetwork)
+
+
+class TestPyvisToNetworkx(TestCase):
+    def setUp(self):
+        self.undirected_network = VisNetwork()
+        self.undirected_network.add_node(1, label="Node A", size=10)
+        self.undirected_network.add_node(2, label="Node B", size=15)
+        self.undirected_network.add_edge(1, 2, width=2.0, title="Edge A-B")
+
+        self.directed_network = VisNetwork(directed=True)
+        self.directed_network.add_node(3, label="Node C", size=20)
+        self.directed_network.add_node(4, label="Node D", size=25)
+        self.directed_network.add_edge(3, 4, width=3.0, title="Edge C-D")
+
+    def test_convert_undirected_network(self):
+        nx_graph = pyvis_to_networkx(self.undirected_network)
+        self.assertIsInstance(nx_graph, Graph)
+        self.assertEqual(len(nx_graph.nodes), 2)
+        self.assertEqual(len(nx_graph.edges), 1)
+        self.assertEqual(nx_graph.nodes[1]["name"], "Node A")
+        self.assertAlmostEqual(nx_graph[1][2]["weight"], 2.0)
+        self.assertEqual(nx_graph[1][2]["title"], "Edge A-B")
+
+    def test_convert_directed_network(self):
+        nx_graph = pyvis_to_networkx(self.directed_network)
+        self.assertIsInstance(nx_graph, DiGraph)
+        self.assertEqual(len(nx_graph.nodes), 2)
+        self.assertEqual(len(nx_graph.edges), 1)
+        self.assertEqual(nx_graph.nodes[3]["name"], "Node C")
+        self.assertAlmostEqual(nx_graph[3][4]["weight"], 3.0)
+        self.assertEqual(nx_graph[3][4]["title"], "Edge C-D")
+
+    def test_invalid_input_type(self):
+        with self.assertRaises(TypeError):
+            pyvis_to_networkx([1, 2, 3])
+
+    def test_default_edge_weight(self):
+        self.undirected_network.add_edge(2, 1)
+        nx_graph = pyvis_to_networkx(self.undirected_network)
+        self.assertAlmostEqual(nx_graph[2][1]["weight"], 2.0)
 
 
 if __name__ == "__main__":
