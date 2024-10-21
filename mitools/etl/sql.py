@@ -63,8 +63,8 @@ def check_if_table(conn: Connection, table_name: str) -> bool:
             return False
 
 
-def connect_to_sql_db(db_path: Union[str, os.PathLike], db_name: str) -> Connection:
-    db_path = os.path.join(db_path, db_name)
+def connect_to_sql_db(db_path: Union[str, PathLike], db_name: str) -> CustomConnection:
+    db_path = Path(db_path) / db_name
     return CustomConnection(db_path)
 
 
