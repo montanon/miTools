@@ -17,6 +17,10 @@ from mitools.economic_complexity import (
     NodesSizes,
     assign_net_edges_attributes,
     assign_net_nodes_attributes,
+    average_strength_of_links_from_communities,
+    average_strength_of_links_from_community,
+    average_strength_of_links_within_communities,
+    average_strength_of_links_within_community,
     build_mst_graph,
     build_mst_graphs,
     build_nx_graph,
@@ -903,6 +907,65 @@ class TestDistributeItemsInCommunities(TestCase):
         result1 = distribute_items_in_communities(self.items, n_communities=2)
         result2 = distribute_items_in_communities(self.items, n_communities=2)
         self.assertNotEqual(result1, result2)  #
+
+
+class TestLinkStrengthFunctions(TestCase):
+    def setUp(self):
+        self.G = Graph()
+        self.G.add_edge(1, 2, weight=0.8)
+        self.G.add_edge(2, 3, weight=0.5)
+        self.G.add_edge(3, 4, weight=1.5)
+        self.G.add_edge(4, 1, weight=1.2)
+        self.community1 = [1, 2]
+        self.community2 = [3, 4]
+        self.communities = [self.community1, self.community2]
+
+    def test_average_strength_within_community(self):
+        result = average_strength_of_links_within_community(self.G, self.community1)
+        expected = np.mean([0.8])
+        self.assertAlmostEqual(result, expected)
+
+    def test_average_strength_within_empty_community(self):
+        result = average_strength_of_links_within_community(self.G, [])
+        self.assertTrue(np.isnan(result))
+
+    def test_average_strength_within_communities(self):
+        result = average_strength_of_links_within_communities(self.G, self.communities)
+        expected_mean = np.mean([0.8, 1.5])
+        expected = {
+            "mean": expected_mean,
+            "std": np.std([0.8, 1.5]),
+            "max": 1.5,
+            "min": 0.8,
+        }
+        self.assertDictEqual(result, expected)
+
+    def test_average_strength_from_community(self):
+        result = average_strength_of_links_from_community(self.G, self.community1)
+        expected = np.mean([0.85])
+        self.assertAlmostEqual(result, expected)
+
+    def test_average_strength_from_empty_community(self):
+        result = average_strength_of_links_from_community(self.G, [])
+        self.assertTrue(np.isnan(result))
+
+    def test_average_strength_from_communities(self):
+        result = average_strength_of_links_from_communities(self.G, self.communities)
+        expected_mean = np.mean([0.85])
+        expected = {
+            "mean": expected_mean,
+            "std": np.std([0.0]),
+            "max": 0.85,
+            "min": 0.85,
+        }
+        self.assertDictEqual(result, expected)
+
+    def test_community_with_missing_edges(self):
+        self.G.add_node(5)  # Add a disconnected node
+        result_within = average_strength_of_links_within_community(self.G, [5])
+        result_from = average_strength_of_links_from_community(self.G, [5])
+        self.assertTrue(np.isnan(result_within))
+        self.assertTrue(np.isnan(result_from))
 
 
 if __name__ == "__main__":
