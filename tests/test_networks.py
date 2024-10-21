@@ -23,6 +23,7 @@ from mitools.economic_complexity import (
     build_vis_graph,
     build_vis_graphs,
     check_if_dataframe_sequence,
+    draw_nx_colored_graph,
     proximity_vectors_sequence,
     pyvis_to_networkx,
     store_dataframe_sequence,
@@ -791,6 +792,62 @@ class TestPyvisToNetworkx(TestCase):
         self.undirected_network.add_edge(2, 1)
         nx_graph = pyvis_to_networkx(self.undirected_network)
         self.assertAlmostEqual(nx_graph[2][1]["weight"], 2.0)
+
+
+class TestDrawNxColoredGraph(unittest.TestCase):
+    def setUp(self):
+        self.G = Graph()
+        self.G.add_edges_from([(1, 2), (2, 3), (3, 4), (4, 1)])
+        self.pos_G = nx.spring_layout(self.G)
+        self.node_colors = {"red": [1, 2], "blue": [3, 4]}
+        self.edge_widths = {
+            2.0: [(1, 2), (3, 4)],
+            3.0: [(2, 3)],
+        }
+
+    def test_valid_input(self):
+        draw_nx_colored_graph(self.G, self.pos_G, self.node_colors, self.edge_widths)
+
+    def test_invalid_graph_type(self):
+        with self.assertRaises(ArgumentTypeError):
+            draw_nx_colored_graph(
+                "not_a_graph", self.pos_G, self.node_colors, self.edge_widths
+            )
+
+    def test_invalid_pos_G_type(self):
+        with self.assertRaises(ArgumentTypeError):
+            draw_nx_colored_graph(
+                self.G, "not_a_dict", self.node_colors, self.edge_widths
+            )
+
+    def test_missing_nodes(self):
+        self.node_colors["red"].append(5)  # Node 5 is not in the graph
+        with self.assertRaises(ArgumentValueError):
+            draw_nx_colored_graph(
+                self.G, self.pos_G, self.node_colors, self.edge_widths
+            )
+
+    def test_missing_edges(self):
+        self.edge_widths[2.0].append((5, 6))  # Edge (5, 6) is not in the graph
+        with self.assertRaises(ArgumentValueError):
+            draw_nx_colored_graph(
+                self.G, self.pos_G, self.node_colors, self.edge_widths
+            )
+
+    def test_custom_node_size(self):
+        draw_nx_colored_graph(
+            self.G, self.pos_G, self.node_colors, self.edge_widths, node_size=20
+        )
+
+    def test_custom_width_scale(self):
+        draw_nx_colored_graph(
+            self.G, self.pos_G, self.node_colors, self.edge_widths, width_scale=5.0
+        )
+
+    def test_edge_alpha(self):
+        draw_nx_colored_graph(
+            self.G, self.pos_G, self.node_colors, self.edge_widths, edge_alpha=0.5
+        )
 
 
 if __name__ == "__main__":
