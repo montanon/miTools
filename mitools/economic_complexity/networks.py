@@ -416,7 +416,7 @@ def pyvis_to_networkx(pyvis_network: VisNetwork) -> Union[Graph, DiGraph]:
 
 
 def draw_nx_colored_graph(
-    G: nx.Graph,
+    G: Graph,
     pos_G: Dict[Any, Tuple[float, float]],
     node_colors: NodesColors,
     edge_widths: Dict[float, List[Tuple[Any, Any]]],
