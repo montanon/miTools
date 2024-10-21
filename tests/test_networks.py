@@ -794,7 +794,7 @@ class TestPyvisToNetworkx(TestCase):
         self.assertAlmostEqual(nx_graph[2][1]["weight"], 2.0)
 
 
-class TestDrawNxColoredGraph(unittest.TestCase):
+class TestDrawNxColoredGraph(TestCase):
     def setUp(self):
         self.G = Graph()
         self.G.add_edges_from([(1, 2), (2, 3), (3, 4), (4, 1)])
