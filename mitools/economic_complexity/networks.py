@@ -6,7 +6,7 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 from networkx import Graph
-from pandas import DataFrame
+from pandas import DataFrame, Interval
 from pyvis.network import Network as VisNetwork
 
 from mitools.economic_complexity import (
@@ -14,7 +14,14 @@ from mitools.economic_complexity import (
     load_dataframe_sequence,
     store_dataframe_sequence,
 )
-from mitools.exceptions import ArgumentValueError
+from mitools.exceptions import ArgumentValueError, ArgumentTypeError
+
+NodeID: Any
+NodeColor: Union[Tuple[float], Tuple[int]]
+NodesColors: Dict[NodeID, NodeColor]
+NodesLabels: Dict[NodeID, str]
+NodesSizes: Dict[NodeID, Union[int, float]]
+EdgesWidthsBins: Dict[Interval, float]
 
 
 def vectors_from_proximity_matrix(
@@ -239,12 +246,14 @@ def build_vis_graph(
     products_codes: DataFrame = None,
     color_bins: Dict[Tuple[int, int], str] = None,
     physics: bool = False,
-    node_size: int = 10,
-    label_size: int = 20,
+    node_label_size: int = 20,
     widths: List[int] = [2, 5, 10, 15, 30],
     notebook: bool = True,
     net_height: int = 700,
-    edge_attribute: str = "weight",
+    nodes_sizes: Union[NodesSizes, int] = None,
+    nodes_colors: Union[NodesColors, NodeColor] = None,
+    nodes_labels: Union[NodesLabels, str] = None,
+    edges_widths: EdgesWidthsBins = None,
     physics_kwargs: Dict[str, Any] = None,
 ) -> VisNetwork:
     if physics_kwargs is None:
@@ -259,10 +268,79 @@ def build_vis_graph(
     net = VisNetwork(height=f"{net_height}px", notebook=notebook)
     net.from_nx(graph)
 
-    for node in net.nodes:
-        node["size"] = node_size
-        node["font"] = f"{label_size}px arial black"
+    assign_net_nodes_attributes(
+        net=net,
+        sizes=nodes_sizes,
+        label_sizes=node_label_size,
+        colors=nodes_colors,
+        labels=nodes_labels,
+    )
 
+    assign_net_edges_attributes(net=net, edges)
+    net.barnes_hut(**physics_kwargs)
+    if physics:
+        net.show_buttons(filter_=["physics"])
+    return net
+
+
+def assign_net_edges_attributes():
+    if not all(node["id"] in edges_widths for node in net.nodes):
+        raise ArgumentValueError(
+            "Some node ids are not present in the corresponding 'nodes_colors' argument."
+        )
+    for edge in net.edges:
+        try:
+            edge["width"] = next(w for b, w in width_bins.items() if edge["width"] in b)
+        except StopIteration:
+            edge["width"] = width_bins[max(width_bins)]  # Default to max width
+
+
+def assign_net_nodes_attributes(
+    net: VisNetwork, 
+    sizes: Union[NodesSizes, Union[int, float]] = None, 
+    colors: Union[NodesColors, NodeColor] = None, 
+    labels: Union[NodesLabels, str] = None,
+    label_sizes: Union[NodesSizes, Union[int, float]] = None, 
+):
+    if not isinstance(sizes, (int, dict)):
+        raise ArgumentTypeError("Nodes 'sizes' must be a int or dict.")
+    if isinstance(sizes, dict) and not all(node["id"] in sizes for node in net.nodes):
+        raise ArgumentValueError(
+            "Some node ids are not present in the corresponding 'sizes' argument."
+        )
+    if not isinstance(colors, (tuple, list, dict)):
+        raise ArgumentTypeError("Nodes 'colors' must be a tuple, list or dict.")
+    if isinstance(colors, dict) and not all(node["id"] in colors for node in net.nodes):
+        raise ArgumentValueError(
+            "Some node ids are not present in the corresponding 'colors' argument."
+        )
+    if not isinstance(labels, (str, dict)):
+        raise ArgumentTypeError("Nodes 'labels' must be a str or dict.")
+    if isinstance(labels, dict) and not all(node["id"] in labels for node in net.nodes):
+        raise ArgumentValueError(
+            "Some node ids are not present in the corresponding 'labels' argument."
+        )
+    if not isinstance(label_sizes, (int, dict)):
+        raise ArgumentTypeError("Nodes 'label_sizes' must be a int or dict.")
+    if isinstance(label_sizes, dict) and not all(node["id"] in label_sizes for node in net.nodes):
+        raise ArgumentValueError(
+            "Some node ids are not present in the corresponding 'label_sizes' argument."
+        )
+    if sizes is not None:
+        for node in net.nodes:
+            node["size"] = sizes
+    if colors is not None:
+        for node in net.nodes:
+            node["color"] = colors[node["id"]]
+    if labels is not None:
+        for node in net.nodes:
+            node["label"] = labels[node["id"]]
+    if label_sizes is not None:
+        for node in net.nodes:
+            node["font"] = f"{label_sizes}px arial black"
+
+
+def width_bins():
     width_bins = pd.cut(
         proximity_vectors[edge_attribute].sort_values(), bins=len(widths), precision=0
     ).unique()
@@ -281,27 +359,6 @@ def build_vis_graph(
                 )
             except (IndexError, StopIteration):
                 node["color"] = "gray"  # Default color
-
-    for edge in net.edges:
-        try:
-            edge["width"] = next(w for b, w in width_bins.items() if edge["width"] in b)
-        except StopIteration:
-            edge["width"] = width_bins[max(width_bins)]  # Default to max width
-    if products_codes is not None:
-        for node in net.nodes:
-            try:
-                product_id = int(node["id"])
-                product_label = products_codes.loc[
-                    products_codes[product_code_col] == product_id, label_col
-                ].values[0]
-                node["label"] = product_label
-            except IndexError:
-                node["label"] = "Unknown"  # Default label
-
-    net.barnes_hut(**physics_kwargs)
-    if physics:
-        net.show_buttons(filter_=["physics"])
-    return net
 
 
 def distribute_products_in_communities(series, n_communities):
@@ -395,7 +452,7 @@ def build_vis_graphs(
             color_bins,
             physics=physics,
             node_size=node_size,
-            label_size=label_size,
+            node_label_size=label_size,
         )
 
         nets[temp_id] = net
