@@ -393,6 +393,25 @@ def build_vis_graphs(
     return vis_graphs, graph_files
 
 
+def pyvis_to_networkx(pyvis_network: VisNetwork) -> Union[Graph, DiGraph]:
+    if not isinstance(pyvis_network, VisNetwork):
+        raise TypeError("Input must be a PyVis network.")
+    nx_graph = DiGraph() if pyvis_network.directed else Graph()
+    for node in pyvis_network.nodes:
+        node_id = node["id"]
+        node_attrs = {k: v for k, v in node.items() if k != "id"}
+        if "label" in node_attrs:
+            node_attrs["name"] = node_attrs.pop("label")
+        nx_graph.add_node(node_id, **node_attrs)
+    for edge in pyvis_network.edges:
+        source, target = edge["from"], edge["to"]
+        edge_attrs = {"weight": edge.get("width", 1.0)}
+        if "title" in edge:
+            edge_attrs["title"] = edge["title"]
+        nx_graph.add_edge(source, target, **edge_attrs)
+    return nx_graph
+
+
 def distribute_products_in_communities(series, n_communities):
     values = series.tolist()
     np.random.shuffle(values)
@@ -542,23 +561,3 @@ def display_country_nodes(net, country, masked_rca_matrix, export_matrix, bins=3
                 node["size"] = node["size"] * rca_nodes_exports[node["id"]]
 
     return _net
-
-
-def pyvis_to_networkx(pyvis_network):
-    nx_graph = DiGraph() if pyvis_network.directed else Graph()
-
-    for node in pyvis_network.nodes:
-        node_id = node["id"]
-        node_attrs = {k: v for k, v in node.items() if k != "id"}
-        node_attrs["name"] = node_attrs["label"]
-        nx_graph.add_node(node_id, **node_attrs)
-
-    for edge in pyvis_network.edges:
-        source = edge["from"]
-        target = edge["to"]
-        edge_attrs = {"weight": edge["width"]}
-        if "title" in edge:
-            edge_attrs["title"] = edge["title"]
-        nx_graph.add_edge(source, target, **edge_attrs)
-
-    return nx_graph
