@@ -5,6 +5,7 @@ from typing import Dict, List, Optional, Sequence, Tuple, Union
 import chardet
 import numpy as np
 import pandas as pd
+import torch
 from numba import jit
 from pandas import DataFrame
 
@@ -148,8 +149,8 @@ def calculate_relatedness_matrix(
     return wcp
 
 
-@jit(nopython=True)
-def _calculate_economic_complexity(
+@jit
+def jit_calculate_economic_complexity(
     rca_matrix: np.ndarray,
 ) -> Tuple[np.ndarray, np.ndarray]:
     diversity = rca_matrix.sum(axis=1)
@@ -176,6 +177,36 @@ def _calculate_economic_complexity(
     return eci, pci
 
 
+def torch_calculate_economic_complexity(
+    rca_matrix: np.ndarray, device: str = "mps"
+) -> Tuple[np.ndarray, np.ndarray]:
+    rca_matrix = torch.from_numpy(rca_matrix.astype(np.float32)).to(device)
+
+    diversity = rca_matrix.sum(dim=1)
+    ubiquity = rca_matrix.sum(dim=0)
+
+    M1 = (rca_matrix.T / diversity).T
+    M1 = torch.nan_to_num(M1)
+    M2 = rca_matrix / ubiquity
+    M2 = torch.nan_to_num(M2)
+
+    Mpp = M2.T @ M1
+
+    eigen_values, eigen_vectors = torch.linalg.eig(Mpp)
+    eigen_vectors = eigen_vectors.real  # Use the real part of the eigenvectors
+
+    eigen_vector_index = torch.argsort(eigen_values.real)[-2]
+    kp = eigen_vectors[:, eigen_vector_index]
+
+    kc = M1 @ kp
+    signature = torch.sign(torch.corrcoef(torch.stack([diversity, kc]))[0, 1])
+
+    eci = signature * kc
+    pci = signature * kp
+
+    return eci.cpu().numpy(), pci.cpu().numpy()
+
+
 def calculate_economic_complexity(
     rca_matrix: DataFrame,
     standardize: Optional[bool] = True,
@@ -194,7 +225,7 @@ def calculate_economic_complexity(
 
     if fast:
         rca_np = rca_matrix.values
-        eci, pci = _calculate_economic_complexity(rca_np)
+        eci, pci = jit_calculate_economic_complexity(rca_np)
     else:
         diversity = rca_matrix.sum(axis=1)
         ubiquity = rca_matrix.sum(axis=0)

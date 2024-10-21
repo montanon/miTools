@@ -19,3 +19,4 @@ env_checkpoints/*
 *.csv
 .coverage
 coverage_report.txt
+lib/*
