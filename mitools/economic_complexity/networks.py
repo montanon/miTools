@@ -279,15 +279,16 @@ def build_vis_graph(
 
 
 def assign_net_edges_attributes(net: VisNetwork, edges_widths: EdgesWidthsBins):
-    for edge in net.edges:
-        try:
-            edge["width"] = next(
-                w for b, w in edges_widths.items() if edge["width"] in b
-            )
-        except StopIteration:
-            raise ArgumentValueError(
-                "Some edge width values are not present in the corresponding 'edges_widths' argument."
-            )
+    if edges_widths is not None:
+        for edge in net.edges:
+            try:
+                edge["width"] = next(
+                    w for b, w in edges_widths.items() if edge["width"] in b
+                )
+            except StopIteration:
+                raise ArgumentValueError(
+                    "Some edge width values are not present in the corresponding 'edges_widths' argument."
+                )
 
 
 def assign_net_nodes_attributes(
@@ -345,27 +346,6 @@ def assign_net_nodes_attributes(
                 if not isinstance(label_sizes, dict)
                 else f"{label_sizes[node['id']]}px arial black"
             )
-
-
-# def width_bins():
-#     width_bins = pd.cut(
-#         proximity_vectors[edge_attribute].sort_values(), bins=len(widths), precision=0
-#     ).unique()
-#     width_bins = {b: w for b, w in zip(width_bins, widths)}
-
-#     if products_codes is not None and color_bins is not None:
-#         for node in net.nodes:
-#             try:
-#                 product_id = int(node["id"])
-#                 product_code = products_codes.loc[
-#                     products_codes[product_code_col] == product_id, product_code_col
-#                 ].values[0]
-
-#                 node["color"] = next(
-#                     c for b, c in color_bins.items() if int(product_code) in b
-#                 )
-#             except (IndexError, StopIteration):
-#                 node["color"] = "gray"  # Default color
 
 
 def distribute_products_in_communities(series, n_communities):
