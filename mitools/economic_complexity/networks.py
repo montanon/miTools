@@ -1,4 +1,3 @@
-import os
 from os import PathLike
 from pathlib import Path
 from typing import Any, Dict, List, Tuple, Union
@@ -233,7 +232,7 @@ def build_mst_graphs(
 
 
 def build_vis_graph(
-    mst: Graph,
+    graph: Graph,
     proximity_vectors: DataFrame,
     label_col: str,
     product_code_col: str,
@@ -243,88 +242,11 @@ def build_vis_graph(
     node_size: int = 10,
     label_size: int = 20,
     widths: List[int] = [2, 5, 10, 15, 30],
+    notebook: bool = True,
+    net_height: int = 700,
+    edge_attribute: str = "weight",
+    physics_kwargs: Dict[str, Any] = None,
 ) -> VisNetwork:
-    net = initialize_network(mst, node_size, label_size)
-    width_bins = generate_width_bins(proximity_vectors, widths)
-
-    if products_codes is not None and color_bins is not None:
-        assign_node_colors(net, products_codes, color_bins, product_code_col)
-
-    assign_edge_widths(net, width_bins)
-    assign_node_labels(net, products_codes, label_col, product_code_col)
-
-    configure_physics(net, physics)
-    return net
-
-
-def initialize_network(mst: Graph, node_size: int, label_size: int) -> VisNetwork:
-    net = VisNetwork(height="700px", notebook=True)
-    net.from_nx(mst)
-    for node in net.nodes:
-        node["size"] = node_size
-        node["font"] = f"{label_size}px arial black"
-    return net
-
-
-def generate_width_bins(
-    proximity_vectors: DataFrame, widths: List[int], attribute: str = "weight"
-) -> Dict[pd.Interval, int]:
-    bins = pd.cut(
-        proximity_vectors[attribute].sort_values(), bins=len(widths), precision=0
-    ).unique()
-    return {b: w for b, w in zip(bins, widths)}
-
-
-def assign_node_colors(
-    net: VisNetwork,
-    products_codes: DataFrame,
-    color_bins: Dict[Tuple[int, int], str],
-    product_code_col: str,
-) -> None:
-    for node in net.nodes:
-        try:
-            product_id = int(node["id"])
-            product_code = products_codes.loc[
-                products_codes[product_code_col] == product_id, product_code_col
-            ].values[0]
-
-            node["color"] = next(
-                c for b, c in color_bins.items() if int(product_code) in b
-            )
-        except (IndexError, StopIteration):
-            node["color"] = "gray"  # Default color
-
-
-def assign_edge_widths(net: VisNetwork, width_bins: Dict[pd.Interval, int]) -> None:
-    for edge in net.edges:
-        try:
-            edge["width"] = next(w for b, w in width_bins.items() if edge["width"] in b)
-        except StopIteration:
-            edge["width"] = width_bins[max(width_bins)]  # Default to max width
-
-
-def assign_node_labels(
-    net: VisNetwork,
-    products_codes: DataFrame,
-    label_col: str,
-    product_code_col: str,
-) -> None:
-    if products_codes is None:
-        return
-    for node in net.nodes:
-        try:
-            product_id = int(node["id"])
-            product_label = products_codes.loc[
-                products_codes[product_code_col] == product_id, label_col
-            ].values[0]
-            node["label"] = product_label
-        except IndexError:
-            node["label"] = "Unknown"  # Default label
-
-
-def configure_physics(
-    net: VisNetwork, physics: bool, physics_kwargs: Dict[str, Any] = None
-) -> None:
     if physics_kwargs is None:
         physics_kwargs = {
             "gravity": -1000000,
@@ -334,9 +256,52 @@ def configure_physics(
             "damping": 0.1,
             "overlap": 1,
         }
+    net = VisNetwork(height=f"{net_height}px", notebook=notebook)
+    net.from_nx(graph)
+
+    for node in net.nodes:
+        node["size"] = node_size
+        node["font"] = f"{label_size}px arial black"
+
+    width_bins = pd.cut(
+        proximity_vectors[edge_attribute].sort_values(), bins=len(widths), precision=0
+    ).unique()
+    width_bins = {b: w for b, w in zip(width_bins, widths)}
+
+    if products_codes is not None and color_bins is not None:
+        for node in net.nodes:
+            try:
+                product_id = int(node["id"])
+                product_code = products_codes.loc[
+                    products_codes[product_code_col] == product_id, product_code_col
+                ].values[0]
+
+                node["color"] = next(
+                    c for b, c in color_bins.items() if int(product_code) in b
+                )
+            except (IndexError, StopIteration):
+                node["color"] = "gray"  # Default color
+
+    for edge in net.edges:
+        try:
+            edge["width"] = next(w for b, w in width_bins.items() if edge["width"] in b)
+        except StopIteration:
+            edge["width"] = width_bins[max(width_bins)]  # Default to max width
+    if products_codes is not None:
+        for node in net.nodes:
+            try:
+                product_id = int(node["id"])
+                product_label = products_codes.loc[
+                    products_codes[product_code_col] == product_id, label_col
+                ].values[0]
+                node["label"] = product_label
+            except IndexError:
+                node["label"] = "Unknown"  # Default label
+
     net.barnes_hut(**physics_kwargs)
     if physics:
         net.show_buttons(filter_=["physics"])
+    return net
 
 
 def distribute_products_in_communities(series, n_communities):
