@@ -37,8 +37,8 @@ class MainConnection(CustomConnection):
             self._initialized = True
 
 
-def check_if_tables(conn: Connection, tablesnames: Iterable[str]) -> List[bool]:
-    return [check_if_table(conn, tablename) for tablename in tablesnames]
+def check_if_tables(conn: Connection, tables_names: Iterable[str]) -> List[bool]:
+    return [check_if_table(conn, table_name) for table_name in tables_names]
 
 
 def get_conn_db_folder(conn: Connection) -> PathLike:
