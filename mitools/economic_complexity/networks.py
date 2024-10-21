@@ -1,6 +1,6 @@
 from os import PathLike
 from pathlib import Path
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, List, Sequence, Tuple, Union
 
 import networkx as nx
 import numpy as np
@@ -444,66 +444,66 @@ def draw_nx_colored_graph(
         )
 
 
-def distribute_products_in_communities(series, n_communities):
-    values = series.tolist()
-    np.random.shuffle(values)
-    size = len(values) // n_communities
-    remainder = len(values) % n_communities
-
+def distribute_items_in_communities(items: Sequence, n_communities: int) -> Sequence:
+    np.random.shuffle(items)
+    size = len(items) // n_communities
+    remainder = len(items) % n_communities
     communities = []
     start = 0
-
     for i in range(n_communities):
         end = start + size + (1 if i < remainder else 0)
-        communities.append(values[start:end])
+        communities.append(items[start:end])
         start = end
-
     return communities
 
 
-def average_strenght_of_links_within_community(G, community):
+def average_strength_of_links_within_community(G: Graph, community: List[Any]) -> float:
     links = G.edges(community, data=True)
-    try:
-        return np.mean([d["width"] for u, v, d in links if v in community])
-    except Exception:
-        return np.mean([d["weight"] for u, v, d in links if v in community])
+    strengths = [
+        d.get("width", d.get("weight", 0.0))  # Handle missing 'width' and 'weight'
+        for u, v, d in links
+        if v in community
+    ]
+    return np.mean(strengths) if strengths else np.nan
 
 
-def average_strenght_of_links_within_communities(G, communities):
-    strenghts = [
-        average_strenght_of_links_within_community(G, community)
+def average_strength_of_links_within_communities(
+    G: Graph, communities: List[List[Any]]
+) -> Dict[str, Union[float, int]]:
+    strengths = [
+        average_strength_of_links_within_community(G, community)
         for community in communities
     ]
-    strenghts = [s for s in strenghts if not np.isnan(s)]
+    strengths = [s for s in strengths if not np.isnan(s)]
     return {
-        "mean": np.mean(strenghts),
-        "std": np.std(strenghts),
-        "max": np.max(strenghts),
-        "min": np.min(strenghts),
+        "mean": np.mean(strengths),
+        "std": np.std(strengths),
+        "max": np.max(strengths),
+        "min": np.min(strengths),
     }
 
 
-def average_strength_of_links_from_community(G, community):
+def average_strength_of_links_from_community(G: Graph, community: List[Any]) -> float:
     links = G.edges(data=True)
-    try:
-        return np.mean(
-            [d["width"] for u, v, d in links if u in community and v not in community]
-        )
-    except Exception:
-        return np.mean(
-            [d["weight"] for u, v, d in links if u in community and v not in community]
-        )
+    strengths = [
+        d.get("width", d.get("weight", 0.0))  # Handle missing 'width' and 'weight'
+        for u, v, d in links
+        if u in community and v not in community
+    ]
+    return np.mean(strengths) if strengths else np.nan
 
 
-def average_strength_of_links_from_communities(G, communities):
-    strenghts = [
+def average_strength_of_links_from_communities(
+    G: Graph, communities: List[List[Any]]
+) -> Dict[str, Union[float, int]]:
+    strengths = [
         average_strength_of_links_from_community(G, community)
         for community in communities
     ]
-    strenghts = [s for s in strenghts if not np.isnan(s)]
+    strengths = [s for s in strengths if not np.isnan(s)]
     return {
-        "mean": np.mean(strenghts),
-        "std": np.std(strenghts),
-        "max": np.max(strenghts),
-        "min": np.min(strenghts),
+        "mean": np.mean(strengths),
+        "std": np.std(strengths),
+        "max": np.max(strengths),
+        "min": np.min(strengths),
     }
