@@ -5,11 +5,12 @@ from unittest import TestCase
 
 import networkx as nx
 from networkx import Graph
-from pandas import DataFrame
+from pandas import DataFrame, Interval
 from pandas.testing import assert_frame_equal
 from pyvis.network import Network as VisNetwork
 
 from mitools.economic_complexity import (
+    assign_net_edges_attributes,
     assign_net_nodes_attributes,
     build_mst_graph,
     build_mst_graphs,
@@ -528,6 +529,56 @@ class TestAssignNetNodesAttributes(TestCase):
         label_sizes = {1: 15, 2: 20}  # Missing size for node 3
         with self.assertRaises(ArgumentValueError):
             assign_net_nodes_attributes(self.net, label_sizes=label_sizes)
+
+
+class TestAssignNetEdgesAttributes(TestCase):
+    def setUp(self):
+        self.net = VisNetwork()
+        self.net.add_node(1)
+        self.net.add_node(2)
+        self.net.add_node(3)
+        self.net.add_edge(1, 2, width=3.0)
+        self.net.add_edge(2, 3, width=7.0)
+
+        self.edges_widths = {
+            Interval(0, 5, closed="both"): 2.0,
+            Interval(5, 10, closed="both"): 5.0,
+        }
+
+    def test_assign_valid_edges_widths(self):
+        assign_net_edges_attributes(self.net, self.edges_widths)
+        expected_widths = [2.0, 5.0]
+        for edge, expected in zip(self.net.edges, expected_widths):
+            self.assertEqual(edge["width"], expected)
+
+    def test_edge_width_not_in_bins(self):
+        self.net.add_edge(3, 1, width=12.0)
+        with self.assertRaises(ArgumentValueError):
+            assign_net_edges_attributes(self.net, self.edges_widths)
+
+    def test_empty_edges_widths(self):
+        with self.assertRaises(ArgumentValueError):
+            assign_net_edges_attributes(self.net, {})
+
+    def test_no_matching_bins_for_edges(self):
+        invalid_bins = {Interval(20, 30, closed="both"): 10.0}
+        with self.assertRaises(ArgumentValueError):
+            assign_net_edges_attributes(self.net, invalid_bins)
+
+    def test_assign_to_empty_network(self):
+        empty_net = VisNetwork()
+        try:
+            assign_net_edges_attributes(empty_net, self.edges_widths)
+        except Exception as e:
+            self.fail(
+                f"assign_net_edges_attributes raised {type(e).__name__} unexpectedly!"
+            )
+
+    def test_multiple_edges_with_same_width(self):
+        self.net.add_edge(1, 3, width=3.0)  # Another edge with width 3.0
+        assign_net_edges_attributes(self.net, self.edges_widths)
+        for edge, val in zip(self.net.edges, [2.0, 5.0, 2.0]):
+            self.assertEqual(edge["width"], val)
 
 
 if __name__ == "__main__":
