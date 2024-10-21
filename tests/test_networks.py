@@ -4,6 +4,7 @@ from pathlib import Path
 from unittest import TestCase
 
 import networkx as nx
+import numpy as np
 from networkx import DiGraph, Graph
 from pandas import DataFrame, Interval
 from pandas.testing import assert_frame_equal
@@ -23,6 +24,7 @@ from mitools.economic_complexity import (
     build_vis_graph,
     build_vis_graphs,
     check_if_dataframe_sequence,
+    distribute_items_in_communities,
     draw_nx_colored_graph,
     proximity_vectors_sequence,
     pyvis_to_networkx,
@@ -848,6 +850,59 @@ class TestDrawNxColoredGraph(TestCase):
         draw_nx_colored_graph(
             self.G, self.pos_G, self.node_colors, self.edge_widths, edge_alpha=0.5
         )
+
+
+class TestDistributeItemsInCommunities(TestCase):
+    def setUp(self):
+        self.items = list(range(10))  # Example items [0, 1, 2, ..., 9]
+
+    def test_equal_distribution(self):
+        result = distribute_items_in_communities(self.items, n_communities=2)
+        self.assertEqual(len(result), 2)  # Check correct number of communities
+        self.assertEqual(len(result[0]), 5)  # Check size of each community
+        self.assertEqual(len(result[1]), 5)
+
+    def test_unequal_distribution(self):
+        result = distribute_items_in_communities(self.items, n_communities=3)
+        self.assertEqual(len(result), 3)  # Check correct number of communities
+        sizes = [len(community) for community in result]
+        self.assertIn(4, sizes)  # At least one community should have size 4
+        self.assertIn(3, sizes)  # Others should have size 3
+
+    def test_single_community(self):
+        result = distribute_items_in_communities(self.items, n_communities=1)
+        self.assertEqual(len(result), 1)  # Only one community
+        self.assertEqual(
+            len(result[0]), 10
+        )  # All items should be in the first community
+
+    def test_community_per_item(self):
+        result = distribute_items_in_communities(
+            self.items, n_communities=len(self.items)
+        )
+        self.assertEqual(len(result), len(self.items))  # One community per item
+        for community in result:
+            self.assertEqual(
+                len(community), 1
+            )  # Each community should contain one item
+
+    def test_more_communities_than_items(self):
+        with self.assertRaises(ArgumentValueError):
+            distribute_items_in_communities(self.items, n_communities=15)
+
+    def test_empty_items(self):
+        with self.assertRaises(ArgumentValueError):
+            distribute_items_in_communities([], n_communities=3)
+
+    def test_invalid_number_of_communities(self):
+        with self.assertRaises(ArgumentValueError):
+            distribute_items_in_communities(self.items, n_communities=0)
+
+    def test_random_distribution(self):
+        np.random.seed(42)  # Fix the random seed for reproducibility
+        result1 = distribute_items_in_communities(self.items, n_communities=2)
+        result2 = distribute_items_in_communities(self.items, n_communities=2)
+        self.assertNotEqual(result1, result2)  #
 
 
 if __name__ == "__main__":
