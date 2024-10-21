@@ -16,12 +16,12 @@ from mitools.economic_complexity import (
 )
 from mitools.exceptions import ArgumentValueError, ArgumentTypeError
 
-NodeID: Any
-NodeColor: Union[Tuple[float], Tuple[int]]
-NodesColors: Dict[NodeID, NodeColor]
-NodesLabels: Dict[NodeID, str]
-NodesSizes: Dict[NodeID, Union[int, float]]
-EdgesWidthsBins: Dict[Interval, float]
+NodeID = Any
+NodeColor = Union[Tuple[float, ...], Tuple[int, ...]]
+NodesColors = Dict[NodeID, NodeColor]
+NodesLabels = Dict[NodeID, str]
+NodesSizes = Dict[NodeID, Union[int, float]]
+EdgesWidthsBins = Dict[Interval, float]
 
 
 def vectors_from_proximity_matrix(
