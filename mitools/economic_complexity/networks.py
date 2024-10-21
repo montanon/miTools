@@ -246,13 +246,13 @@ def build_vis_graph(
     products_codes: DataFrame = None,
     color_bins: Dict[Tuple[int, int], str] = None,
     physics: bool = False,
-    node_label_size: int = 20,
     widths: List[int] = [2, 5, 10, 15, 30],
     notebook: bool = True,
     net_height: int = 700,
-    nodes_sizes: Union[NodesSizes, int] = None,
+    nodes_sizes: Union[NodesSizes, int, float] = None,
     nodes_colors: Union[NodesColors, NodeColor] = None,
     nodes_labels: Union[NodesLabels, str] = None,
+    node_label_size: Union[Dict[NodeID, int], int] = None,
     edges_widths: EdgesWidthsBins = None,
     physics_kwargs: Dict[str, Any] = None,
 ) -> VisNetwork:
@@ -271,9 +271,9 @@ def build_vis_graph(
     assign_net_nodes_attributes(
         net=net,
         sizes=nodes_sizes,
-        label_sizes=node_label_size,
         colors=nodes_colors,
         labels=nodes_labels,
+        label_sizes=node_label_size,
     )
 
     assign_net_edges_attributes(net=net, edges)
@@ -297,19 +297,19 @@ def assign_net_edges_attributes():
 
 def assign_net_nodes_attributes(
     net: VisNetwork, 
-    sizes: Union[NodesSizes, Union[int, float]] = None, 
+    sizes: Union[NodesSizes, int, float] = None, 
     colors: Union[NodesColors, NodeColor] = None, 
     labels: Union[NodesLabels, str] = None,
-    label_sizes: Union[NodesSizes, Union[int, float]] = None, 
+    label_sizes: Union[Dict[NodeID, int], int] = None, 
 ):
-    if not isinstance(sizes, (int, dict)):
-        raise ArgumentTypeError("Nodes 'sizes' must be a int or dict.")
+    if not isinstance(sizes, (int, float, dict)):
+        raise ArgumentTypeError("Nodes 'sizes' must be a int, float or dict.")
     if isinstance(sizes, dict) and not all(node["id"] in sizes for node in net.nodes):
         raise ArgumentValueError(
             "Some node ids are not present in the corresponding 'sizes' argument."
         )
-    if not isinstance(colors, (tuple, list, dict)):
-        raise ArgumentTypeError("Nodes 'colors' must be a tuple, list or dict.")
+    if not isinstance(colors, (tuple, list, dict, NodeColor)):
+        raise ArgumentTypeError("Nodes 'colors' must be a tuple, list, NodeColor or dict.")
     if isinstance(colors, dict) and not all(node["id"] in colors for node in net.nodes):
         raise ArgumentValueError(
             "Some node ids are not present in the corresponding 'colors' argument."
