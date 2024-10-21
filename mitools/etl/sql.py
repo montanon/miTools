@@ -25,19 +25,15 @@ class MainConnection(CustomConnection):
     _instances = {}
 
     def __new__(cls, path: PathLike):
-        if not isinstance(path, Path):
-            path = Path(path)
-        path = str(path.absolute())
+        path = Path(path).absolute()
         if path not in cls._instances:
-            instance = super(MainConnection, cls).__new__(cls)
-            cls._instances[path] = instance
-            instance._initialized = False
+            cls._instances[path] = super(MainConnection, cls).__new__(cls)
+            cls._instances[path]._initialized = False
         return cls._instances[path]
 
-    def __init__(self, path, *args, **kwargs):
+    def __init__(self, path: PathLike, *args, **kwargs):
         if not self._initialized:
             super().__init__(path, *args, **kwargs)
-            self.path = path
             self._initialized = True
 
 
