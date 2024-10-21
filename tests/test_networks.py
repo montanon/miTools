@@ -21,6 +21,7 @@ from mitools.economic_complexity import (
     build_nx_graph,
     build_nx_graphs,
     build_vis_graph,
+    build_vis_graphs,
     check_if_dataframe_sequence,
     proximity_vectors_sequence,
     store_dataframe_sequence,
@@ -671,6 +672,84 @@ class TestBuildVisGraph(TestCase):
         net = build_vis_graph(graph=self.graph, node_label_size=18)
         for node in net.nodes:
             self.assertEqual(node["font"], "18px arial black")
+
+
+class TestBuildVisGraphs(TestCase):
+    def setUp(self):
+        self.networks_folder = Path("./tests/.test_assets/.data")
+        self.networks_folder.mkdir(parents=True, exist_ok=True)
+        self.graphs_data = {
+            1: nx.Graph([(1, 2, {"weight": 0.8}), (1, 3, {"weight": 0.4})]),
+            2: nx.Graph([(2, 3, {"weight": 0.5})]),
+        }
+
+    def tearDown(self):
+        if self.networks_folder.exists():
+            shutil.rmtree(self.networks_folder)
+
+    def test_build_and_store_vis_graphs(self):
+        vis_graphs, graph_files = build_vis_graphs(
+            self.graphs_data, networks_folder=self.networks_folder
+        )
+        for key, html_path in graph_files.items():
+            self.assertTrue(Path(html_path).exists())
+            self.assertIsInstance(vis_graphs[key], VisNetwork)
+        self.assertEqual(len(vis_graphs[1].nodes), 3)
+        self.assertEqual(len(vis_graphs[1].edges), 2)
+        self.assertEqual(len(vis_graphs[2].nodes), 2)
+        self.assertEqual(len(vis_graphs[2].edges), 1)
+
+    def test_missing_network_folder(self):
+        with self.assertRaises(ArgumentValueError):
+            build_vis_graphs(self.graphs_data, networks_folder="non_existent_folder")
+
+    def test_empty_graph_data(self):
+        vis_graphs, graph_files = build_vis_graphs(
+            {},
+            networks_folder=self.networks_folder,
+        )
+        self.assertEqual(len(vis_graphs), 0)
+        self.assertEqual(len(graph_files), 0)
+
+    def test_build_with_custom_node_sizes(self):
+        node_sizes = {1: 10, 2: 15, 3: 20}
+        vis_graphs, _ = build_vis_graphs(
+            self.graphs_data,
+            networks_folder=self.networks_folder,
+            nodes_sizes=node_sizes,
+        )
+        for node in vis_graphs[1].nodes:
+            self.assertEqual(node["size"], node_sizes[node["id"]])
+
+    def test_build_with_custom_node_colors(self):
+        node_colors = {1: (255, 0, 0), 2: (0, 255, 0), 3: (0, 0, 255)}
+        vis_graphs, _ = build_vis_graphs(
+            self.graphs_data,
+            networks_folder=self.networks_folder,
+            nodes_colors=node_colors,
+        )
+        for node in vis_graphs[1].nodes:
+            self.assertEqual(node["color"], node_colors[node["id"]])
+
+    def test_build_with_custom_labels(self):
+        node_labels = {1: "A", 2: "B", 3: "C"}
+        vis_graphs, _ = build_vis_graphs(
+            self.graphs_data,
+            networks_folder=self.networks_folder,
+            nodes_labels=node_labels,
+        )
+        for node in vis_graphs[1].nodes:
+            self.assertEqual(node["label"], node_labels[node["id"]])
+
+    def test_build_with_custom_physics(self):
+        physics_kwargs = {"gravity": -5000, "spring_length": 300}
+        vis_graphs, _ = build_vis_graphs(
+            self.graphs_data,
+            networks_folder=self.networks_folder,
+            physics=True,
+            physics_kwargs=physics_kwargs,
+        )
+        self.assertIsInstance(vis_graphs[1], VisNetwork)
 
 
 if __name__ == "__main__":
