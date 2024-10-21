@@ -7,8 +7,10 @@ import networkx as nx
 from networkx import Graph
 from pandas import DataFrame
 from pandas.testing import assert_frame_equal
+from pyvis.network import Network as VisNetwork
 
 from mitools.economic_complexity import (
+    assign_net_nodes_attributes,
     build_mst_graph,
     build_mst_graphs,
     build_nx_graph,
@@ -18,7 +20,7 @@ from mitools.economic_complexity import (
     store_dataframe_sequence,
     vectors_from_proximity_matrix,
 )
-from mitools.exceptions import ArgumentValueError
+from mitools.exceptions import ArgumentTypeError, ArgumentValueError
 
 
 class TestVectorsFromProximityMatrix(TestCase):
@@ -324,7 +326,7 @@ class TestBuildMSTGraph(TestCase):
         self.assertTrue(all("year" in data for _, _, data in mst.edges(data=True)))
 
 
-class TestBuildMSTGraphs(unittest.TestCase):
+class TestBuildMSTGraphs(TestCase):
     def setUp(self):
         self.networks_folder = Path("./tests/.test_assets/.data")
         self.networks_folder.mkdir(parents=True, exist_ok=True)
@@ -443,6 +445,89 @@ class TestBuildMSTGraphs(unittest.TestCase):
         )
         self.assertEqual(len(graphs), 0)  # No graphs should be built
         self.assertEqual(len(graph_files), 0)
+
+
+class TestAssignNetNodesAttributes(TestCase):
+    def setUp(self):
+        self.net = VisNetwork()
+        self.net.add_node(1)
+        self.net.add_node(2)
+        self.net.add_node(3)
+
+    def test_assign_valid_sizes(self):
+        sizes = {1: 10, 2: 15, 3: 20}
+        assign_net_nodes_attributes(self.net, sizes=sizes)
+        for node in self.net.nodes:
+            self.assertEqual(node["size"], sizes[node["id"]])
+
+    def test_assign_single_size(self):
+        assign_net_nodes_attributes(self.net, sizes=12)
+        for node in self.net.nodes:
+            self.assertEqual(node["size"], 12)
+
+    def test_invalid_sizes_type(self):
+        with self.assertRaises(ArgumentTypeError):
+            assign_net_nodes_attributes(self.net, sizes="invalid_size")
+
+    def test_missing_node_in_sizes(self):
+        sizes = {1: 10, 2: 15}  # Missing size for node 3
+        with self.assertRaises(ArgumentValueError):
+            assign_net_nodes_attributes(self.net, sizes=sizes)
+
+    def test_assign_valid_colors(self):
+        colors = {1: (255, 0, 0), 2: (0, 255, 0), 3: (0, 0, 255)}
+        assign_net_nodes_attributes(self.net, colors=colors)
+        for node in self.net.nodes:
+            self.assertEqual(node["color"], colors[node["id"]])
+
+    def test_invalid_colors_type(self):
+        with self.assertRaises(ArgumentTypeError):
+            assign_net_nodes_attributes(self.net, colors="invalid_color")
+
+    def test_missing_node_in_colors(self):
+        colors = {1: (255, 0, 0), 2: (0, 255, 0)}  # Missing color for node 3
+        with self.assertRaises(ArgumentValueError):
+            assign_net_nodes_attributes(self.net, colors=colors)
+
+    def test_assign_valid_labels(self):
+        labels = {1: "Node A", 2: "Node B", 3: "Node C"}
+        assign_net_nodes_attributes(self.net, labels=labels)
+        for node in self.net.nodes:
+            self.assertEqual(node["label"], labels[node["id"]])
+
+    def test_single_label_assignment(self):
+        assign_net_nodes_attributes(self.net, labels="Common Label")
+        for node in self.net.nodes:
+            self.assertEqual(node["label"], "Common Label")
+
+    def test_invalid_labels_type(self):
+        with self.assertRaises(ArgumentTypeError):
+            assign_net_nodes_attributes(self.net, labels=123)
+
+    def test_missing_node_in_labels(self):
+        labels = {1: "Node A", 2: "Node B"}  # Missing label for node 3
+        with self.assertRaises(ArgumentValueError):
+            assign_net_nodes_attributes(self.net, labels=labels)
+
+    def test_assign_valid_label_sizes(self):
+        label_sizes = {1: 15, 2: 20, 3: 25}
+        assign_net_nodes_attributes(self.net, label_sizes=label_sizes)
+        for node in self.net.nodes:
+            self.assertEqual(node["font"], f"{label_sizes[node['id']]}px arial black")
+
+    def test_single_label_size_assignment(self):
+        assign_net_nodes_attributes(self.net, label_sizes=18)
+        for node in self.net.nodes:
+            self.assertEqual(node["font"], "18px arial black")
+
+    def test_invalid_label_sizes_type(self):
+        with self.assertRaises(ArgumentTypeError):
+            assign_net_nodes_attributes(self.net, label_sizes="invalid_size")
+
+    def test_missing_node_in_label_sizes(self):
+        label_sizes = {1: 15, 2: 20}  # Missing size for node 3
+        with self.assertRaises(ArgumentValueError):
+            assign_net_nodes_attributes(self.net, label_sizes=label_sizes)
 
 
 if __name__ == "__main__":
