@@ -14,7 +14,7 @@ from mitools.economic_complexity import (
     load_dataframe_sequence,
     store_dataframe_sequence,
 )
-from mitools.exceptions import ArgumentValueError, ArgumentTypeError
+from mitools.exceptions import ArgumentTypeError, ArgumentValueError
 
 NodeID = Any
 NodeColor = Union[Tuple[float, ...], Tuple[int, ...]]
@@ -270,7 +270,7 @@ def build_vis_graph(
         label_sizes=node_label_size,
     )
 
-    assign_net_edges_attributes(net=net, edges_widths)
+    assign_net_edges_attributes(net=net, edges_widths=edges_widths)
 
     net.barnes_hut(**physics_kwargs)
     if physics:
@@ -278,62 +278,75 @@ def build_vis_graph(
     return net
 
 
-def assign_net_edges_attributes(
-    net: VisNetwork, edges_widths: EdgesWidthsBins):
+def assign_net_edges_attributes(net: VisNetwork, edges_widths: EdgesWidthsBins):
     if not all(node["id"] in edges_widths for node in net.nodes):
         raise ArgumentValueError(
             "Some node ids are not present in the corresponding 'nodes_colors' argument."
         )
     for edge in net.edges:
         try:
-            edge["width"] = next(w for b, w in edges_widths.items() if edge["width"] in b)
+            edge["width"] = next(
+                w for b, w in edges_widths.items() if edge["width"] in b
+            )
         except StopIteration:
             edge["width"] = edges_widths[max(edges_widths)]  # Default to max width
 
 
 def assign_net_nodes_attributes(
-    net: VisNetwork, 
-    sizes: Union[NodesSizes, int, float] = None, 
-    colors: Union[NodesColors, NodeColor] = None, 
+    net: VisNetwork,
+    sizes: Union[NodesSizes, int, float] = None,
+    colors: Union[NodesColors, NodeColor] = None,
     labels: Union[NodesLabels, str] = None,
-    label_sizes: Union[Dict[NodeID, int], int] = None, 
+    label_sizes: Union[Dict[NodeID, int], int] = None,
 ):
-    if not isinstance(sizes, (int, float, dict)):
+    if sizes is not None and not isinstance(sizes, (int, float, dict)):
         raise ArgumentTypeError("Nodes 'sizes' must be a int, float or dict.")
     if isinstance(sizes, dict) and not all(node["id"] in sizes for node in net.nodes):
         raise ArgumentValueError(
             "Some node ids are not present in the corresponding 'sizes' argument."
         )
-    if not isinstance(colors, (tuple, list, dict, NodeColor)):
-        raise ArgumentTypeError("Nodes 'colors' must be a tuple, list, NodeColor or dict.")
+    if colors is not None and not isinstance(colors, (tuple, list, dict)):
+        raise ArgumentTypeError(
+            "Nodes 'colors' must be a tuple, list, NodeColor or dict."
+        )
     if isinstance(colors, dict) and not all(node["id"] in colors for node in net.nodes):
         raise ArgumentValueError(
             "Some node ids are not present in the corresponding 'colors' argument."
         )
-    if not isinstance(labels, (str, dict)):
+    if labels is not None and not isinstance(labels, (str, dict)):
         raise ArgumentTypeError("Nodes 'labels' must be a str or dict.")
     if isinstance(labels, dict) and not all(node["id"] in labels for node in net.nodes):
         raise ArgumentValueError(
             "Some node ids are not present in the corresponding 'labels' argument."
         )
-    if not isinstance(label_sizes, (int, dict)):
+    if label_sizes is not None and not isinstance(label_sizes, (int, dict)):
         raise ArgumentTypeError("Nodes 'label_sizes' must be a int or dict.")
-    if isinstance(label_sizes, dict) and not all(node["id"] in label_sizes for node in net.nodes):
+    if isinstance(label_sizes, dict) and not all(
+        node["id"] in label_sizes for node in net.nodes
+    ):
         raise ArgumentValueError(
             "Some node ids are not present in the corresponding 'label_sizes' argument."
         )
     if sizes is not None:
         for node in net.nodes:
-            node["size"] = sizes
+            node["size"] = sizes if not isinstance(sizes, dict) else sizes[node["id"]]
     if colors is not None:
         for node in net.nodes:
-            node["color"] = colors[node["id"]]
+            node["color"] = (
+                colors if not isinstance(colors, dict) else colors[node["id"]]
+            )
     if labels is not None:
         for node in net.nodes:
-            node["label"] = labels[node["id"]]
+            node["label"] = (
+                labels if not isinstance(labels, dict) else labels[node["id"]]
+            )
     if label_sizes is not None:
         for node in net.nodes:
-            node["font"] = f"{label_sizes}px arial black"
+            node["font"] = (
+                f"{label_sizes}px arial black"
+                if not isinstance(label_sizes, dict)
+                else f"{label_sizes[node['id']]}px arial black"
+            )
 
 
 # def width_bins():
