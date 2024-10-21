@@ -12,9 +12,9 @@ from ..utils import suppress_user_warning
 
 
 class CustomConnection(Connection):
-    def __init__(self, path, *args, **kwargs):
+    def __init__(self, path: PathLike, *args, **kwargs):
         super().__init__(path, *args, **kwargs)
-        self.path = path
+        self.path = Path(path).absolute()
 
     @property
     def __class__(self):
