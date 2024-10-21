@@ -44,10 +44,8 @@ def check_if_tables(conn: Connection, tables_names: Iterable[str]) -> List[bool]
 def get_conn_db_folder(conn: Connection) -> PathLike:
     cursor = conn.cursor()
     cursor.execute("PRAGMA database_list;")
-    result = cursor.fetchone()
-    db_path = result[2]
-    db_folder = os.path.dirname(db_path)
-    return db_folder
+    db_path = Path(cursor.fetchone()[2])
+    return db_path.parent
 
 
 def check_if_table(conn: Connection, tablename: str) -> bool:
