@@ -97,14 +97,13 @@ def read_sql_tables(
 
 
 @suppress_user_warning
-def transfer_sql_tables(
-    src_db_connection: Connection,
-    dst_db_connection: Connection,
-    tablename: str,
-    if_exists: Optional[str] = "fail",
-    index_col: Optional[str] = "index",
+def transfer_sql_table(
+    src_conn: Connection,
+    dst_conn: Connection,
+    table_name: str,
+    if_exists: str = "fail",
+    index_col: str = "index",
 ) -> None:
-    table = pd.read_sql(
-        f"SELECT * FROM {tablename};", src_db_connection, index_col=index_col
-    )
-    table.to_sql(tablename, dst_db_connection, if_exists=if_exists)
+    query = f"SELECT * FROM {table_name};"
+    table = pd.read_sql(query, src_conn, index_col=index_col)
+    table.to_sql(table_name, dst_conn, if_exists=if_exists)
