@@ -71,16 +71,20 @@ def connect_to_sql_db(db_path: Union[str, PathLike], db_name: str) -> CustomConn
 @suppress_user_warning
 def read_sql_table(
     conn: Connection,
-    tablename: str,
-    columns: Optional[Union[str, list, ndarray]] = None,
-    index_col: Optional[str] = "index",
+    table_name: str,
+    columns: Union[str, List[str], ndarray] = None,
+    index_col: str = "index",
 ) -> DataFrame:
     if columns is None:
-        return pd.read_sql(f'SELECT * FROM "{tablename}"', conn, index_col=index_col)
+        query = f'SELECT * FROM "{table_name}";'
     elif isinstance(columns, (list, ndarray)):
-        return pd.read_sql(f'SELECT {", ".join(columns)} FROM "{tablename}"', conn)
+        query = f'SELECT {", ".join(columns)} FROM "{table_name}";'
     elif isinstance(columns, str):
-        return pd.read_sql(f'SELECT {columns} FROM "{tablename}"', conn)
+        query = f'SELECT {columns} FROM "{table_name}";'
+    else:
+        raise ValueError("Invalid column specification")
+
+    return pd.read_sql(query, conn, index_col=index_col)
 
 
 def read_sql_tables(
