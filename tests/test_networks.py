@@ -10,12 +10,17 @@ from pandas.testing import assert_frame_equal
 from pyvis.network import Network as VisNetwork
 
 from mitools.economic_complexity import (
+    EdgesWidthsBins,
+    NodesColors,
+    NodesLabels,
+    NodesSizes,
     assign_net_edges_attributes,
     assign_net_nodes_attributes,
     build_mst_graph,
     build_mst_graphs,
     build_nx_graph,
     build_nx_graphs,
+    build_vis_graph,
     check_if_dataframe_sequence,
     proximity_vectors_sequence,
     store_dataframe_sequence,
@@ -570,6 +575,102 @@ class TestAssignNetEdgesAttributes(TestCase):
         assign_net_edges_attributes(self.net, self.edges_widths)
         for edge, val in zip(self.net.edges, [2.0, 5.0, 2.0]):
             self.assertEqual(edge["width"], val)
+
+
+class TestBuildVisGraph(TestCase):
+    def setUp(self):
+        self.graph = nx.Graph()
+        self.graph.add_edge(1, 2, weight=3.0)
+        self.graph.add_edge(2, 3, weight=7.0)
+        self.nodes_sizes: NodesSizes = {1: 15, 2: 20, 3: 25}
+        self.nodes_colors: NodesColors = {
+            1: (255, 0, 0),
+            2: (0, 255, 0),
+            3: (0, 0, 255),
+        }
+        self.nodes_labels: NodesLabels = {1: "A", 2: "B", 3: "C"}
+        self.edges_widths: EdgesWidthsBins = {
+            Interval(0, 5, closed="both"): 2.0,
+            Interval(5, 10, closed="both"): 5.0,
+        }
+
+    def test_build_with_valid_attributes(self):
+        net = build_vis_graph(
+            graph=self.graph,
+            nodes_sizes=self.nodes_sizes,
+            nodes_colors=self.nodes_colors,
+            nodes_labels=self.nodes_labels,
+            edges_widths=self.edges_widths,
+        )
+        self.assertIsInstance(net, VisNetwork)
+        self.assertEqual(len(net.nodes), 3)  # Ensure all nodes are added
+        self.assertEqual(len(net.edges), 2)  # Ensure all edges are added
+
+    def test_build_with_single_size(self):
+        net = build_vis_graph(graph=self.graph, nodes_sizes=12)
+        for node in net.nodes:
+            self.assertEqual(node["size"], 12)
+
+    def test_build_with_single_color(self):
+        net = build_vis_graph(graph=self.graph, nodes_colors=(255, 0, 0))
+        for node in net.nodes:
+            self.assertEqual(node["color"], (255, 0, 0))
+
+    def test_build_with_single_label(self):
+        net = build_vis_graph(graph=self.graph, nodes_labels="Common Label")
+        for node in net.nodes:
+            self.assertEqual(node["label"], "Common Label")
+
+    def test_invalid_nodes_sizes_type(self):
+        with self.assertRaises(ArgumentTypeError):
+            build_vis_graph(graph=self.graph, nodes_sizes="invalid_size")
+
+    def test_invalid_nodes_colors_type(self):
+        with self.assertRaises(ArgumentTypeError):
+            build_vis_graph(graph=self.graph, nodes_colors="invalid_color")
+
+    def test_invalid_nodes_labels_type(self):
+        with self.assertRaises(ArgumentTypeError):
+            build_vis_graph(graph=self.graph, nodes_labels=123)
+
+    def test_physics_settings(self):
+        physics_kwargs = {
+            "gravity": -5000,
+            "spring_length": 300,
+            "damping": 0.2,
+        }
+        net = build_vis_graph(
+            graph=self.graph, physics=True, physics_kwargs=physics_kwargs
+        )
+        self.assertIsInstance(net, VisNetwork)  # Ensure a network is returned
+
+    def test_empty_graph(self):
+        empty_graph = nx.Graph()
+        net = build_vis_graph(graph=empty_graph)
+        self.assertEqual(len(net.nodes), 0)
+        self.assertEqual(len(net.edges), 0)
+
+    def test_missing_edges_widths(self):
+        net = build_vis_graph(graph=self.graph)
+        for edge in net.edges:
+            self.assertIn("width", edge)  # Ensure width attribute exists
+
+    def test_edge_width_not_in_bins(self):
+        self.graph.add_edge(3, 4, weight=12.0)  # Add an edge with a weight not in bins
+        with self.assertRaises(ArgumentValueError):
+            build_vis_graph(graph=self.graph, edges_widths=self.edges_widths)
+
+    def test_assign_label_sizes(self):
+        label_sizes = {1: 15, 2: 20, 3: 25}
+        net = build_vis_graph(graph=self.graph, node_label_size=label_sizes)
+        for node in net.nodes:
+            expected_size = label_sizes[node["id"]]
+            self.assertEqual(node["font"], f"{expected_size}px arial black")
+
+    def test_assign_single_label_size(self):
+        net = build_vis_graph(graph=self.graph, node_label_size=18)
+        for node in net.nodes:
+            self.assertEqual(node["font"], "18px arial black")
 
 
 if __name__ == "__main__":
