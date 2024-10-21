@@ -298,6 +298,9 @@ def assign_net_nodes_attributes(
     labels: Union[NodesLabels, str] = None,
     label_sizes: Union[Dict[NodeID, int], int] = None,
 ):
+    # node["color"] = {"border": color, "background": "#cccccc"}
+    # node["borderWidth"] = 1
+    # node["shape"] = "square"
     if sizes is not None and not isinstance(sizes, (int, float, dict)):
         raise ArgumentTypeError("Nodes 'sizes' must be a int, float or dict.")
     if isinstance(sizes, dict) and not all(node["id"] in sizes for node in net.nodes):
@@ -412,6 +415,35 @@ def pyvis_to_networkx(pyvis_network: VisNetwork) -> Union[Graph, DiGraph]:
     return nx_graph
 
 
+def draw_nx_colored_graph(
+    G: nx.Graph,
+    pos_G: Dict[Any, Tuple[float, float]],
+    node_colors: NodesColors,
+    edge_widths: Dict[float, List[Tuple[Any, Any]]],
+    node_size: int = 10,
+    edge_alpha: float = 1.0,
+    width_scale: float = 10.0,
+):
+    if not isinstance(G, Graph):
+        raise ArgumentTypeError("G must be a NetworkX graph.")
+    if not isinstance(pos_G, dict):
+        raise ArgumentTypeError("pos_G must be a dictionary of node positions.")
+    for color, nodes in node_colors.items():
+        if not all(node in G for node in nodes):
+            raise ArgumentValueError("Some nodes in 'nodes' are not in the graph.")
+        nx.draw_networkx_nodes(
+            G, pos_G, nodelist=nodes, node_color=color, node_size=node_size
+        )
+    for width, edges in edge_widths.items():
+        if not all(G.has_edge(u, v) for u, v in edges):
+            raise ArgumentValueError(
+                "Some edges in 'edges' are not present in the graph."
+            )
+        nx.draw_networkx_edges(
+            G, pos_G, edgelist=edges, width=width / width_scale, alpha=edge_alpha
+        )
+
+
 def distribute_products_in_communities(series, n_communities):
     values = series.tolist()
     np.random.shuffle(values)
@@ -475,89 +507,3 @@ def average_strength_of_links_from_communities(G, communities):
         "max": np.max(strenghts),
         "min": np.min(strenghts),
     }
-
-
-def create_nx_nodes_color_dict(G, color_bins, sitc_codes):
-    node_colors = {}
-
-    for node in G.nodes:
-        sitc_id = sitc_codes.loc[
-            sitc_codes["sitc_product_code"] == node, "sitc_product_code"
-        ].values[0]
-        if not sitc_id.isdigit():
-            node_colors[node] = "#000000"
-        else:
-            for b, c in color_bins.items():
-                if int(sitc_id) in b:
-                    node_colors[node] = c
-                    continue
-
-    return node_colors
-
-
-def create_nx_edges_widths(G, proximity_vectors, bin_widths):
-    edge_widths = {w: [] for w in bin_widths.values()}
-
-    for edge in G.edges:
-        prox = proximity_vectors.loc[
-            (proximity_vectors["product_i"].isin(edge))
-            & (proximity_vectors["product_j"].isin(edge)),
-            "proximity",
-        ].values[0]
-        for b, w in bin_widths.items():
-            if prox in b:
-                edge_widths[w].append(edge)
-                continue
-
-
-def draw_nx_colored_graph(G, pos_G, node_colors, edge_widths):
-    for c, nodes in node_colors.items():
-        nx.draw_networkx_nodes(G, pos_G, node_size=10, nodelist=nodes, node_color=c)
-    for w, nodes in edge_widths.items():
-        nx.draw_networkx_edges(G, pos_G, alpha=1, nodelist=nodes, width=w / 10)
-
-
-def display_country_nodes(net, country, masked_rca_matrix, export_matrix, bins=3):
-    _net = VisNetwork(height="700px", notebook=True)
-
-    net_data = net.get_network_data()
-
-    for node in net_data[0]:
-        _net.add_node(node["id"], **node)
-
-    for edge in net_data[1]:
-        _net.add_edge(
-            edge["from"],
-            edge["to"],
-            **{k: v for k, v in edge.items() if k not in ["from", "to"]},
-        )
-
-    _net.set_options(net_data[5])
-
-    country_rcas = masked_rca_matrix.loc[[country]]
-    country_exports = export_matrix.loc[[country]]
-
-    rca_nodes = country_rcas.loc[:, (country_rcas == 1.0).any()].columns.tolist()
-    rca_nodes_exports = country_exports.loc[:, rca_nodes].T
-    rca_nodes_exports["bins"] = pd.cut(
-        rca_nodes_exports.values[:, 0], bins, labels=[n + 1 for n in range(bins)]
-    )
-    rca_nodes_exports = {n: e for n, e in zip(rca_nodes, rca_nodes_exports["bins"])}
-
-    for node in _net.nodes:
-        if isinstance(node["id"], str) and node["id"].isdigit():
-            not_in_nodes = int(node["id"]) not in rca_nodes
-        else:
-            not_in_nodes = node["id"] not in rca_nodes
-        if not_in_nodes:
-            sector_color = node["color"]
-            node["color"] = {"border": sector_color, "background": "#cccccc"}
-            node["borderWidth"] = 1
-        else:
-            node["shape"] = "square"
-            try:
-                node["size"] = node["size"] * rca_nodes_exports[int(node["id"])]
-            except Exception:
-                node["size"] = node["size"] * rca_nodes_exports[node["id"]]
-
-    return _net
