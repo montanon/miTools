@@ -89,13 +89,11 @@ def read_sql_table(
 
 def read_sql_tables(
     conn: Connection,
-    tablenames: Iterable[str],
-    columns: Optional[Union[str, list, ndarray]] = None,
-    index_col: Optional[str] = "index",
+    table_names: Iterable[str],
+    columns: Union[str, List[str], ndarray] = None,
+    index_col: str = "index",
 ) -> List[DataFrame]:
-    return [
-        read_sql_table(conn, tablename, columns, index_col) for tablename in tablenames
-    ]
+    return [read_sql_table(conn, name, columns, index_col) for name in table_names]
 
 
 @suppress_user_warning
