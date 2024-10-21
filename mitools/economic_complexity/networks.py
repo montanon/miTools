@@ -445,6 +445,12 @@ def draw_nx_colored_graph(
 
 
 def distribute_items_in_communities(items: Sequence, n_communities: int) -> Sequence:
+    if n_communities < 1:
+        raise ArgumentValueError("The number of communities must be greater than zero.")
+    if len(items) < n_communities:
+        raise ArgumentValueError(
+            "The number of items must be greater or equal to the number of communities."
+        )
     np.random.shuffle(items)
     size = len(items) // n_communities
     remainder = len(items) % n_communities
