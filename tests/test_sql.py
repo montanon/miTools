@@ -4,11 +4,22 @@ import unittest
 import warnings
 from pathlib import Path
 from unittest import TestCase
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pandas as pd
 
-from mitools.etl import *
+from mitools.etl import (
+    Connection,
+    CustomConnection,
+    MainConnection,
+    check_if_table,
+    check_if_tables,
+    connect_to_sql_db,
+    get_conn_db_folder,
+    read_sql_table,
+    read_sql_tables,
+    suppress_user_warning,
+)
 
 
 class TestMainConnection(unittest.TestCase):
@@ -23,27 +34,22 @@ class TestMainConnection(unittest.TestCase):
         self.conn2.unlink()
 
     def test_singleton_property(self):
-        """Test that the same instance is returned for the same path"""
-
         conn1 = MainConnection(self.conn1)
         conn2 = MainConnection(self.conn1)
         self.assertIs(conn1, conn2)
 
     def test_different_instances(self):
-        """Test that different instances are created for different paths"""
         conn1 = MainConnection(self.conn1)
         conn2 = MainConnection(self.conn2)
         self.assertIsNot(conn1, conn2)
 
     def test_path_normalization(self):
-        """Test that paths are normalized (absolute path handling)"""
         absolute_path = Path(self.conn1).absolute()
         conn1 = MainConnection(self.conn1)
         conn2 = MainConnection(absolute_path)
         self.assertIs(conn1, conn2)
 
     def test_initialization_check(self):
-        """Test that initialization does not occur more than once"""
         conn1 = MainConnection(self.conn1)
         with self.assertRaises(AttributeError):
             conn1.some_random_attribute
