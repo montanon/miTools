@@ -74,7 +74,7 @@ def rename_folders_in_folder(
 
 def remove_characters_from_string(string: str, characters: str = None) -> str:
     if characters is None:
-        characters = r'[\\/*?:"<>|]'
+        characters = r'[\\/*?%&:"<>|]'
     return re.sub(characters, "", string)
 
 
@@ -114,18 +114,26 @@ def rename_files_in_folder(
     file_types: List[str] = None,
     renaming_function: Callable[[str], str] = None,
 ) -> None:
-    folder = Path(folder_path).resolve(strict=True)
+    try:
+        folder = Path(folder_path).resolve(strict=True)
+    except FileNotFoundError as e:
+        raise ArgumentValueError(f"Invalid 'folder_path'={folder_path} provided.")
     for file in folder.iterdir():
         if not file.is_file():
             continue  # Skip non-files
         if file_types and file.suffix.lower() not in file_types:
             continue  # Skip files not in the specified types
         try:
+            if renaming_function is not None:
+                new_name = renaming_function(file.name)
             rename_file(
-                file, None if renaming_function is None else renaming_function(file)
+                file,
+                None if renaming_function is None else new_name,
             )
         except Exception as e:
-            print(f"Error processing '{file.name}': {e}")
+            print(
+                f"Error processing '{file.name}' with 'renaming_function'={renaming_function}: {e}"
+            )
 
 
 if __name__ == "__main__":
