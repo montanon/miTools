@@ -78,7 +78,9 @@ def remove_characters_from_string(string: str, characters: str = None) -> str:
     return re.sub(characters, "", string)
 
 
-def remove_characters_from_filename(file_path: PathLike, characters: str = None) -> str:
+def remove_characters_from_filename(
+    file_path: PathLike, characters: str = None
+) -> Path:
     file_path = Path(file_path)
     filename = remove_characters_from_string(
         string=file_path.stem, characters=characters
@@ -98,9 +100,11 @@ def handle_duplicated_filenames(file_path: Path) -> Path:
 def rename_file(file: PathLike, new_name: str = None) -> None:
     file = Path(file)
     sanitized_name = (
-        remove_characters_from_filename(file) if new_name is None else new_name
+        remove_characters_from_filename(file)
+        if new_name is None
+        else file.with_name(new_name)
     )
-    new_file = handle_duplicated_filenames(file.with_name(sanitized_name))
+    new_file = handle_duplicated_filenames(sanitized_name)
     shutil.move(str(file), str(new_file))
     print(f"Renamed '{file.name}' to '{new_file.name}'")
 
