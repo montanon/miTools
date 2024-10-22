@@ -1,5 +1,3 @@
-import os
-import re
 from os import PathLike
 from pathlib import Path
 from typing import Dict, Union
@@ -8,7 +6,6 @@ import PyPDF2
 
 from mitools.exceptions import ArgumentTypeError, ArgumentValueError
 from mitools.files import remove_characters_from_string, rename_file
-from mitools.utils import fuzz_string_in_string
 
 PATTERN = "^([A-Za-z0-9.]+-)+[A-Za-z0-9]+.pdf$"
 
