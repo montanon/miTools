@@ -5,7 +5,7 @@ sys.path.append("/Users/sebastian/Desktop/MontagnaInc/miTools/mitools")
 from mitools.files import (
     rename_files_in_folder,
     set_folder_pdf_filenames_as_title,
-    set_pdf_filename_as_title,
+    set_pdf_title_as_filename,
 )
 
 if __name__ == "__main__":
@@ -17,7 +17,7 @@ if __name__ == "__main__":
     rename_parser = subparsers.add_parser(
         "rename", help="Rename a single PDF based on its title."
     )
-    rename_parser.set_defaults(func=set_pdf_filename_as_title)
+    rename_parser.set_defaults(func=set_pdf_title_as_filename)
 
     # Command to set filenames as titles within a folder
     rename_folder_parser = subparsers.add_parser(

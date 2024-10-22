@@ -12,5 +12,5 @@ from .pdf_handlers import (
     extract_pdf_metadata,
     extract_pdf_title,
     set_folder_pdf_filenames_as_title,
-    set_pdf_filename_as_title,
+    set_pdf_title_as_filename,
 )
