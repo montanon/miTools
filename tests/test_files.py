@@ -6,6 +6,7 @@ from unittest import TestCase
 from mitools.files import (
     folder_in_subtree,
     folder_is_subfolder,
+    handle_duplicated_filenames,
     remove_characters_from_filename,
     remove_characters_from_string,
     rename_folders_in_folder,
@@ -178,7 +179,7 @@ class TestRemoveCharactersFromString(TestCase):
         self.assertEqual(result, "helloworld")
 
 
-class TestRemoveCharactersFromFilename(unittest.TestCase):
+class TestRemoveCharactersFromFilename(TestCase):
     def setUp(self):
         self.test_file = Path("invalid:file?name.txt")
         self.expected_file = Path("invalidfilename.txt")
