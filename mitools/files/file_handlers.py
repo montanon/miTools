@@ -147,7 +147,9 @@ def rename_file(
     overwrite: bool = False,
 ) -> None:
     file = Path(file)
-    new_name = new_name if isinstance(new_name, str) else new_name.name
+    new_name = (
+        new_name if isinstance(new_name, str) or new_name is None else new_name.name
+    )
     sanitized_name = (
         remove_characters_from_filename(file)
         if new_name is None

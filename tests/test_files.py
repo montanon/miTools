@@ -407,7 +407,7 @@ class TestRenameFile(TestCase):
 
     def test_non_existent_file(self):
         non_existent_file = self.test_dir / "non_existent.txt"
-        with self.assertRaises(FileNotFoundError):
+        with self.assertRaises(ArgumentValueError):
             rename_file(non_existent_file)
 
     def test_custom_name_with_conflict(self):
@@ -627,7 +627,7 @@ class TestExtractPdfTitle(TestCase):
     def test_extract_title_from_non_pdf_file(self):
         with self.assertRaises(ArgumentTypeError) as context:
             extract_pdf_title(self.non_pdf_file)
-        self.assertIn("is not a valid pdf file", str(context.exception))
+        self.assertIn("is not a valid PDF file", str(context.exception))
 
 
 class TestSetPdfTitleAsFilename(TestCase):
