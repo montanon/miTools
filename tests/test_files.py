@@ -230,5 +230,51 @@ class TestRemoveCharactersFromFilename(TestCase):
         self.assertEqual(result.name, expected.name)
 
 
+class TestHandleDuplicatedFilenames(TestCase):
+    def setUp(self):
+        self.test_dir = Path("./test_folder")
+        self.test_dir.mkdir(exist_ok=True)
+        self.file_path = self.test_dir / "test_file.txt"
+        self.file_path.touch()  # Create the first version of the file
+
+    def tearDown(self):
+        if self.test_dir.exists():
+            shutil.rmtree(self.test_dir)
+
+    def test_no_conflict(self):
+        new_file_path = self.test_dir / "unique_file.txt"
+        result = handle_duplicated_filenames(new_file_path)
+        self.assertEqual(result, new_file_path)
+
+    def test_single_conflict(self):
+        conflicting_file = self.test_dir / "test_file.txt"
+        conflicting_file.touch()
+
+        result = handle_duplicated_filenames(conflicting_file)
+        expected = self.test_dir / "test_file_1.txt"
+        self.assertEqual(result, expected)
+
+    def test_multiple_conflicts(self):
+        for i in range(1, 3):
+            (self.test_dir / f"test_file_{i}.txt").touch()
+
+        result = handle_duplicated_filenames(self.file_path)
+        expected = self.test_dir / "test_file_3.txt"
+        self.assertEqual(result, expected)
+
+    def test_no_file_extension(self):
+        file_without_ext = self.test_dir / "test_file"
+        file_without_ext.touch()  # Create the conflicting file
+
+        result = handle_duplicated_filenames(file_without_ext)
+        expected = self.test_dir / "test_file_1"
+        self.assertEqual(result, expected)
+
+    def test_non_existing_directory(self):
+        non_existing_file = Path("./non_existing_folder/test_file.txt")
+        result = handle_duplicated_filenames(non_existing_file)
+        self.assertEqual(result, non_existing_file)
+
+
 if __name__ == "__main__":
     unittest.main()
