@@ -1,3 +1,4 @@
+import os
 import re
 import shutil
 from os import PathLike
@@ -45,10 +46,49 @@ def folder_in_subtree(
     return None
 
 
+def can_move_file_or_folder(
+    source: PathLike, destination: PathLike, overwrite: bool = False
+) -> bool:
+    try:
+        source = Path(source).resolve(strict=True)
+    except FileNotFoundError as e:
+        raise ArgumentValueError(f"Invalid 'source'={source} provided.")
+    destination = Path(destination).resolve(strict=False)
+    if not destination.parent.exists():
+        raise ArgumentValueError(
+            f"'destination.parent={destination.parent}' does not exist."
+        )
+    if destination.exists() and not overwrite:
+        raise ArgumentValueError(f"'{destination}' already exists.")
+    if not os.access(source, os.R_OK):
+        raise PermissionError(f"Read permission denied for '{source}'.")
+    if not os.access(destination.parent, os.W_OK):
+        raise PermissionError(f"Write permission denied for '{destination.parent}'.")
+    if len(str(destination.name)) > 255:
+        raise OSError(
+            f"The path 'destination.name={destination.name}' exceeds the maximum length allowed."
+        )
+    if source.stat().st_dev != destination.parent.stat().st_dev:
+        src_size = source.stat().st_size
+        free_space = destination.parent.stat().st_blocks * 512  # Approximate free space
+        if free_space < src_size:
+            raise OSError("Insufficient space on the destination drive.")
+    if source == destination:
+        return False
+    if source.is_dir() and destination.is_file():
+        return False
+    if source.is_file() and destination.parent.is_dir():
+        return True
+    if source.is_dir() and destination.is_dir():
+        return True
+    return False
+
+
 def rename_folders_in_folder(
     folder_path: PathLike,
     char_replacement: Callable[[str], str] = None,
     attempt: bool = False,
+    overwrite: bool = False,
 ) -> None:
     folder_path = Path(folder_path).resolve(strict=False)
     if not folder_path.is_dir():
@@ -60,13 +100,16 @@ def rename_folders_in_folder(
             new_path = folder_path / new_name
             if folder == new_path:
                 continue
-            if new_path.exists():
+            if new_path.exists() and not overwrite:
                 print(
                     f"Skipping '{folder.name}' → '{new_name}' (target already exists)"
                 )
                 continue
             if attempt:
-                print(f"[Attempt] Renaming '{folder.name}' to '{new_name}'")
+                print(
+                    f"[Attempt] Renaming '{folder.name}' to '{new_name}' results in {can_move_file_or_folder(folder, new_path)}"
+                )
+
             else:
                 print(f"Renaming '{folder.name}' to '{new_name}'")
                 shutil.move(str(folder), str(new_path))
@@ -97,8 +140,16 @@ def handle_duplicated_filenames(file_path: Path) -> Path:
     return new_file
 
 
-def rename_file(file: PathLike, new_name: str = None, overwrite: bool = False) -> None:
+def rename_file(
+    file: PathLike,
+    new_name: Union[PathLike, str] = None,
+    attempt: bool = False,
+    overwrite: bool = False,
+) -> None:
     file = Path(file)
+    new_name = (
+        new_name if isinstance(new_name, str) or new_name is None else new_name.name
+    )
     sanitized_name = (
         remove_characters_from_filename(file)
         if new_name is None
@@ -107,14 +158,20 @@ def rename_file(file: PathLike, new_name: str = None, overwrite: bool = False) -
     new_file = (
         handle_duplicated_filenames(sanitized_name) if not overwrite else sanitized_name
     )
-    shutil.move(str(file), str(new_file))
-    print(f"Renamed '{file.name}' to '{new_file.name}'")
+    if attempt:
+        print(
+            f"[Attempt] Renaming '{file}' to '{new_name}' results in {can_move_file_or_folder(file, new_file, overwrite=overwrite)}"
+        )
+    elif can_move_file_or_folder(file, new_file, overwrite=overwrite):
+        shutil.move(str(file), str(new_file))
+        print(f"Renamed '{file.name}' to '{new_file.name}'")
 
 
 def rename_files_in_folder(
     folder_path: PathLike,
     file_types: List[str] = None,
     renaming_function: Callable[[str], str] = None,
+    attempt: bool = False,
     overwrite: bool = False,
 ) -> None:
     try:
@@ -132,6 +189,7 @@ def rename_files_in_folder(
             rename_file(
                 file=file,
                 new_name=None if renaming_function is None else new_name,
+                attempt=attempt,
                 overwrite=overwrite,
             )
         except Exception as e:

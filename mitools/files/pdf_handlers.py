@@ -1,13 +1,11 @@
-import os
-import re
 from os import PathLike
 from pathlib import Path
 from typing import Dict, Union
 
 import PyPDF2
 
-from mitools.exceptions import ArgumentValueError
-from mitools.utils import fuzz_string_in_string
+from mitools.exceptions import ArgumentTypeError, ArgumentValueError
+from mitools.files import remove_characters_from_string, rename_file
 
 PATTERN = "^([A-Za-z0-9.]+-)+[A-Za-z0-9]+.pdf$"
 
@@ -34,30 +32,46 @@ def extract_pdf_metadata(pdf_filename: PathLike) -> Union[Dict[str, str], None]:
 
 
 def extract_pdf_title(pdf_filename: PathLike) -> str:
+    pdf_filename = Path(pdf_filename)
+    if not pdf_filename.is_file():
+        raise ArgumentValueError(f"'{pdf_filename}' is not a valid file path.")
+    if not pdf_filename.suffix.lower() == ".pdf":
+        raise ArgumentTypeError(f"'{pdf_filename}' is not a valid PDF file.")
     metadata = extract_pdf_metadata(pdf_filename)
     if "Title" in metadata:
         return metadata["Title"]
     else:
-        raise Exception(f"{os.path.basename(pdf_filename)} has no title in metadata")
+        raise ArgumentValueError(f"'{pdf_filename}' has no title in its metadata.")
 
 
-def set_pdf_filename_as_title(pdf_filename: PathLike, title: str) -> None:
-    title = re.sub("[:\)\(\/]*", "", title)
-    os.rename(pdf_filename, os.path.join(os.path.dirname(pdf_filename), f"{title}.pdf"))
+def set_pdf_title_as_filename(
+    pdf_filename: PathLike, attempt: bool = False, overwrite: bool = False
+) -> None:
+    pdf_filename = Path(pdf_filename).resolve(strict=True)
+    if pdf_filename.suffix.lower() != ".pdf":
+        raise ArgumentTypeError(f"'{pdf_filename}' is not a valid PDF file.")
+    title = extract_pdf_title(pdf_filename)
+    title = remove_characters_from_string(title).replace(" ", "_")
+    new_filename = pdf_filename.with_name(f"{title}.pdf")
+    rename_file(
+        file=pdf_filename, new_name=new_filename, overwrite=overwrite, attempt=attempt
+    )
 
 
-def set_folder_pdf_filenames_as_title(folder: PathLike) -> None:
-    pdfs = [f for f in os.listdir(folder) if f.endswith("pdf")]
-    for pdf in pdfs:
-        title = extract_pdf_title(pdf)
-        title_in_name = fuzz_string_in_string(title, pdf, 85)
-        if (re.match(PATTERN, pdf) or not title_in_name) and not pdf.startswith(
-            "RELEVANT"
-        ):
-            try:
-                set_pdf_filename_as_title(os.path.join(folder, pdf), title)
-            except Exception as e:
-                print(e)
+def set_folder_pdfs_titles_as_filenames(
+    folder_path: PathLike, attempt: bool = False, overwrite: bool = False
+) -> None:
+    try:
+        folder = Path(folder_path).resolve(strict=True)
+    except FileNotFoundError as e:
+        raise ArgumentValueError(f"Invalid 'folder_path'={folder_path} provided. {e}")
+    for file in folder.iterdir():
+        if not file.is_file() or file.suffix.lower() != ".pdf":
+            continue  # Skip non-PDF files
+        try:
+            set_pdf_title_as_filename(file, overwrite=overwrite, attempt=attempt)
+        except Exception as e:
+            print(f"Error processing '{file.name}': {e}")
 
 
 if __name__ == "__main__":
