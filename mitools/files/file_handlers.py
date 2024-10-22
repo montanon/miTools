@@ -88,6 +88,7 @@ def rename_folders_in_folder(
     folder_path: PathLike,
     char_replacement: Callable[[str], str] = None,
     attempt: bool = False,
+    overwrite: bool = False,
 ) -> None:
     folder_path = Path(folder_path).resolve(strict=False)
     if not folder_path.is_dir():
@@ -99,7 +100,7 @@ def rename_folders_in_folder(
             new_path = folder_path / new_name
             if folder == new_path:
                 continue
-            if new_path.exists():
+            if new_path.exists() and not overwrite:
                 print(
                     f"Skipping '{folder.name}' → '{new_name}' (target already exists)"
                 )
