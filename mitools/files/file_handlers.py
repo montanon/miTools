@@ -105,7 +105,10 @@ def rename_folders_in_folder(
                 )
                 continue
             if attempt:
-                print(f"[Attempt] Renaming '{folder.name}' to '{new_name}'")
+                print(
+                    f"[Attempt] Renaming '{folder.name}' to '{new_name}' results in {can_move_file_or_folder(folder, new_path)}"
+                )
+
             else:
                 print(f"Renaming '{folder.name}' to '{new_name}'")
                 shutil.move(str(folder), str(new_path))
