@@ -5,9 +5,10 @@ from unittest import TestCase
 
 import PyPDF2
 
-from mitools.exceptions import ArgumentValueError
+from mitools.exceptions import ArgumentTypeError, ArgumentValueError
 from mitools.files import (
     extract_pdf_metadata,
+    extract_pdf_title,
     folder_in_subtree,
     folder_is_subfolder,
     handle_duplicated_filenames,
@@ -496,6 +497,57 @@ class TestExtractPdfMetadata(TestCase):
             writer.write(f)
         result = extract_pdf_metadata(unicode_pdf)
         self.assertEqual(result, {"Title": "Тестовый PDF", "Producer": "PyPDF2"})
+
+
+class TestExtractPdfTitle(TestCase):
+    def setUp(self):
+        self.test_dir = Path("./test_folder")
+        self.test_dir.mkdir(exist_ok=True)
+        self.pdf_with_title = self.test_dir / "with_title.pdf"
+        with open(self.pdf_with_title, "wb") as f:
+            writer = PyPDF2.PdfWriter()
+            writer.add_metadata({"/Title": "Test PDF Title"})
+            writer.write(f)
+        self.pdf_without_title = self.test_dir / "without_title.pdf"
+        with open(self.pdf_without_title, "wb") as f:
+            writer = PyPDF2.PdfWriter()
+            writer.add_metadata({"/Author": "Jane Doe"})
+            writer.write(f)
+        self.corrupted_pdf = self.test_dir / "corrupted.pdf"
+        with open(self.corrupted_pdf, "wb") as f:
+            f.write(b"%PDF-1.4\nINVALID CONTENT")
+        self.non_pdf_file = self.test_dir / "not_a_pdf.txt"
+        with open(self.non_pdf_file, "w") as f:
+            f.write("This is not a PDF file.")
+
+    def tearDown(self):
+        if self.test_dir.exists():
+            shutil.rmtree(self.test_dir)
+
+    def test_extract_title_from_valid_pdf(self):
+        result = extract_pdf_title(self.pdf_with_title)
+        self.assertEqual(result, "Test PDF Title")
+
+    def test_extract_title_from_pdf_without_title(self):
+        with self.assertRaises(ArgumentValueError) as context:
+            extract_pdf_title(self.pdf_without_title)
+        self.assertIn("has no title in its metadata", str(context.exception))
+
+    def test_non_existent_file(self):
+        non_existing_file = self.test_dir / "non_existent.pdf"
+        with self.assertRaises(ArgumentValueError) as context:
+            extract_pdf_title(non_existing_file)
+        self.assertIn("is not a valid file path", str(context.exception))
+
+    def test_extract_title_from_corrupted_pdf(self):
+        with self.assertRaises(ArgumentValueError) as context:
+            extract_pdf_title(self.corrupted_pdf)
+        self.assertIn("Error reading PDF", str(context.exception))
+
+    def test_extract_title_from_non_pdf_file(self):
+        with self.assertRaises(ArgumentTypeError) as context:
+            extract_pdf_title(self.non_pdf_file)
+        self.assertIn("is not a valid pdf file", str(context.exception))
 
 
 if __name__ == "__main__":
