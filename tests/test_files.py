@@ -334,6 +334,14 @@ class TestRenameFile(TestCase):
         self.assertTrue(expected_file.exists())
         self.assertFalse(self.test_file.exists())
 
+    def test_custom_name_with_conflict_and_overwrite(self):
+        conflict_file = self.test_dir / "custom_name.txt"
+        conflict_file.touch()
+        rename_file(self.test_file, new_name="custom_name.txt", overwrite=True)
+        expected_file = self.test_dir / "custom_name.txt"
+        self.assertTrue(expected_file.exists())
+        self.assertFalse(self.test_file.exists())
+
 
 class TestRenameFilesInFolder(TestCase):
     def setUp(self):
@@ -364,11 +372,31 @@ class TestRenameFilesInFolder(TestCase):
 
     def test_rename_with_custom_function(self):
         def custom_renamer(file: str) -> str:
-            return file.replace("file", "renamed")
+            return file.replace("file%&", "renamed")
 
         rename_files_in_folder(self.test_dir, renaming_function=custom_renamer)
         renamed_files = {f.name for f in self.test_dir.iterdir() if f.is_file()}
         expected_files = {"renamed1.txt", "renamed2.pdf", "renamed3.TXT"}
+        self.assertEqual(renamed_files, expected_files)
+
+    def test_rename_with_duplicated_name(self):
+        def custom_renamer(file: str) -> str:
+            return file.replace("file%&", "file%&")  # Do nothing
+
+        rename_files_in_folder(self.test_dir, renaming_function=custom_renamer)
+        renamed_files = {f.name for f in self.test_dir.iterdir() if f.is_file()}
+        expected_files = {"file%&1_1.txt", "file%&2_1.pdf", "file%&3_1.TXT"}
+        self.assertEqual(renamed_files, expected_files)
+
+    def test_rename_with_duplicated_name_and_overwrite(self):
+        def custom_renamer(file: str) -> str:
+            return file.replace("file%&", "file%&")  # Do nothing
+
+        rename_files_in_folder(
+            self.test_dir, renaming_function=custom_renamer, overwrite=True
+        )
+        renamed_files = {f.name for f in self.test_dir.iterdir() if f.is_file()}
+        expected_files = {"file%&1.txt", "file%&2.pdf", "file%&3.TXT"}
         self.assertEqual(renamed_files, expected_files)
 
     def test_rename_skips_non_files(self):
