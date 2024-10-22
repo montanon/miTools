@@ -8,4 +8,9 @@ from .file_handlers import (
     rename_files_in_folder,
     rename_folders_in_folder,
 )
-from .scripts import *
+from .pdf_handlers import (
+    extract_pdf_metadata,
+    extract_pdf_title,
+    set_folder_pdf_filenames_as_title,
+    set_pdf_filename_as_title,
+)
