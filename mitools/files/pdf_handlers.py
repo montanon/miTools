@@ -7,6 +7,7 @@ from typing import Dict, Union
 import PyPDF2
 
 from mitools.exceptions import ArgumentTypeError, ArgumentValueError
+from mitools.files import remove_characters_from_string, rename_file
 from mitools.utils import fuzz_string_in_string
 
 PATTERN = "^([A-Za-z0-9.]+-)+[A-Za-z0-9]+.pdf$"
@@ -46,9 +47,14 @@ def extract_pdf_title(pdf_filename: PathLike) -> str:
         raise ArgumentValueError(f"'{pdf_filename}' has no title in its metadata.")
 
 
-def set_pdf_title_as_filename(pdf_filename: PathLike, title: str) -> None:
-    title = re.sub("[:\)\(\/]*", "", title)
-    os.rename(pdf_filename, os.path.join(os.path.dirname(pdf_filename), f"{title}.pdf"))
+def set_pdf_title_as_filename(pdf_filename: PathLike, overwrite: bool = False) -> None:
+    pdf_filename = Path(pdf_filename).resolve(strict=True)
+    if pdf_filename.suffix.lower() != ".pdf":
+        raise ArgumentValueError(f"'{pdf_filename}' is not a valid PDF file.")
+    title = extract_pdf_title(pdf_filename)
+    title = remove_characters_from_string(title)
+    new_filename = pdf_filename.with_name(f"{title}.pdf")
+    rename_file(file=pdf_filename, new_name=new_filename, overwrite=overwrite)
 
 
 def set_folder_pdf_filenames_as_title(folder: PathLike) -> None:
