@@ -3,6 +3,7 @@ import unittest
 from pathlib import Path
 from unittest import TestCase
 
+from mitools.exceptions import ArgumentValueError
 from mitools.files import (
     folder_in_subtree,
     folder_is_subfolder,
@@ -10,6 +11,7 @@ from mitools.files import (
     remove_characters_from_filename,
     remove_characters_from_string,
     rename_file,
+    rename_files_in_folder,
     rename_folders_in_folder,
 )
 
@@ -331,6 +333,60 @@ class TestRenameFile(TestCase):
         expected_file = self.test_dir / "custom_name_1.txt"
         self.assertTrue(expected_file.exists())
         self.assertFalse(self.test_file.exists())
+
+
+class TestRenameFilesInFolder(TestCase):
+    def setUp(self):
+        self.test_dir = Path("./test_folder")
+        self.test_dir.mkdir(exist_ok=True)
+        (self.test_dir / "file%&1.txt").touch()
+        (self.test_dir / "file%&2.pdf").touch()
+        (self.test_dir / "file%&3.TXT").touch()
+        (
+            self.test_dir / "non_file"
+        ).mkdir()  # Create a folder to ensure non-files are skipped
+
+    def tearDown(self):
+        if self.test_dir.exists():
+            shutil.rmtree(self.test_dir)
+
+    def test_default_rename_all_files(self):
+        rename_files_in_folder(self.test_dir)
+        renamed_files = {f.name for f in self.test_dir.iterdir() if f.is_file()}
+        expected_files = {"file1.txt", "file2.pdf", "file3.TXT"}
+        self.assertEqual(renamed_files, expected_files)
+
+    def test_rename_with_file_type_filter(self):
+        rename_files_in_folder(self.test_dir, file_types=[".txt"])
+        renamed_files = {f.name for f in self.test_dir.iterdir() if f.is_file()}
+        expected_files = {"file1.txt", "file3.TXT", "file%&2.pdf"}  # .pdf should remain
+        self.assertEqual(renamed_files, expected_files)
+
+    def test_rename_with_custom_function(self):
+        def custom_renamer(file: str) -> str:
+            return file.replace("file", "renamed")
+
+        rename_files_in_folder(self.test_dir, renaming_function=custom_renamer)
+        renamed_files = {f.name for f in self.test_dir.iterdir() if f.is_file()}
+        expected_files = {"renamed1.txt", "renamed2.pdf", "renamed3.TXT"}
+        self.assertEqual(renamed_files, expected_files)
+
+    def test_rename_skips_non_files(self):
+        rename_files_in_folder(self.test_dir)
+        self.assertTrue((self.test_dir / "non_file").exists())
+
+    def test_error_handling(self):
+        def faulty_renamer(file: str) -> str:
+            raise ValueError("Renaming failed")
+
+        try:
+            rename_files_in_folder(self.test_dir, renaming_function=faulty_renamer)
+        except Exception as e:
+            self.fail(f"rename_files_in_folder raised an unexpected exception: {e}")
+
+    def test_rename_with_nonexistent_folder(self):
+        with self.assertRaises(ArgumentValueError):
+            rename_files_in_folder(Path("./non_existent_folder"))
 
 
 if __name__ == "__main__":
