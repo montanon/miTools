@@ -13,11 +13,15 @@ def folder_is_subfolder(root_folder: PathLike, folder_to_check: PathLike) -> boo
     try:
         root_folder = root_folder.resolve(strict=False)
     except Exception as e:
-        raise ArgumentValueError(f"Invalid {root_folder} path provided: {e}")
+        raise ArgumentValueError(
+            f"Invalid 'root_folder'={root_folder} path provided: {e}"
+        )
     try:
         folder_to_check = folder_to_check.resolve(strict=False)
     except Exception as e:
-        raise ArgumentValueError(f"Invalid {folder_to_check} path provided: {e}")
+        raise ArgumentValueError(
+            f"Invalid 'folder_to_check'={folder_to_check} path provided: {e}"
+        )
     if root_folder == folder_to_check:
         return False
     return root_folder in folder_to_check.parents
