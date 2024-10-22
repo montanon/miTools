@@ -1,4 +1,5 @@
 from .file_handlers import (
+    can_move_file_or_folder,
     folder_in_subtree,
     folder_is_subfolder,
     handle_duplicated_filenames,
