@@ -172,34 +172,23 @@ class TestCheckIfTables(TestCase):
 
 class TestGetConnDbFolder(TestCase):
     def setUp(self):
-        self.conn = Mock(spec=Connection)
-        self.cursor = self.conn.cursor()
+        self.db_path = Path("./test_db_sqlite")
+        self.conn = sqlite3.connect(self.db_path)
 
-    @patch("os.path.dirname", return_value="/path/to/db_folder")
-    def test_valid_path(self, mock_dirname):
-        self.cursor.fetchone.return_value = [None, None, "/path/to/db.sqlite"]
+    def tearDown(self):
+        self.conn.close()
+        if self.db_path.exists():
+            self.db_path.unlink()  # Remove the temporary database file
+
+    def test_get_conn_db_folder(self):
         db_folder = get_conn_db_folder(self.conn)
-        self.assertEqual(db_folder, "/path/to/db_folder")
+        expected_folder = self.db_path.parent.absolute()
+        self.assertEqual(db_folder, expected_folder)
 
-    def test_none_path(self):
-        self.cursor.fetchone.return_value = None  # None is returned from fetchone
-        with self.assertRaises(
-            TypeError
-        ):  # This would cause TypeError when trying to access result[2]
-            get_conn_db_folder(self.conn)
-
-    def test_invalid_result(self):
-        self.cursor.fetchone.return_value = [None, None]  # Missing the third element
-        with self.assertRaises(IndexError):  # This would cause IndexError
-            get_conn_db_folder(self.conn)
-
-    def test_exception_while_executing_sql(self):
-        self.cursor.execute.side_effect = Exception(
-            "Some error"
-        )  # Simulating some database error
-        with self.assertRaises(Exception) as context:
-            get_conn_db_folder(self.conn)
-        self.assertEqual(str(context.exception), "Some error")
+    def test_in_memory_database(self):
+        with sqlite3.connect(":memory:") as in_memory_conn:
+            db_folder = get_conn_db_folder(in_memory_conn)
+            self.assertEqual(db_folder, Path(".").absolute())
 
 
 class TestConnectToSqlDb(TestCase):
