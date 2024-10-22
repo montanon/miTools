@@ -18,6 +18,7 @@ from mitools.files import (
     rename_file,
     rename_files_in_folder,
     rename_folders_in_folder,
+    set_folder_pdfs_titles_as_filenames,
     set_pdf_title_as_filename,
 )
 
@@ -679,6 +680,73 @@ class TestSetPdfTitleAsFilename(TestCase):
         set_pdf_title_as_filename(self.pdf_with_title, overwrite=True)
         self.assertTrue(duplicate_pdf.exists())
         self.assertFalse(self.pdf_with_title.exists())  # Original should be renamed
+
+
+class TestSetFolderPDFsTitlesAsFilenames(TestCase):
+    def setUp(self):
+        self.test_dir = Path("./test_folder")
+        self.test_dir.mkdir(exist_ok=True)
+        self.pdf_with_title = self.test_dir / "with_title.pdf"
+        self.create_pdf_with_metadata(self.pdf_with_title, title="Test Title")
+        self.pdf_without_title = self.test_dir / "without_title.pdf"
+        self.create_pdf_with_metadata(self.pdf_without_title, title=None)
+        self.non_pdf_file = self.test_dir / "not_a_pdf.txt"
+        self.non_pdf_file.write_text("This is a text file.")
+
+    def tearDown(self):
+        if self.test_dir.exists():
+            shutil.rmtree(self.test_dir)
+
+    @staticmethod
+    def create_pdf_with_metadata(file_path: Path, title: str = None):
+        pdf_writer = PyPDF2.PdfWriter()
+        pdf_writer.add_blank_page(width=72, height=72)  # Add a blank page
+        if title:
+            pdf_writer.add_metadata({"/Title": title})
+        with open(file_path, "wb") as f:
+            pdf_writer.write(f)
+
+    def test_valid_folder_with_pdfs(self):
+        set_folder_pdfs_titles_as_filenames(self.test_dir, overwrite=True)
+        expected_file = self.test_dir / "Test_Title.pdf"
+        self.assertTrue(expected_file.exists())
+
+    def test_pdf_without_title(self):
+        set_folder_pdfs_titles_as_filenames(self.test_dir, overwrite=True)
+
+    def test_skip_non_pdf_files(self):
+        set_folder_pdfs_titles_as_filenames(self.test_dir, overwrite=True)
+        self.assertTrue(self.non_pdf_file.exists())  # Non-PDF file remains unchanged
+
+    def test_invalid_folder_path(self):
+        with self.assertRaises(ArgumentValueError):
+            set_folder_pdfs_titles_as_filenames("./non_existent_folder")
+
+    def test_attempt_mode(self):
+        set_folder_pdfs_titles_as_filenames(self.test_dir, attempt=True)
+        old_file = self.test_dir / "with_title.pdf"
+        new_file = self.test_dir / "Test_Title.pdf"
+        self.assertTrue(old_file.exists())  # Ensure no renaming occurred
+        self.assertFalse(new_file.exists())
+
+    def test_dont_overwrite_existing_file(self):
+        duplicate_pdf = self.test_dir / "Test_Title.pdf"
+        self.create_pdf_with_metadata(duplicate_pdf, title="Test Title")
+        set_folder_pdfs_titles_as_filenames(self.test_dir, overwrite=False)
+        self.assertTrue((self.test_dir / "Test_Title_1.pdf").exists())
+        self.assertFalse((self.test_dir / "Test_Title.pdf").exists())
+
+    def test_overwrite_existing_file(self):
+        duplicate_pdf = self.test_dir / "Test_Title.pdf"
+        self.create_pdf_with_metadata(duplicate_pdf, title="Test Title")
+        set_folder_pdfs_titles_as_filenames(self.test_dir, overwrite=True)
+        self.assertTrue((self.test_dir / "Test_Title.pdf").exists())
+        self.assertFalse((self.test_dir / "Test_Title_1.pdf").exists())
+
+    def test_failure_handling_in_pdf_processing(self):
+        corrupted_pdf = self.test_dir / "corrupted.pdf"
+        corrupted_pdf.write_text("This is not a valid PDF.")
+        set_folder_pdfs_titles_as_filenames(self.test_dir)
 
 
 if __name__ == "__main__":
