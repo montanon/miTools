@@ -19,10 +19,11 @@ from mitools.etl import (
     read_sql_table,
     read_sql_tables,
     suppress_user_warning,
+    transfer_sql_table,
 )
 
 
-class TestMainConnection(unittest.TestCase):
+class TestMainConnection(TestCase):
     def setUp(self):
         self.conn1 = Path("./tests/.test_assets/conn1.db")
         self.conn2 = Path("./tests/.test_assets/conn2.db")
@@ -60,7 +61,7 @@ class TestMainConnection(unittest.TestCase):
 
 class TestCustomConnection(TestCase):
     def setUp(self):
-        self.path = "sample_path"
+        self.path = Path("sample_path").absolute()
         self.conn = CustomConnection(self.path)
 
     def tearDown(self):
@@ -287,7 +288,7 @@ class TestReadSqlTables(TestCase):
             )
 
 
-class TestTransferSqlTables(TestCase):
+class TestTransferSqlTable(TestCase):
     def setUp(self):
         # Set up two in-memory SQLite databases
         self.src_conn = sqlite3.connect(":memory:")
@@ -311,11 +312,11 @@ class TestTransferSqlTables(TestCase):
         self.src_conn.close()
         self.dst_conn.close()
 
-    def test_transfer_sql_tables(self):
+    def test_transfer_sql_table(self):
         # Given
         tablename = "sample"
         # Transfer table from src to dst
-        transfer_sql_tables(
+        transfer_sql_table(
             self.src_conn, self.dst_conn, tablename, if_exists="replace", index_col=None
         )
         # Verify the data was transferred
