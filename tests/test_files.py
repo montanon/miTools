@@ -1,8 +1,13 @@
+import shutil
 import unittest
 from pathlib import Path
 from unittest import TestCase
 
-from mitools.files import folder_in_subtree, folder_is_subfolder
+from mitools.files import (
+    folder_in_subtree,
+    folder_is_subfolder,
+    rename_folders_in_folder,
+)
 
 
 class TestFolderIsSubfolder(TestCase):
@@ -68,6 +73,53 @@ class TestFolderInSubtree(TestCase):
         self.assertEqual(
             result, Path("/home/user/documents/reports").resolve(strict=False)
         )
+
+
+class TestRenameFoldersInFolder(TestCase):
+    def setUp(self):
+        self.test_dir = Path("./test_folder")
+        self.test_dir.mkdir(exist_ok=True)
+        (self.test_dir / "folder 1").mkdir()
+        (self.test_dir / "folder 2").mkdir()
+        (self.test_dir / "already_exists").mkdir()
+
+    def tearDown(self):
+        if self.test_dir.exists():
+            shutil.rmtree(self.test_dir)
+
+    def test_default_rename(self):
+        rename_folders_in_folder(self.test_dir)
+        self.assertTrue((self.test_dir / "folder_1").exists())
+        self.assertTrue((self.test_dir / "folder_2").exists())
+
+    def test_attempt_mode(self):
+        rename_folders_in_folder(self.test_dir, attempt=True)
+        self.assertTrue((self.test_dir / "folder 1").exists())
+        self.assertTrue((self.test_dir / "folder 2").exists())
+
+    def test_custom_char_replacement(self):
+        rename_folders_in_folder(
+            self.test_dir, char_replacement=lambda name: name.replace(" ", "-")
+        )
+        self.assertTrue((self.test_dir / "folder-1").exists())
+        self.assertTrue((self.test_dir / "folder-2").exists())
+
+    def test_existing_target_folder(self):
+        (self.test_dir / "folder_1").mkdir()  # Create a conflicting folder
+        rename_folders_in_folder(self.test_dir)
+        self.assertTrue((self.test_dir / "folder 1").exists())  # Original remains
+
+    def test_no_change_for_identical_name(self):
+        (self.test_dir / "folder_1").mkdir()
+        rename_folders_in_folder(
+            self.test_dir,
+            char_replacement=lambda name: name,  # No change
+        )
+        self.assertTrue((self.test_dir / "folder_1").exists())
+
+    def test_invalid_directory(self):
+        with self.assertRaises(ValueError):
+            rename_folders_in_folder("./non_existent_folder")
 
 
 if __name__ == "__main__":
