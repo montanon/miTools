@@ -169,6 +169,7 @@ def rename_files_in_folder(
     folder_path: PathLike,
     file_types: List[str] = None,
     renaming_function: Callable[[str], str] = None,
+    attempt: bool = False,
     overwrite: bool = False,
 ) -> None:
     try:
@@ -186,6 +187,7 @@ def rename_files_in_folder(
             rename_file(
                 file=file,
                 new_name=None if renaming_function is None else new_name,
+                attempt=attempt,
                 overwrite=overwrite,
             )
         except Exception as e:
