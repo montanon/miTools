@@ -12,9 +12,9 @@ from ..utils import suppress_user_warning
 
 
 class CustomConnection(Connection):
-    def __init__(self, path, *args, **kwargs):
+    def __init__(self, path: PathLike, *args, **kwargs):
         super().__init__(path, *args, **kwargs)
-        self.path = path
+        self.path = Path(path).absolute()
 
     @property
     def __class__(self):
@@ -25,92 +25,85 @@ class MainConnection(CustomConnection):
     _instances = {}
 
     def __new__(cls, path: PathLike):
-        if not isinstance(path, Path):
-            path = Path(path)
-        path = str(path.absolute())
+        path = Path(path).absolute()
         if path not in cls._instances:
-            instance = super(MainConnection, cls).__new__(cls)
-            cls._instances[path] = instance
-            instance._initialized = False
+            cls._instances[path] = super(MainConnection, cls).__new__(cls)
+            cls._instances[path]._initialized = False
         return cls._instances[path]
 
-    def __init__(self, path, *args, **kwargs):
+    def __init__(self, path: PathLike, *args, **kwargs):
         if not self._initialized:
             super().__init__(path, *args, **kwargs)
-            self.path = path
             self._initialized = True
 
 
-def check_if_tables(conn: Connection, tablesnames: Iterable[str]) -> List[bool]:
-    return [check_if_table(conn, tablename) for tablename in tablesnames]
+def check_if_tables(conn: Connection, tables_names: Iterable[str]) -> List[bool]:
+    return [check_if_table(conn, table_name) for table_name in tables_names]
 
 
 def get_conn_db_folder(conn: Connection) -> PathLike:
     cursor = conn.cursor()
     cursor.execute("PRAGMA database_list;")
-    result = cursor.fetchone()
-    db_path = result[2]
-    db_folder = os.path.dirname(db_path)
-    return db_folder
+    db_path = Path(cursor.fetchone()[2])
+    return db_path.parent.absolute()
 
 
-def check_if_table(conn: Connection, tablename: str) -> bool:
-    c = conn.cursor()
+def check_if_table(conn: Connection, table_name: str) -> bool:
+    query = (
+        f'SELECT name FROM sqlite_master WHERE type="table" AND name="{table_name}";'
+    )
+    cursor = conn.cursor()
     try:
-        _ = conn.cursor().execute("SELECT name FROM sqlite_master")
-        c.execute(f'SELECT * FROM "{tablename}"')
-        return True if c.fetchone() else False
+        return cursor.execute(query).fetchone() is not None
     except OperationalError:
-        _ = conn.cursor().execute("SELECT name FROM sqlite_master")
         try:
-            db_folder = get_conn_db_folder(conn)
-            parquet_folder = os.path.join(db_folder, "parquet")
-            table_file = os.path.join(parquet_folder, f"{tablename}.parquet")
-            return True if os.path.exists(table_file) else False
-        except Exception:
+            parquet_folder = get_conn_db_folder(conn) / "parquet"
+            return (parquet_folder / f"{table_name}.parquet").exists()
+        except Exception as e:
             return False
 
 
-def connect_to_sql_db(db_path: Union[str, os.PathLike], db_name: str) -> Connection:
-    db_path = os.path.join(db_path, db_name)
+def connect_to_sql_db(db_path: Union[str, PathLike], db_name: str) -> CustomConnection:
+    db_path = Path(db_path) / db_name
     return CustomConnection(db_path)
 
 
 @suppress_user_warning
 def read_sql_table(
     conn: Connection,
-    tablename: str,
-    columns: Optional[Union[str, list, ndarray]] = None,
-    index_col: Optional[str] = "index",
+    table_name: str,
+    columns: Union[str, List[str], ndarray] = None,
+    index_col: str = None,
 ) -> DataFrame:
     if columns is None:
-        return pd.read_sql(f'SELECT * FROM "{tablename}"', conn, index_col=index_col)
+        query = f'SELECT * FROM "{table_name}";'
     elif isinstance(columns, (list, ndarray)):
-        return pd.read_sql(f'SELECT {", ".join(columns)} FROM "{tablename}"', conn)
+        query = f'SELECT {", ".join(columns)} FROM "{table_name}";'
     elif isinstance(columns, str):
-        return pd.read_sql(f'SELECT {columns} FROM "{tablename}"', conn)
+        query = f'SELECT {columns} FROM "{table_name}";'
+    else:
+        raise ValueError("Invalid column specification")
+
+    return pd.read_sql(query, conn, index_col=index_col if index_col else None)
 
 
 def read_sql_tables(
     conn: Connection,
-    tablenames: Iterable[str],
-    columns: Optional[Union[str, list, ndarray]] = None,
-    index_col: Optional[str] = "index",
+    table_names: Iterable[str],
+    columns: Union[str, List[str], ndarray] = None,
+    index_col: str = "index",
 ) -> List[DataFrame]:
-    return [
-        read_sql_table(conn, tablename, columns, index_col) for tablename in tablenames
-    ]
+    return [read_sql_table(conn, name, columns, index_col) for name in table_names]
 
 
 @suppress_user_warning
-def transfer_sql_tables(
-    src_db_connection: Connection,
-    dst_db_connection: Connection,
-    tablename: str,
-    if_exists: Optional[str] = "fail",
-    index_col: Optional[str] = "index",
+def transfer_sql_table(
+    src_conn: Connection,
+    dst_conn: Connection,
+    table_name: str,
+    if_exists: str = "fail",
+    index_col: str = "index",
 ) -> None:
-    table = pd.read_sql(
-        f"SELECT * FROM {tablename};", src_db_connection, index_col=index_col
-    )
-    table.to_sql(tablename, dst_db_connection, if_exists=if_exists)
+    query = f"SELECT * FROM {table_name};"
+    table = pd.read_sql(query, src_conn, index_col=index_col)
+    table.to_sql(table_name, dst_conn, if_exists=if_exists)

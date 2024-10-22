@@ -149,7 +149,7 @@ def calculate_relatedness_matrix(
     return wcp
 
 
-@jit
+@jit(nopython=True)
 def jit_calculate_economic_complexity(
     rca_matrix: np.ndarray,
 ) -> Tuple[np.ndarray, np.ndarray]:
