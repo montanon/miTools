@@ -34,11 +34,12 @@ def extract_pdf_metadata(pdf_filename: PathLike) -> Union[Dict[str, str], None]:
 
 
 def extract_pdf_title(pdf_filename: PathLike) -> str:
+    Path(pdf_filename)
     metadata = extract_pdf_metadata(pdf_filename)
     if "Title" in metadata:
         return metadata["Title"]
     else:
-        raise Exception(f"{os.path.basename(pdf_filename)} has no title in metadata")
+        raise ArgumentValueError(f"'{pdf_filename.name}' has no title in its metadata.")
 
 
 def set_pdf_filename_as_title(pdf_filename: PathLike, title: str) -> None:
