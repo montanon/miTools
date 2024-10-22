@@ -45,6 +45,44 @@ def folder_in_subtree(
     return None
 
 
+def can_move_file_or_folder(
+    source: PathLike, destination: PathLike, overwrite: bool = False
+) -> bool:
+    try:
+        source = Path(source).resolve(strict=True)
+    except FileNotFoundError as e:
+        raise ArgumentValueError(f"Invalid 'source'={source} provided.")
+    destination = Path(destination).resolve(strict=False)
+    if not destination.parent.exists():
+        raise ArgumentValueError(
+            f"'destination.parent={destination.parent}' does not exist."
+        )
+    if destination.exists() and not overwrite:
+        raise ArgumentValueError(f"'{destination}' already exists.")
+    if not source.is_readable():
+        raise PermissionError(f"Read permission denied for '{source}'.")
+    if not destination.parent.is_writable():
+        raise PermissionError(f"Write permission denied for '{destination.parent}'.")
+    if len(str(destination.name)) > 255:
+        raise OSError(
+            f"The path 'destination.name={destination.name}' exceeds the maximum length allowed."
+        )
+    if source.stat().st_dev != destination.stat().st_dev:
+        src_size = source.stat().st_size
+        free_space = destination.parent.stat().st_blocks * 512  # Approximate free space
+        if free_space < src_size:
+            raise OSError("Insufficient space on the destination drive.")
+    if source == destination:
+        return False
+    if source.is_dir() and destination.is_file():
+        return False
+    if source.is_file() and destination.is_dir():
+        return True
+    if source.is_dir() and destination.is_dir():
+        return True
+    return False
+
+
 def rename_folders_in_folder(
     folder_path: PathLike,
     char_replacement: Callable[[str], str] = None,
