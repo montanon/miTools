@@ -141,7 +141,10 @@ def handle_duplicated_filenames(file_path: Path) -> Path:
 
 
 def rename_file(
-    file: PathLike, new_name: Union[PathLike, str] = None, overwrite: bool = False
+    file: PathLike,
+    new_name: Union[PathLike, str] = None,
+    attempt: bool = False,
+    overwrite: bool = False,
 ) -> None:
     file = Path(file)
     new_name = new_name if isinstance(new_name, str) else new_name.name
@@ -153,8 +156,13 @@ def rename_file(
     new_file = (
         handle_duplicated_filenames(sanitized_name) if not overwrite else sanitized_name
     )
-    shutil.move(str(file), str(new_file))
-    print(f"Renamed '{file.name}' to '{new_file.name}'")
+    if attempt:
+        print(
+            f"[Attempt] Renaming '{file}' to '{new_name}' results in {can_move_file_or_folder(file, new_file, overwrite=overwrite)}"
+        )
+    elif can_move_file_or_folder(file, new_file, overwrite=overwrite):
+        shutil.move(str(file), str(new_file))
+        print(f"Renamed '{file.name}' to '{new_file.name}'")
 
 
 def rename_files_in_folder(
