@@ -1,6 +1,7 @@
+import shutil
 from os import PathLike
 from pathlib import Path
-from typing import List, Union
+from typing import Callable, List, Union
 
 from mitools.exceptions import ArgumentValueError
 
@@ -37,3 +38,30 @@ def folder_in_subtree(
         if folder == root_folder:
             break
     return None
+
+
+def rename_folders_in_folder(
+    folder_path: PathLike,
+    char_replacement: Callable[[str], str] = None,
+    attempt: bool = False,
+) -> None:
+    folder_path = Path(folder_path).resolve(strict=False)
+    if not folder_path.is_dir():
+        raise ArgumentValueError(f"{folder_path} is not a valid directory.")
+    char_replacement = char_replacement or (lambda name: name.replace(" ", "_"))
+    for folder in folder_path.iterdir():
+        if folder.is_dir():
+            new_name = char_replacement(folder.name)
+            new_path = folder_path / new_name
+            if folder == new_path:
+                continue
+            if new_path.exists():
+                print(
+                    f"Skipping '{folder.name}' → '{new_name}' (target already exists)"
+                )
+                continue
+            if attempt:
+                print(f"[Attempt] Renaming '{folder.name}' to '{new_name}'")
+            else:
+                print(f"Renaming '{folder.name}' to '{new_name}'")
+                shutil.move(str(folder), str(new_path))
