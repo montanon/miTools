@@ -73,7 +73,7 @@ def read_sql_table(
     conn: Connection,
     table_name: str,
     columns: Union[str, List[str], ndarray] = None,
-    index_col: str = "index",
+    index_col: str = None,
 ) -> DataFrame:
     if columns is None:
         query = f'SELECT * FROM "{table_name}";'
@@ -84,7 +84,7 @@ def read_sql_table(
     else:
         raise ValueError("Invalid column specification")
 
-    return pd.read_sql(query, conn, index_col=index_col)
+    return pd.read_sql(query, conn, index_col=index_col if index_col else None)
 
 
 def read_sql_tables(

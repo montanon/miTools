@@ -7,6 +7,8 @@ from unittest import TestCase
 from unittest.mock import Mock, patch
 
 import pandas as pd
+from pandas import DataFrame
+from pandas.testing import assert_frame_equal
 
 from mitools.etl import (
     Connection,
@@ -208,47 +210,57 @@ class TestConnectToSqlDb(TestCase):
 
 class TestReadSqlTable(TestCase):
     def setUp(self):
-        self.conn = Mock(spec=Connection)
-
-    @patch("pandas.read_sql")
-    def test_read_full_table(self, mock_read_sql):
-        tablename = "sample_table"
-        mock_read_sql.return_value = (
-            "dataframe_result"  # Mock return value for pd.read_sql
+        self.db_path = Path("./test_temp_db.sqlite")
+        self.conn = sqlite3.connect(self.db_path)
+        self.conn.execute(
+            """
+            CREATE TABLE test_table (
+                id INTEGER PRIMARY KEY,
+                name TEXT,
+                age INTEGER
+            );
+            """
         )
-        result = read_sql_table(self.conn, tablename)
-        mock_read_sql.assert_called_once_with(
-            f'SELECT * FROM "{tablename}"', self.conn, index_col="index"
+        self.conn.executemany(
+            "INSERT INTO test_table (name, age) VALUES (?, ?);",
+            [("Alice", 25), ("Bob", 30), ("Charlie", 35)],
         )
-        self.assertEqual(result, "dataframe_result")
+        self.conn.commit()
 
-    @patch("pandas.read_sql")
-    def test_read_specific_columns_list(self, mock_read_sql):
-        tablename = "sample_table"
-        columns = ["col1", "col2"]
-        mock_read_sql.return_value = "dataframe_result"
-        result = read_sql_table(self.conn, tablename, columns=columns)
-        mock_read_sql.assert_called_once_with(
-            f'SELECT col1, col2 FROM "{tablename}"', self.conn
-        )
-        self.assertEqual(result, "dataframe_result")
+    def tearDown(self):
+        self.conn.close()
+        if self.db_path.exists():
+            self.db_path.unlink()  # Remove the temporary database file
 
-    @patch("pandas.read_sql")
-    def test_read_specific_column_string(self, mock_read_sql):
-        tablename = "sample_table"
-        columns = "col1"
-        mock_read_sql.return_value = "dataframe_result"
-        result = read_sql_table(self.conn, tablename, columns=columns)
-        mock_read_sql.assert_called_once_with(
-            f'SELECT col1 FROM "{tablename}"', self.conn
-        )
-        self.assertEqual(result, "dataframe_result")
+    def test_read_full_table(self):
+        expected = DataFrame(
+            {"id": [1, 2, 3], "name": ["Alice", "Bob", "Charlie"], "age": [25, 30, 35]}
+        ).set_index("id")
 
-    def test_unexpected_columns_type(self):
-        tablename = "sample_table"
-        columns = 123  # Intentionally wrong type
-        result = read_sql_table(self.conn, tablename, columns=columns)
-        self.assertIsNone(result)
+        result = read_sql_table(self.conn, "test_table", index_col="id")
+        assert_frame_equal(result, expected)
+
+    def test_read_specific_columns(self):
+        expected = DataFrame({"name": ["Alice", "Bob", "Charlie"]})
+
+        result = read_sql_table(self.conn, "test_table", columns=["name"])
+        from IPython.display import display
+
+        display(result)
+        assert_frame_equal(result, expected)
+
+    def test_read_single_column_as_string(self):
+        expected = DataFrame({"age": [25, 30, 35]})
+        result = read_sql_table(self.conn, "test_table", columns="age")
+        assert_frame_equal(result, expected)
+
+    def test_invalid_column_specification(self):
+        with self.assertRaises(ValueError):
+            read_sql_table(self.conn, "test_table", columns={"invalid": "dict"})
+
+    def test_non_existent_table(self):
+        with self.assertRaises(pd.io.sql.DatabaseError):
+            read_sql_table(self.conn, "non_existent_table")
 
 
 class TestReadSqlTables(TestCase):
