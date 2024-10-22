@@ -9,6 +9,7 @@ from mitools.files import (
     handle_duplicated_filenames,
     remove_characters_from_filename,
     remove_characters_from_string,
+    rename_file,
     rename_folders_in_folder,
 )
 
@@ -274,6 +275,62 @@ class TestHandleDuplicatedFilenames(TestCase):
         non_existing_file = Path("./non_existing_folder/test_file.txt")
         result = handle_duplicated_filenames(non_existing_file)
         self.assertEqual(result, non_existing_file)
+
+
+class TestRenameFile(TestCase):
+    def setUp(self):
+        self.test_dir = Path("./test_folder")
+        self.test_dir.mkdir(exist_ok=True)
+        self.test_file = self.test_dir / "invalid:file?name.txt"
+        self.test_file.touch()  # Create the initial test file
+
+    def tearDown(self):
+        if self.test_dir.exists():
+            shutil.rmtree(self.test_dir)
+
+    def test_default_rename_with_sanitization(self):
+        rename_file(self.test_file)
+        expected_file = self.test_dir / "invalidfilename.txt"
+        self.assertTrue(expected_file.exists())
+        self.assertFalse(self.test_file.exists())
+
+    def test_custom_rename(self):
+        new_name = "custom_name.txt"
+        rename_file(self.test_file, new_name=new_name)
+        expected_file = self.test_dir / new_name
+        self.assertTrue(expected_file.exists())
+        self.assertFalse(self.test_file.exists())
+
+    def test_conflict_handling(self):
+        conflict_file = self.test_dir / "invalidfilename.txt"
+        conflict_file.touch()
+
+        rename_file(self.test_file)
+        expected_file = self.test_dir / "invalidfilename_1.txt"
+        self.assertTrue(expected_file.exists())
+        self.assertFalse(self.test_file.exists())
+
+    def test_rename_no_extension(self):
+        no_ext_file = self.test_dir / "invalid:file?name"
+        no_ext_file.touch()
+
+        rename_file(no_ext_file)
+        expected_file = self.test_dir / "invalidfilename"
+        self.assertTrue(expected_file.exists())
+        self.assertFalse(no_ext_file.exists())
+
+    def test_non_existent_file(self):
+        non_existent_file = self.test_dir / "non_existent.txt"
+        with self.assertRaises(FileNotFoundError):
+            rename_file(non_existent_file)
+
+    def test_custom_name_with_conflict(self):
+        conflict_file = self.test_dir / "custom_name.txt"
+        conflict_file.touch()
+        rename_file(self.test_file, new_name="custom_name.txt")
+        expected_file = self.test_dir / "custom_name_1.txt"
+        self.assertTrue(expected_file.exists())
+        self.assertFalse(self.test_file.exists())
 
 
 if __name__ == "__main__":
