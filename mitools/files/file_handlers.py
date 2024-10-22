@@ -22,15 +22,14 @@ def folder_is_subfolder(root_folder: PathLike, folder_to_check: PathLike) -> boo
 
 
 def folder_in_subtree(
-    root_folder: Path, branch_folder: Path, folders_to_check: List[Path]
+    root_folder: PathLike, branch_folder: PathLike, folders_to_check: List[PathLike]
 ) -> Union[Path, None]:
-    root_folder = root_folder.resolve()
-    branch_folder = branch_folder.resolve()
-    folders_to_check = [folder.resolve() for folder in folders_to_check]
+    root_folder = Path(root_folder).resolve()
+    branch_folder = Path(branch_folder).resolve()
+    folders_to_check = {Path(folder).resolve() for folder in folders_to_check}
     if not folder_is_subfolder(root_folder, branch_folder):
         return None
-    intermediate_folders = list(branch_folder.parents)
-    for folder in intermediate_folders:
+    for folder in branch_folder.parents:
         if folder in folders_to_check:
             return folder
         if folder == root_folder:
