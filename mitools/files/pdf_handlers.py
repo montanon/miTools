@@ -62,7 +62,7 @@ def set_pdf_title_as_filename(
 
 
 def set_folder_pdfs_titles_as_filenames(
-    folder_path: PathLike, overwrite: bool = False
+    folder_path: PathLike, attempt: bool = False, overwrite: bool = False
 ) -> None:
     try:
         folder = Path(folder_path).resolve(strict=True)
@@ -72,7 +72,7 @@ def set_folder_pdfs_titles_as_filenames(
         if not file.is_file() or file.suffix.lower() != ".pdf":
             continue  # Skip non-PDF files
         try:
-            set_pdf_title_as_filename(file, overwrite=overwrite)
+            set_pdf_title_as_filename(file, overwrite=overwrite, attempt=attempt)
         except Exception as e:
             print(f"Error processing '{file.name}': {e}")
 
