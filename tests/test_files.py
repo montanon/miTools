@@ -3,8 +3,11 @@ import unittest
 from pathlib import Path
 from unittest import TestCase
 
+import PyPDF2
+
 from mitools.exceptions import ArgumentValueError
 from mitools.files import (
+    extract_pdf_metadata,
     folder_in_subtree,
     folder_is_subfolder,
     handle_duplicated_filenames,
@@ -415,6 +418,84 @@ class TestRenameFilesInFolder(TestCase):
     def test_rename_with_nonexistent_folder(self):
         with self.assertRaises(ArgumentValueError):
             rename_files_in_folder(Path("./non_existent_folder"))
+
+
+class TestExtractPdfMetadata(TestCase):
+    def setUp(self):
+        self.test_dir = Path("./test_folder")
+        self.test_dir.mkdir(exist_ok=True)
+        self.pdf_with_metadata = self.test_dir / "with_metadata.pdf"
+        with open(self.pdf_with_metadata, "wb") as f:
+            writer = PyPDF2.PdfWriter()
+            writer.add_metadata(
+                {
+                    "/Title": "Test PDF",
+                    "/Author": "Jane Doe",
+                    "/Subject": "Testing Metadata",
+                }
+            )
+            writer.write(f)
+        self.pdf_without_metadata = self.test_dir / "without_metadata.pdf"
+        with open(self.pdf_without_metadata, "wb") as f:
+            writer = PyPDF2.PdfWriter()
+            writer.write(f)
+        self.corrupted_pdf = self.test_dir / "corrupted.pdf"
+        with open(self.corrupted_pdf, "wb") as f:
+            f.write(b"%PDF-1.4\nINVALID CONTENT")
+        self.non_pdf_file = self.test_dir / "not_a_pdf.txt"
+        with open(self.non_pdf_file, "w") as f:
+            f.write("This is not a PDF file.")
+
+    def tearDown(self):
+        if self.test_dir.exists():
+            shutil.rmtree(self.test_dir)
+
+    def test_extract_metadata_valid_pdf(self):
+        result = extract_pdf_metadata(self.pdf_with_metadata)
+        expected = {
+            "Title": "Test PDF",
+            "Author": "Jane Doe",
+            "Subject": "Testing Metadata",
+            "Producer": "PyPDF2",
+        }
+        self.assertEqual(result, expected)
+
+    def test_extract_metadata_empty_pdf(self):
+        result = extract_pdf_metadata(self.pdf_without_metadata)
+        self.assertEqual(result, {"Producer": "PyPDF2"})
+
+    def test_non_existing_file(self):
+        non_existing_file = self.test_dir / "non_existent.pdf"
+        with self.assertRaises(ArgumentValueError):
+            extract_pdf_metadata(non_existing_file)
+
+    def test_corrupted_pdf(self):
+        with self.assertRaises(ArgumentValueError):
+            extract_pdf_metadata(self.corrupted_pdf)
+
+    def test_non_pdf_file(self):
+        with self.assertRaises(ArgumentValueError):
+            extract_pdf_metadata(self.non_pdf_file)
+
+    def test_large_pdf_with_metadata(self):
+        large_pdf = self.test_dir / "large_with_metadata.pdf"
+        with open(large_pdf, "wb") as f:
+            writer = PyPDF2.PdfWriter()
+            writer.add_metadata({"/Title": "Large Test PDF"})
+            for _ in range(100):
+                writer.add_blank_page(width=210, height=297)
+            writer.write(f)
+        result = extract_pdf_metadata(large_pdf)
+        self.assertEqual(result, {"Title": "Large Test PDF", "Producer": "PyPDF2"})
+
+    def test_unicode_metadata(self):
+        unicode_pdf = self.test_dir / "unicode_metadata.pdf"
+        with open(unicode_pdf, "wb") as f:
+            writer = PyPDF2.PdfWriter()
+            writer.add_metadata({"/Title": "Тестовый PDF"})  # Russian text
+            writer.write(f)
+        result = extract_pdf_metadata(unicode_pdf)
+        self.assertEqual(result, {"Title": "Тестовый PDF", "Producer": "PyPDF2"})
 
 
 if __name__ == "__main__":
