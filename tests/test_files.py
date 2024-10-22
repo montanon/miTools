@@ -7,6 +7,7 @@ import PyPDF2
 
 from mitools.exceptions import ArgumentTypeError, ArgumentValueError
 from mitools.files import (
+    can_move_file_or_folder,
     extract_pdf_metadata,
     extract_pdf_title,
     folder_in_subtree,
@@ -17,6 +18,7 @@ from mitools.files import (
     rename_file,
     rename_files_in_folder,
     rename_folders_in_folder,
+    set_pdf_title_as_filename,
 )
 
 
@@ -83,6 +85,83 @@ class TestFolderInSubtree(TestCase):
         self.assertEqual(
             result, Path("/home/user/documents/reports").resolve(strict=False)
         )
+
+
+class TestCanMoveFileOrFolder(TestCase):
+    def setUp(self):
+        self.test_dir = Path("./test_folder")
+        self.test_dir.mkdir(exist_ok=True)
+        self.source_file = self.test_dir / "source.txt"
+        self.source_file.write_text("This is a test file.")
+        self.source_folder = self.test_dir / "source_folder"
+        self.source_folder.mkdir()
+        self.destination_file = self.test_dir / "destination.txt"
+        self.destination_folder = self.test_dir / "destination_folder"
+        self.destination_folder.mkdir()
+
+    def tearDown(self):
+        if self.test_dir.exists():
+            shutil.rmtree(self.test_dir)
+
+    def test_valid_file_to_file_move(self):
+        destination = self.test_dir / "new_name.txt"
+        self.assertTrue(can_move_file_or_folder(self.source_file, destination))
+
+    def test_file_to_existing_file_without_overwrite(self):
+        self.destination_file.touch()  # Create destination file
+        with self.assertRaises(ArgumentValueError):
+            can_move_file_or_folder(self.source_file, self.destination_file)
+
+    def test_file_to_existing_file_with_overwrite(self):
+        self.destination_file.touch()  # Create destination file
+        self.assertTrue(
+            can_move_file_or_folder(
+                self.source_file, self.destination_file, overwrite=True
+            )
+        )
+
+    def test_directory_to_existing_file(self):
+        self.assertFalse(
+            can_move_file_or_folder(self.source_folder, self.destination_file)
+        )
+
+    def test_file_to_directory(self):
+        destination = self.destination_folder / "new_file.txt"
+        self.assertTrue(can_move_file_or_folder(self.source_file, destination))
+
+    def test_directory_to_directory(self):
+        new_directory = self.test_dir / "new_folder"
+        new_directory.mkdir(exist_ok=True)
+        self.assertTrue(
+            can_move_file_or_folder(self.source_folder, new_directory, overwrite=True)
+        )
+
+    def test_source_not_exist(self):
+        non_existent_file = self.test_dir / "non_existent.txt"
+        with self.assertRaises(ArgumentValueError):
+            can_move_file_or_folder(non_existent_file, self.destination_file)
+
+    def test_destination_parent_not_exist(self):
+        invalid_destination = Path("./non_existent_folder/destination.txt")
+        with self.assertRaises(ArgumentValueError):
+            can_move_file_or_folder(self.source_file, invalid_destination)
+
+    def test_permission_denied(self):
+        self.source_file.chmod(0o000)
+        with self.assertRaises(PermissionError):
+            can_move_file_or_folder(self.source_file, self.destination_file)
+        self.source_file.chmod(0o644)
+
+    def test_path_length_exceeded(self):
+        long_name = "a" * 256 + ".txt"
+        long_path = self.test_dir / long_name
+        with self.assertRaises(OSError):
+            can_move_file_or_folder(self.source_file, long_path)
+
+    def test_insufficient_space(self):
+        if self.source_file.stat().st_dev != self.destination_folder.stat().st_dev:
+            with self.assertRaises(OSError):
+                can_move_file_or_folder(self.source_file, self.destination_file)
 
 
 class TestRenameFoldersInFolder(TestCase):
@@ -548,6 +627,58 @@ class TestExtractPdfTitle(TestCase):
         with self.assertRaises(ArgumentTypeError) as context:
             extract_pdf_title(self.non_pdf_file)
         self.assertIn("is not a valid pdf file", str(context.exception))
+
+
+class TestSetPdfTitleAsFilename(TestCase):
+    def setUp(self):
+        self.test_dir = Path("./test_folder")
+        self.test_dir.mkdir(exist_ok=True)
+        self.pdf_with_title = self.test_dir / "with_title.pdf"
+        with open(self.pdf_with_title, "wb") as f:
+            writer = PyPDF2.PdfWriter()
+            writer.add_metadata({"/Title": "Valid PDF Title"})
+            writer.write(f)
+        self.pdf_without_title = self.test_dir / "without_title.pdf"
+        with open(self.pdf_without_title, "wb") as f:
+            writer = PyPDF2.PdfWriter()
+            writer.add_metadata({"/Author": "Jane Doe"})
+            writer.write(f)
+        self.non_pdf_file = self.test_dir / "not_a_pdf.txt"
+        with open(self.non_pdf_file, "w") as f:
+            f.write("This is not a PDF file.")
+
+    def tearDown(self):
+        if self.test_dir.exists():
+            shutil.rmtree(self.test_dir)
+
+    def test_valid_pdf_with_title(self):
+        set_pdf_title_as_filename(self.pdf_with_title)
+        expected_filename = self.test_dir / "Valid_PDF_Title.pdf"
+        self.assertTrue(expected_filename.exists())
+
+    def test_pdf_without_title(self):
+        with self.assertRaises(ArgumentValueError) as context:
+            set_pdf_title_as_filename(self.pdf_without_title)
+        self.assertIn("has no title in its metadata", str(context.exception))
+
+    def test_non_pdf_file(self):
+        with self.assertRaises(ArgumentTypeError) as context:
+            set_pdf_title_as_filename(self.non_pdf_file)
+        self.assertIn("is not a valid PDF file", str(context.exception))
+
+    def test_rename_with_duplicate_filename(self):
+        duplicate_pdf = self.test_dir / "Valid_PDF_Title.pdf"
+        duplicate_pdf.touch()  # Create a duplicate file
+        set_pdf_title_as_filename(self.pdf_with_title)
+        expected_filename = self.test_dir / "Valid_PDF_Title_1.pdf"
+        self.assertTrue(expected_filename.exists())
+
+    def test_overwrite_existing_file(self):
+        duplicate_pdf = self.test_dir / "Valid_PDF_Title.pdf"
+        duplicate_pdf.touch()  # Create a duplicate file
+        set_pdf_title_as_filename(self.pdf_with_title, overwrite=True)
+        self.assertTrue(duplicate_pdf.exists())
+        self.assertFalse(self.pdf_with_title.exists())  # Original should be renamed
 
 
 if __name__ == "__main__":
