@@ -6,6 +6,7 @@ from unittest import TestCase
 from mitools.files import (
     folder_in_subtree,
     folder_is_subfolder,
+    remove_characters_from_string,
     rename_folders_in_folder,
 )
 
@@ -120,6 +121,60 @@ class TestRenameFoldersInFolder(TestCase):
     def test_invalid_directory(self):
         with self.assertRaises(ValueError):
             rename_folders_in_folder("./non_existent_folder")
+
+
+class TestRemoveCharactersFromString(TestCase):
+    def test_default_removal(self):
+        input_str = "file:name?with|invalid<characters>"
+        expected = "filenamewithinvalidcharacters"
+        result = remove_characters_from_string(input_str)
+        self.assertEqual(result, expected)
+
+    def test_path_object_input(self):
+        path_input = Path("invalid/file:name.txt")
+        expected = "invalidfilename.txt"
+        result = remove_characters_from_string(str(path_input))
+        self.assertEqual(result, expected)
+
+    def test_custom_character_removal(self):
+        input_str = "remove these characters!"
+        characters_to_remove = r"[!]"
+        expected = "remove these characters"
+        result = remove_characters_from_string(input_str, characters_to_remove)
+        self.assertEqual(result, expected)
+
+    def test_no_characters_to_remove(self):
+        input_str = "this string stays unchanged"
+        result = remove_characters_from_string(input_str, "")
+        self.assertEqual(result, input_str)
+
+    def test_empty_string(self):
+        input_str = ""
+        result = remove_characters_from_string(input_str)
+        self.assertEqual(result, "")
+
+    def test_all_characters_removed(self):
+        input_str = "removeall"
+        characters_to_remove = r"[a-z]"
+        result = remove_characters_from_string(input_str, characters_to_remove)
+        self.assertEqual(result, "")
+
+    def test_special_characters_in_input(self):
+        input_str = "@hello$world!"
+        expected = "@hello$world!"
+        result = remove_characters_from_string(input_str, r'[\\/*?:"<>|]')
+        self.assertEqual(result, expected)
+
+    def test_non_matching_characters(self):
+        input_str = "no_match_here"
+        characters_to_remove = r"[XYZ]"
+        result = remove_characters_from_string(input_str, characters_to_remove)
+        self.assertEqual(result, input_str)
+
+    def test_unicode_characters(self):
+        input_str = "hello✨world"
+        result = remove_characters_from_string(input_str, r"[✨]")
+        self.assertEqual(result, "helloworld")
 
 
 if __name__ == "__main__":
