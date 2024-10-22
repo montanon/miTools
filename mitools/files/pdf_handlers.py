@@ -52,7 +52,7 @@ def set_pdf_title_as_filename(pdf_filename: PathLike, overwrite: bool = False) -
     if pdf_filename.suffix.lower() != ".pdf":
         raise ArgumentValueError(f"'{pdf_filename}' is not a valid PDF file.")
     title = extract_pdf_title(pdf_filename)
-    title = remove_characters_from_string(title)
+    title = remove_characters_from_string(title).replace(" ", "_")
     new_filename = pdf_filename.with_name(f"{title}.pdf")
     rename_file(file=pdf_filename, new_name=new_filename, overwrite=overwrite)
 
