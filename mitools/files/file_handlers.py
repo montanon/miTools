@@ -1,3 +1,4 @@
+import os
 import re
 import shutil
 from os import PathLike
@@ -59,15 +60,15 @@ def can_move_file_or_folder(
         )
     if destination.exists() and not overwrite:
         raise ArgumentValueError(f"'{destination}' already exists.")
-    if not source.is_readable():
+    if not os.access(source, os.R_OK):
         raise PermissionError(f"Read permission denied for '{source}'.")
-    if not destination.parent.is_writable():
+    if not os.access(destination.parent, os.W_OK):
         raise PermissionError(f"Write permission denied for '{destination.parent}'.")
     if len(str(destination.name)) > 255:
         raise OSError(
             f"The path 'destination.name={destination.name}' exceeds the maximum length allowed."
         )
-    if source.stat().st_dev != destination.stat().st_dev:
+    if source.stat().st_dev != destination.parent.stat().st_dev:
         src_size = source.stat().st_size
         free_space = destination.parent.stat().st_blocks * 512  # Approximate free space
         if free_space < src_size:
@@ -76,7 +77,7 @@ def can_move_file_or_folder(
         return False
     if source.is_dir() and destination.is_file():
         return False
-    if source.is_file() and destination.is_dir():
+    if source.is_file() and destination.parent.is_dir():
         return True
     if source.is_dir() and destination.is_dir():
         return True
