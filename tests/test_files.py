@@ -6,6 +6,7 @@ from unittest import TestCase
 from mitools.files import (
     folder_in_subtree,
     folder_is_subfolder,
+    remove_characters_from_filename,
     remove_characters_from_string,
     rename_folders_in_folder,
 )
@@ -175,6 +176,57 @@ class TestRemoveCharactersFromString(TestCase):
         input_str = "hello✨world"
         result = remove_characters_from_string(input_str, r"[✨]")
         self.assertEqual(result, "helloworld")
+
+
+class TestRemoveCharactersFromFilename(unittest.TestCase):
+    def setUp(self):
+        self.test_file = Path("invalid:file?name.txt")
+        self.expected_file = Path("invalidfilename.txt")
+
+    def test_default_character_removal(self):
+        result = remove_characters_from_filename(self.test_file)
+        self.assertEqual(result.name, self.expected_file.name)
+
+    def test_custom_character_removal(self):
+        file_path = Path("file-name-to-remove-dash.txt")
+        expected = Path("filenametoremovedash.txt")
+        result = remove_characters_from_filename(file_path, characters=r"[-]")
+        self.assertEqual(result.name, expected.name)
+
+    def test_filename_without_illegal_characters(self):
+        file_path = Path("valid_filename.txt")
+        result = remove_characters_from_filename(file_path)
+        self.assertEqual(result.name, "valid_filename.txt")
+
+    def test_empty_filename(self):
+        file_path = Path(".txt")  # No name, only extension
+        result = remove_characters_from_filename(file_path)
+        self.assertEqual(result.name, ".txt")
+
+    def test_special_unicode_characters(self):
+        file_path = Path("hello✨world.txt")
+        expected = Path("helloworld.txt")
+        result = remove_characters_from_filename(file_path, characters=r"[✨]")
+        self.assertEqual(result.name, expected.name)
+
+    def test_path_object_with_nested_folders(self):
+        file_path = Path("some/folder/with/invalid:file?name.txt")
+        expected = Path("some/folder/with/invalidfilename.txt")
+        result = remove_characters_from_filename(file_path)
+        self.assertEqual(result.name, expected.name)
+        self.assertEqual(result.parent, Path("some/folder/with"))
+
+    def test_filename_with_spaces(self):
+        file_path = Path("file with spaces.txt")
+        expected = Path("filewithspaces.txt")
+        result = remove_characters_from_filename(file_path, characters=r"[ ]")
+        self.assertEqual(result.name, expected.name)
+
+    def test_non_existing_file_path(self):
+        file_path = Path("non_existing:file.txt")
+        expected = Path("non_existingfile.txt")
+        result = remove_characters_from_filename(file_path)
+        self.assertEqual(result.name, expected.name)
 
 
 if __name__ == "__main__":
