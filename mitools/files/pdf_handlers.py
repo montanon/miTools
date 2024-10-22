@@ -47,14 +47,18 @@ def extract_pdf_title(pdf_filename: PathLike) -> str:
         raise ArgumentValueError(f"'{pdf_filename}' has no title in its metadata.")
 
 
-def set_pdf_title_as_filename(pdf_filename: PathLike, overwrite: bool = False) -> None:
+def set_pdf_title_as_filename(
+    pdf_filename: PathLike, attempt: bool = False, overwrite: bool = False
+) -> None:
     pdf_filename = Path(pdf_filename).resolve(strict=True)
     if pdf_filename.suffix.lower() != ".pdf":
         raise ArgumentTypeError(f"'{pdf_filename}' is not a valid PDF file.")
     title = extract_pdf_title(pdf_filename)
     title = remove_characters_from_string(title).replace(" ", "_")
     new_filename = pdf_filename.with_name(f"{title}.pdf")
-    rename_file(file=pdf_filename, new_name=new_filename, overwrite=overwrite)
+    rename_file(
+        file=pdf_filename, new_name=new_filename, overwrite=overwrite, attempt=attempt
+    )
 
 
 def set_folder_pdfs_titles_as_filenames(
