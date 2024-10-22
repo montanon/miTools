@@ -1,3 +1,4 @@
+import re
 import shutil
 from os import PathLike
 from pathlib import Path
@@ -65,3 +66,59 @@ def rename_folders_in_folder(
             else:
                 print(f"Renaming '{folder.name}' to '{new_name}'")
                 shutil.move(str(folder), str(new_path))
+
+
+def remove_characters_from_string(string: str, characters: str = None) -> str:
+    if characters is None:
+        characters = r'[\\/*?:"<>|]'
+    return re.sub(characters, "", string)
+
+
+def remove_characters_from_filename(file_path: PathLike, characters: str = None) -> str:
+    file_path = Path(file_path)
+    filename = remove_characters_from_string(
+        string=file_path.stem, characters=characters
+    )
+    return file_path.with_name(f"{filename}{file_path.suffix}")
+
+
+def handle_duplicated_filenames(file_path: Path) -> Path:
+    counter = 1
+    new_file = file_path
+    while new_file.exists():
+        new_file = file_path.with_name(f"{file_path.stem}_{counter}{file_path.suffix}")
+        counter += 1
+    return new_file
+
+
+def rename_file(file: PathLike, new_name: str = None) -> None:
+    file = Path(file)
+    sanitized_name = (
+        remove_characters_from_filename(file) if new_name is None else new_name
+    )
+    new_file = handle_duplicated_filenames(file.with_name(sanitized_name))
+    shutil.move(str(file), str(new_file))
+    print(f"Renamed '{file.name}' to '{new_file.name}'")
+
+
+def rename_files_in_folder(
+    folder_path: PathLike,
+    file_types: List[str] = None,
+    renaming_function: Callable[[str], str] = None,
+) -> None:
+    folder = Path(folder_path).resolve(strict=True)
+    for file in folder.iterdir():
+        if not file.is_file():
+            continue  # Skip non-files
+        if file_types and file.suffix.lower() not in file_types:
+            continue  # Skip files not in the specified types
+        try:
+            rename_file(
+                file, None if renaming_function is None else renaming_function(file)
+            )
+        except Exception as e:
+            print(f"Error processing '{file.name}': {e}")
+
+
+if __name__ == "__main__":
+    pass
