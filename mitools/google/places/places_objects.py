@@ -6,7 +6,9 @@ from typing import Any, Dict, List, NewType, Optional, Protocol, Tuple
 
 import geopandas as gpd
 import seaborn as sns
+from geopandas import GeoDataFrame, GeoSeries
 from jsonschema import ValidationError, validate
+from matplotlib.pyplot import Axes
 from pandas import Series
 from shapely import Point, Polygon
 from shapely.ops import unary_union
@@ -309,72 +311,90 @@ class NewNearbySearchRequest:
 
 
 class CityGeojson:
+    TOKYO_WARDS_NAMES = [
+        "Chiyoda Ward",
+        "Koto Ward",
+        "Nakano",
+        "Meguro",
+        "Shinagawa Ward",
+        "Ota-ku",
+        "Setagaya",
+        "Suginami",
+        "Nerima Ward",
+        "Itabashi Ward",
+        "Adachi Ward",
+        "Katsushika",
+        "Edogawa Ward",
+        "Sumida Ward",
+        "Chuo-ku",
+        "Minato-ku",
+        "North Ward",
+        "Toshima ward",
+        "Shibuya Ward",
+        "Arakawa",
+        "Bunkyo Ward",
+        "Shinjuku ward",
+        "Taito",
+    ]
+
     def __init__(self, geojson_path: PathLike, name: str):
-        self.geojson_path = Path(geojson_path)
-        self.data = gpd.read_file(geojson_path)
+        self.geojson_path = self._validate_path(geojson_path)
+        self.data = self._load_geojson(self.geojson_path)
         self.name = name
         self.plots_width = 14
-        self.plots_aspect_ratio = 16 / 9
+        self.plots_aspect_ratio = 16.0 / 9.0
         self.plots_height = self.plots_width / self.plots_aspect_ratio
-
-        if self.geojson_path.name == "translated_tokyo_wards.geojson":
-            wards = [
-                "Chiyoda Ward",
-                "Koto Ward",
-                "Nakano",
-                "Meguro",
-                "Shinagawa Ward",
-                "Ota-ku",
-                "Setagaya",
-                "Suginami",
-                "Nerima Ward",
-                "Itabashi Ward",
-                "Adachi Ward",
-                "Katsushika",
-                "Edogawa Ward",
-                "Sumida Ward",
-                "Chuo-ku",
-                "Minato-ku",
-                "North Ward",
-                "Toshima ward",
-                "Shibuya Ward",
-                "Arakawa",
-                "Bunkyo Ward",
-                "Shinjuku ward",
-                "Taito",
-            ]
-            polygons = [
-                unary_union(self.data.loc[self.data["Wards"] == ward, "geometry"])
-                for ward in wards
-            ]
-            self.polygons = (
-                gpd.GeoSeries(polygons).explode(index_parts=True).reset_index(drop=True)
-            )
-        else:
-            self.polygons = self.data["geometry"]
+        self.polygons = self._process_polygons()
         self.merged_polygon = self.polygons.unary_union
         self.bounds = self.polygons.bounds.iloc[0].values
 
-    def plot_unary_polygon(self):
-        ax = gpd.GeoSeries(self.merged_polygon).plot(
-            facecolor="none",
-            edgecolor=sns.color_palette("Paired")[0],
-            figsize=(self.plots_width, self.plots_height),
-        )
-        ax.set_ylabel("Latitude")
-        ax.set_xlabel("Longitude")
-        ax.set_title(f"{self.name.title()} Polygon")
-        return ax
+    @staticmethod
+    def _validate_path(geojson_path: PathLike) -> Path:
+        path = Path(geojson_path).resolve(strict=True)
+        if not path.exists() or not path.is_file():
+            raise ArgumentValueError(f"Invalid GeoJSON path: {geojson_path}")
+        return path
 
-    def plot_polygons(self):
-        ax = gpd.GeoSeries(self.polygons).plot(
+    @staticmethod
+    def _load_geojson(geojson_path: Path) -> GeoDataFrame:
+        try:
+            return gpd.read_file(geojson_path)
+        except Exception as e:
+            raise ArgumentValueError(
+                f"Failed to load GeoJSON file: {geojson_path}. Error: {e}"
+            )
+
+    def _process_polygons(self) -> GeoSeries:
+        if self.geojson_path.name == "translated_tokyo_wards.geojson":
+            return self._merge_tokyo_wards()
+        return self.data["geometry"]
+
+    def _merge_tokyo_wards(self) -> GeoSeries:
+        polygons = [
+            unary_union(self.data.loc[self.data["Wards"] == ward, "geometry"])
+            for ward in self.TOKYO_WARDS_NAMES
+        ]
+        return GeoSeries(polygons).explode(index_parts=True).reset_index(drop=True)
+
+    def plot_unary_polygon(self) -> Axes:
+        return self._plot_geoseries(
+            GeoSeries(self.merged_polygon), f"{self.name.title()} Polygon"
+        )
+
+    def plot_polygons(self) -> Axes:
+        return self._plot_geoseries(
+            GeoSeries(self.polygons), f"{self.name.title()} Wards Polygons"
+        )
+
+    def _plot_geoseries(self, geoseries: GeoSeries, title: str) -> Axes:
+        ax = geoseries.plot(
             facecolor="none",
             edgecolor=sns.color_palette("Paired")[0],
             figsize=(self.plots_width, self.plots_height),
         )
         ax.set_ylabel("Latitude")
         ax.set_xlabel("Longitude")
-        ax.set_title(f"{self.name.title()} Wards Polygons")
+        ax.set_title(title)
         return ax
 
 
