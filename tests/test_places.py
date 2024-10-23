@@ -395,5 +395,123 @@ class TestNearbySearchRequest(TestCase):
         )
 
 
+class TestNewNearbySearchRequest(TestCase):
+    def setUp(self):
+        self.valid_location = Point(151.2099, -33.865143)  # Sydney coordinates
+        self.valid_distance = 1000.0
+        self.valid_included_types = ["restaurant", "cafe"]
+        self.valid_language = "en"
+
+    def test_successful_creation(self):
+        request = NewNearbySearchRequest(
+            location=self.valid_location,
+            distance_in_meters=self.valid_distance,
+            included_types=self.valid_included_types,
+        )
+        self.assertEqual(request.location, self.valid_location)
+        self.assertEqual(request.distance_in_meters, self.valid_distance)
+        self.assertEqual(request.included_types, self.valid_included_types)
+        self.assertEqual(request.language_code, self.valid_language)
+
+    def test_custom_language_code(self):
+        request = NewNearbySearchRequest(
+            location=self.valid_location,
+            distance_in_meters=self.valid_distance,
+            included_types=self.valid_included_types,
+            language_code="es",
+        )
+        self.assertEqual(request.language_code, "es")
+
+    def test_invalid_location_type(self):
+        with self.assertRaises(ArgumentTypeError):
+            NewNearbySearchRequest(
+                location=(-33.865143, 151.2099),  # Not a Point object
+                distance_in_meters=self.valid_distance,
+            )
+
+    def test_negative_distance(self):
+        with self.assertRaises(ArgumentValueError):
+            NewNearbySearchRequest(
+                location=self.valid_location,
+                distance_in_meters=-500.0,
+            )
+
+    def test_invalid_language_code(self):
+        with self.assertRaises(ArgumentValueError):
+            NewNearbySearchRequest(
+                location=self.valid_location,
+                distance_in_meters=self.valid_distance,
+                language_code="eng",  # Invalid length
+            )
+
+    def test_empty_included_types(self):
+        request = NewNearbySearchRequest(
+            location=self.valid_location,
+            distance_in_meters=self.valid_distance,
+            included_types=[],
+        )
+        self.assertEqual(request.included_types, [])
+
+    def test_invalid_max_result_count(self):
+        with self.assertRaises(ArgumentValueError):
+            NewNearbySearchRequest(
+                location=self.valid_location,
+                distance_in_meters=self.valid_distance,
+                max_result_count=0,
+            )
+
+    def test_json_query_output(self):
+        request = NewNearbySearchRequest(
+            location=self.valid_location,
+            distance_in_meters=self.valid_distance,
+            included_types=self.valid_included_types,
+        )
+        expected_query = {
+            "includedTypes": self.valid_included_types,
+            "maxResultCount": 20,
+            "locationRestriction": {
+                "circle": {
+                    "center": {
+                        "latitude": self.valid_location.centroid.y,
+                        "longitude": self.valid_location.centroid.x,
+                    },
+                    "radius": self.valid_distance,
+                }
+            },
+            "languageCode": self.valid_language,
+        }
+        self.assertDictEqual(request.json_query(), expected_query)
+
+    def test_large_distance(self):
+        request = NewNearbySearchRequest(
+            location=self.valid_location,
+            distance_in_meters=100000.0,  # Large distance
+        )
+        self.assertEqual(request.distance_in_meters, 100000.0)
+
+    def test_mutability_violation(self):
+        request = NewNearbySearchRequest(
+            location=self.valid_location,
+            distance_in_meters=self.valid_distance,
+        )
+        with self.assertRaises(AttributeError):
+            request.distance_in_meters = 500.0
+
+    def test_missing_included_types(self):
+        request = NewNearbySearchRequest(
+            location=self.valid_location,
+            distance_in_meters=self.valid_distance,
+        )
+        self.assertEqual(request.included_types, [])
+
+    def test_invalid_language_code_type(self):
+        with self.assertRaises(ArgumentValueError):
+            NewNearbySearchRequest(
+                location=self.valid_location,
+                distance_in_meters=self.valid_distance,
+                language_code=None,
+            )
+
+
 if __name__ == "__main__":
     unittest.main()
