@@ -6,7 +6,7 @@ import geopandas as gpd
 from pandas import Series
 from shapely import Point
 
-from mitools.exceptions import ArgumentKeyError, ArgumentValueError
+from mitools.exceptions import ArgumentKeyError, ArgumentTypeError, ArgumentValueError
 from mitools.google.places import (
     QUERY_HEADERS,
     AccessibilityOptions,
@@ -128,6 +128,123 @@ class TestPlace(TestCase):
         series = place.to_series()
         self.assertIsNone(series["price_level"])
         self.assertIsNone(series["rating"])
+
+
+class TestNewPlace(TestCase):
+    def setUp(self):
+        self.valid_data = {
+            "id": "123",
+            "types": ["restaurant", "food"],
+            "formattedAddress": "123 Main St, Springfield",
+            "addressComponents": [
+                {
+                    "longText": "Main St",
+                    "shortText": "Main",
+                    "types": ["route"],
+                    "languageCode": "en",
+                },
+            ],
+            "plusCode": {"globalCode": "849VCWC8+R9", "compoundCode": "CWC8+R9"},
+            "location": {"latitude": 40.7128, "longitude": -74.0060},
+            "viewport": {
+                "low": {"latitude": 40.7, "longitude": -74.01},
+                "high": {"latitude": 40.73, "longitude": -73.98},
+            },
+            "googleMapsUri": "https://maps.google.com/",
+            "utcOffsetMinutes": -240,
+            "adrFormatAddress": "<span>123 Main St</span>",
+            "businessStatus": "OPERATIONAL",
+            "iconMaskBaseUri": "https://example.com/icon.png",
+            "iconBackgroundColor": "#FFFFFF",
+            "displayName": {"text": "Sample Place"},
+            "primaryTypeDisplayName": {"text": "Restaurant"},
+            "primaryType": "restaurant",
+            "shortFormattedAddress": "Main St",
+            "accessibilityOptions": {"wheelchairAccessibleEntrance": True},
+            "internationalPhoneNumber": "+1 234-567-890",
+            "nationalPhoneNumber": "(234) 567-890",
+            "priceLevel": "3",
+            "rating": 4.5,
+            "userRatingCount": 200,
+            "websiteUri": "https://example.com",
+            "currentOpeningHours": "Open now",
+            "currentSecondaryOpeningHours": "Closed at 8 PM",
+            "regularOpeningHours": "Mon-Fri: 9 AM - 5 PM",
+            "regularSecondaryOpeningHours": "Sat: 10 AM - 4 PM",
+        }
+
+    def test_from_json_valid_data(self):
+        place = NewPlace.from_json(self.valid_data)
+        self.assertEqual(place.id, "123")
+        self.assertEqual(place.types, "restaurant,food")
+        self.assertEqual(place.latitude, 40.7128)
+        self.assertEqual(place.longitude, -74.0060)
+        self.assertEqual(place.globalCode, "849VCWC8+R9")
+        self.assertEqual(place.businessStatus, "OPERATIONAL")
+        self.assertEqual(place.rating, 4.5)
+        self.assertEqual(place.userRatingCount, 200)
+
+    def test_from_json_missing_fields(self):
+        minimal_data = {
+            "id": "123",
+            "types": ["restaurant"],
+            "location": {"latitude": 40.7128, "longitude": -74.0060},
+        }
+        place = NewPlace.from_json(minimal_data)
+        self.assertEqual(place.id, "123")
+        self.assertEqual(place.types, "restaurant")
+        self.assertEqual(place.businessStatus, "")  # Optional field
+
+    def test_from_json_invalid_data(self):
+        with self.assertRaises(ArgumentValueError):
+            NewPlace.from_json({"invalid_key": "value"})
+
+    def test_parse_address_components(self):
+        components = NewPlace._parse_address_components(
+            self.valid_data["addressComponents"]
+        )
+        self.assertIsInstance(components, list)
+        self.assertEqual(components[0].longText, "Main St")
+
+    def test_parse_viewport(self):
+        viewport = NewPlace._parse_viewport(self.valid_data["viewport"])
+        self.assertIsInstance(viewport, Viewport)
+        self.assertEqual(viewport.low.latitude, 40.7)
+        self.assertEqual(viewport.high.longitude, -73.98)
+
+    def test_parse_plus_code(self):
+        global_code, compound_code = NewPlace._parse_plus_code(
+            self.valid_data["plusCode"]
+        )
+        self.assertEqual(global_code, "849VCWC8+R9")
+        self.assertEqual(compound_code, "CWC8+R9")
+
+    def test_to_series(self):
+        place = NewPlace.from_json(self.valid_data)
+        series = place.to_series()
+        self.assertIsInstance(series, Series)
+        self.assertEqual(series["id"], "123")
+        self.assertNotIn("addressComponents", series)  # Non-serialized field
+
+    def test_invalid_viewport_data(self):
+        invalid_data = {"location": {"latitude": 40.7128, "longitude": -74.0060}}
+        viewport = NewPlace._parse_viewport(invalid_data.get("viewport", {}))
+        self.assertEqual(viewport.low.latitude, 0.0)
+        self.assertEqual(viewport.high.longitude, 0.0)
+
+    def test_invalid_plus_code(self):
+        plus_code = NewPlace._parse_plus_code({})
+        self.assertEqual(plus_code, ("", ""))
+
+    def test_missing_file_path(self):
+        with self.assertRaises(ArgumentTypeError):
+            NewPlace.from_json(None)
+
+    def test_invalid_accessibility_options(self):
+        invalid_data = self.valid_data.copy()
+        invalid_data["accessibilityOptions"] = {"unknown_option": True}
+        with self.assertRaises(ArgumentTypeError):
+            NewPlace._parse_accessibility_options(invalid_data["accessibilityOptions"])
 
 
 if __name__ == "__main__":
