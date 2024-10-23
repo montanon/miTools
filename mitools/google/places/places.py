@@ -1,9 +1,9 @@
-import itertools
 import math
 import os
 import random
 import time
 from datetime import datetime
+from itertools import product
 from os import PathLike
 from pathlib import Path
 from typing import Iterable, List, NewType, Optional, Tuple, Union
@@ -123,7 +123,7 @@ def sample_polygon_with_circles(
     polygon: Polygon,
     radius_in_meters: float,
     step_in_degrees: float,
-    condition_rule: Optional[str] = "center",
+    condition_rule: str = "center",
 ) -> List[CircleType]:
     if not polygon.is_valid:
         raise ArgumentValueError("Invalid Polygon")
@@ -132,7 +132,7 @@ def sample_polygon_with_circles(
     latitudes = np.arange(miny, maxy, step_in_degrees)
     longitudes = np.arange(minx, maxx, step_in_degrees)
     circles = []
-    for lat, lon in itertools.product(latitudes, longitudes):
+    for lat, lon in product(latitudes, longitudes):
         deg_radius = meters_to_degree(
             distance_in_meters=radius_in_meters, reference_latitude=lat
         )
