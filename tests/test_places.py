@@ -1,3 +1,4 @@
+import math
 import unittest
 from dataclasses import asdict
 from pathlib import Path
@@ -51,6 +52,62 @@ from mitools.google.places import (
     search_places_in_polygon,
     update_progress_and_save,
 )
+
+
+class TestMetersToDegree(TestCase):
+    def test_zero_distance(self):
+        result = meters_to_degree(0, 0)
+        self.assertEqual(result, 0.0)
+
+    def test_equator_reference_latitude(self):
+        distance = 1000.0  # 1 km
+        result = meters_to_degree(distance, 0)
+        expected = distance / 111_132.95  # Same for lat/lon at equator
+        self.assertAlmostEqual(result, expected, places=6)
+
+    def test_polar_reference_latitude(self):
+        distance = 1000.0  # 1 km
+        with self.assertRaises(ArgumentValueError):
+            meters_to_degree(distance, 90)
+
+    def test_mid_latitude(self):
+        distance = 1000.0  # 1 km
+        reference_latitude = 45.0
+        meters_per_degree_latitude = 111_132.95
+        meters_per_degree_longitude = 111_132.95 * math.cos(
+            math.radians(reference_latitude)
+        )
+        expected = max(
+            distance / meters_per_degree_latitude,
+            distance / meters_per_degree_longitude,
+        )
+        result = meters_to_degree(distance, reference_latitude)
+        self.assertAlmostEqual(result, expected, places=6)
+
+    def test_negative_distance(self):
+        with self.assertRaises(ArgumentValueError):
+            meters_to_degree(-1000.0, 45)
+
+    def test_invalid_latitude(self):
+        with self.assertRaises(ArgumentValueError):
+            meters_to_degree(1000.0, 100)  # Latitude must be between -90 and 90
+
+    def test_large_distance(self):
+        distance = 10_000_000.0  # 10,000 km
+        reference_latitude = 0.0  # Equator
+        expected = distance / 111_132.95  # Large distance at equator
+        result = meters_to_degree(distance, reference_latitude)
+        self.assertAlmostEqual(result, expected, places=6)
+
+    def test_extreme_latitude(self):
+        distance = 1000.0  # 1 km
+        for latitude in [-89.9, 89.9]:  # Close to poles
+            result = meters_to_degree(distance, latitude)
+            expected = distance / (
+                111_132.95 * math.cos(math.radians(latitude))
+            )  # Very close to 0 for longitude
+            self.assertAlmostEqual(result, expected, places=6)
+
 
 if __name__ == "__main__":
     unittest.main()
