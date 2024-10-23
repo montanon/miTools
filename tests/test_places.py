@@ -199,7 +199,7 @@ class TestSamplePolygonWithCircles(TestCase):
         self.assertGreater(len(circles), 0)
 
     def test_zero_step_in_degrees_raises_error(self):
-        with self.assertRaises(ZeroDivisionError):
+        with self.assertRaises(ArgumentValueError):
             sample_polygon_with_circles(
                 self.valid_polygon,
                 self.radius_in_meters,

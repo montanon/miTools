@@ -156,11 +156,15 @@ def sample_polygons_with_circles(
     step_in_degrees: float,
     condition_rule: Optional[str] = "center",
 ) -> List[CircleType]:
-    if isinstance(polygons, Polygon):
+    if not isinstance(polygons, (Polygon, MultiPolygon, Iterable)):
+        raise ArgumentTypeError(
+            "Invalid 'polygons' is not of type Polygon, MultiPolygon or an iterable of them."
+        )
+    elif isinstance(polygons, Polygon):
         polygons = [polygons]
     elif isinstance(polygons, MultiPolygon):
         polygons = list(polygons.geoms)
-    else:
+    elif not all(isinstance(polygon, (Polygon, MultiPolygon)) for polygon in polygons):
         raise ArgumentTypeError(
             "Invalid 'polygons' is not of type Polygon or MultiPolygon."
         )
