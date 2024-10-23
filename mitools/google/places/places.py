@@ -206,9 +206,9 @@ def create_subsampled_circles(
     factor: float = 1.0,
 ) -> List[Polygon]:
     if large_radius <= 0 or small_radius <= 0:
-        raise ArgumentValueError("Radius values must be positive.")
+        raise ValueError("Radius values must be positive.")
     if radial_samples <= 0:
-        raise ArgumentValueError("radial_samples must be a positive integer.")
+        raise ValueError("radial_samples must be a positive integer.")
     large_radius_deg = meters_to_degree(large_radius, large_circle_center.y)
     small_radius_deg = meters_to_degree(small_radius, large_circle_center.y)
     large_circle = large_circle_center.buffer(large_radius_deg)
