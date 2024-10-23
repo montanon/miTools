@@ -8,6 +8,7 @@ from shapely import Point
 
 from mitools.exceptions import ArgumentKeyError, ArgumentTypeError, ArgumentValueError
 from mitools.google.places import (
+    GOOGLE_PLACES_API_KEY,
     QUERY_HEADERS,
     AccessibilityOptions,
     AddressComponent,
@@ -288,6 +289,110 @@ class TestDummyResponse(TestCase):
         data = {"key_" + str(i): i for i in range(1000)}
         response = DummyResponse(data=data)
         self.assertEqual(response.json(), data)
+
+
+class TestNearbySearchRequest(TestCase):
+    def setUp(self):
+        self.valid_location = Point(151.2099, -33.865143)  # Sydney coordinates
+        self.valid_distance = 1000.0
+        self.valid_type = "restaurant"
+        self.valid_language = "en"
+
+    def test_successful_creation(self):
+        request = NearbySearchRequest(
+            location=self.valid_location,
+            distance_in_meters=self.valid_distance,
+            type=self.valid_type,
+        )
+        self.assertEqual(request.formatted_location, "-33.865143, 151.2099")
+        self.assertEqual(request.distance_in_meters, self.valid_distance)
+        self.assertEqual(request.type, self.valid_type)
+        self.assertEqual(request.language_code, self.valid_language)
+        self.assertEqual(request.key, GOOGLE_PLACES_API_KEY)
+
+    def test_custom_language_code(self):
+        request = NearbySearchRequest(
+            location=self.valid_location,
+            distance_in_meters=self.valid_distance,
+            type=self.valid_type,
+            language_code="es",
+        )
+        self.assertEqual(request.language_code, "es")
+
+    def test_invalid_location_type(self):
+        with self.assertRaises(TypeError):
+            NearbySearchRequest(
+                location=(-33.865143, 151.2099),  # Not a Point object
+                distance_in_meters=self.valid_distance,
+                type=self.valid_type,
+            )
+
+    def test_negative_distance(self):
+        with self.assertRaises(ArgumentValueError):
+            NearbySearchRequest(
+                location=self.valid_location,
+                distance_in_meters=-500.0,
+                type=self.valid_type,
+            )
+
+    def test_empty_type(self):
+        with self.assertRaises(ArgumentValueError):
+            NearbySearchRequest(
+                location=self.valid_location,
+                distance_in_meters=self.valid_distance,
+                type="",
+            )
+
+    def test_invalid_language_code(self):
+        with self.assertRaises(ArgumentValueError):
+            NearbySearchRequest(
+                location=self.valid_location,
+                distance_in_meters=self.valid_distance,
+                type=self.valid_type,
+                language_code=None,  # Invalid language code type
+            )
+
+    def test_json_query_output(self):
+        request = NearbySearchRequest(
+            location=self.valid_location,
+            distance_in_meters=self.valid_distance,
+            type=self.valid_type,
+        )
+        expected_query = {
+            "location": "-33.865143, 151.2099",
+            "radius": "1000.0",
+            "type": "restaurant",
+            "key": GOOGLE_PLACES_API_KEY,
+            "language": "en",
+        }
+        self.assertDictEqual(request.json_query(), expected_query)
+
+    def test_large_distance(self):
+        request = NearbySearchRequest(
+            location=self.valid_location,
+            distance_in_meters=100000.0,  # Large distance
+            type=self.valid_type,
+        )
+        self.assertEqual(request.distance_in_meters, 100000.0)
+
+    def test_mutability_violation(self):
+        request = NearbySearchRequest(
+            location=self.valid_location,
+            distance_in_meters=self.valid_distance,
+            type=self.valid_type,
+        )
+        with self.assertRaises(AttributeError):
+            request.distance_in_meters = 500.0
+
+    def test_missing_key_config(self):
+        self.assertEqual(
+            NearbySearchRequest(
+                location=self.valid_location,
+                distance_in_meters=self.valid_distance,
+                type=self.valid_type,
+            ).key,
+            GOOGLE_PLACES_API_KEY,
+        )
 
 
 if __name__ == "__main__":
