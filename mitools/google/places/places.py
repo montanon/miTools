@@ -198,6 +198,32 @@ def get_circles_search(
     return circles
 
 
+def create_subsampled_circles(
+    large_circle_center: Point,
+    large_radius: float,
+    small_radius: float,
+    radial_samples: int,
+    factor: float = 1.0,
+) -> List[Polygon]:
+    if large_radius <= 0 or small_radius <= 0:
+        raise ArgumentValueError("Radius values must be positive.")
+    if radial_samples <= 0:
+        raise ArgumentValueError("radial_samples must be a positive integer.")
+    large_radius_deg = meters_to_degree(large_radius, large_circle_center.y)
+    small_radius_deg = meters_to_degree(small_radius, large_circle_center.y)
+    large_circle = large_circle_center.buffer(large_radius_deg)
+    subsampled_circles = [large_circle_center.buffer(small_radius_deg)]
+    angle_step = 2 * np.pi / radial_samples
+    for i in range(radial_samples):
+        angle = i * angle_step
+        dx = factor * small_radius_deg * np.cos(angle)
+        dy = factor * small_radius_deg * np.sin(angle)
+        new_center = Point(large_circle_center.x + dx, large_circle_center.y + dy)
+        if large_circle.contains(new_center):
+            subsampled_circles.append(new_center.buffer(small_radius_deg))
+    return subsampled_circles
+
+
 def polygons_folium_map(
     polygons: Union[Iterable[Polygon], Polygon],
     output_file_path: Optional[PathLike] = None,
@@ -418,26 +444,6 @@ def polygon_plot_with_points(
     if output_file_path:
         plt.savefig(output_file_path, dpi=DPI)
     return ax
-
-
-def create_subsampled_circles(
-    large_circle_center, large_radius, small_radius, radial_samples, factor
-):
-    large_radius_in_deg = meters_to_degree(large_radius, large_circle_center.y)
-    small_radius_in_deg = meters_to_degree(small_radius, large_circle_center.y)
-    large_circle = Point(large_circle_center).buffer(large_radius_in_deg)
-    subsampled_points = [Point(large_circle_center).buffer(small_radius_in_deg)]
-    angle_step = 2 * np.pi / radial_samples
-    for i in range(radial_samples):
-        angle = i * angle_step
-        dx = factor * small_radius_in_deg * np.cos(angle)
-        dy = factor * small_radius_in_deg * np.sin(angle)
-        point = Point(large_circle_center.x + dx, large_circle_center.y + dy)
-        if large_circle.contains(
-            point
-        ):  # Check if small circle is within the large circle
-            subsampled_points.append(point.buffer(small_radius_in_deg))
-    return subsampled_points
 
 
 def read_or_initialize_places(file_path, recalculate=False):
