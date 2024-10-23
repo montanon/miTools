@@ -1,4 +1,6 @@
 from .places import (
+    GOOGLE_PLACES_API_KEY,
+    QUERY_HEADERS,
     calculate_degree_steps,
     create_dummy_place,
     create_dummy_response,
