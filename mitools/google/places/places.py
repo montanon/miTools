@@ -205,6 +205,8 @@ def create_subsampled_circles(
     radial_samples: int,
     factor: float = 1.0,
 ) -> List[Polygon]:
+    if not isinstance(large_circle_center, Point):
+        raise ArgumentTypeError("Invalid 'large_circle_center' is not of type Point.")
     if large_radius <= 0 or small_radius <= 0:
         raise ArgumentValueError("Radius values must be positive.")
     if radial_samples <= 0:
