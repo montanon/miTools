@@ -1,9 +1,9 @@
-import itertools
 import math
 import os
 import random
 import time
 from datetime import datetime
+from itertools import product
 from os import PathLike
 from pathlib import Path
 from typing import Iterable, List, NewType, Optional, Tuple, Union
@@ -21,6 +21,8 @@ from matplotlib.axes import Axes
 from shapely.geometry import MultiPolygon, Point, Polygon
 from shapely.ops import transform
 from tqdm import tqdm
+
+from mitools.exceptions import ArgumentTypeError, ArgumentValueError
 
 from .places_objects import (
     CityGeojson,
@@ -104,6 +106,10 @@ HEIGHT = WIDTH / ASPECT_RATIO
 
 
 def meters_to_degree(distance_in_meters: float, reference_latitude: float) -> float:
+    if not isinstance(distance_in_meters, (int, float)) or distance_in_meters < 0:
+        raise ArgumentValueError("Invalid Distance, must be a positive number")
+    if reference_latitude >= 90 or reference_latitude <= -90:
+        raise ArgumentValueError("Invalid Latitude, must be between -90° and 90°")
     meters_per_degree_latitude = 111_132.95
     meters_per_degree_longitude = 111_132.95 * math.cos(
         math.radians(reference_latitude)
@@ -117,16 +123,22 @@ def sample_polygon_with_circles(
     polygon: Polygon,
     radius_in_meters: float,
     step_in_degrees: float,
-    condition_rule: Optional[str] = "center",
+    condition_rule: str = "center",
 ) -> List[CircleType]:
+    if not isinstance(polygon, Polygon):
+        raise ArgumentTypeError("Invalid 'polygon' is not of type Polygon.")
     if not polygon.is_valid:
-        raise ValueError("Invalid Polygon")
+        raise ArgumentValueError("Invalid Polygon")
+    if polygon.is_empty:
+        raise ArgumentValueError("Empty Polygon")
+    if step_in_degrees <= 0:
+        raise ArgumentValueError("Invalid Step, must be a positive number")
     condition = intersection_condition_factory(condition_rule)
     minx, miny, maxx, maxy = polygon.bounds
     latitudes = np.arange(miny, maxy, step_in_degrees)
     longitudes = np.arange(minx, maxx, step_in_degrees)
     circles = []
-    for lat, lon in itertools.product(latitudes, longitudes):
+    for lat, lon in product(latitudes, longitudes):
         deg_radius = meters_to_degree(
             distance_in_meters=radius_in_meters, reference_latitude=lat
         )
@@ -146,6 +158,10 @@ def sample_polygons_with_circles(
         polygons = [polygons]
     elif isinstance(polygons, MultiPolygon):
         polygons = list(polygons.geoms)
+    else:
+        raise ArgumentTypeError(
+            "Invalid 'polygons' is not of type Polygon or MultiPolygon."
+        )
     circles = []
     for polygon in polygons:
         circles.extend(
@@ -156,6 +172,29 @@ def sample_polygons_with_circles(
                 condition_rule=condition_rule,
             )
         )
+    return circles
+
+
+def get_circles_search(
+    circles_path,
+    polygon,
+    radius_in_meters,
+    step_in_degrees,
+    condition_rule="center",
+    recalculate=False,
+):
+    if not circles_path.exists() or recalculate:
+        circles = sample_polygons_with_circles(
+            polygons=polygon,
+            radius_in_meters=radius_in_meters,
+            step_in_degrees=step_in_degrees,
+            condition_rule=condition_rule,
+        )
+        circles = gpd.GeoDataFrame(geometry=circles).reset_index(drop=True)
+        circles["searched"] = False
+        circles.to_file(circles_path, driver="GeoJSON")
+    else:
+        circles = gpd.read_file(circles_path)
     return circles
 
 
@@ -379,29 +418,6 @@ def polygon_plot_with_points(
     if output_file_path:
         plt.savefig(output_file_path, dpi=DPI)
     return ax
-
-
-def get_circles_search(
-    circles_path,
-    polygon,
-    radius_in_meters,
-    step_in_degrees,
-    condition_rule="center",
-    recalculate=False,
-):
-    if not circles_path.exists() or recalculate:
-        circles = sample_polygons_with_circles(
-            polygons=polygon,
-            radius_in_meters=radius_in_meters,
-            step_in_degrees=step_in_degrees,
-            condition_rule=condition_rule,
-        )
-        circles = gpd.GeoDataFrame(geometry=circles).reset_index(drop=True)
-        circles["searched"] = False
-        circles.to_file(circles_path, driver="GeoJSON")
-    else:
-        circles = gpd.read_file(circles_path)
-    return circles
 
 
 def create_subsampled_circles(
