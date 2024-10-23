@@ -13,7 +13,7 @@ from shapely.ops import unary_union
 
 from mitools.exceptions import ArgumentKeyError, ArgumentTypeError, ArgumentValueError
 
-from .json_schemas import PLACE_SCHEMA
+from .json_schemas import NEWPLACE_SCHEMA, PLACE_SCHEMA
 
 CircleType = NewType("CircleType", Polygon)
 
@@ -125,6 +125,7 @@ class NewPlace:
     @staticmethod
     def from_json(data: Dict[str, Any]) -> "NewPlace":
         try:
+            validate(instance=data, schema=NEWPLACE_SCHEMA)
             global_code, compound_code = NewPlace._parse_plus_code(
                 data.get("plusCode", {})
             )
@@ -146,7 +147,7 @@ class NewPlace:
                 businessStatus=data.get("businessStatus", ""),
                 iconMaskBaseUri=data.get("iconMaskBaseUri", ""),
                 iconBackgroundColor=data.get("iconBackgroundColor", ""),
-                displayName=data.get("displayName", {}).get("text", ""),
+                displayName=data["displayName"]["text"],
                 primaryTypeDisplayName=data.get("primaryTypeDisplayName", {}).get(
                     "text", ""
                 ),
