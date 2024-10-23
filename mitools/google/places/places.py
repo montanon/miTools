@@ -6,7 +6,7 @@ from datetime import datetime
 from itertools import product
 from os import PathLike
 from pathlib import Path
-from typing import Iterable, List, NewType, Optional, Tuple, Union
+from typing import Any, Dict, Iterable, List, NewType, Optional, Tuple, Type, Union
 
 import folium
 import geopandas as gpd
@@ -29,6 +29,7 @@ from .places_objects import (
     DummyResponse,
     NewNearbySearchRequest,
     NewPlace,
+    Place,
     intersection_condition_factory,
 )
 
@@ -103,6 +104,7 @@ DPI = 500
 WIDTH = 14
 ASPECT_RATIO = 16 / 9
 HEIGHT = WIDTH / ASPECT_RATIO
+PLACE_CLASSES = Union[Place, NewPlace]
 
 
 def meters_to_degree(distance_in_meters: float, reference_latitude: float) -> float:
@@ -154,11 +156,15 @@ def sample_polygons_with_circles(
     step_in_degrees: float,
     condition_rule: Optional[str] = "center",
 ) -> List[CircleType]:
-    if isinstance(polygons, Polygon):
+    if not isinstance(polygons, (Polygon, MultiPolygon, Iterable)):
+        raise ArgumentTypeError(
+            "Invalid 'polygons' is not of type Polygon, MultiPolygon or an iterable of them."
+        )
+    elif isinstance(polygons, Polygon):
         polygons = [polygons]
     elif isinstance(polygons, MultiPolygon):
         polygons = list(polygons.geoms)
-    else:
+    elif not all(isinstance(polygon, (Polygon, MultiPolygon)) for polygon in polygons):
         raise ArgumentTypeError(
             "Invalid 'polygons' is not of type Polygon or MultiPolygon."
         )
@@ -196,6 +202,100 @@ def get_circles_search(
     else:
         circles = gpd.read_file(circles_path)
     return circles
+
+
+def create_subsampled_circles(
+    large_circle_center: Point,
+    large_radius: float,
+    small_radius: float,
+    radial_samples: int,
+    factor: float = 1.0,
+) -> List[Polygon]:
+    if not isinstance(large_circle_center, Point):
+        raise ArgumentTypeError("Invalid 'large_circle_center' is not of type Point.")
+    if large_radius <= 0 or small_radius <= 0:
+        raise ArgumentValueError("Radius values must be positive.")
+    if radial_samples <= 0:
+        raise ArgumentValueError("radial_samples must be a positive integer.")
+    large_radius_deg = meters_to_degree(large_radius, large_circle_center.y)
+    small_radius_deg = meters_to_degree(small_radius, large_circle_center.y)
+    large_circle = large_circle_center.buffer(large_radius_deg)
+    subsampled_circles = [large_circle_center.buffer(small_radius_deg)]
+    angle_step = 2 * np.pi / radial_samples
+    for i in range(radial_samples):
+        angle = i * angle_step
+        dx = factor * small_radius_deg * np.cos(angle)
+        dy = factor * small_radius_deg * np.sin(angle)
+        new_center = Point(large_circle_center.x + dx, large_circle_center.y + dy)
+        if large_circle.contains(new_center):
+            subsampled_circles.append(new_center.buffer(small_radius_deg))
+    return subsampled_circles
+
+
+def create_dummy_place(query: Dict, place_class: Type[PLACE_CLASSES] = Place) -> Dict:
+    latitude = query["locationRestriction"]["circle"]["center"]["latitude"]
+    longitude = query["locationRestriction"]["circle"]["center"]["longitude"]
+    radius = query["locationRestriction"]["circle"]["radius"]
+    distance_in_deg = meters_to_degree(radius, latitude)
+    random_types = random.sample(
+        RESTAURANT_TYPES,
+        random.randint(1, min(len(RESTAURANT_TYPES), random.randint(1, 5))),
+    )
+    unique_id = generate_unique_place_id()
+    random_latitude = random.uniform(
+        latitude - distance_in_deg, latitude + distance_in_deg
+    )
+    random_longitude = random.uniform(
+        longitude - distance_in_deg, longitude + distance_in_deg
+    )
+    place_data = {
+        "id": unique_id,
+        "types": random_types,
+        "location": {
+            "latitude": random_latitude,
+            "longitude": random_longitude,
+        },
+    }
+    if place_class == Place:
+        place_data.update(
+            {
+                "place_id": unique_id,
+                "name": f"Name {unique_id}",
+                "geometry": {"location": place_data["location"]},
+                "types": random_types,
+                "price_level": random.choice([1, 2, 3, 4, 5, None]),
+                "rating": random.uniform(1.0, 5.0),
+                "user_ratings_total": random.randint(1, 500),
+                "vicinity": "Some street, Some city",
+                "permanently_closed": random.choice([True, False, None]),
+            }
+        )
+    elif place_class == NewPlace:
+        place_data.update(
+            {
+                "displayName": {"text": f"Name {unique_id}"},
+                "primaryType": random.choice(random_types),
+                "primaryTypeDisplayName": {"text": random.choice(random_types)},
+                "formattedAddress": f"{unique_id} Some Address",
+                "addressComponents": [
+                    {"long_name": "City", "short_name": "C", "types": ["locality"]}
+                ],
+                "googleMapsUri": f"https://maps.google.com/?q={random_latitude},{random_longitude}",
+                "priceLevel": str(random.choice([1, 2, 3, 4, 5])),
+                "rating": random.uniform(1.0, 5.0),
+                "userRatingCount": random.randint(1, 500),
+            }
+        )
+    return place_data
+
+
+def create_dummy_response(query: Dict[str, Any]) -> DummyResponse:
+    has_places = random.choice([True, False, False])
+    data = {}
+    if has_places:
+        places_n = random.randint(1, 21)
+        data["places"] = [create_dummy_place(query) for _ in range(places_n)]
+    return DummyResponse(data=data)
 
 
 def polygons_folium_map(
@@ -420,26 +520,6 @@ def polygon_plot_with_points(
     return ax
 
 
-def create_subsampled_circles(
-    large_circle_center, large_radius, small_radius, radial_samples, factor
-):
-    large_radius_in_deg = meters_to_degree(large_radius, large_circle_center.y)
-    small_radius_in_deg = meters_to_degree(small_radius, large_circle_center.y)
-    large_circle = Point(large_circle_center).buffer(large_radius_in_deg)
-    subsampled_points = [Point(large_circle_center).buffer(small_radius_in_deg)]
-    angle_step = 2 * np.pi / radial_samples
-    for i in range(radial_samples):
-        angle = i * angle_step
-        dx = factor * small_radius_in_deg * np.cos(angle)
-        dy = factor * small_radius_in_deg * np.sin(angle)
-        point = Point(large_circle_center.x + dx, large_circle_center.y + dy)
-        if large_circle.contains(
-            point
-        ):  # Check if small circle is within the large circle
-            subsampled_points.append(point.buffer(small_radius_in_deg))
-    return subsampled_points
-
-
 def read_or_initialize_places(file_path, recalculate=False):
     if file_path.exists() and not recalculate:
         return pd.read_parquet(file_path)
@@ -449,44 +529,6 @@ def read_or_initialize_places(file_path, recalculate=False):
 
 def generate_unique_place_id():
     return datetime.now().strftime("%Y%m%d%H%M%S%f")
-
-
-def create_dummy_place(query):
-    latitude = query["locationRestriction"]["circle"]["center"]["latitude"]
-    longitude = query["locationRestriction"]["circle"]["center"]["longitude"]
-    radius = query["locationRestriction"]["circle"]["radius"]
-    distance_in_deg = meters_to_degree(radius, latitude)
-    random_types = random.sample(
-        RESTAURANT_TYPES,
-        random.randint(1, min(len(RESTAURANT_TYPES), random.randint(1, 5))),
-    )
-    unique_id = generate_unique_place_id()
-    random_latitude = random.uniform(
-        latitude - distance_in_deg, latitude + distance_in_deg
-    )
-    random_longitude = random.uniform(
-        longitude - distance_in_deg, longitude + distance_in_deg
-    )
-    place_json = {
-        "id": unique_id,
-        "types": random_types,
-        "location": {
-            "latitude": random_latitude,
-            "longitude": random_longitude,
-        },
-        "displayName": {"text": f"Name {unique_id}"},
-        "primaryType": random.choice(random_types),
-    }
-    return place_json
-
-
-def create_dummy_response(query):
-    dummy_response = DummyResponse()
-    has_places = random.choice([True, False, False])
-    if has_places:
-        places_n = random.randint(1, 21)
-        dummy_response["places"] = [create_dummy_place(query) for _ in range(places_n)]
-    return dummy_response
 
 
 def nearby_search_request(
