@@ -173,7 +173,7 @@ class NewPlace:
             )
         except KeyError as e:
             raise ArgumentValueError(f"Missing expected field: {e}")
-        except (AttributeError, ArgumentTypeError, TypeError) as e:
+        except (AttributeError, ArgumentTypeError, TypeError, ValidationError) as e:
             raise ArgumentTypeError(f"Invalid 'data={data}' structure or type: {e}")
 
     @staticmethod
