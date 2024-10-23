@@ -85,11 +85,12 @@ class TestPlace(TestCase):
     def test_place_from_json_missing_keys(self):
         with self.assertRaises(ArgumentValueError) as context:
             Place.from_json(self.missing_keys_json)
-        self.assertIn("Invalid place data", str(context.exception))
+        self.assertIn("Invalid place data schema", str(context.exception))
 
     def test_place_from_empty_json(self):
-        with self.assertRaises(ArgumentValueError):
+        with self.assertRaises(ArgumentValueError) as context:
             Place.from_json(self.empty_json)
+        self.assertIn("Invalid place data schema", str(context.exception))
 
     def test_optional_fields_with_none(self):
         json_data = {

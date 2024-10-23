@@ -6,11 +6,14 @@ from typing import Any, Dict, List, NewType, Optional, Protocol
 
 import geopandas as gpd
 import seaborn as sns
+from jsonschema import ValidationError, validate
 from pandas import Series
 from shapely import Point, Polygon
 from shapely.ops import unary_union
 
 from mitools.exceptions import ArgumentValueError
+
+from .json_schemas import PLACE_SCHEMA
 
 CircleType = NewType("CircleType", Polygon)
 
@@ -302,6 +305,7 @@ class Place:
     @staticmethod
     def from_json(data: Dict[str, Any]) -> "Place":
         try:
+            validate(instance=data, schema=PLACE_SCHEMA)
             return Place(
                 id=data["place_id"],
                 name=data["name"],
@@ -314,6 +318,8 @@ class Place:
                 vicinity=data.get("vicinity"),
                 permanently_closed=data.get("permanently_closed"),
             )
+        except ValidationError as e:
+            raise ArgumentValueError(f"Invalid place data schema: {data}. {e}")
         except KeyError as e:
             raise ArgumentValueError(f"Invalid place data: {data}. {e}")
 
