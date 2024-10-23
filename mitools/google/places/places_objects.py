@@ -1,5 +1,5 @@
 import os
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from os import PathLike
 from pathlib import Path
 from typing import Any, Dict, List, NewType, Optional, Protocol, Tuple
@@ -227,6 +227,40 @@ class DummyResponse:
         return self.data
 
 
+@dataclass(frozen=True)
+class NearbySearchRequest:
+    location: Point
+    distance_in_meters: float
+    type: str
+    language_code: str = "en"
+    key: str = field(default=GOOGLE_PLACES_API_KEY, init=False)
+
+    def __post_init__(self):
+        if not isinstance(self.location, Point):
+            raise ArgumentTypeError(
+                f"'location' must be a Point, got {type(self.location)}"
+            )
+        if self.distance_in_meters <= 0:
+            raise ArgumentValueError("Distance in meters must be a positive number.")
+        if not isinstance(self.type, str) or not self.type:
+            raise ArgumentValueError("'type' must be a non-empty string.")
+        if not isinstance(self.language_code, str):
+            raise ArgumentValueError("'language_code' must be a string.")
+
+    @property
+    def formatted_location(self) -> str:
+        return f"{self.location.y}, {self.location.x}"
+
+    def json_query(self) -> Dict[str, str]:
+        return {
+            "location": self.formatted_location,
+            "radius": str(self.distance_in_meters),
+            "type": self.type,
+            "key": self.key,
+            "language": self.language_code,
+        }
+
+
 class CityGeojson:
     def __init__(self, geojson_path: PathLike, name: str):
         self.geojson_path = Path(geojson_path)
@@ -327,31 +361,6 @@ class NewNearbySearchRequest:
             "maxResultCount": self.max_result_count,
             "locationRestriction": self.location_restriction,
             "languageCode": self.language_code,
-        }
-        return query
-
-
-class NearbySearchRequest:
-    def __init__(
-        self,
-        location: Point,
-        distance_in_meters: float,
-        type: str,
-        language_code: Optional[str] = "en",
-    ):
-        self.location = f"{location.centroid.y}, {location.centroid.x}"
-        self.distance_in_meters = distance_in_meters
-        self.type = type
-        self.key = GOOGLE_PLACES_API_KEY
-        self.language_code = language_code
-
-    def json_query(self) -> Dict:
-        query = {
-            "location": self.location,
-            "radius": self.distance_in_meters,
-            "type": self.type,
-            "key": self.key,
-            "language": self.language_code,
         }
         return query
 
