@@ -213,5 +213,115 @@ class TestSamplePolygonWithCircles(TestCase):
         self.assertTrue(condition.check(self.valid_polygon, circle))
 
 
+class TestSamplePolygonsWithCircles(TestCase):
+    def setUp(self):
+        self.square_polygon = Polygon([(0, 0), (0, 1), (1, 1), (1, 0), (0, 0)])
+        self.rectangular_polygon = Polygon([(0, 0), (0, 2), (1, 2), (1, 0), (0, 0)])
+        self.multipolygon = MultiPolygon(
+            [self.square_polygon, self.rectangular_polygon]
+        )
+        self.radius_in_meters = 1000.0  # 1 km radius
+        self.step_in_degrees = 0.01  # Small step size for dense sampling
+        self.condition_rule = "center"  # Default rule
+
+    def test_single_polygon(self):
+        circles = sample_polygons_with_circles(
+            polygons=self.square_polygon,
+            radius_in_meters=self.radius_in_meters,
+            step_in_degrees=self.step_in_degrees,
+            condition_rule=self.condition_rule,
+        )
+        self.assertIsInstance(circles, list)
+        self.assertGreater(len(circles), 0)
+        for circle in circles:
+            self.assertTrue(self.square_polygon.contains(circle.centroid))
+
+    def test_multipolygon(self):
+        circles = sample_polygons_with_circles(
+            polygons=self.multipolygon,
+            radius_in_meters=self.radius_in_meters,
+            step_in_degrees=self.step_in_degrees,
+            condition_rule="intersection",
+        )
+        self.assertIsInstance(circles, list)
+        self.assertGreater(len(circles), 0)
+
+    def test_empty_polygon_list(self):
+        circles = sample_polygons_with_circles(
+            polygons=[],
+            radius_in_meters=self.radius_in_meters,
+            step_in_degrees=self.step_in_degrees,
+        )
+        self.assertIsInstance(circles, list)
+        self.assertEqual(len(circles), 0)
+
+    def test_invalid_polygon_type(self):
+        with self.assertRaises(ArgumentTypeError):
+            sample_polygons_with_circles(
+                polygons=Point(0, 0),  # Invalid input: Not a polygon
+                radius_in_meters=self.radius_in_meters,
+                step_in_degrees=self.step_in_degrees,
+            )
+
+    def test_large_step_in_degrees(self):
+        circles = sample_polygons_with_circles(
+            polygons=self.square_polygon,
+            radius_in_meters=self.radius_in_meters,
+            step_in_degrees=0.5,  # Large step size for sparse sampling
+        )
+        self.assertIsInstance(circles, list)
+        self.assertGreater(len(circles), 0)
+
+    def test_zero_radius(self):
+        circles = sample_polygons_with_circles(
+            polygons=self.square_polygon,
+            radius_in_meters=0.0,
+            step_in_degrees=self.step_in_degrees,
+        )
+        self.assertEqual(len(circles), 0)
+
+    def test_invalid_condition_rule(self):
+        with self.assertRaises(ValueError):
+            sample_polygons_with_circles(
+                polygons=self.square_polygon,
+                radius_in_meters=self.radius_in_meters,
+                step_in_degrees=self.step_in_degrees,
+                condition_rule="invalid_rule",  # Invalid rule
+            )
+
+    def test_multiple_polygons(self):
+        polygons = [self.square_polygon, self.rectangular_polygon]
+        circles = sample_polygons_with_circles(
+            polygons=polygons,
+            radius_in_meters=self.radius_in_meters,
+            step_in_degrees=self.step_in_degrees,
+        )
+        self.assertIsInstance(circles, list)
+        self.assertGreater(len(circles), 0)
+
+    def test_intersecting_circles(self):
+        circles = sample_polygons_with_circles(
+            polygons=self.square_polygon,
+            radius_in_meters=self.radius_in_meters,
+            step_in_degrees=self.step_in_degrees,
+            condition_rule="intersection",
+        )
+        self.assertIsInstance(circles, list)
+        self.assertGreater(len(circles), 0)
+        for circle in circles:
+            self.assertTrue(self.square_polygon.intersects(circle))
+
+    def test_multiple_polygons_and_rules(self):
+        polygons = [self.square_polygon, self.rectangular_polygon]
+        for rule in ["center", "intersection", "circle"]:
+            circles = sample_polygons_with_circles(
+                polygons=polygons,
+                radius_in_meters=self.radius_in_meters,
+                step_in_degrees=self.step_in_degrees,
+                condition_rule=rule,
+            )
+            self.assertIsInstance(circles, list)
+
+
 if __name__ == "__main__":
     unittest.main()
