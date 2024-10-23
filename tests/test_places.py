@@ -570,5 +570,116 @@ class TestCreateSubsampledCircles(TestCase):
         self.assertEqual(len(circles), 1)  # Only the center circle
 
 
+class TestCreateDummyPlace(TestCase):
+    def setUp(self):
+        self.query = {
+            "locationRestriction": {
+                "circle": {
+                    "center": {"latitude": 35.6895, "longitude": 139.6917},  # Tokyo
+                    "radius": 1000,
+                }
+            }
+        }
+
+    def test_create_place(self):
+        place_data = create_dummy_place(self.query, place_class=Place)
+        self.assertIn("place_id", place_data)
+        self.assertIn("name", place_data)
+        self.assertIn("geometry", place_data)
+        self.assertIn("types", place_data)
+        self.assertIn("vicinity", place_data)
+        self.assertIsInstance(place_data["place_id"], str)
+        self.assertIsInstance(place_data["name"], str)
+        self.assertIsInstance(place_data["geometry"]["location"]["latitude"], float)
+        self.assertIsInstance(place_data["geometry"]["location"]["longitude"], float)
+
+    def test_create_new_place(self):
+        new_place_data = create_dummy_place(self.query, place_class=NewPlace)
+        self.assertIn("id", new_place_data)
+        self.assertIn("displayName", new_place_data)
+        self.assertIn("location", new_place_data)
+        self.assertIn("primaryType", new_place_data)
+        self.assertIsInstance(new_place_data["id"], str)
+        self.assertIsInstance(new_place_data["displayName"]["text"], str)
+        self.assertIsInstance(new_place_data["location"]["latitude"], float)
+        self.assertIsInstance(new_place_data["location"]["longitude"], float)
+
+    def test_random_types(self):
+        place_data = create_dummy_place(self.query, place_class=Place)
+        types = place_data["types"]
+        self.assertIsInstance(types, list)
+        self.assertGreaterEqual(len(types), 1)
+        self.assertLessEqual(len(types), 5)
+
+    def test_random_coordinates_within_bounds(self):
+        latitude = self.query["locationRestriction"]["circle"]["center"]["latitude"]
+        longitude = self.query["locationRestriction"]["circle"]["center"]["longitude"]
+        radius = self.query["locationRestriction"]["circle"]["radius"]
+        place_data = create_dummy_place(self.query, place_class=Place)
+        place_lat = place_data["geometry"]["location"]["latitude"]
+        place_lon = place_data["geometry"]["location"]["longitude"]
+        distance_in_deg = meters_to_degree(radius, latitude)
+        self.assertTrue(
+            latitude - distance_in_deg <= place_lat <= latitude + distance_in_deg
+        )
+        self.assertTrue(
+            longitude - distance_in_deg <= place_lon <= longitude + distance_in_deg
+        )
+
+    def test_randomness_in_place_ids(self):
+        place1 = create_dummy_place(self.query, place_class=Place)
+        place2 = create_dummy_place(self.query, place_class=Place)
+        self.assertNotEqual(place1["place_id"], place2["place_id"])
+
+    def test_missing_location_restriction(self):
+        invalid_query = {"locationRestriction": {"circle": {}}}
+        with self.assertRaises(KeyError):
+            create_dummy_place(invalid_query, place_class=Place)
+
+    def test_new_place_has_display_name(self):
+        new_place_data = create_dummy_place(self.query, place_class=NewPlace)
+        display_name = new_place_data["displayName"]["text"]
+        self.assertTrue(display_name.startswith("Name"))
+
+    def test_large_radius(self):
+        large_query = {
+            "locationRestriction": {
+                "circle": {
+                    "center": {"latitude": 40.7128, "longitude": -74.0060},  # NYC
+                    "radius": 50_000,  # Large radius
+                }
+            }
+        }
+        place_data = create_dummy_place(large_query, place_class=Place)
+        self.assertIsInstance(place_data, dict)
+
+    def test_generate_new_place_with_no_types(self):
+        query_no_types = {
+            "locationRestriction": {
+                "circle": {
+                    "center": {"latitude": 34.0522, "longitude": -118.2437},  # LA
+                    "radius": 500,
+                }
+            }
+        }
+        new_place_data = create_dummy_place(query_no_types, place_class=NewPlace)
+        self.assertIn("types", new_place_data)
+
+    def test_query_with_invalid_coordinates(self):
+        invalid_query = {
+            "locationRestriction": {
+                "circle": {
+                    "center": {
+                        "latitude": 200.0,
+                        "longitude": -118.2437,
+                    },  # Invalid lat
+                    "radius": 500,
+                }
+            }
+        }
+        with self.assertRaises(ArgumentValueError):
+            create_dummy_place(invalid_query, place_class=Place)
+
+
 if __name__ == "__main__":
     unittest.main()
