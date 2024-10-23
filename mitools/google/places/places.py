@@ -22,6 +22,8 @@ from shapely.geometry import MultiPolygon, Point, Polygon
 from shapely.ops import transform
 from tqdm import tqdm
 
+from mitools.exceptions import ArgumentValueError
+
 from .places_objects import (
     CityGeojson,
     DummyResponse,
@@ -104,6 +106,10 @@ HEIGHT = WIDTH / ASPECT_RATIO
 
 
 def meters_to_degree(distance_in_meters: float, reference_latitude: float) -> float:
+    if not isinstance(distance_in_meters, (int, float)) or distance_in_meters < 0:
+        raise ArgumentValueError("Invalid Distance, must be a positive number")
+    if reference_latitude >= 90 or reference_latitude <= -90:
+        raise ArgumentValueError("Invalid Latitude, must be between -90° and 90°")
     meters_per_degree_latitude = 111_132.95
     meters_per_degree_longitude = 111_132.95 * math.cos(
         math.radians(reference_latitude)
@@ -120,7 +126,7 @@ def sample_polygon_with_circles(
     condition_rule: Optional[str] = "center",
 ) -> List[CircleType]:
     if not polygon.is_valid:
-        raise ValueError("Invalid Polygon")
+        raise ArgumentValueError("Invalid Polygon")
     condition = intersection_condition_factory(condition_rule)
     minx, miny, maxx, maxy = polygon.bounds
     latitudes = np.arange(miny, maxy, step_in_degrees)
