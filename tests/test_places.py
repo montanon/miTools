@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest import TestCase
 
 import geopandas as gpd
+from geopandas import GeoDataFrame, GeoSeries
 from pandas import Series
 from shapely import Point
 from shapely.geometry import MultiPolygon, Polygon
@@ -321,6 +322,118 @@ class TestSamplePolygonsWithCircles(TestCase):
                 condition_rule=rule,
             )
             self.assertIsInstance(circles, list)
+
+
+class TestGetCirclesSearch(TestCase):
+    def setUp(self):
+        self.test_path = Path("./test_circles.geojson")
+        self.polygon = Polygon([(0, 0), (0, 1), (1, 1), (1, 0), (0, 0)])
+        self.radius_in_meters = 1000.0
+        self.step_in_degrees = 0.01
+        self.condition_rule = "center"
+        self.recalculate = False
+
+    def tearDown(self):
+        if self.test_path.exists():
+            self.test_path.unlink()
+
+    def test_generate_circles_and_save(self):
+        circles = get_circles_search(
+            circles_path=self.test_path,
+            polygon=self.polygon,
+            radius_in_meters=self.radius_in_meters,
+            step_in_degrees=self.step_in_degrees,
+            condition_rule=self.condition_rule,
+        )
+        self.assertTrue(self.test_path.exists())
+        self.assertIsInstance(circles, GeoDataFrame)
+        self.assertIn("searched", circles.columns)
+        self.assertFalse(circles["searched"].any())
+
+    def test_load_existing_file(self):
+        circles1 = get_circles_search(
+            circles_path=self.test_path,
+            polygon=self.polygon,
+            radius_in_meters=self.radius_in_meters,
+            step_in_degrees=self.step_in_degrees,
+            condition_rule=self.condition_rule,
+        )
+        circles2 = get_circles_search(
+            circles_path=self.test_path,
+            polygon=self.polygon,
+            radius_in_meters=self.radius_in_meters,
+            step_in_degrees=self.step_in_degrees,
+            condition_rule=self.condition_rule,
+            recalculate=False,
+        )
+        self.assertTrue(self.test_path.exists())
+        self.assertIsInstance(circles2, GeoDataFrame)
+        self.assertListEqual(circles1.index.tolist(), circles2.index.tolist())
+
+    def test_recalculate_for_existing_file(self):
+        get_circles_search(
+            circles_path=self.test_path,
+            polygon=self.polygon,
+            radius_in_meters=self.radius_in_meters,
+            step_in_degrees=self.step_in_degrees,
+        )
+        circles = get_circles_search(
+            circles_path=self.test_path,
+            polygon=self.polygon,
+            radius_in_meters=self.radius_in_meters,
+            step_in_degrees=self.step_in_degrees,
+            recalculate=True,
+        )
+        self.assertTrue(self.test_path.exists())
+        self.assertIsInstance(circles, GeoDataFrame)
+
+    def test_empty_polygon(self):
+        empty_polygon = Polygon()
+        with self.assertRaises(ArgumentValueError):
+            get_circles_search(
+                circles_path=self.test_path,
+                polygon=empty_polygon,
+                radius_in_meters=self.radius_in_meters,
+                step_in_degrees=self.step_in_degrees,
+            )
+
+    def test_invalid_path(self):
+        invalid_path = Path("/invalid_directory/test_circles.geojson")
+        with self.assertRaises(Exception):
+            get_circles_search(
+                circles_path=invalid_path,
+                polygon=self.polygon,
+                radius_in_meters=self.radius_in_meters,
+                step_in_degrees=self.step_in_degrees,
+            )
+
+    def test_invalid_radius(self):
+        with self.assertRaises(ArgumentValueError):
+            get_circles_search(
+                circles_path=self.test_path,
+                polygon=self.polygon,
+                radius_in_meters=-100.0,  # Invalid radius
+                step_in_degrees=self.step_in_degrees,
+            )
+
+    def test_invalid_step_in_degrees(self):
+        with self.assertRaises(ArgumentValueError):
+            get_circles_search(
+                circles_path=self.test_path,
+                polygon=self.polygon,
+                radius_in_meters=self.radius_in_meters,
+                step_in_degrees=0,  # Invalid step size
+            )
+
+    def test_invalid_condition_rule(self):
+        with self.assertRaises(ArgumentValueError):
+            get_circles_search(
+                circles_path=self.test_path,
+                polygon=self.polygon,
+                radius_in_meters=self.radius_in_meters,
+                step_in_degrees=self.step_in_degrees,
+                condition_rule="invalid_rule",  # Invalid rule
+            )
 
 
 if __name__ == "__main__":
