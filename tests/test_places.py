@@ -56,6 +56,7 @@ class TestPlace(TestCase):
             "place_id": "12345",
             "name": "Test Place",
             "geometry": {"location": {"lat": 40.7128, "lng": -74.0060}},
+            "displayName": {"text": "Sample Place"},
             "types": ["restaurant", "food"],
             "price_level": 2,
             "rating": 4.5,
