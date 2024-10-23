@@ -175,6 +175,29 @@ def sample_polygons_with_circles(
     return circles
 
 
+def get_circles_search(
+    circles_path,
+    polygon,
+    radius_in_meters,
+    step_in_degrees,
+    condition_rule="center",
+    recalculate=False,
+):
+    if not circles_path.exists() or recalculate:
+        circles = sample_polygons_with_circles(
+            polygons=polygon,
+            radius_in_meters=radius_in_meters,
+            step_in_degrees=step_in_degrees,
+            condition_rule=condition_rule,
+        )
+        circles = gpd.GeoDataFrame(geometry=circles).reset_index(drop=True)
+        circles["searched"] = False
+        circles.to_file(circles_path, driver="GeoJSON")
+    else:
+        circles = gpd.read_file(circles_path)
+    return circles
+
+
 def polygons_folium_map(
     polygons: Union[Iterable[Polygon], Polygon],
     output_file_path: Optional[PathLike] = None,
@@ -395,29 +418,6 @@ def polygon_plot_with_points(
     if output_file_path:
         plt.savefig(output_file_path, dpi=DPI)
     return ax
-
-
-def get_circles_search(
-    circles_path,
-    polygon,
-    radius_in_meters,
-    step_in_degrees,
-    condition_rule="center",
-    recalculate=False,
-):
-    if not circles_path.exists() or recalculate:
-        circles = sample_polygons_with_circles(
-            polygons=polygon,
-            radius_in_meters=radius_in_meters,
-            step_in_degrees=step_in_degrees,
-            condition_rule=condition_rule,
-        )
-        circles = gpd.GeoDataFrame(geometry=circles).reset_index(drop=True)
-        circles["searched"] = False
-        circles.to_file(circles_path, driver="GeoJSON")
-    else:
-        circles = gpd.read_file(circles_path)
-    return circles
 
 
 def create_subsampled_circles(
