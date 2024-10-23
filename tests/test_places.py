@@ -436,5 +436,139 @@ class TestGetCirclesSearch(TestCase):
             )
 
 
+class TestCreateSubsampledCircles(TestCase):
+    def setUp(self):
+        self.center = Point(0, 0)  # Origin as the center
+        self.large_radius = 5000  # Meters
+        self.small_radius = 1000  # Meters
+        self.radial_samples = 8
+        self.factor = 1.0
+
+    def test_successful_creation(self):
+        circles = create_subsampled_circles(
+            large_circle_center=self.center,
+            large_radius=self.large_radius,
+            small_radius=self.small_radius,
+            radial_samples=self.radial_samples,
+            factor=self.factor,
+        )
+        self.assertIsInstance(circles, list)
+        self.assertGreater(len(circles), 0)
+        for circle in circles:
+            self.assertIsInstance(circle, Polygon)
+
+    def test_zero_large_radius(self):
+        with self.assertRaises(ArgumentValueError) as cm:
+            create_subsampled_circles(
+                large_circle_center=self.center,
+                large_radius=0,
+                small_radius=self.small_radius,
+                radial_samples=self.radial_samples,
+            )
+        self.assertEqual(str(cm.exception), "Radius values must be positive.")
+
+    def test_negative_small_radius(self):
+        with self.assertRaises(ArgumentValueError) as cm:
+            create_subsampled_circles(
+                large_circle_center=self.center,
+                large_radius=self.large_radius,
+                small_radius=-1000,
+                radial_samples=self.radial_samples,
+            )
+        self.assertEqual(str(cm.exception), "Radius values must be positive.")
+
+    def test_zero_radial_samples(self):
+        with self.assertRaises(ArgumentValueError) as cm:
+            create_subsampled_circles(
+                large_circle_center=self.center,
+                large_radius=self.large_radius,
+                small_radius=self.small_radius,
+                radial_samples=0,
+            )
+        self.assertEqual(
+            str(cm.exception), "radial_samples must be a positive integer."
+        )
+
+    def test_large_radius_contains_all_circles(self):
+        circles = create_subsampled_circles(
+            large_circle_center=self.center,
+            large_radius=self.large_radius,
+            small_radius=self.small_radius,
+            radial_samples=self.radial_samples,
+            factor=self.factor,
+        )
+        large_circle_deg = self.center.buffer(
+            meters_to_degree(self.large_radius, self.center.y)
+        )
+        for circle in circles:
+            self.assertTrue(large_circle_deg.contains(circle))
+
+    def test_factor_influence_on_circle_placement(self):
+        circles_default = create_subsampled_circles(
+            large_circle_center=self.center,
+            large_radius=self.large_radius,
+            small_radius=self.small_radius,
+            radial_samples=self.radial_samples,
+            factor=1.0,
+        )
+        circles_increased = create_subsampled_circles(
+            large_circle_center=self.center,
+            large_radius=self.large_radius,
+            small_radius=self.small_radius,
+            radial_samples=self.radial_samples,
+            factor=10.0,
+        )
+        self.assertGreater(len(circles_default), len(circles_increased))
+
+    def test_edge_case_single_radial_sample(self):
+        circles = create_subsampled_circles(
+            large_circle_center=self.center,
+            large_radius=self.large_radius,
+            small_radius=self.small_radius,
+            radial_samples=1,
+        )
+        self.assertEqual(len(circles), 2)  # Center circle + 1 radial circle
+
+    def test_non_intersecting_large_circle(self):
+        large_circle_center = Point(0, 0)
+        circles = create_subsampled_circles(
+            large_circle_center=large_circle_center,
+            large_radius=1000,  # Small large circle
+            small_radius=500,
+            radial_samples=4,
+            factor=5.0,  # Large factor causing non-intersecting circles
+        )
+        self.assertEqual(len(circles), 1)  # Only the center circle is generated
+
+    def test_result_with_different_latitudes(self):
+        circles = create_subsampled_circles(
+            large_circle_center=Point(0, 45),  # Higher latitude
+            large_radius=self.large_radius,
+            small_radius=self.small_radius,
+            radial_samples=self.radial_samples,
+            factor=self.factor,
+        )
+        self.assertGreater(len(circles), 0)
+
+    def test_invalid_large_circle_center_type(self):
+        with self.assertRaises(ArgumentTypeError):
+            create_subsampled_circles(
+                large_circle_center=(0, 0),  # Invalid type
+                large_radius=self.large_radius,
+                small_radius=self.small_radius,
+                radial_samples=self.radial_samples,
+            )
+
+    def test_empty_result_with_large_factor(self):
+        circles = create_subsampled_circles(
+            large_circle_center=self.center,
+            large_radius=self.large_radius,
+            small_radius=self.small_radius,
+            radial_samples=self.radial_samples,
+            factor=10.0,  # Large factor making circles non-overlapping
+        )
+        self.assertEqual(len(circles), 1)  # Only the center circle
+
+
 if __name__ == "__main__":
     unittest.main()
