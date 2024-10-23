@@ -22,7 +22,7 @@ from shapely.geometry import MultiPolygon, Point, Polygon
 from shapely.ops import transform
 from tqdm import tqdm
 
-from mitools.google.places_objects import (
+from mitools.google.places import (
     CityGeojson,
     DummyResponse,
     NewNearbySearchRequest,
