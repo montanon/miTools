@@ -20,135 +20,6 @@ CircleType = NewType("CircleType", Polygon)
 GOOGLE_PLACES_API_KEY = os.environ.get("GOOGLE_PLACES_API_KEY", "")
 
 
-class CityGeojson:
-    def __init__(self, geojson_path: PathLike, name: str):
-        self.geojson_path = Path(geojson_path)
-        self.data = gpd.read_file(geojson_path)
-        self.name = name
-        self.plots_width = 14
-        self.plots_aspect_ratio = 16 / 9
-        self.plots_height = self.plots_width / self.plots_aspect_ratio
-
-        if self.geojson_path.name == "translated_tokyo_wards.geojson":
-            wards = [
-                "Chiyoda Ward",
-                "Koto Ward",
-                "Nakano",
-                "Meguro",
-                "Shinagawa Ward",
-                "Ota-ku",
-                "Setagaya",
-                "Suginami",
-                "Nerima Ward",
-                "Itabashi Ward",
-                "Adachi Ward",
-                "Katsushika",
-                "Edogawa Ward",
-                "Sumida Ward",
-                "Chuo-ku",
-                "Minato-ku",
-                "North Ward",
-                "Toshima ward",
-                "Shibuya Ward",
-                "Arakawa",
-                "Bunkyo Ward",
-                "Shinjuku ward",
-                "Taito",
-            ]
-            polygons = [
-                unary_union(self.data.loc[self.data["Wards"] == ward, "geometry"])
-                for ward in wards
-            ]
-            self.polygons = (
-                gpd.GeoSeries(polygons).explode(index_parts=True).reset_index(drop=True)
-            )
-        else:
-            self.polygons = self.data["geometry"]
-        self.merged_polygon = self.polygons.unary_union
-        self.bounds = self.polygons.bounds.iloc[0].values
-
-    def plot_unary_polygon(self):
-        ax = gpd.GeoSeries(self.merged_polygon).plot(
-            facecolor="none",
-            edgecolor=sns.color_palette("Paired")[0],
-            figsize=(self.plots_width, self.plots_height),
-        )
-        ax.set_ylabel("Latitude")
-        ax.set_xlabel("Longitude")
-        ax.set_title(f"{self.name.title()} Polygon")
-        return ax
-
-    def plot_polygons(self):
-        ax = gpd.GeoSeries(self.polygons).plot(
-            facecolor="none",
-            edgecolor=sns.color_palette("Paired")[0],
-            figsize=(self.plots_width, self.plots_height),
-        )
-        ax.set_ylabel("Latitude")
-        ax.set_xlabel("Longitude")
-        ax.set_title(f"{self.name.title()} Wards Polygons")
-        return ax
-
-
-class NewNearbySearchRequest:
-    def __init__(
-        self,
-        location: Point,
-        distance_in_meters: float,
-        max_result_count: Optional[int] = 20,
-        included_types: Optional[List[str]] = None,
-        language_code: Optional[str] = "en",
-    ):
-        self.location = location
-        self.distance_in_meters = distance_in_meters
-        self.language_code = language_code
-        self.location_restriction = {
-            "circle": {
-                "center": {
-                    "latitude": self.location.centroid.y,
-                    "longitude": self.location.centroid.x,
-                },
-                "radius": self.distance_in_meters,
-            }
-        }
-        self.included_types = included_types if included_types else []
-        self.max_result_count = max_result_count
-
-    def json_query(self) -> Dict:
-        query = {
-            "includedTypes": self.included_types,
-            "maxResultCount": self.max_result_count,
-            "locationRestriction": self.location_restriction,
-            "languageCode": self.language_code,
-        }
-        return query
-
-
-class NearbySearchRequest:
-    def __init__(
-        self,
-        location: Point,
-        distance_in_meters: float,
-        type: str,
-        language_code: Optional[str] = "en",
-    ):
-        self.location = f"{location.centroid.y}, {location.centroid.x}"
-        self.distance_in_meters = distance_in_meters
-        self.type = type
-        self.key = GOOGLE_PLACES_API_KEY
-        self.language_code = language_code
-
-    def json_query(self) -> Dict:
-        query = {
-            "location": self.location,
-            "radius": self.distance_in_meters,
-            "type": self.type,
-            "key": self.key,
-            "language": self.language_code,
-        }
-        return query
-
-
 @dataclass
 class AddressComponent:
     longText: str
@@ -175,6 +46,45 @@ class AccessibilityOptions:
     wheelchairAccessibleParking: Optional[bool] = None
     wheelchairAccessibleEntrance: Optional[bool] = None
     wheelchairAccessibleRestroom: Optional[bool] = None
+
+
+@dataclass
+class Place:
+    id: str
+    name: str
+    latitude: float
+    longitude: float
+    types: str
+    price_level: int = None
+    rating: float = None
+    total_ratings: int = None
+    vicinity: str = None
+    permanently_closed: bool = None
+
+    @staticmethod
+    def from_json(data: Dict[str, Any]) -> "Place":
+        try:
+            validate(instance=data, schema=PLACE_SCHEMA)
+            return Place(
+                id=data["place_id"],
+                name=data["name"],
+                latitude=data["geometry"]["location"].get("lat"),
+                longitude=data["geometry"]["location"].get("lng"),
+                types=",".join(data.get("types")),
+                price_level=data.get("price_level"),
+                rating=data.get("rating"),
+                total_ratings=data.get("user_ratings_total"),
+                vicinity=data.get("vicinity"),
+                permanently_closed=data.get("permanently_closed"),
+            )
+        except ValidationError as e:
+            raise ArgumentValueError(f"Invalid place data schema: {data}. {e}")
+        except KeyError as e:
+            raise ArgumentValueError(f"Invalid place data: {data}. {e}")
+
+    def to_series(self) -> Series:
+        place_dict = asdict(self)
+        return Series(place_dict)
 
 
 @dataclass
@@ -306,43 +216,133 @@ class NewPlace:
         return Series(place_dict)
 
 
-@dataclass
-class Place:
-    id: str
-    name: str
-    latitude: float
-    longitude: float
-    types: str
-    price_level: int = None
-    rating: float = None
-    total_ratings: int = None
-    vicinity: str = None
-    permanently_closed: bool = None
+class CityGeojson:
+    def __init__(self, geojson_path: PathLike, name: str):
+        self.geojson_path = Path(geojson_path)
+        self.data = gpd.read_file(geojson_path)
+        self.name = name
+        self.plots_width = 14
+        self.plots_aspect_ratio = 16 / 9
+        self.plots_height = self.plots_width / self.plots_aspect_ratio
 
-    @staticmethod
-    def from_json(data: Dict[str, Any]) -> "Place":
-        try:
-            validate(instance=data, schema=PLACE_SCHEMA)
-            return Place(
-                id=data["place_id"],
-                name=data["name"],
-                latitude=data["geometry"]["location"].get("lat"),
-                longitude=data["geometry"]["location"].get("lng"),
-                types=",".join(data.get("types")),
-                price_level=data.get("price_level"),
-                rating=data.get("rating"),
-                total_ratings=data.get("user_ratings_total"),
-                vicinity=data.get("vicinity"),
-                permanently_closed=data.get("permanently_closed"),
+        if self.geojson_path.name == "translated_tokyo_wards.geojson":
+            wards = [
+                "Chiyoda Ward",
+                "Koto Ward",
+                "Nakano",
+                "Meguro",
+                "Shinagawa Ward",
+                "Ota-ku",
+                "Setagaya",
+                "Suginami",
+                "Nerima Ward",
+                "Itabashi Ward",
+                "Adachi Ward",
+                "Katsushika",
+                "Edogawa Ward",
+                "Sumida Ward",
+                "Chuo-ku",
+                "Minato-ku",
+                "North Ward",
+                "Toshima ward",
+                "Shibuya Ward",
+                "Arakawa",
+                "Bunkyo Ward",
+                "Shinjuku ward",
+                "Taito",
+            ]
+            polygons = [
+                unary_union(self.data.loc[self.data["Wards"] == ward, "geometry"])
+                for ward in wards
+            ]
+            self.polygons = (
+                gpd.GeoSeries(polygons).explode(index_parts=True).reset_index(drop=True)
             )
-        except ValidationError as e:
-            raise ArgumentValueError(f"Invalid place data schema: {data}. {e}")
-        except KeyError as e:
-            raise ArgumentValueError(f"Invalid place data: {data}. {e}")
+        else:
+            self.polygons = self.data["geometry"]
+        self.merged_polygon = self.polygons.unary_union
+        self.bounds = self.polygons.bounds.iloc[0].values
 
-    def to_series(self) -> Series:
-        place_dict = asdict(self)
-        return Series(place_dict)
+    def plot_unary_polygon(self):
+        ax = gpd.GeoSeries(self.merged_polygon).plot(
+            facecolor="none",
+            edgecolor=sns.color_palette("Paired")[0],
+            figsize=(self.plots_width, self.plots_height),
+        )
+        ax.set_ylabel("Latitude")
+        ax.set_xlabel("Longitude")
+        ax.set_title(f"{self.name.title()} Polygon")
+        return ax
+
+    def plot_polygons(self):
+        ax = gpd.GeoSeries(self.polygons).plot(
+            facecolor="none",
+            edgecolor=sns.color_palette("Paired")[0],
+            figsize=(self.plots_width, self.plots_height),
+        )
+        ax.set_ylabel("Latitude")
+        ax.set_xlabel("Longitude")
+        ax.set_title(f"{self.name.title()} Wards Polygons")
+        return ax
+
+
+class NewNearbySearchRequest:
+    def __init__(
+        self,
+        location: Point,
+        distance_in_meters: float,
+        max_result_count: Optional[int] = 20,
+        included_types: Optional[List[str]] = None,
+        language_code: Optional[str] = "en",
+    ):
+        self.location = location
+        self.distance_in_meters = distance_in_meters
+        self.language_code = language_code
+        self.location_restriction = {
+            "circle": {
+                "center": {
+                    "latitude": self.location.centroid.y,
+                    "longitude": self.location.centroid.x,
+                },
+                "radius": self.distance_in_meters,
+            }
+        }
+        self.included_types = included_types if included_types else []
+        self.max_result_count = max_result_count
+
+    def json_query(self) -> Dict:
+        query = {
+            "includedTypes": self.included_types,
+            "maxResultCount": self.max_result_count,
+            "locationRestriction": self.location_restriction,
+            "languageCode": self.language_code,
+        }
+        return query
+
+
+class NearbySearchRequest:
+    def __init__(
+        self,
+        location: Point,
+        distance_in_meters: float,
+        type: str,
+        language_code: Optional[str] = "en",
+    ):
+        self.location = f"{location.centroid.y}, {location.centroid.x}"
+        self.distance_in_meters = distance_in_meters
+        self.type = type
+        self.key = GOOGLE_PLACES_API_KEY
+        self.language_code = language_code
+
+    def json_query(self) -> Dict:
+        query = {
+            "location": self.location,
+            "radius": self.distance_in_meters,
+            "type": self.type,
+            "key": self.key,
+            "language": self.language_code,
+        }
+        return query
 
 
 class DummyResponse:
