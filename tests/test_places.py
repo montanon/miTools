@@ -579,5 +579,69 @@ class TestCityGeojson(TestCase):
         self.assertAlmostEqual(city.plots_height, expected_height, places=5)
 
 
+class TestCircleInsidePolygon(TestCase):
+    def setUp(self):
+        self.polygon = Polygon([(0, 0), (5, 0), (5, 5), (0, 5)])
+        self.circle = Point(2, 2).buffer(1)  # Circle-like shape with radius 1
+
+    def test_circle_within_polygon(self):
+        condition = CircleInsidePolygon()
+        self.assertTrue(condition.check(self.polygon, self.circle))
+
+    def test_circle_outside_polygon(self):
+        circle_outside = Point(10, 10).buffer(1)
+        condition = CircleInsidePolygon()
+        self.assertFalse(condition.check(self.polygon, circle_outside))
+
+
+class TestCircleCenterInsidePolygon(TestCase):
+    def setUp(self):
+        self.polygon = Polygon([(0, 0), (5, 0), (5, 5), (0, 5)])
+        self.circle = Point(2, 2).buffer(1)  # Circle-like shape with radius 1
+
+    def test_center_inside_polygon(self):
+        condition = CircleCenterInsidePolygon()
+        self.assertTrue(condition.check(self.polygon, self.circle))
+
+    def test_center_outside_polygon(self):
+        circle_outside = Point(10, 10).buffer(1)
+        condition = CircleCenterInsidePolygon()
+        self.assertFalse(condition.check(self.polygon, circle_outside))
+
+
+class TestCircleIntersectsPolygon(TestCase):
+    def setUp(self):
+        self.polygon = Polygon([(0, 0), (5, 0), (5, 5), (0, 5)])
+        self.circle = Point(4, 4).buffer(2)  # Intersects the polygon
+
+    def test_circle_intersects_polygon(self):
+        condition = CircleIntersectsPolygon()
+        self.assertTrue(condition.check(self.polygon, self.circle))
+
+    def test_no_intersection(self):
+        circle_outside = Point(10, 10).buffer(1)
+        condition = CircleIntersectsPolygon()
+        self.assertFalse(condition.check(self.polygon, circle_outside))
+
+
+class TestIntersectionConditionFactory(TestCase):
+    def test_circle_condition(self):
+        condition = intersection_condition_factory("circle")
+        self.assertIsInstance(condition, CircleInsidePolygon)
+
+    def test_center_condition(self):
+        condition = intersection_condition_factory("center")
+        self.assertIsInstance(condition, CircleCenterInsidePolygon)
+
+    def test_intersection_condition(self):
+        condition = intersection_condition_factory("intersection")
+        self.assertIsInstance(condition, CircleIntersectsPolygon)
+
+    def test_invalid_condition_type(self):
+        with self.assertRaises(ArgumentValueError) as context:
+            intersection_condition_factory("invalid_type")
+        self.assertEqual(str(context.exception), "Unknown condition type: invalid_type")
+
+
 if __name__ == "__main__":
     unittest.main()
