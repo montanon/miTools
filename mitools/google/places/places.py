@@ -6,7 +6,7 @@ from datetime import datetime
 from itertools import product
 from os import PathLike
 from pathlib import Path
-from typing import Dict, Iterable, List, NewType, Optional, Tuple, Type, Union
+from typing import Any, Dict, Iterable, List, NewType, Optional, Tuple, Type, Union
 
 import folium
 import geopandas as gpd
@@ -285,6 +285,15 @@ def create_dummy_place(query: Dict, place_class: Type[PLACE_CLASSES] = Place) ->
     return place_data
 
 
+def create_dummy_response(query: Dict[str, Any]) -> DummyResponse:
+    has_places = random.choice([True, False, False])
+    data = {}
+    if has_places:
+        places_n = random.randint(1, 21)
+        data["places"] = [create_dummy_place(query) for _ in range(places_n)]
+    return DummyResponse(data=data)
+
+
 def polygons_folium_map(
     polygons: Union[Iterable[Polygon], Polygon],
     output_file_path: Optional[PathLike] = None,
@@ -516,15 +525,6 @@ def read_or_initialize_places(file_path, recalculate=False):
 
 def generate_unique_place_id():
     return datetime.now().strftime("%Y%m%d%H%M%S%f")
-
-
-def create_dummy_response(query):
-    dummy_response = DummyResponse()
-    has_places = random.choice([True, False, False])
-    if has_places:
-        places_n = random.randint(1, 21)
-        dummy_response["places"] = [create_dummy_place(query) for _ in range(places_n)]
-    return dummy_response
 
 
 def nearby_search_request(
