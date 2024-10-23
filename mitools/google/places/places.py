@@ -22,7 +22,7 @@ from shapely.geometry import MultiPolygon, Point, Polygon
 from shapely.ops import transform
 from tqdm import tqdm
 
-from mitools.exceptions import ArgumentValueError
+from mitools.exceptions import ArgumentTypeError, ArgumentValueError
 
 from .places_objects import (
     CityGeojson,
@@ -125,6 +125,8 @@ def sample_polygon_with_circles(
     step_in_degrees: float,
     condition_rule: str = "center",
 ) -> List[CircleType]:
+    if not isinstance(polygon, Polygon):
+        raise ArgumentTypeError("Invalid 'polygon' is not of type Polygon.")
     if not polygon.is_valid:
         raise ArgumentValueError("Invalid Polygon")
     condition = intersection_condition_factory(condition_rule)
@@ -152,6 +154,10 @@ def sample_polygons_with_circles(
         polygons = [polygons]
     elif isinstance(polygons, MultiPolygon):
         polygons = list(polygons.geoms)
+    else:
+        raise ArgumentTypeError(
+            "Invalid 'polygons' is not of type Polygon or MultiPolygon."
+        )
     circles = []
     for polygon in polygons:
         circles.extend(
