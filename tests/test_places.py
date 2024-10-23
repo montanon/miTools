@@ -190,6 +190,7 @@ class TestNewPlace(TestCase):
             "id": "123",
             "types": ["restaurant"],
             "location": {"latitude": 40.7128, "longitude": -74.0060},
+            "displayName": {"text": "Sample Place"},
         }
         place = NewPlace.from_json(minimal_data)
         self.assertEqual(place.id, "123")
@@ -197,7 +198,7 @@ class TestNewPlace(TestCase):
         self.assertEqual(place.businessStatus, "")  # Optional field
 
     def test_from_json_invalid_data(self):
-        with self.assertRaises(ArgumentValueError):
+        with self.assertRaises(ArgumentTypeError):
             NewPlace.from_json({"invalid_key": "value"})
 
     def test_parse_address_components(self):
