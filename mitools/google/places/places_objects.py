@@ -350,9 +350,10 @@ class CityGeojson:
 
     @staticmethod
     def _validate_path(geojson_path: PathLike) -> Path:
-        path = Path(geojson_path).resolve(strict=True)
-        if not path.exists() or not path.is_file():
-            raise ArgumentValueError(f"Invalid GeoJSON path: {geojson_path}")
+        try:
+            path = Path(geojson_path).resolve(strict=True)
+        except Exception as e:
+            raise ArgumentValueError(f"Invalid GeoJSON path: {geojson_path}. {e}")
         return path
 
     @staticmethod
