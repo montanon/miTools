@@ -1,10 +1,12 @@
 import unittest
 from dataclasses import asdict
+from pathlib import Path
 from unittest import TestCase
 
 import geopandas as gpd
 from pandas import Series
 from shapely import Point
+from shapely.geometry import MultiPolygon, Polygon
 
 from mitools.exceptions import ArgumentKeyError, ArgumentTypeError, ArgumentValueError
 from mitools.google.places import (
@@ -511,6 +513,70 @@ class TestNewNearbySearchRequest(TestCase):
                 distance_in_meters=self.valid_distance,
                 language_code=None,
             )
+
+
+class TestCityGeojson(TestCase):
+    def setUp(self):
+        self.valid_geojson_path = Path(
+            "./tests/.test_assets/delhi_1997-2012_district.json"
+        )
+        self.invalid_geojson_path = Path("./invalid/path.geojson")
+
+    def test_valid_geojson_initialization(self):
+        city = CityGeojson(self.valid_geojson_path, "Test City")
+        self.assertEqual(city.name, "Test City")
+        self.assertEqual(len(city.polygons), 9)
+        self.assertIsInstance(city.merged_polygon, Polygon)
+
+    def test_invalid_geojson_path(self):
+        with self.assertRaises(ArgumentValueError):
+            CityGeojson(self.invalid_geojson_path, "Invalid City")
+
+    def test_plot_unary_polygon(self):
+        city = CityGeojson(self.valid_geojson_path, "Test City")
+        ax = city.plot_unary_polygon()
+        self.assertIsNotNone(ax)
+        self.assertEqual(ax.get_title(), "Test City Polygon")
+
+    def test_plot_polygons(self):
+        city = CityGeojson(self.valid_geojson_path, "Test City")
+        ax = city.plot_polygons()
+        self.assertIsNotNone(ax)
+        self.assertEqual(ax.get_title(), "Test City Wards Polygons")
+
+    def test_invalid_file_format(self):
+        invalid_file = Path("./tests/.test_assets/invalid_file.txt")
+        with open(invalid_file, "w") as f:
+            f.write("This is not a valid GeoJSON file.")
+        with self.assertRaises(ArgumentValueError):
+            CityGeojson(invalid_file, "Invalid Format City")
+        invalid_file.unlink()  # Clean up
+
+    def test_bounds_computation(self):
+        city = CityGeojson(self.valid_geojson_path, "Test City")
+        self.assertEqual(len(city.bounds), 4)  # Should return [minx, miny, maxx, maxy]
+
+    def test_unary_union_result(self):
+        city = CityGeojson(self.valid_geojson_path, "Test City")
+        self.assertIsInstance(city.merged_polygon, Polygon)
+        self.assertAlmostEqual(city.merged_polygon.area, 0.138790, places=5)
+
+    def test_large_file_handling(self):
+        geometry = [Polygon([(i, i), (i + 1, i + 1), (i + 1, i)]) for i in range(1000)]
+        data = gpd.GeoDataFrame({"geometry": geometry, "Wards": ["Test Ward"] * 1000})
+        large_geojson_path = Path("./tests/.test_assets/large_test_city.geojson")
+        data.to_file(large_geojson_path, driver="GeoJSON")
+        try:
+            city = CityGeojson(large_geojson_path, "Large Test City")
+            self.assertEqual(len(city.polygons), 1000)
+        finally:
+            if large_geojson_path.exists():
+                large_geojson_path.unlink()
+
+    def test_aspect_ratio_computation(self):
+        city = CityGeojson(self.valid_geojson_path, "Test City")
+        expected_height = city.plots_width / city.plots_aspect_ratio
+        self.assertAlmostEqual(city.plots_height, expected_height, places=5)
 
 
 if __name__ == "__main__":
