@@ -22,7 +22,7 @@ from shapely.geometry import MultiPolygon, Point, Polygon
 from shapely.ops import transform
 from tqdm import tqdm
 
-from mitools.google.places import (
+from .places_objects import (
     CityGeojson,
     DummyResponse,
     NewNearbySearchRequest,
@@ -31,7 +31,6 @@ from mitools.google.places import (
 )
 
 CircleType = NewType("CircleType", Polygon)
-
 
 # https://mapsplatform.google.com/pricing/#pricing-grid
 # https://developers.google.com/maps/documentation/places/web-service/search-nearby
