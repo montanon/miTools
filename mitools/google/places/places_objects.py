@@ -400,21 +400,21 @@ class CityGeojson:
 
 
 class ConditionProtocol(Protocol):
-    def check(self, polygon: Polygon, circle: "CircleType") -> bool: ...
+    def check(self, polygon: Polygon, circle: CircleType) -> bool: ...
 
 
 class CircleInsidePolygon:
-    def check(self, polygon: Polygon, circle: "CircleType") -> bool:
+    def check(self, polygon: Polygon, circle: CircleType) -> bool:
         return circle.within(polygon)
 
 
 class CircleCenterInsidePolygon:
-    def check(self, polygon: Polygon, circle: "CircleType") -> bool:
+    def check(self, polygon: Polygon, circle: CircleType) -> bool:
         return polygon.contains(circle.centroid)
 
 
 class CircleIntersectsPolygon:
-    def check(self, polygon: Polygon, circle: "CircleType") -> bool:
+    def check(self, polygon: Polygon, circle: CircleType) -> bool:
         return polygon.intersects(circle)
 
 
@@ -426,4 +426,4 @@ def intersection_condition_factory(condition_type: str) -> ConditionProtocol:
     elif condition_type == "intersection":
         return CircleIntersectsPolygon()
     else:
-        raise ValueError(f"Unknown condition type: {condition_type}")
+        raise ArgumentValueError(f"Unknown condition type: {condition_type}")
