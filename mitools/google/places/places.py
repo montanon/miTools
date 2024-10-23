@@ -129,6 +129,10 @@ def sample_polygon_with_circles(
         raise ArgumentTypeError("Invalid 'polygon' is not of type Polygon.")
     if not polygon.is_valid:
         raise ArgumentValueError("Invalid Polygon")
+    if polygon.is_empty:
+        raise ArgumentValueError("Empty Polygon")
+    if step_in_degrees <= 0:
+        raise ArgumentValueError("Invalid Step, must be a positive number")
     condition = intersection_condition_factory(condition_rule)
     minx, miny, maxx, maxy = polygon.bounds
     latitudes = np.arange(miny, maxy, step_in_degrees)
