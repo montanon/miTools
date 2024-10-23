@@ -261,6 +261,53 @@ class NearbySearchRequest:
         }
 
 
+@dataclass(frozen=True)
+class NewNearbySearchRequest:
+    location: Point
+    distance_in_meters: float
+    max_result_count: int = 20
+    included_types: List[str] = field(default_factory=list)
+    language_code: str = "en"
+
+    def __post_init__(self):
+        if not isinstance(self.location, Point):
+            raise ArgumentTypeError(
+                f"Invalid location type: {type(self.location)}. Expected a 'Point'."
+            )
+        if self.distance_in_meters <= 0:
+            raise ArgumentValueError(
+                f"Distance must be positive. Received: {self.distance_in_meters}"
+            )
+        if not isinstance(self.language_code, str) or len(self.language_code) != 2:
+            raise ArgumentValueError(
+                f"Invalid language code: {self.language_code}. Expected a two-letter code."
+            )
+        if self.max_result_count <= 0:
+            raise ArgumentValueError(
+                f"Max result count must be positive. Received: {self.max_result_count}"
+            )
+
+    @property
+    def location_restriction(self) -> Dict[str, Dict]:
+        return {
+            "circle": {
+                "center": {
+                    "latitude": self.location.centroid.y,
+                    "longitude": self.location.centroid.x,
+                },
+                "radius": self.distance_in_meters,
+            }
+        }
+
+    def json_query(self) -> Dict[str, Any]:
+        return {
+            "includedTypes": self.included_types,
+            "maxResultCount": self.max_result_count,
+            "locationRestriction": self.location_restriction,
+            "languageCode": self.language_code,
+        }
+
+
 class CityGeojson:
     def __init__(self, geojson_path: PathLike, name: str):
         self.geojson_path = Path(geojson_path)
@@ -329,40 +376,6 @@ class CityGeojson:
         ax.set_xlabel("Longitude")
         ax.set_title(f"{self.name.title()} Wards Polygons")
         return ax
-
-
-class NewNearbySearchRequest:
-    def __init__(
-        self,
-        location: Point,
-        distance_in_meters: float,
-        max_result_count: Optional[int] = 20,
-        included_types: Optional[List[str]] = None,
-        language_code: Optional[str] = "en",
-    ):
-        self.location = location
-        self.distance_in_meters = distance_in_meters
-        self.language_code = language_code
-        self.location_restriction = {
-            "circle": {
-                "center": {
-                    "latitude": self.location.centroid.y,
-                    "longitude": self.location.centroid.x,
-                },
-                "radius": self.distance_in_meters,
-            }
-        }
-        self.included_types = included_types if included_types else []
-        self.max_result_count = max_result_count
-
-    def json_query(self) -> Dict:
-        query = {
-            "includedTypes": self.included_types,
-            "maxResultCount": self.max_result_count,
-            "locationRestriction": self.location_restriction,
-            "languageCode": self.language_code,
-        }
-        return query
 
 
 class ConditionProtocol(Protocol):
