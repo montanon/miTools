@@ -8,6 +8,7 @@ import geopandas as gpd
 from pandas import Series
 from shapely import Point
 from shapely.geometry import MultiPolygon, Polygon
+from shapely.geometry.polygon import orient
 
 from mitools.exceptions import ArgumentKeyError, ArgumentTypeError, ArgumentValueError
 from mitools.google.places import (
@@ -107,6 +108,109 @@ class TestMetersToDegree(TestCase):
                 111_132.95 * math.cos(math.radians(latitude))
             )  # Very close to 0 for longitude
             self.assertAlmostEqual(result, expected, places=6)
+
+
+class TestSamplePolygonWithCircles(TestCase):
+    def setUp(self):
+        self.valid_polygon = Polygon([(0, 0), (0, 1), (1, 1), (1, 0), (0, 0)])
+        self.complex_polygon = orient(
+            Polygon([(-1, -1), (-1, 2), (2, 2), (2, -1), (-1, -1)]), sign=1.0
+        )
+        self.invalid_polygon = Polygon([(0, 0), (1, 1), (1, 0), (0, 1), (0, 0)])
+        self.radius_in_meters = 1000.0  # 1 km
+        self.step_in_degrees = 0.01
+        self.condition_rule = "center"  # Default rule
+
+    def test_valid_polygon_with_center_rule(self):
+        circles = sample_polygon_with_circles(
+            self.valid_polygon,
+            self.radius_in_meters,
+            self.step_in_degrees,
+            condition_rule=self.condition_rule,
+        )
+        self.assertIsInstance(circles, list)
+        self.assertGreater(len(circles), 0)
+        for circle in circles:
+            self.assertTrue(self.valid_polygon.contains(circle.centroid))
+
+    def test_valid_polygon_with_intersection_rule(self):
+        circles = sample_polygon_with_circles(
+            self.valid_polygon,
+            self.radius_in_meters,
+            self.step_in_degrees,
+            condition_rule="intersection",
+        )
+        self.assertIsInstance(circles, list)
+        self.assertGreater(len(circles), 0)
+        for circle in circles:
+            self.assertTrue(self.valid_polygon.intersects(circle))
+
+    def test_complex_polygon_sampling(self):
+        circles = sample_polygon_with_circles(
+            self.complex_polygon,
+            self.radius_in_meters,
+            self.step_in_degrees,
+        )
+        self.assertIsInstance(circles, list)
+        self.assertGreater(len(circles), 0)
+
+    def test_invalid_polygon_raises_error(self):
+        with self.assertRaises(ArgumentValueError):
+            sample_polygon_with_circles(
+                self.invalid_polygon,
+                self.radius_in_meters,
+                self.step_in_degrees,
+            )
+
+    def test_negative_radius_raises_error(self):
+        with self.assertRaises(ArgumentValueError):
+            sample_polygon_with_circles(
+                self.valid_polygon,
+                -1000.0,  # Negative radius
+                self.step_in_degrees,
+            )
+
+    def test_invalid_condition_rule(self):
+        with self.assertRaises(ArgumentValueError):
+            sample_polygon_with_circles(
+                self.valid_polygon,
+                self.radius_in_meters,
+                self.step_in_degrees,
+                condition_rule="invalid_rule",
+            )
+
+    def test_empty_polygon_bounds(self):
+        degenerate_polygon = Polygon([(0, 0), (0, 0), (0, 0)])
+        with self.assertRaises(ArgumentValueError):
+            sample_polygon_with_circles(
+                degenerate_polygon,
+                self.radius_in_meters,
+                self.step_in_degrees,
+            )
+
+    def test_large_step_in_degrees(self):
+        circles = sample_polygon_with_circles(
+            self.valid_polygon,
+            self.radius_in_meters,
+            step_in_degrees=0.5,  # Large step size
+        )
+        self.assertIsInstance(circles, list)
+        self.assertGreater(len(circles), 0)
+
+    def test_zero_step_in_degrees_raises_error(self):
+        with self.assertRaises(ZeroDivisionError):
+            sample_polygon_with_circles(
+                self.valid_polygon,
+                self.radius_in_meters,
+                step_in_degrees=0.0,
+            )
+
+    def test_json_query_output(self):
+        condition = intersection_condition_factory("center")
+        circle = Point(0.5, 0.5).buffer(
+            meters_to_degree(self.radius_in_meters, reference_latitude=0.5)
+        )
+        self.assertTrue(condition.check(self.valid_polygon, circle))
 
 
 if __name__ == "__main__":
