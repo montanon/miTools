@@ -681,5 +681,69 @@ class TestCreateDummyPlace(TestCase):
             create_dummy_place(invalid_query, place_class=Place)
 
 
+class TestCreateDummyResponse(TestCase):
+    def setUp(self):
+        self.query = {
+            "locationRestriction": {
+                "circle": {
+                    "center": {"latitude": 40.748817, "longitude": -73.985428},
+                    "radius": 1000,
+                }
+            }
+        }
+
+    def test_response_type(self):
+        response = create_dummy_response(self.query)
+        self.assertIsInstance(response, DummyResponse)
+
+    def test_empty_places(self):
+        for _ in range(10):
+            response = create_dummy_response(self.query)
+            data = response.json()
+            if "places" not in data:
+                self.assertEqual(
+                    data, {}
+                )  # Should return an empty dictionary if no places
+
+    def test_non_empty_places(self):
+        found_non_empty = False
+        for _ in range(100):
+            response = create_dummy_response(self.query)
+            data = response.json()
+            if "places" in data:
+                self.assertIsInstance(data["places"], list)
+                self.assertTrue(1 <= len(data["places"]) <= 21)
+                found_non_empty = True
+                break
+        self.assertTrue(
+            found_non_empty, "No non-empty response found after multiple runs."
+        )
+
+    def test_places_structure(self):
+        for _ in range(50):  # Repeat to ensure we hit non-empty cases
+            response = create_dummy_response(self.query)
+            data = response.json()
+            if "places" in data:
+                for place in data["places"]:
+                    self.assertIn("id", place)
+                    self.assertIn("types", place)
+                    self.assertIn("location", place)
+                    self.assertIn("latitude", place["location"])
+                    self.assertIn("longitude", place["location"])
+
+    def test_randomness(self):
+        empty_count = 0
+        non_empty_count = 0
+        for _ in range(100):
+            response = create_dummy_response(self.query)
+            data = response.json()
+            if "places" in data:
+                non_empty_count += 1
+            else:
+                empty_count += 1
+        self.assertGreater(non_empty_count, 0, "No non-empty responses found.")
+        self.assertGreater(empty_count, 0, "No empty responses found.")
+
+
 if __name__ == "__main__":
     unittest.main()
