@@ -2,7 +2,7 @@ import os
 from dataclasses import asdict, dataclass
 from os import PathLike
 from pathlib import Path
-from typing import Any, Dict, List, NewType, Optional, Protocol
+from typing import Any, Dict, List, NewType, Optional, Protocol, Tuple
 
 import geopandas as gpd
 import seaborn as sns
@@ -11,7 +11,7 @@ from pandas import Series
 from shapely import Point, Polygon
 from shapely.ops import unary_union
 
-from mitools.exceptions import ArgumentValueError
+from mitools.exceptions import ArgumentKeyError, ArgumentTypeError, ArgumentValueError
 
 from .json_schemas import PLACE_SCHEMA
 
@@ -180,6 +180,7 @@ class AccessibilityOptions:
 @dataclass
 class NewPlace:
     _NON_SERIALIZED_DATA = ["addressComponents", "viewport", "accessibilityOptions"]
+
     id: str
     types: str
     formattedAddress: str
@@ -212,57 +213,66 @@ class NewPlace:
     regularOpeningHours: str
 
     @staticmethod
-    def from_json(data: dict) -> "NewPlace":
-        global_code, compound_code = NewPlace.parse_plus_code(data.get("plusCode", {}))
-        return NewPlace(
-            id=data.get("id", ""),
-            types=",".join(data.get("types", [])),
-            formattedAddress=data.get("formattedAddress", ""),
-            addressComponents=NewPlace.parse_address_components(
-                data.get("addressComponents")
-            ),
-            globalCode=global_code,
-            compoundCode=compound_code,
-            latitude=data.get("location", {}).get("latitude", 0.0),
-            longitude=data.get("location", {}).get("longitude", 0.0),
-            viewport=NewPlace.parse_viewport(data.get("viewport")),
-            googleMapsUri=data.get("googleMapsUri", ""),
-            utcOffsetMinutes=data.get("utcOffsetMinutes", 0),
-            adrFormatAddress=data.get("adrFormatAddress", ""),
-            businessStatus=data.get("businessStatus", ""),
-            iconMaskBaseUri=data.get("iconMaskBaseUri", ""),
-            iconBackgroundColor=data.get("iconBackgroundColor", ""),
-            displayName=data.get("displayName", {}).get("text", ""),
-            primaryTypeDisplayName=data.get("primaryTypeDisplayName", {}).get(
-                "text", ""
-            ),
-            primaryType=data.get("primaryType", ""),
-            shortFormattedAddress=data.get("shortFormattedAddress", ""),
-            accessibilityOptions=AccessibilityOptions(
-                **data.get("accessibilityOptions", {})
-            ),
-            internationalPhoneNumber=data.get("internationalPhoneNumber", ""),
-            nationalPhoneNumber=data.get("nationalPhoneNumber", ""),
-            priceLevel=data.get("priceLevel", ""),
-            rating=data.get("rating", -1.0),
-            userRatingCount=data.get("userRatingCount", 0),
-            websiteUri=data.get("websiteUri", ""),
-            regularOpeningHours=str(data.get("regularOpeningHours", "")),
-            regularSecondaryOpeningHours=str(
-                data.get("regularSecondaryOpeningHours", "")
-            ),
-            currentOpeningHours=str(data.get("currentOpeningHours", "")),
-            currentSecondaryOpeningHours=str(
-                data.get("currentSecondaryOpeningHours", "")
-            ),
-        )
+    def from_json(data: Dict[str, Any]) -> "NewPlace":
+        try:
+            global_code, compound_code = NewPlace._parse_plus_code(
+                data.get("plusCode", {})
+            )
+            return NewPlace(
+                id=data["id"],
+                types=",".join(data["types"]),
+                formattedAddress=data.get("formattedAddress", ""),
+                addressComponents=NewPlace._parse_address_components(
+                    data.get("addressComponents")
+                ),
+                globalCode=global_code,
+                compoundCode=compound_code,
+                latitude=data["location"]["latitude"],
+                longitude=data["location"]["longitude"],
+                viewport=NewPlace._parse_viewport(data.get("viewport")),
+                googleMapsUri=data.get("googleMapsUri", ""),
+                utcOffsetMinutes=data.get("utcOffsetMinutes", 0),
+                adrFormatAddress=data.get("adrFormatAddress", ""),
+                businessStatus=data.get("businessStatus", ""),
+                iconMaskBaseUri=data.get("iconMaskBaseUri", ""),
+                iconBackgroundColor=data.get("iconBackgroundColor", ""),
+                displayName=data.get("displayName", {}).get("text", ""),
+                primaryTypeDisplayName=data.get("primaryTypeDisplayName", {}).get(
+                    "text", ""
+                ),
+                primaryType=data.get("primaryType", ""),
+                shortFormattedAddress=data.get("shortFormattedAddress", ""),
+                accessibilityOptions=NewPlace._parse_accessibility_options(
+                    data.get("accessibilityOptions", {})
+                ),
+                internationalPhoneNumber=data.get("internationalPhoneNumber", ""),
+                nationalPhoneNumber=data.get("nationalPhoneNumber", ""),
+                priceLevel=data.get("priceLevel", ""),
+                rating=data.get("rating", -1.0),
+                userRatingCount=data.get("userRatingCount", 0),
+                websiteUri=data.get("websiteUri", ""),
+                regularOpeningHours=str(data.get("regularOpeningHours", "")),
+                regularSecondaryOpeningHours=str(
+                    data.get("regularSecondaryOpeningHours", "")
+                ),
+                currentOpeningHours=str(data.get("currentOpeningHours", "")),
+                currentSecondaryOpeningHours=str(
+                    data.get("currentSecondaryOpeningHours", "")
+                ),
+            )
+        except KeyError as e:
+            raise ArgumentValueError(f"Missing expected field: {e}")
+        except (AttributeError, ArgumentTypeError, TypeError) as e:
+            raise ArgumentTypeError(f"Invalid 'data={data}' structure or type: {e}")
 
     @staticmethod
-    def parse_address_components(components: List[dict]) -> List[AddressComponent]:
+    def _parse_address_components(
+        components: List[Dict[str, Any]],
+    ) -> List[AddressComponent]:
         return [AddressComponent(**comp) for comp in components] if components else []
 
     @staticmethod
-    def parse_viewport(viewport_data: dict) -> Viewport:
+    def _parse_viewport(viewport_data: Dict[str, Any]) -> Viewport:
         if not viewport_data:
             return Viewport(
                 low=ViewportCoordinate(0.0, 0.0), high=ViewportCoordinate(0.0, 0.0)
@@ -273,11 +283,18 @@ class NewPlace:
         )
 
     @staticmethod
-    def parse_plus_code(plus_code_data: dict) -> tuple:
+    def _parse_plus_code(plus_code_data: Dict[str, Any]) -> Tuple[str, str]:
         return (
             plus_code_data.get("globalCode", ""),
             plus_code_data.get("compoundCode", ""),
         )
+
+    @staticmethod
+    def _parse_accessibility_options(data: Dict[str, Any]) -> AccessibilityOptions:
+        try:
+            return AccessibilityOptions(**data) if data else AccessibilityOptions()
+        except TypeError as e:
+            raise ArgumentTypeError(f"Invalid accessibility options data: {data}. {e}")
 
     def to_series(self) -> Series:
         place_dict = asdict(self)
