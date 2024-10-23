@@ -217,6 +217,16 @@ class NewPlace:
         return Series(place_dict)
 
 
+class DummyResponse:
+    def __init__(self, data: Dict[str, Any] = None, status_code: int = 200):
+        self.data = data or {}
+        self.status_code = status_code
+        self.reason = "OK" if status_code == 200 else "Error"
+
+    def json(self) -> Dict[str, Any]:
+        return self.data
+
+
 class CityGeojson:
     def __init__(self, geojson_path: PathLike, name: str):
         self.geojson_path = Path(geojson_path)
@@ -344,16 +354,6 @@ class NearbySearchRequest:
             "language": self.language_code,
         }
         return query
-
-
-class DummyResponse:
-    def __init__(self, data: Dict[str, Any] = None, status_code: int = 200):
-        self.data = data or {}
-        self.status_code = status_code
-        self.reason = "OK" if status_code == 200 else "Error"
-
-    def json(self) -> Dict[str, Any]:
-        return self.data
 
 
 class ConditionProtocol(Protocol):

@@ -249,5 +249,46 @@ class TestNewPlace(TestCase):
             NewPlace._parse_accessibility_options(invalid_data["accessibilityOptions"])
 
 
+class TestDummyResponse(TestCase):
+    def test_default_response(self):
+        response = DummyResponse()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.reason, "OK")
+        self.assertEqual(response.json(), {})
+
+    def test_custom_data_response(self):
+        data = {"key": "value", "status": "success"}
+        response = DummyResponse(data=data)
+        self.assertEqual(response.json(), data)
+
+    def test_custom_status_code(self):
+        response = DummyResponse(status_code=404)
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.reason, "Error")
+        self.assertEqual(response.json(), {})
+
+    def test_custom_data_and_status_code(self):
+        data = {"error": "Not found"}
+        response = DummyResponse(data=data, status_code=404)
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.reason, "Error")
+        self.assertEqual(response.json(), data)
+
+    def test_empty_data(self):
+        response = DummyResponse(data={})
+        self.assertEqual(response.json(), {})
+
+    def test_invalid_status_code(self):
+        response = DummyResponse(status_code=500)
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response.reason, "Error")
+        self.assertEqual(response.json(), {})
+
+    def test_large_data_payload(self):
+        data = {"key_" + str(i): i for i in range(1000)}
+        response = DummyResponse(data=data)
+        self.assertEqual(response.json(), data)
+
+
 if __name__ == "__main__":
     unittest.main()
