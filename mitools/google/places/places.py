@@ -289,12 +289,16 @@ def create_dummy_place(query: Dict, place_class: Type[PLACE_CLASSES] = Place) ->
     return place_data
 
 
-def create_dummy_response(query: Dict[str, Any]) -> DummyResponse:
+def create_dummy_response(
+    query: Dict[str, Any], place_class: Type[PLACE_CLASSES] = Place
+) -> DummyResponse:
     has_places = random.choice([True, False, False])
     data = {}
     if has_places:
         places_n = random.randint(1, 21)
-        data["places"] = [create_dummy_place(query) for _ in range(places_n)]
+        data["places"] = [
+            create_dummy_place(query, place_class) for _ in range(places_n)
+        ]
     return DummyResponse(data=data)
 
 
