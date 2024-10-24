@@ -36,7 +36,6 @@ from .places import (
     process_single_circle,
     sample_polygon_with_circles,
     sample_polygons_with_circles,
-    save_state,
     search_and_update_places,
     search_places_in_polygon,
     should_process_circles,
