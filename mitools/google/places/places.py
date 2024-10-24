@@ -352,10 +352,7 @@ def nearby_search_request(
 def get_response_places(
     response_id: str, response: Union[requests.Response, DummyResponse]
 ) -> DataFrame:
-    try:
-        places = response.json()["places"]
-    except (AttributeError, KeyError) as e:
-        raise ArgumentStructureError(f"No 'places' key found in the response: {e}")
+    places = response.json().get("places", [])
     place_series_list = []
     for place in places:
         place_series = NewPlace.from_json(place).to_series()
@@ -391,7 +388,7 @@ def search_and_update_places(
         places_df = get_response_places(response_id, response)
     except (ArgumentStructureError, ArgumentValueError) as e:
         print(f"Failed to get places from response: {e}")
-        return False, None
+        return True, None
     return True, places_df
 
 
@@ -417,7 +414,7 @@ def process_circles(
     if should_process_circles(circles, recalculate):
         with tqdm(total=len(circles), desc="Processing circles") as pbar:
             for response_id, circle in circles[~circles["searched"]].iterrows():
-                process_single_circle(
+                found_places = process_single_circle(
                     response_id=response_id,
                     circle=circle,
                     radius_in_meters=radius_in_meters,
@@ -446,13 +443,17 @@ def process_single_circle(
     pbar: tqdm,
     included_types: List[str] = None,
     query_headers: Optional[Dict[str, str]] = None,
+    has_places: bool = True,
 ) -> None:
+    if not should_do_search():
+        return found_places
     searched, places_df = search_and_update_places(
         circle=circle,
         radius_in_meters=radius_in_meters,
         response_id=response_id,
         query_headers=query_headers,
         included_types=included_types,
+        has_places=has_places,
     )
     if places_df is not None:
         found_places = pd.concat([found_places, places_df], axis=0, ignore_index=True)
@@ -462,6 +463,7 @@ def process_single_circle(
         found_places.to_parquet(file_path)
         circles.to_file(circles_path, driver="GeoJSON")
     update_progress_bar(pbar, circles, found_places)
+    return found_places
 
 
 def should_save_state(
@@ -472,6 +474,10 @@ def should_save_state(
         or (response_id == total_circles - 1)
         or (global_requests_counter.value >= global_requests_counter_limit.value - 1)
     )
+
+
+def should_do_search() -> None:
+    return global_requests_counter.value < global_requests_counter_limit.value
 
 
 def update_progress_bar(
