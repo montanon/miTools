@@ -283,7 +283,12 @@ def create_dummy_place(query: Dict, place_class: Type[PLACE_CLASSES] = Place) ->
                 "primaryTypeDisplayName": {"text": random.choice(random_types)},
                 "formattedAddress": f"{unique_id} Some Address",
                 "addressComponents": [
-                    {"long_name": "City", "short_name": "C", "types": ["locality"]}
+                    {
+                        "longText": "City",
+                        "shortText": "C",
+                        "types": ["locality"],
+                        "languageCode": "en",
+                    }
                 ],
                 "googleMapsUri": f"https://maps.google.com/?q={random_latitude},{random_longitude}",
                 "priceLevel": str(random.choice([1, 2, 3, 4, 5])),
@@ -326,7 +331,7 @@ def nearby_search_request(
     headers = query_headers or QUERY_HEADERS
     api_key = headers.get("X-Goog-Api-Key", "")
     if not api_key:
-        return create_dummy_response(query, has_places=has_places)
+        return create_dummy_response(query, has_places=has_places, place_class=NewPlace)
     try:
         response = requests.post(
             NEW_NEARBY_SEARCH_URL, headers=headers, json=query, timeout=10
@@ -360,12 +365,14 @@ def search_and_update_places(
     response_id: str,
     query_headers: Dict[str, str] = None,
     included_types: List[str] = None,
+    has_places: bool = True,
 ) -> Tuple[bool, Optional[DataFrame]]:
     response = nearby_search_request(
         circle=circle,
         radius_in_meters=radius_in_meters,
         query_headers=query_headers,
         included_types=included_types,
+        has_places=has_places,
     )
     if response.status_code != 200 or response.reason != "OK":
         print(
