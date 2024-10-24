@@ -404,6 +404,7 @@ def process_circles(
     query_headers: Optional[Dict[str, str]] = None,
     included_types: List[str] = None,
     recalculate: bool = False,
+    has_places: bool = True,
 ) -> DataFrame:
     if file_path.exists() and not recalculate:
         found_places = pd.read_parquet(file_path)
@@ -416,7 +417,7 @@ def process_circles(
             for response_id, circle in circles[~circles["searched"]].iterrows():
                 found_places = process_single_circle(
                     response_id=response_id,
-                    circle=circle,
+                    circle=circle["geometry"],
                     radius_in_meters=radius_in_meters,
                     query_headers=query_headers,
                     included_types=included_types,
@@ -424,6 +425,7 @@ def process_circles(
                     circles=circles,
                     file_path=file_path,
                     circles_path=circles_path,
+                    has_places=has_places,
                     pbar=pbar,
                 )
     else:
