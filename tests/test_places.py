@@ -8,9 +8,11 @@ from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
 import geopandas as gpd
+import pandas as pd
 import requests
 from geopandas import GeoDataFrame, GeoSeries
 from pandas import DataFrame, Series
+from pandas.testing import assert_frame_equal
 from shapely import Point
 from shapely.geometry import MultiPolygon, Polygon
 from shapely.geometry.polygon import orient
@@ -1183,6 +1185,101 @@ class TestProcessSingleCircle(TestCase):
         self.assertTrue(found_places.empty)
         self.assertFalse(self.file_path.exists())
         self.assertFalse(self.circles_path.exists())
+
+
+class TestProcessCircles(TestCase):
+    def setUp(self):
+        self.temp_dir = TemporaryDirectory()
+        self.file_path = Path(self.temp_dir.name) / "found_places.parquet"
+        self.circles_path = Path(self.temp_dir.name) / "circles.geojson"
+        geometry = [Point(0, 0), Point(1, 1)]
+        self.circles = GeoDataFrame({"searched": [False, False], "geometry": geometry})
+        self.found_places = DataFrame(
+            columns=["circle", *list(NewPlace.__annotations__.keys())]
+        )
+
+    def tearDown(self):
+        self.temp_dir.cleanup()
+
+    def test_process_circles_no_recalculation(self):
+        self.found_places.to_parquet(self.file_path)
+        result = process_circles(
+            circles=self.circles,
+            radius_in_meters=1000,
+            file_path=self.file_path,
+            circles_path=self.circles_path,
+            recalculate=False,
+        )
+        assert_frame_equal(result, self.found_places)
+
+    def test_process_circles_with_recalculation(self):
+        result = process_circles(
+            circles=self.circles,
+            radius_in_meters=1000,
+            file_path=self.file_path,
+            circles_path=self.circles_path,
+            recalculate=True,
+        )
+        self.assertFalse(result.empty)
+        self.assertEqual(len(result), len(self.circles))
+
+    def test_process_circles_empty_circles(self):
+        empty_circles = GeoDataFrame(columns=["searched", "geometry"])
+        result = process_circles(
+            circles=empty_circles,
+            radius_in_meters=1000,
+            file_path=self.file_path,
+            circles_path=self.circles_path,
+        )
+        self.assertTrue(result.empty)
+
+    def test_process_circles_partial_processing(self):
+        self.circles.loc[0, "searched"] = True
+        result = process_circles(
+            circles=self.circles,
+            radius_in_meters=1000,
+            file_path=self.file_path,
+            circles_path=self.circles_path,
+            recalculate=True,
+        )
+        self.assertEqual(len(result), 1)
+
+    def test_process_circles_save_to_file(self):
+        result = process_circles(
+            circles=self.circles,
+            radius_in_meters=1000,
+            file_path=self.file_path,
+            circles_path=self.circles_path,
+            recalculate=True,
+        )
+        self.assertTrue(self.file_path.exists())
+        self.assertTrue(self.circles_path.exists())
+        saved_places = pd.read_parquet(self.file_path)
+        saved_circles = gpd.read_file(self.circles_path)
+        assert_frame_equal(saved_places, result)
+        assert_frame_equal(saved_circles, self.circles)
+
+    def test_process_circles_with_included_types(self):
+        result = process_circles(
+            circles=self.circles,
+            radius_in_meters=1000,
+            file_path=self.file_path,
+            circles_path=self.circles_path,
+            included_types=["restaurant", "cafe"],
+            recalculate=True,
+        )
+        self.assertFalse(result.empty)
+
+    def test_process_circles_timeout_behavior(self):
+        global_requests_counter.value = global_requests_counter_limit.value - 1
+        result = process_circles(
+            circles=self.circles,
+            radius_in_meters=1000,
+            file_path=self.file_path,
+            circles_path=self.circles_path,
+            recalculate=True,
+        )
+        self.assertTrue(result.empty)
 
 
 if __name__ == "__main__":
