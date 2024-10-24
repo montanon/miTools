@@ -10,6 +10,8 @@ from .places import (
     get_circles_search,
     get_response_places,
     get_saturated_area,
+    global_requests_counter,
+    global_requests_counter_limit,
     meters_to_degree,
     nearby_search_request,
     places_search_step,
