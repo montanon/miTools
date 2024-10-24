@@ -354,6 +354,33 @@ def get_response_places(
     return DataFrame(place_series_list)
 
 
+def search_and_update_places(
+    circle: CircleType,
+    radius_in_meters: float,
+    response_id: str,
+    query_headers: Dict[str, str] = None,
+    included_types: List[str] = None,
+) -> Tuple[bool, Optional[DataFrame]]:
+    response = nearby_search_request(
+        circle=circle,
+        radius_in_meters=radius_in_meters,
+        query_headers=query_headers,
+        included_types=included_types,
+    )
+    if response.status_code != 200 or response.reason != "OK":
+        print(
+            f"Failed request: {response.status_code} - {response.reason} - {response.text}"
+        )
+        time.sleep(30)
+        return False, None
+    try:
+        places_df = get_response_places(response_id, response)
+    except (ArgumentStructureError, ArgumentValueError) as e:
+        print(f"Failed to get places from response: {e}")
+        return False, None
+    return True, places_df
+
+
 def read_or_initialize_places(file_path, recalculate=False):
     if file_path.exists() and not recalculate:
         return pd.read_parquet(file_path)
@@ -363,24 +390,6 @@ def read_or_initialize_places(file_path, recalculate=False):
 
 def generate_unique_place_id():
     return datetime.now().strftime("%Y%m%d%H%M%S%f")
-
-
-def search_and_update_places(
-    circle, radius_in_meters, response_id, query_headers=None, restaurants=False
-):
-    response = nearby_search_request(
-        circle, radius_in_meters, query_headers=query_headers, restaurants=restaurants
-    )
-    places_df = None
-    if response.reason == "OK":
-        if "places" in response.json():
-            places_df = get_response_places(response_id, response)
-        searched = True
-    else:
-        print(response.status_code, response.reason, response.text)
-        searched = False
-        time.sleep(30)
-    return searched, places_df
 
 
 def process_circles(
