@@ -463,9 +463,11 @@ def process_single_circle(
     update_progress_bar(pbar, circles, found_places)
 
 
-def should_save_state(response_id: int, total_circles: int) -> bool:
+def should_save_state(
+    response_id: int, total_circles: int, n_amount: int = 200
+) -> bool:
     return (
-        (response_id % 200 == 0)
+        (response_id % n_amount == 0)
         or (response_id == total_circles - 1)
         or (global_requests_counter.value >= global_requests_counter_limit.value - 1)
     )
