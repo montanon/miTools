@@ -17,12 +17,14 @@ import numpy as np
 import pandas as pd
 import requests
 import seaborn as sns
+from geopandas import GeoDataFrame
 from matplotlib.axes import Axes
-from pandas import DataFrame
+from pandas import DataFrame, Series
 from shapely.geometry import MultiPolygon, Point, Polygon
 from shapely.ops import transform
 from tqdm import tqdm
 
+from mitools.context import ContextVar
 from mitools.exceptions import (
     ArgumentStructureError,
     ArgumentTypeError,
@@ -39,6 +41,11 @@ from .places_objects import (
 )
 
 CircleType = NewType("CircleType", Polygon)
+
+global_requests_counter = ContextVar("GLOBAL_REQUESTS_COUNTER", default_value=0)
+global_requests_counter_limit = ContextVar(
+    "GLOBAL_REQUESTS_COUNTER_LIMIT", default_value=100
+)
 
 # https://mapsplatform.google.com/pricing/#pricing-grid
 # https://developers.google.com/maps/documentation/places/web-service/search-nearby
@@ -388,90 +395,110 @@ def search_and_update_places(
     return True, places_df
 
 
-def read_or_initialize_places(file_path, recalculate=False):
+def should_process_circles(circles: GeoDataFrame, recalculate: bool) -> bool:
+    return (~circles["searched"]).any() or recalculate
+
+
+def process_circles(
+    circles: GeoDataFrame,
+    radius_in_meters: float,
+    file_path: Path,
+    circles_path: Path,
+    query_headers: Optional[Dict[str, str]] = None,
+    included_types: List[str] = None,
+    recalculate: bool = False,
+) -> DataFrame:
     if file_path.exists() and not recalculate:
-        return pd.read_parquet(file_path)
+        found_places = pd.read_parquet(file_path)
     else:
-        return pd.DataFrame(columns=["circle", *list(NewPlace.__annotations__.keys())])
+        found_places = DataFrame(
+            columns=["circle", *list(NewPlace.__annotations__.keys())]
+        )
+    if should_process_circles(circles, recalculate):
+        with tqdm(total=len(circles), desc="Processing circles") as pbar:
+            for response_id, circle in circles[~circles["searched"]].iterrows():
+                process_single_circle(
+                    response_id=response_id,
+                    circle=circle,
+                    radius_in_meters=radius_in_meters,
+                    query_headers=query_headers,
+                    included_types=included_types,
+                    found_places=found_places,
+                    circles=circles,
+                    file_path=file_path,
+                    circles_path=circles_path,
+                    pbar=pbar,
+                )
+    else:
+        found_places = pd.read_parquet(file_path)
+
+    return found_places
+
+
+def process_single_circle(
+    response_id: int,
+    circle: Series,
+    radius_in_meters: float,
+    found_places: DataFrame,
+    circles: GeoDataFrame,
+    file_path: Path,
+    circles_path: Path,
+    pbar: tqdm,
+    included_types: List[str] = None,
+    query_headers: Optional[Dict[str, str]] = None,
+) -> None:
+    searched, places_df = search_and_update_places(
+        circle=circle,
+        radius_in_meters=radius_in_meters,
+        response_id=response_id,
+        query_headers=query_headers,
+        included_types=included_types,
+    )
+    if places_df is not None:
+        found_places = pd.concat([found_places, places_df], axis=0, ignore_index=True)
+    circles.loc[response_id, "searched"] = searched
+    global_requests_counter.value += 1
+    if should_save_state(response_id, circles.shape[0]):
+        save_state(found_places, file_path, circles, circles_path)
+    update_progress_bar(pbar, circles, found_places)
+
+
+def should_save_state(response_id: int, total_circles: int) -> bool:
+    return (
+        (response_id % 200 == 0)
+        or (response_id == total_circles - 1)
+        or (global_requests_counter.value >= global_requests_counter_limit.value - 1)
+    )
+
+
+def save_state(
+    found_places: DataFrame,
+    file_path: PathLike,
+    circles: GeoDataFrame,
+    circles_path: PathLike,
+) -> None:
+    found_places.to_parquet(file_path)
+    circles.to_file(circles_path, driver="GeoJSON")
+
+
+def update_progress_bar(
+    pbar: tqdm, circles: GeoDataFrame, found_places: DataFrame
+) -> None:
+    remaining_circles = circles["searched"].value_counts().get(False, 0)
+    searched_circles = circles["searched"].sum()
+    found_places_count = found_places["id"].nunique()
+    pbar.update()
+    pbar.set_postfix(
+        {
+            "Remaining Circles": remaining_circles,
+            "Found Places": found_places_count,
+            "Searched Circles": searched_circles,
+        }
+    )
 
 
 def generate_unique_place_id():
     return datetime.now().strftime("%Y%m%d%H%M%S%f")
-
-
-def process_circles(
-    circles,
-    radius_in_meters,
-    file_path,
-    circles_path,
-    global_requests_counter=None,
-    global_requests_counter_limit=None,
-    query_headers=None,
-    restaurants=False,
-    recalculate=False,
-):
-    if global_requests_counter is None and global_requests_counter_limit is None:
-        global GLOBAL_REQUESTS_COUNTER, GLOBAL_REQUESTS_COUNTER_LIMIT
-    else:
-        GLOBAL_REQUESTS_COUNTER = global_requests_counter[0]
-        GLOBAL_REQUESTS_COUNTER_LIMIT = global_requests_counter_limit[0]
-    if (
-        (~circles["searched"]).any() or recalculate
-    ) and GLOBAL_REQUESTS_COUNTER <= GLOBAL_REQUESTS_COUNTER_LIMIT:
-        circles_search = circles[~circles["searched"]]
-        found_places = read_or_initialize_places(file_path, recalculate)
-        with tqdm(total=len(circles_search), desc="Processing circles") as pbar:
-            for response_id, circle in circles_search.iterrows():
-                searched, places_df = search_and_update_places(
-                    circle,
-                    radius_in_meters,
-                    response_id,
-                    query_headers=query_headers,
-                    restaurants=restaurants,
-                )
-                if places_df is not None:
-                    found_places = pd.concat(
-                        [found_places, places_df], axis=0, ignore_index=True
-                    )
-                GLOBAL_REQUESTS_COUNTER += 1
-                update_progress_and_save(
-                    searched,
-                    circles,
-                    response_id,
-                    found_places,
-                    file_path,
-                    circles_path,
-                    pbar,
-                )
-                global_requests_counter[0] = GLOBAL_REQUESTS_COUNTER
-                if GLOBAL_REQUESTS_COUNTER >= GLOBAL_REQUESTS_COUNTER_LIMIT:
-                    break
-    else:
-        found_places = pd.read_parquet(file_path)
-    return found_places
-
-
-def update_progress_and_save(
-    searched, circles, index, found_places, file_path, circles_path, pbar
-):
-    circles.loc[index, "searched"] = searched
-    if (
-        (index % 200 == 0)
-        or (index == circles.shape[0] - 1)
-        or (GLOBAL_REQUESTS_COUNTER >= GLOBAL_REQUESTS_COUNTER_LIMIT - 1)
-    ):
-        found_places.to_parquet(file_path)
-        circles.to_file(circles_path, driver="GeoJSON")
-    pbar.update()
-    pbar.set_postfix(
-        {
-            "Remaining Circles": circles["searched"].value_counts()[False]
-            if False in circles["searched"].value_counts()
-            else 0,
-            "Found Places": found_places["id"].nunique(),
-            "Searched Circles": circles["searched"].sum(),
-        }
-    )
 
 
 def search_places_in_polygon(
