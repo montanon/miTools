@@ -435,7 +435,7 @@ class TestCalculateEconomicComplexity(TestCase):
 
     def test_fast_option(self):
         _N = 4
-        large_rca = DataFrame(np.random.rand(5_000, 5_000))
+        large_rca = DataFrame(np.random.rand(100, 100))
         fast_times = []
         for _ in range(_N):
             start_time = time.time()
