@@ -1,19 +1,33 @@
 import math
 import unittest
 from dataclasses import asdict
+from io import StringIO
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest import TestCase
+from unittest.mock import MagicMock, patch
 
 import geopandas as gpd
+import pandas as pd
+import requests
 from geopandas import GeoDataFrame, GeoSeries
-from pandas import Series
+from pandas import DataFrame, Series
+from pandas.testing import assert_frame_equal
 from shapely import Point
 from shapely.geometry import MultiPolygon, Polygon
 from shapely.geometry.polygon import orient
+from tqdm import tqdm
 
-from mitools.exceptions import ArgumentKeyError, ArgumentTypeError, ArgumentValueError
+from mitools.context import ContextVar
+from mitools.exceptions import (
+    ArgumentKeyError,
+    ArgumentStructureError,
+    ArgumentTypeError,
+    ArgumentValueError,
+)
 from mitools.google.places import (
     GOOGLE_PLACES_API_KEY,
+    NEW_NEARBY_SEARCH_URL,
     QUERY_HEADERS,
     AccessibilityOptions,
     AddressComponent,
@@ -37,22 +51,20 @@ from mitools.google.places import (
     get_circles_search,
     get_response_places,
     get_saturated_area,
+    global_requests_counter,
+    global_requests_counter_limit,
     intersection_condition_factory,
     meters_to_degree,
     nearby_search_request,
     places_search_step,
-    polygon_plot_with_circles_and_points,
-    polygon_plot_with_points,
-    polygon_plot_with_sampling_circles,
-    polygons_folium_map,
-    polygons_folium_map_with_pois,
     process_circles,
-    read_or_initialize_places,
+    process_single_circle,
     sample_polygon_with_circles,
     sample_polygons_with_circles,
     search_and_update_places,
     search_places_in_polygon,
-    update_progress_and_save,
+    should_save_state,
+    update_progress_bar,
 )
 
 
@@ -282,7 +294,7 @@ class TestSamplePolygonsWithCircles(TestCase):
         self.assertEqual(len(circles), 0)
 
     def test_invalid_condition_rule(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ArgumentValueError):
             sample_polygons_with_circles(
                 polygons=self.square_polygon,
                 radius_in_meters=self.radius_in_meters,
@@ -743,6 +755,531 @@ class TestCreateDummyResponse(TestCase):
                 empty_count += 1
         self.assertGreater(non_empty_count, 0, "No non-empty responses found.")
         self.assertGreater(empty_count, 0, "No empty responses found.")
+
+
+class TestNearbySearchRequest(TestCase):
+    def setUp(self):
+        self.circle = Point(151.2099, -33.865143)  # Sydney
+        self.radius_in_meters = 1000.0  # 1 km radius
+        self.valid_headers = {"X-Goog-Api-Key": "valid_api_key"}
+        self.restaurants = ["restaurant", "cafe", "bar"]
+
+    @patch("requests.post")
+    def test_valid_request(self, mock_post):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"status": "OK", "results": []}
+        mock_post.return_value = mock_response
+        response = nearby_search_request(
+            circle=self.circle,
+            radius_in_meters=self.radius_in_meters,
+            query_headers=self.valid_headers,
+            included_types=self.restaurants,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"status": "OK", "results": []})
+        mock_post.assert_called_once_with(
+            NEW_NEARBY_SEARCH_URL,
+            headers=self.valid_headers,
+            json=NewNearbySearchRequest(
+                location=self.circle.centroid,
+                distance_in_meters=self.radius_in_meters,
+                included_types=self.restaurants,
+            ).json_query(),
+            timeout=10,
+        )
+
+    def test_dummy_response_without_api_key(self):
+        response = nearby_search_request(
+            circle=self.circle,
+            radius_in_meters=self.radius_in_meters,
+            query_headers={"X-Goog-Api-Key": ""},
+            has_places=True,
+        )
+        self.assertIsInstance(response, DummyResponse)
+        self.assertIn("places", response.json())
+
+    @patch("requests.post", side_effect=requests.exceptions.RequestException)
+    def test_request_failure(self, mock_post):
+        with self.assertRaises(RuntimeError):
+            nearby_search_request(
+                circle=self.circle,
+                radius_in_meters=self.radius_in_meters,
+                query_headers=self.valid_headers,
+            )
+
+    def test_headers_fallback_to_global(self):
+        with patch("requests.post") as mock_post:
+            mock_response = MagicMock()
+            mock_response.status_code = 200
+            mock_post.return_value = mock_response
+            response = nearby_search_request(
+                circle=self.circle,
+                radius_in_meters=self.radius_in_meters,
+                included_types=[],
+            )
+            self.assertEqual(response.status_code, 200)
+            mock_post.assert_called_once_with(
+                NEW_NEARBY_SEARCH_URL,
+                headers=QUERY_HEADERS,
+                json=NewNearbySearchRequest(
+                    location=self.circle.centroid,
+                    distance_in_meters=self.radius_in_meters,
+                    included_types=[],
+                ).json_query(),
+                timeout=10,
+            )
+
+    def test_invalid_circle_type(self):
+        with self.assertRaises(ArgumentTypeError):
+            nearby_search_request(
+                circle={"invalid": "object"},
+                radius_in_meters=self.radius_in_meters,
+                query_headers=self.valid_headers,
+            )
+
+    def test_timeout_handling(self):
+        with patch("requests.post", side_effect=requests.exceptions.Timeout):
+            with self.assertRaises(RuntimeError) as context:
+                nearby_search_request(
+                    circle=self.circle,
+                    radius_in_meters=self.radius_in_meters,
+                    query_headers=self.valid_headers,
+                )
+            self.assertIn("Request to", str(context.exception))
+
+
+class TestGetResponsePlaces(TestCase):
+    def setUp(self):
+        self.valid_place_data = {
+            "id": "place_1",
+            "types": ["restaurant"],
+            "location": {"latitude": 40.748817, "longitude": -73.985428},
+            "displayName": {"text": "Sample Place"},
+            "primaryType": "restaurant",
+        }
+        self.valid_response = DummyResponse(data={"places": [self.valid_place_data]})
+        self.multi_place_response = DummyResponse(
+            data={
+                "places": [
+                    {**self.valid_place_data, "id": f"place_{i}"} for i in range(3)
+                ]
+            }
+        )
+        self.empty_response = DummyResponse(data={"places": []})
+        self.invalid_response = DummyResponse(data={"invalid_key": []})
+
+    def test_valid_response_single_place(self):
+        df = get_response_places("circle_1", self.valid_response)
+        self.assertIsInstance(df, DataFrame)
+        self.assertEqual(len(df), 1)
+        self.assertEqual(df.iloc[0]["id"], "place_1")
+        self.assertEqual(df.iloc[0]["circle"], "circle_1")
+
+    def test_valid_response_multiple_places(self):
+        df = get_response_places("circle_1", self.multi_place_response)
+        self.assertIsInstance(df, DataFrame)
+        self.assertEqual(len(df), 3)
+        self.assertListEqual(df["id"].tolist(), ["place_0", "place_1", "place_2"])
+
+    def test_empty_response(self):
+        with self.assertRaises(ArgumentValueError) as context:
+            get_response_places("circle_1", self.empty_response)
+        self.assertEqual(str(context.exception), "No places found in the response.")
+
+    def test_invalid_response_structure(self):
+        with self.assertRaises(ArgumentValueError) as context:
+            get_response_places("circle_1", self.invalid_response)
+        self.assertIn("No places found in the response.", str(context.exception))
+
+    def test_requests_response_integration(self):
+        import requests
+
+        response = requests.Response()
+        response._content = b'{"places": [{"id": "place_1", "location": {"latitude": 40.748817, "longitude": -73.985428}, "displayName": {"text": "Sample Place"}, "primaryType": "restaurant", "types": ["restaurant"]}]}'
+        response.status_code = 200
+        df = get_response_places("circle_2", response)
+        self.assertEqual(len(df), 1)
+        self.assertEqual(df.iloc[0]["id"], "place_1")
+        self.assertEqual(df.iloc[0]["circle"], "circle_2")
+
+    def test_invalid_json_in_response(self):
+        invalid_response = DummyResponse(data=None)
+        with self.assertRaises(ArgumentValueError) as context:
+            get_response_places("circle_1", invalid_response)
+        self.assertIn("No places found in the response.", str(context.exception))
+
+
+class TestSearchAndUpdatePlaces(TestCase):
+    def setUp(self):
+        self.circle = Point(151.2099, -33.865143)  # Small area near Sydney
+        self.radius_in_meters = 1000.0
+        self.response_id = "test_circle"
+        self.query_headers = {"X-Goog-Api-Key": ""}
+        self.valid_place_1 = {
+            "id": "place_1",
+            "types": ["restaurant"],
+            "location": {"latitude": -33.865, "longitude": 151.209},
+            "displayName": {"text": "Test Place 1"},
+            "primaryType": "restaurant",
+        }
+        self.valid_place_2 = {
+            "id": "place_2",
+            "types": ["cafe"],
+            "location": {"latitude": -33.866, "longitude": 151.208},
+            "displayName": {"text": "Test Place 2"},
+            "primaryType": "cafe",
+        }
+
+    def create_dummy_response(self, has_places: bool) -> DummyResponse:
+        data = (
+            {"places": [self.valid_place_1, self.valid_place_2]} if has_places else {}
+        )
+        return DummyResponse(data=data)
+
+    def test_successful_search_with_places(self):
+        success, places_df = search_and_update_places(
+            circle=self.circle,
+            radius_in_meters=self.radius_in_meters,
+            response_id=self.response_id,
+            query_headers=self.query_headers,
+        )
+        self.assertTrue(success)
+        self.assertIsInstance(places_df, DataFrame)
+        self.assertIn("id", places_df.columns)
+        self.assertIn("circle", places_df.columns)
+
+    def test_unsucessful_search_without_places(self):
+        searched, places_df = search_and_update_places(
+            circle=self.circle,
+            radius_in_meters=self.radius_in_meters,
+            response_id=self.response_id,
+            query_headers=self.query_headers,
+            has_places=False,
+        )
+        self.assertTrue(searched)
+        self.assertIsNone(places_df)
+
+    def test_failed_request_with_invalid_key(self):
+        with self.assertRaises(RuntimeError):
+            search_and_update_places(
+                circle=self.circle,
+                radius_in_meters=self.radius_in_meters,
+                response_id=self.response_id,
+                query_headers={"X-Goog-Api-Key": "invalid_key"},  # Invalid key
+            )
+
+    def test_large_radius_handling(self):
+        success, places_df = search_and_update_places(
+            circle=self.circle,
+            radius_in_meters=100000.0,  # Large search radius
+            response_id=self.response_id,
+            query_headers=self.query_headers,
+        )
+        self.assertTrue(success)  # Ensure the search succeeds
+        self.assertIsInstance(places_df, DataFrame)
+
+    def test_request_with_included_types(self):
+        success, places_df = search_and_update_places(
+            circle=self.circle,
+            radius_in_meters=self.radius_in_meters,
+            response_id=self.response_id,
+            query_headers=self.query_headers,
+            included_types=["restaurant"],
+        )
+        self.assertTrue(success)
+        self.assertIsInstance(places_df, DataFrame)
+
+
+class TestUpdateProgressBar(TestCase):
+    def setUp(self):
+        self.circles = GeoDataFrame(
+            {"id": [1, 2, 3, 4, 5], "searched": [False, True, False, True, False]}
+        )
+        self.found_places = DataFrame({"id": [1, 2, 3, 2]})  # Duplicate ID (2)
+        self.tqdm_out = StringIO()
+        self.pbar = tqdm(total=len(self.circles), file=self.tqdm_out)
+
+    def tearDown(self):
+        self.pbar.close()
+
+    def test_update_progress_bar_values(self):
+        update_progress_bar(self.pbar, self.circles, self.found_places)
+        postfix = self.pbar.format_dict["postfix"]
+        self.assertEqual(
+            postfix, "Remaining Circles=3, Found Places=3, Searched Circles=2"
+        )
+
+    def test_update_progress_bar_complete(self):
+        self.circles["searched"] = True  # All circles searched
+        update_progress_bar(self.pbar, self.circles, self.found_places)
+        postfix = self.pbar.format_dict["postfix"]
+        self.assertEqual(
+            postfix, "Remaining Circles=0, Found Places=3, Searched Circles=5"
+        )
+
+    def test_update_progress_bar_empty_data(self):
+        empty_circles = GeoDataFrame(columns=["id", "searched"])
+        empty_places = DataFrame(columns=["id"])
+        update_progress_bar(self.pbar, empty_circles, empty_places)
+        postfix = self.pbar.format_dict["postfix"]
+        self.assertEqual(
+            postfix, "Remaining Circles=0, Found Places=0, Searched Circles=0"
+        )
+
+    def test_progress_bar_increment(self):
+        initial_progress = self.pbar.n  # Initial progress value
+        update_progress_bar(self.pbar, self.circles, self.found_places)
+        self.assertEqual(self.pbar.n, initial_progress + 1)
+
+    def test_progress_bar_output(self):
+        update_progress_bar(self.pbar, self.circles, self.found_places)
+        output = self.tqdm_out.getvalue()
+        self.assertIn("Remaining Circles", output)
+        self.assertIn("Found Places", output)
+        self.assertIn("Searched Circles", output)
+
+
+class TestShouldSaveState(TestCase):
+    def setUp(self):
+        global_requests_counter.value = 0
+        global_requests_counter_limit.value = 1000
+
+    def test_save_on_exact_n_amount(self):
+        self.assertTrue(should_save_state(response_id=200, total_circles=500))
+
+    def test_save_on_last_circle(self):
+        self.assertTrue(should_save_state(response_id=499, total_circles=500))
+
+    def test_save_on_global_counter_limit(self):
+        global_requests_counter.value = 999
+        self.assertTrue(should_save_state(response_id=150, total_circles=500))
+
+    def test_no_save_mid_execution(self):
+        self.assertFalse(should_save_state(response_id=150, total_circles=500))
+
+    def test_save_on_counter_limit_edge_case(self):
+        global_requests_counter.value = 998
+        global_requests_counter_limit.value = 999
+        self.assertTrue(should_save_state(response_id=150, total_circles=500))
+
+    def test_not_save_when_global_counter_not_reached(self):
+        global_requests_counter.value = 500
+        self.assertFalse(should_save_state(response_id=150, total_circles=500))
+
+    def test_save_when_total_circles_is_one(self):
+        self.assertTrue(should_save_state(response_id=0, total_circles=1))
+
+
+class TestProcessSingleCircle(TestCase):
+    def setUp(self):
+        self.response_id = 0
+        self.radius_in_meters = 1000.0
+        self.circle = Point(0, 1)
+        self.found_places = DataFrame(columns=["id", "name", "circle"])
+        self.circles = GeoDataFrame(
+            {"geometry": [None], "searched": [False]}, index=[self.response_id]
+        )
+        self.file_path = Path("./test_found_places.parquet")
+        self.circles_path = Path("./test_circles.geojson")
+        self.pbar = tqdm(total=1)
+        self.included_types = ["restaurant", "cafe"]
+        self.query_headers = {"X-Goog-Api-Key": ""}
+
+    def tearDown(self):
+        if self.file_path.exists():
+            self.file_path.unlink()
+        if self.circles_path.exists():
+            self.circles_path.unlink()
+
+    def test_successful_processing(self):
+        global_requests_counter.value = 0
+        global_requests_counter_limit.value = 100
+        found_places = process_single_circle(
+            response_id=self.response_id,
+            circle=self.circle,
+            radius_in_meters=self.radius_in_meters,
+            found_places=self.found_places,
+            circles=self.circles,
+            file_path=self.file_path,
+            circles_path=self.circles_path,
+            pbar=self.pbar,
+            included_types=self.included_types,
+            query_headers=self.query_headers,
+        )
+        self.assertTrue(self.circles.loc[self.response_id, "searched"])
+        self.assertGreater(len(found_places), 0)
+        self.assertTrue(self.file_path.exists())
+        self.assertTrue(self.circles_path.exists())
+
+    def test_no_places_found(self):
+        global_requests_counter.value = 0
+        global_requests_counter_limit.value = 100
+        found_places = process_single_circle(
+            response_id=self.response_id,
+            circle=self.circle,
+            radius_in_meters=self.radius_in_meters,
+            found_places=self.found_places,
+            circles=self.circles,
+            file_path=self.file_path,
+            circles_path=self.circles_path,
+            pbar=self.pbar,
+            included_types=self.included_types,
+            query_headers=self.query_headers,
+            has_places=False,
+        )
+        self.assertTrue(self.circles.loc[self.response_id, "searched"])
+        self.assertTrue(found_places.empty)
+
+    def test_should_save_state(self):
+        global_requests_counter.value = 0
+        global_requests_counter_limit.value = 100
+        process_single_circle(
+            response_id=self.response_id,
+            circle=self.circle,
+            radius_in_meters=self.radius_in_meters,
+            found_places=self.found_places,
+            circles=self.circles,
+            file_path=self.file_path,
+            circles_path=self.circles_path,
+            pbar=self.pbar,
+            included_types=self.included_types,
+            query_headers=self.query_headers,
+        )
+        self.assertTrue(self.file_path.exists())
+        self.assertTrue(self.circles_path.exists())
+
+    def test_invalid_query_headers(self):
+        global_requests_counter.value = 0
+        global_requests_counter_limit.value = 100
+        with self.assertRaises(RuntimeError):
+            process_single_circle(
+                response_id=self.response_id,
+                circle=self.circle,
+                radius_in_meters=self.radius_in_meters,
+                found_places=self.found_places,
+                circles=self.circles,
+                file_path=self.file_path,
+                circles_path=self.circles_path,
+                pbar=self.pbar,
+                included_types=self.included_types,
+                query_headers={"X-Goog-Api-Key": "invalid_key"},
+            )
+
+    def test_no_search_due_to_limit(self):
+        global_requests_counter.value = 1000
+        global_requests_counter_limit.value = 1000
+        found_places = process_single_circle(
+            response_id=self.response_id,
+            circle=self.circle,
+            radius_in_meters=self.radius_in_meters,
+            found_places=self.found_places,
+            circles=self.circles,
+            file_path=self.file_path,
+            circles_path=self.circles_path,
+            pbar=self.pbar,
+            included_types=self.included_types,
+            query_headers=self.query_headers,
+        )
+        self.assertFalse(self.circles.loc[self.response_id, "searched"])
+        self.assertTrue(found_places.empty)
+        self.assertFalse(self.file_path.exists())
+        self.assertFalse(self.circles_path.exists())
+
+
+class TestProcessCircles(TestCase):
+    def setUp(self):
+        self.temp_dir = TemporaryDirectory()
+        self.file_path = Path(self.temp_dir.name) / "found_places.parquet"
+        self.circles_path = Path(self.temp_dir.name) / "circles.geojson"
+        geometry = [Point(0, 0), Point(1, 1)]
+        self.circles = GeoDataFrame({"searched": [False, False], "geometry": geometry})
+        self.found_places = DataFrame(
+            columns=["circle", *list(NewPlace.__annotations__.keys())]
+        )
+
+    def tearDown(self):
+        self.temp_dir.cleanup()
+
+    def test_process_circles_no_recalculation(self):
+        self.found_places.to_parquet(self.file_path)
+        result = process_circles(
+            circles=self.circles,
+            radius_in_meters=1000,
+            file_path=self.file_path,
+            circles_path=self.circles_path,
+            recalculate=False,
+        )
+        assert_frame_equal(result, self.found_places)
+
+    def test_process_circles_with_recalculation(self):
+        result = process_circles(
+            circles=self.circles,
+            radius_in_meters=1000,
+            file_path=self.file_path,
+            circles_path=self.circles_path,
+            recalculate=True,
+        )
+        self.assertFalse(result.empty)
+        self.assertEqual(len(result), len(self.circles))
+
+    def test_process_circles_empty_circles(self):
+        empty_circles = GeoDataFrame(columns=["searched", "geometry"])
+        result = process_circles(
+            circles=empty_circles,
+            radius_in_meters=1000,
+            file_path=self.file_path,
+            circles_path=self.circles_path,
+        )
+        self.assertTrue(result.empty)
+
+    def test_process_circles_partial_processing(self):
+        self.circles.loc[0, "searched"] = True
+        result = process_circles(
+            circles=self.circles,
+            radius_in_meters=1000,
+            file_path=self.file_path,
+            circles_path=self.circles_path,
+            recalculate=True,
+        )
+        self.assertEqual(len(result), 1)
+
+    def test_process_circles_save_to_file(self):
+        result = process_circles(
+            circles=self.circles,
+            radius_in_meters=1000,
+            file_path=self.file_path,
+            circles_path=self.circles_path,
+            recalculate=True,
+        )
+        self.assertTrue(self.file_path.exists())
+        self.assertTrue(self.circles_path.exists())
+        saved_places = pd.read_parquet(self.file_path)
+        saved_circles = gpd.read_file(self.circles_path)
+        assert_frame_equal(saved_places, result)
+        assert_frame_equal(saved_circles, self.circles)
+
+    def test_process_circles_with_included_types(self):
+        result = process_circles(
+            circles=self.circles,
+            radius_in_meters=1000,
+            file_path=self.file_path,
+            circles_path=self.circles_path,
+            included_types=["restaurant", "cafe"],
+            recalculate=True,
+        )
+        self.assertFalse(result.empty)
+
+    def test_process_circles_timeout_behavior(self):
+        global_requests_counter.value = global_requests_counter_limit.value - 1
+        result = process_circles(
+            circles=self.circles,
+            radius_in_meters=1000,
+            file_path=self.file_path,
+            circles_path=self.circles_path,
+            recalculate=True,
+        )
+        self.assertTrue(result.empty)
 
 
 if __name__ == "__main__":

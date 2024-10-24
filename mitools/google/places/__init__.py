@@ -1,5 +1,6 @@
 from .places import (
     GOOGLE_PLACES_API_KEY,
+    NEW_NEARBY_SEARCH_URL,
     QUERY_HEADERS,
     calculate_degree_steps,
     create_dummy_place,
@@ -9,21 +10,20 @@ from .places import (
     get_circles_search,
     get_response_places,
     get_saturated_area,
+    global_requests_counter,
+    global_requests_counter_limit,
     meters_to_degree,
     nearby_search_request,
     places_search_step,
-    polygon_plot_with_circles_and_points,
-    polygon_plot_with_points,
-    polygon_plot_with_sampling_circles,
-    polygons_folium_map,
-    polygons_folium_map_with_pois,
     process_circles,
-    read_or_initialize_places,
+    process_single_circle,
     sample_polygon_with_circles,
     sample_polygons_with_circles,
     search_and_update_places,
     search_places_in_polygon,
-    update_progress_and_save,
+    should_process_circles,
+    should_save_state,
+    update_progress_bar,
 )
 from .places_objects import (
     AccessibilityOptions,
@@ -41,4 +41,11 @@ from .places_objects import (
     Viewport,
     ViewportCoordinate,
     intersection_condition_factory,
+)
+from .plots import (
+    polygon_plot_with_circles_and_points,
+    polygon_plot_with_points,
+    polygon_plot_with_sampling_circles,
+    polygons_folium_map,
+    polygons_folium_map_with_pois,
 )

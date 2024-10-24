@@ -17,12 +17,19 @@ import numpy as np
 import pandas as pd
 import requests
 import seaborn as sns
+from geopandas import GeoDataFrame
 from matplotlib.axes import Axes
+from pandas import DataFrame, Series
 from shapely.geometry import MultiPolygon, Point, Polygon
 from shapely.ops import transform
 from tqdm import tqdm
 
-from mitools.exceptions import ArgumentTypeError, ArgumentValueError
+from mitools.context import ContextVar
+from mitools.exceptions import (
+    ArgumentStructureError,
+    ArgumentTypeError,
+    ArgumentValueError,
+)
 
 from .places_objects import (
     CityGeojson,
@@ -34,6 +41,11 @@ from .places_objects import (
 )
 
 CircleType = NewType("CircleType", Polygon)
+
+global_requests_counter = ContextVar("GLOBAL_REQUESTS_COUNTER", default_value=0)
+global_requests_counter_limit = ContextVar(
+    "GLOBAL_REQUESTS_COUNTER_LIMIT", default_value=100
+)
 
 # https://mapsplatform.google.com/pricing/#pricing-grid
 # https://developers.google.com/maps/documentation/places/web-service/search-nearby
@@ -278,7 +290,12 @@ def create_dummy_place(query: Dict, place_class: Type[PLACE_CLASSES] = Place) ->
                 "primaryTypeDisplayName": {"text": random.choice(random_types)},
                 "formattedAddress": f"{unique_id} Some Address",
                 "addressComponents": [
-                    {"long_name": "City", "short_name": "C", "types": ["locality"]}
+                    {
+                        "longText": "City",
+                        "shortText": "C",
+                        "types": ["locality"],
+                        "languageCode": "en",
+                    }
                 ],
                 "googleMapsUri": f"https://maps.google.com/?q={random_latitude},{random_longitude}",
                 "priceLevel": str(random.choice([1, 2, 3, 4, 5])),
@@ -289,368 +306,200 @@ def create_dummy_place(query: Dict, place_class: Type[PLACE_CLASSES] = Place) ->
     return place_data
 
 
-def create_dummy_response(query: Dict[str, Any]) -> DummyResponse:
-    has_places = random.choice([True, False, False])
+def create_dummy_response(
+    query: Dict[str, Any],
+    place_class: Type[PLACE_CLASSES] = Place,
+    has_places: bool = None,
+) -> DummyResponse:
+    has_places = (
+        random.choice([True, False, False]) if has_places is None else has_places
+    )
     data = {}
     if has_places:
         places_n = random.randint(1, 21)
-        data["places"] = [create_dummy_place(query) for _ in range(places_n)]
+        data["places"] = [
+            create_dummy_place(query, place_class) for _ in range(places_n)
+        ]
     return DummyResponse(data=data)
 
 
-def polygons_folium_map(
-    polygons: Union[Iterable[Polygon], Polygon],
-    output_file_path: Optional[PathLike] = None,
-) -> folium.Map:
-    if isinstance(polygons, Polygon):
-        polygons = [polygons]
-    reversed_polygons = [
-        transform(lambda lat, lon: (lon, lat), polygon) for polygon in polygons
-    ]
-    centroids = [polygon.centroid.coords[0] for polygon in reversed_polygons]
-    lons, lats = zip(*centroids)
-    centroid_lon = sum(lons) / len(lons)
-    centroid_lat = sum(lats) / len(lats)
-    centroid = (centroid_lon, centroid_lat)
-    folium_map = folium.Map(location=centroid, zoom_start=15)
-    for polygon in polygons:
-        folium.GeoJson(
-            polygon,
-            style_function=lambda feature: {
-                "fillColor": "blue",  # Color the polygon
-                "color": "black",  # Color for the outline
-                "weight": 2,  # Width of the outline
-                "fillOpacity": 0.3,  # Opacity of the fill color
-            },
-        ).add_to(folium_map)
-    if output_file_path:
-        folium_map.save(output_file_path)
-    return folium_map
-
-
-def polygons_folium_map_with_pois(
-    polygons: Union[Iterable[Polygon], Polygon],
-    pois: Iterable[Tuple[str, Point]],
-    output_file_path: Optional[PathLike] = None,
-) -> folium.Map:
-    folium_map = polygons_folium_map(polygons=polygons, output_file_path=None)
-    for poi_name, poi_point in pois:
-        folium.Marker(
-            location=[poi_point.x, poi_point.y],
-            popup=folium.Popup(poi_name, max_width=250),
-            icon=folium.Icon(color="orange", icon="cutlery", prefix="fa"),
-        ).add_to(folium_map)
-    if output_file_path:
-        folium_map.save(output_file_path)
-    return folium_map
-
-
-def polygon_plot_with_sampling_circles(
-    polygon: Polygon,
-    circles: List[CircleType],
-    point_of_interest: Optional[Point] = None,
-    zoom_level: Optional[float] = 1.0,
-    output_file_path: Optional[PathLike] = None,
-) -> Axes:
-    minx, miny, maxx, maxy = polygon.bounds
-    out_circles, in_circles = [], []
-    for circle in tqdm(circles):
-        if polygon.contains(circle) or polygon.intersects(circle):
-            in_circles.append(circle)
-        else:
-            out_circles.append(circle)
-    polygon = gpd.GeoSeries(polygon)
-    ax = polygon.plot(
-        facecolor=sns.color_palette("Paired")[0],
-        edgecolor="none",
-        alpha=0.5,
-        figsize=(WIDTH, HEIGHT),
-    )
-    ax = polygon.plot(
-        facecolor="none", edgecolor=sns.color_palette("Paired")[0], linewidth=3, ax=ax
-    )
-    point1 = (minx, miny)
-    point2 = (maxx, maxy)
-    rectangle = patches.Rectangle(
-        (point1[0], point1[1]),  # (x,y)
-        point2[0] - point1[0],  # width
-        point2[1] - point1[1],  # height
-        edgecolor="k",
-        facecolor="none",
-        linestyle="--",
-    )
-    ax.add_patch(rectangle)
-    if out_circles:
-        ax = gpd.GeoSeries(out_circles).plot(
-            facecolor="none", edgecolor="r", ax=ax, alpha=0.5, label="Out Circles"
+def nearby_search_request(
+    circle: CircleType,
+    radius_in_meters: float,
+    query_headers: Dict[str, str] = None,
+    included_types: List[str] = None,
+    has_places: bool = None,
+) -> requests.Response:
+    query = NewNearbySearchRequest(
+        location=circle,
+        distance_in_meters=radius_in_meters,
+        included_types=RESTAURANT_TYPES if included_types is None else included_types,
+    ).json_query()
+    headers = query_headers or QUERY_HEADERS
+    api_key = headers.get("X-Goog-Api-Key", "")
+    if not api_key:
+        return create_dummy_response(query, has_places=has_places, place_class=NewPlace)
+    try:
+        response = requests.post(
+            NEW_NEARBY_SEARCH_URL, headers=headers, json=query, timeout=10
         )
-        out_circle_proxy = mlines.Line2D(
-            [],
-            [],
-            color="r",
-            marker="o",
-            markersize=10,
-            label="Out Circles",
-            linestyle="None",
+        response.raise_for_status()  # Raise an error for non-2xx responses
+        return response
+    except requests.exceptions.RequestException as e:
+        raise RuntimeError(f"Request to {NEW_NEARBY_SEARCH_URL} failed: {e}")
+
+
+def get_response_places(
+    response_id: str, response: Union[requests.Response, DummyResponse]
+) -> DataFrame:
+    places = response.json().get("places", [])
+    place_series_list = []
+    for place in places:
+        place_series = NewPlace.from_json(place).to_series()
+        place_series["circle"] = response_id
+        place_series_list.append(place_series)
+    if not place_series_list:
+        raise ArgumentValueError("No places found in the response.")
+    return DataFrame(place_series_list)
+
+
+def search_and_update_places(
+    circle: CircleType,
+    radius_in_meters: float,
+    response_id: str,
+    query_headers: Dict[str, str] = None,
+    included_types: List[str] = None,
+    has_places: bool = True,
+) -> Tuple[bool, Optional[DataFrame]]:
+    response = nearby_search_request(
+        circle=circle,
+        radius_in_meters=radius_in_meters,
+        query_headers=query_headers,
+        included_types=included_types,
+        has_places=has_places,
+    )
+    if response.status_code != 200 or response.reason != "OK":
+        print(
+            f"Failed request: {response.status_code} - {response.reason} - {response.text}"
         )
-    ax = gpd.GeoSeries(in_circles).plot(
-        facecolor="none", edgecolor="g", ax=ax, alpha=0.5, label="In Circles"
-    )
-    in_circle_proxy = mlines.Line2D(
-        [],
-        [],
-        color="g",
-        marker="o",
-        markersize=10,
-        label="In Circles",
-        linestyle="None",
-    )
-    ax.legend(
-        handles=[out_circle_proxy, in_circle_proxy]
-        if out_circles
-        else [in_circle_proxy],
-        loc="lower center",
-        bbox_to_anchor=(0.5, -0.1),
-        ncol=2,
-    )
-    ax.set_title("Circles to Sample")
-    ax.set_xticks([])
-    ax.set_yticks([])
-    if point_of_interest:
-        ax.set_xlim(
-            [
-                point_of_interest.centroid.x - zoom_level,
-                point_of_interest.centroid.x + zoom_level,
-            ]
-        )
-        ax.set_ylim(
-            [
-                point_of_interest.centroid.y - zoom_level,
-                point_of_interest.centroid.y + zoom_level,
-            ]
-        )
-    if output_file_path:
-        plt.savefig(output_file_path, dpi=DPI)
-    return ax
+        time.sleep(30)
+        return False, None
+    try:
+        places_df = get_response_places(response_id, response)
+    except (ArgumentStructureError, ArgumentValueError) as e:
+        print(f"Failed to get places from response: {e}")
+        return True, None
+    return True, places_df
 
 
-def polygon_plot_with_circles_and_points(
-    polygon,
-    circles,
-    points,
-    point_of_interest=None,
-    zoom_level=None,
-    output_file_path=None,
-):
-    ax = polygon_plot_with_sampling_circles(
-        polygon=polygon,
-        circles=circles,
-        point_of_interest=point_of_interest,
-        zoom_level=zoom_level,
-        output_file_path=output_file_path,
-    )
-    for point in points:
-        ax.plot(point[0], point[1], "ro", markersize=0.25)
-    if output_file_path:
-        plt.savefig(output_file_path, dpi=DPI)
-    return ax
+def should_process_circles(circles: GeoDataFrame, recalculate: bool) -> bool:
+    return (~circles["searched"]).any() or recalculate
 
 
-def polygon_plot_with_points(
-    polygon,
-    points,
-    point_of_interest: Optional[Point] = None,
-    zoom_level: Optional[float] = 1.0,
-    output_file_path=None,
-):
-    minx, miny, maxx, maxy = polygon.bounds
-    polygon = gpd.GeoSeries(polygon)
-    ax = polygon.plot(
-        facecolor=sns.color_palette("Paired")[0],
-        edgecolor="none",
-        alpha=0.5,
-        figsize=(WIDTH, HEIGHT),
-    )
-    ax = polygon.plot(
-        facecolor="none", edgecolor=sns.color_palette("Paired")[0], linewidth=3, ax=ax
-    )
-    point1 = (minx, miny)
-    point2 = (maxx, maxy)
-    rectangle = patches.Rectangle(
-        (point1[0], point1[1]),  # (x,y)
-        point2[0] - point1[0],  # width
-        point2[1] - point1[1],  # height
-        edgecolor="k",
-        facecolor="none",
-        linestyle="--",
-    )
-    ax.add_patch(rectangle)
-    for point in points:
-        ax.plot(point[0], point[1], "ro", markersize=0.25)
-    places_proxy = mlines.Line2D(
-        [],
-        [],
-        color="g",
-        marker="o",
-        markersize=10,
-        label="In Circles",
-        linestyle="None",
-    )
-    ax.legend(
-        handles=[places_proxy], loc="lower center", bbox_to_anchor=(0.5, -0.1), ncol=2
-    )
-    ax.set_title("Sampled Points")
-    ax.set_xticks([])
-    ax.set_yticks([])
-    if point_of_interest:
-        ax.set_xlim(
-            [
-                point_of_interest.centroid.x - zoom_level,
-                point_of_interest.centroid.x + zoom_level,
-            ]
-        )
-        ax.set_ylim(
-            [
-                point_of_interest.centroid.y - zoom_level,
-                point_of_interest.centroid.y + zoom_level,
-            ]
-        )
-    if output_file_path:
-        plt.savefig(output_file_path, dpi=DPI)
-    return ax
-
-
-def read_or_initialize_places(file_path, recalculate=False):
+def process_circles(
+    circles: GeoDataFrame,
+    radius_in_meters: float,
+    file_path: Path,
+    circles_path: Path,
+    query_headers: Optional[Dict[str, str]] = None,
+    included_types: List[str] = None,
+    recalculate: bool = False,
+    has_places: bool = True,
+) -> DataFrame:
     if file_path.exists() and not recalculate:
-        return pd.read_parquet(file_path)
+        found_places = pd.read_parquet(file_path)
     else:
-        return pd.DataFrame(columns=["circle", *list(NewPlace.__annotations__.keys())])
+        found_places = DataFrame(
+            columns=["circle", *list(NewPlace.__annotations__.keys())]
+        )
+    if should_process_circles(circles, recalculate):
+        with tqdm(total=len(circles), desc="Processing circles") as pbar:
+            for response_id, circle in circles[~circles["searched"]].iterrows():
+                found_places = process_single_circle(
+                    response_id=response_id,
+                    circle=circle["geometry"],
+                    radius_in_meters=radius_in_meters,
+                    query_headers=query_headers,
+                    included_types=included_types,
+                    found_places=found_places,
+                    circles=circles,
+                    file_path=file_path,
+                    circles_path=circles_path,
+                    has_places=has_places,
+                    pbar=pbar,
+                )
+    else:
+        found_places = pd.read_parquet(file_path)
+
+    return found_places
+
+
+def process_single_circle(
+    response_id: int,
+    circle: Series,
+    radius_in_meters: float,
+    found_places: DataFrame,
+    circles: GeoDataFrame,
+    file_path: Path,
+    circles_path: Path,
+    pbar: tqdm,
+    included_types: List[str] = None,
+    query_headers: Optional[Dict[str, str]] = None,
+    has_places: bool = True,
+) -> None:
+    if not should_do_search():
+        return found_places
+    searched, places_df = search_and_update_places(
+        circle=circle,
+        radius_in_meters=radius_in_meters,
+        response_id=response_id,
+        query_headers=query_headers,
+        included_types=included_types,
+        has_places=has_places,
+    )
+    if places_df is not None:
+        found_places = pd.concat([found_places, places_df], axis=0, ignore_index=True)
+    circles.loc[response_id, "searched"] = searched
+    global_requests_counter.value += 1
+    if should_save_state(response_id, circles.shape[0]):
+        found_places.to_parquet(file_path)
+        circles.to_file(circles_path, driver="GeoJSON")
+    update_progress_bar(pbar, circles, found_places)
+    return found_places
+
+
+def should_save_state(
+    response_id: int, total_circles: int, n_amount: int = 200
+) -> bool:
+    return (
+        (response_id % n_amount == 0)
+        or (response_id == total_circles - 1)
+        or (global_requests_counter.value >= global_requests_counter_limit.value - 1)
+    )
+
+
+def should_do_search() -> None:
+    return global_requests_counter.value < global_requests_counter_limit.value
+
+
+def update_progress_bar(
+    pbar: tqdm, circles: GeoDataFrame, found_places: DataFrame
+) -> None:
+    remaining_circles = circles["searched"].value_counts().get(False, 0)
+    searched_circles = circles["searched"].sum()
+    found_places_count = found_places["id"].nunique()
+    pbar.update()
+    pbar.set_postfix(
+        {
+            "Remaining Circles": remaining_circles,
+            "Found Places": found_places_count,
+            "Searched Circles": searched_circles,
+        }
+    )
 
 
 def generate_unique_place_id():
     return datetime.now().strftime("%Y%m%d%H%M%S%f")
-
-
-def nearby_search_request(
-    circle, radius_in_meters, query_headers=None, restaurants=False
-):
-    query = NewNearbySearchRequest(
-        circle.geometry,
-        distance_in_meters=radius_in_meters,
-        included_types=RESTAURANT_TYPES if restaurants else None,
-    ).json_query()
-    if query_headers is not None:
-        QUERY_HEADERS = query_headers
-    if QUERY_HEADERS["X-Goog-Api-Key"] != "":
-        return requests.post(NEW_NEARBY_SEARCH_URL, headers=QUERY_HEADERS, json=query)
-    else:
-        return create_dummy_response(query)
-
-
-def get_response_places(response_id, response):
-    for n, place in enumerate(response.json()["places"]):
-        place_series = NewPlace.from_json(place).to_series()
-        place_series["circle"] = response_id
-        if n == 0:
-            places_df = pd.DataFrame(place_series).T
-        else:
-            places_df = pd.concat(
-                [places_df, pd.DataFrame(place_series).T], axis=0, ignore_index=True
-            )
-    return places_df
-
-
-def search_and_update_places(
-    circle, radius_in_meters, response_id, query_headers=None, restaurants=False
-):
-    response = nearby_search_request(
-        circle, radius_in_meters, query_headers=query_headers, restaurants=restaurants
-    )
-    places_df = None
-    if response.reason == "OK":
-        if "places" in response.json():
-            places_df = get_response_places(response_id, response)
-        searched = True
-    else:
-        print(response.status_code, response.reason, response.text)
-        searched = False
-        time.sleep(30)
-    return searched, places_df
-
-
-def process_circles(
-    circles,
-    radius_in_meters,
-    file_path,
-    circles_path,
-    global_requests_counter=None,
-    global_requests_counter_limit=None,
-    query_headers=None,
-    restaurants=False,
-    recalculate=False,
-):
-    if global_requests_counter is None and global_requests_counter_limit is None:
-        global GLOBAL_REQUESTS_COUNTER, GLOBAL_REQUESTS_COUNTER_LIMIT
-    else:
-        GLOBAL_REQUESTS_COUNTER = global_requests_counter[0]
-        GLOBAL_REQUESTS_COUNTER_LIMIT = global_requests_counter_limit[0]
-    if (
-        (~circles["searched"]).any() or recalculate
-    ) and GLOBAL_REQUESTS_COUNTER <= GLOBAL_REQUESTS_COUNTER_LIMIT:
-        circles_search = circles[~circles["searched"]]
-        found_places = read_or_initialize_places(file_path, recalculate)
-        with tqdm(total=len(circles_search), desc="Processing circles") as pbar:
-            for response_id, circle in circles_search.iterrows():
-                searched, places_df = search_and_update_places(
-                    circle,
-                    radius_in_meters,
-                    response_id,
-                    query_headers=query_headers,
-                    restaurants=restaurants,
-                )
-                if places_df is not None:
-                    found_places = pd.concat(
-                        [found_places, places_df], axis=0, ignore_index=True
-                    )
-                GLOBAL_REQUESTS_COUNTER += 1
-                update_progress_and_save(
-                    searched,
-                    circles,
-                    response_id,
-                    found_places,
-                    file_path,
-                    circles_path,
-                    pbar,
-                )
-                global_requests_counter[0] = GLOBAL_REQUESTS_COUNTER
-                if GLOBAL_REQUESTS_COUNTER >= GLOBAL_REQUESTS_COUNTER_LIMIT:
-                    break
-    else:
-        found_places = pd.read_parquet(file_path)
-    return found_places
-
-
-def update_progress_and_save(
-    searched, circles, index, found_places, file_path, circles_path, pbar
-):
-    circles.loc[index, "searched"] = searched
-    if (
-        (index % 200 == 0)
-        or (index == circles.shape[0] - 1)
-        or (GLOBAL_REQUESTS_COUNTER >= GLOBAL_REQUESTS_COUNTER_LIMIT - 1)
-    ):
-        found_places.to_parquet(file_path)
-        circles.to_file(circles_path, driver="GeoJSON")
-    pbar.update()
-    pbar.set_postfix(
-        {
-            "Remaining Circles": circles["searched"].value_counts()[False]
-            if False in circles["searched"].value_counts()
-            else 0,
-            "Found Places": found_places["id"].nunique(),
-            "Searched Circles": circles["searched"].sum(),
-        }
-    )
 
 
 def search_places_in_polygon(
