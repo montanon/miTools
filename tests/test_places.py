@@ -3,8 +3,10 @@ import unittest
 from dataclasses import asdict
 from pathlib import Path
 from unittest import TestCase
+from unittest.mock import MagicMock, patch
 
 import geopandas as gpd
+import requests
 from geopandas import GeoDataFrame, GeoSeries
 from pandas import Series
 from shapely import Point
@@ -14,6 +16,7 @@ from shapely.geometry.polygon import orient
 from mitools.exceptions import ArgumentKeyError, ArgumentTypeError, ArgumentValueError
 from mitools.google.places import (
     GOOGLE_PLACES_API_KEY,
+    NEW_NEARBY_SEARCH_URL,
     QUERY_HEADERS,
     AccessibilityOptions,
     AddressComponent,
@@ -743,6 +746,98 @@ class TestCreateDummyResponse(TestCase):
                 empty_count += 1
         self.assertGreater(non_empty_count, 0, "No non-empty responses found.")
         self.assertGreater(empty_count, 0, "No empty responses found.")
+
+
+class TestNearbySearchRequest(TestCase):
+    def setUp(self):
+        self.circle = Point(151.2099, -33.865143)  # Sydney
+        self.radius_in_meters = 1000.0  # 1 km radius
+        self.valid_headers = {"X-Goog-Api-Key": "valid_api_key"}
+        self.restaurants = ["restaurant", "cafe", "bar"]
+
+    @patch("requests.post")
+    def test_valid_request(self, mock_post):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"status": "OK", "results": []}
+        mock_post.return_value = mock_response
+        response = nearby_search_request(
+            circle=self.circle,
+            radius_in_meters=self.radius_in_meters,
+            query_headers=self.valid_headers,
+            included_types=self.restaurants,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"status": "OK", "results": []})
+        mock_post.assert_called_once_with(
+            NEW_NEARBY_SEARCH_URL,
+            headers=self.valid_headers,
+            json=NewNearbySearchRequest(
+                location=self.circle.centroid,
+                distance_in_meters=self.radius_in_meters,
+                included_types=self.restaurants,
+            ).json_query(),
+            timeout=10,
+        )
+
+    def test_dummy_response_without_api_key(self):
+        response = nearby_search_request(
+            circle=self.circle,
+            radius_in_meters=self.radius_in_meters,
+            query_headers={"X-Goog-Api-Key": ""},
+            has_places=True,
+        )
+        self.assertIsInstance(response, DummyResponse)
+        self.assertIn("places", response.json())
+
+    @patch("requests.post", side_effect=requests.exceptions.RequestException)
+    def test_request_failure(self, mock_post):
+        with self.assertRaises(RuntimeError):
+            nearby_search_request(
+                circle=self.circle,
+                radius_in_meters=self.radius_in_meters,
+                query_headers=self.valid_headers,
+            )
+
+    def test_headers_fallback_to_global(self):
+        with patch("requests.post") as mock_post:
+            mock_response = MagicMock()
+            mock_response.status_code = 200
+            mock_post.return_value = mock_response
+            response = nearby_search_request(
+                circle=self.circle,
+                radius_in_meters=self.radius_in_meters,
+                included_types=[],
+            )
+            self.assertEqual(response.status_code, 200)
+            mock_post.assert_called_once_with(
+                NEW_NEARBY_SEARCH_URL,
+                headers=QUERY_HEADERS,
+                json=NewNearbySearchRequest(
+                    location=self.circle.centroid,
+                    distance_in_meters=self.radius_in_meters,
+                    included_types=[],
+                ).json_query(),
+                timeout=10,
+            )
+
+    def test_invalid_circle_type(self):
+        with self.assertRaises(ArgumentTypeError):
+            nearby_search_request(
+                circle={"invalid": "object"},
+                radius_in_meters=self.radius_in_meters,
+                query_headers=self.valid_headers,
+            )
+
+    def test_timeout_handling(self):
+        with patch("requests.post", side_effect=requests.exceptions.Timeout):
+            with self.assertRaises(RuntimeError) as context:
+                nearby_search_request(
+                    circle=self.circle,
+                    radius_in_meters=self.radius_in_meters,
+                    query_headers=self.valid_headers,
+                )
+            self.assertIn("Request to", str(context.exception))
 
 
 if __name__ == "__main__":
