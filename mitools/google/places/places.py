@@ -18,6 +18,7 @@ import pandas as pd
 import requests
 import seaborn as sns
 from matplotlib.axes import Axes
+from pandas import DataFrame
 from shapely.geometry import MultiPolygon, Point, Polygon
 from shapely.ops import transform
 from tqdm import tqdm
@@ -332,6 +333,23 @@ def nearby_search_request(
         raise RuntimeError(f"Request to {NEW_NEARBY_SEARCH_URL} failed: {e}")
 
 
+def get_response_places(
+    response_id: str, response: Union[requests.Response, DummyResponse]
+) -> DataFrame:
+    try:
+        places = response.json().get("places", [])
+    except (AttributeError, KeyError) as e:
+        raise ArgumentValueError(f"Invalid response structure: {e}")
+    place_series_list = []
+    for place in places:
+        place_series = NewPlace.from_json(place).to_series()
+        place_series["circle"] = response_id
+        place_series_list.append(place_series)
+    if not place_series_list:
+        raise ArgumentValueError("No places found in the response.")
+    return DataFrame(place_series_list)
+
+
 def read_or_initialize_places(file_path, recalculate=False):
     if file_path.exists() and not recalculate:
         return pd.read_parquet(file_path)
@@ -341,19 +359,6 @@ def read_or_initialize_places(file_path, recalculate=False):
 
 def generate_unique_place_id():
     return datetime.now().strftime("%Y%m%d%H%M%S%f")
-
-
-def get_response_places(response_id, response):
-    for n, place in enumerate(response.json()["places"]):
-        place_series = NewPlace.from_json(place).to_series()
-        place_series["circle"] = response_id
-        if n == 0:
-            places_df = pd.DataFrame(place_series).T
-        else:
-            places_df = pd.concat(
-                [places_df, pd.DataFrame(place_series).T], axis=0, ignore_index=True
-            )
-    return places_df
 
 
 def search_and_update_places(
