@@ -37,8 +37,8 @@ NEWPLACE_SCHEMA = {
             "items": {
                 "type": "object",
                 "properties": {
-                    "long_name": {"type": "string"},
-                    "short_name": {"type": "string"},
+                    "longText": {"type": "string"},
+                    "shortText": {"type": "string"},
                     "types": {"type": "array", "items": {"type": "string"}},
                 },
             },
