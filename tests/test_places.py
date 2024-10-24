@@ -8,12 +8,17 @@ from unittest.mock import MagicMock, patch
 import geopandas as gpd
 import requests
 from geopandas import GeoDataFrame, GeoSeries
-from pandas import Series
+from pandas import DataFrame, Series
 from shapely import Point
 from shapely.geometry import MultiPolygon, Polygon
 from shapely.geometry.polygon import orient
 
-from mitools.exceptions import ArgumentKeyError, ArgumentTypeError, ArgumentValueError
+from mitools.exceptions import (
+    ArgumentKeyError,
+    ArgumentStructureError,
+    ArgumentTypeError,
+    ArgumentValueError,
+)
 from mitools.google.places import (
     GOOGLE_PLACES_API_KEY,
     NEW_NEARBY_SEARCH_URL,
@@ -44,11 +49,6 @@ from mitools.google.places import (
     meters_to_degree,
     nearby_search_request,
     places_search_step,
-    polygon_plot_with_circles_and_points,
-    polygon_plot_with_points,
-    polygon_plot_with_sampling_circles,
-    polygons_folium_map,
-    polygons_folium_map_with_pois,
     process_circles,
     read_or_initialize_places,
     sample_polygon_with_circles,
@@ -838,6 +838,67 @@ class TestNearbySearchRequest(TestCase):
                     query_headers=self.valid_headers,
                 )
             self.assertIn("Request to", str(context.exception))
+
+
+class TestGetResponsePlaces(TestCase):
+    def setUp(self):
+        self.valid_place_data = {
+            "id": "place_1",
+            "types": ["restaurant"],
+            "location": {"latitude": 40.748817, "longitude": -73.985428},
+            "displayName": {"text": "Sample Place"},
+            "primaryType": "restaurant",
+        }
+        self.valid_response = DummyResponse(data={"places": [self.valid_place_data]})
+        self.multi_place_response = DummyResponse(
+            data={
+                "places": [
+                    {**self.valid_place_data, "id": f"place_{i}"} for i in range(3)
+                ]
+            }
+        )
+        self.empty_response = DummyResponse(data={"places": []})
+        self.invalid_response = DummyResponse(data={"invalid_key": []})
+
+    def test_valid_response_single_place(self):
+        df = get_response_places("circle_1", self.valid_response)
+        self.assertIsInstance(df, DataFrame)
+        self.assertEqual(len(df), 1)
+        self.assertEqual(df.iloc[0]["id"], "place_1")
+        self.assertEqual(df.iloc[0]["circle"], "circle_1")
+
+    def test_valid_response_multiple_places(self):
+        df = get_response_places("circle_1", self.multi_place_response)
+        self.assertIsInstance(df, DataFrame)
+        self.assertEqual(len(df), 3)
+        self.assertListEqual(df["id"].tolist(), ["place_0", "place_1", "place_2"])
+
+    def test_empty_response(self):
+        with self.assertRaises(ArgumentValueError) as context:
+            get_response_places("circle_1", self.empty_response)
+        self.assertEqual(str(context.exception), "No places found in the response.")
+
+    def test_invalid_response_structure(self):
+        with self.assertRaises(ArgumentStructureError) as context:
+            get_response_places("circle_1", self.invalid_response)
+        self.assertIn("No 'places' key found in the response", str(context.exception))
+
+    def test_requests_response_integration(self):
+        import requests
+
+        response = requests.Response()
+        response._content = b'{"places": [{"id": "place_1", "location": {"latitude": 40.748817, "longitude": -73.985428}, "displayName": {"text": "Sample Place"}, "primaryType": "restaurant", "types": ["restaurant"]}]}'
+        response.status_code = 200
+        df = get_response_places("circle_2", response)
+        self.assertEqual(len(df), 1)
+        self.assertEqual(df.iloc[0]["id"], "place_1")
+        self.assertEqual(df.iloc[0]["circle"], "circle_2")
+
+    def test_invalid_json_in_response(self):
+        invalid_response = DummyResponse(data=None)
+        with self.assertRaises(ArgumentStructureError) as context:
+            get_response_places("circle_1", invalid_response)
+        self.assertIn("No 'places' key found in the response", str(context.exception))
 
 
 if __name__ == "__main__":
