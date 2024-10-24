@@ -16,7 +16,7 @@ from shapely.geometry import MultiPolygon, Polygon
 from shapely.geometry.polygon import orient
 from tqdm import tqdm
 
-from mitools.context import Context
+from mitools.context import ContextVar
 from mitools.exceptions import (
     ArgumentKeyError,
     ArgumentStructureError,
@@ -56,6 +56,7 @@ from mitools.google.places import (
     nearby_search_request,
     places_search_step,
     process_circles,
+    process_single_circle,
     sample_polygon_with_circles,
     sample_polygons_with_circles,
     search_and_update_places,
@@ -885,9 +886,9 @@ class TestGetResponsePlaces(TestCase):
         self.assertEqual(str(context.exception), "No places found in the response.")
 
     def test_invalid_response_structure(self):
-        with self.assertRaises(ArgumentStructureError) as context:
+        with self.assertRaises(ArgumentValueError) as context:
             get_response_places("circle_1", self.invalid_response)
-        self.assertIn("No 'places' key found in the response", str(context.exception))
+        self.assertIn("No places found in the response.", str(context.exception))
 
     def test_requests_response_integration(self):
         import requests
@@ -902,9 +903,9 @@ class TestGetResponsePlaces(TestCase):
 
     def test_invalid_json_in_response(self):
         invalid_response = DummyResponse(data=None)
-        with self.assertRaises(ArgumentStructureError) as context:
+        with self.assertRaises(ArgumentValueError) as context:
             get_response_places("circle_1", invalid_response)
-        self.assertIn("No 'places' key found in the response", str(context.exception))
+        self.assertIn("No places found in the response.", str(context.exception))
 
 
 class TestSearchAndUpdatePlaces(TestCase):
@@ -954,7 +955,7 @@ class TestSearchAndUpdatePlaces(TestCase):
             query_headers=self.query_headers,
             has_places=False,
         )
-        self.assertFalse(searched)
+        self.assertTrue(searched)
         self.assertIsNone(places_df)
 
     def test_failed_request_with_invalid_key(self):
@@ -1066,6 +1067,122 @@ class TestShouldSaveState(TestCase):
 
     def test_save_when_total_circles_is_one(self):
         self.assertTrue(should_save_state(response_id=0, total_circles=1))
+
+
+class TestProcessSingleCircle(TestCase):
+    def setUp(self):
+        self.response_id = 0
+        self.radius_in_meters = 1000.0
+        self.circle = Point(0, 1)
+        self.found_places = DataFrame(columns=["id", "name", "circle"])
+        self.circles = GeoDataFrame(
+            {"geometry": [None], "searched": [False]}, index=[self.response_id]
+        )
+        self.file_path = Path("./test_found_places.parquet")
+        self.circles_path = Path("./test_circles.geojson")
+        self.pbar = tqdm(total=1)
+        self.included_types = ["restaurant", "cafe"]
+        self.query_headers = {"X-Goog-Api-Key": ""}
+
+    def tearDown(self):
+        if self.file_path.exists():
+            self.file_path.unlink()
+        if self.circles_path.exists():
+            self.circles_path.unlink()
+
+    def test_successful_processing(self):
+        global_requests_counter.value = 0
+        global_requests_counter_limit.value = 100
+        found_places = process_single_circle(
+            response_id=self.response_id,
+            circle=self.circle,
+            radius_in_meters=self.radius_in_meters,
+            found_places=self.found_places,
+            circles=self.circles,
+            file_path=self.file_path,
+            circles_path=self.circles_path,
+            pbar=self.pbar,
+            included_types=self.included_types,
+            query_headers=self.query_headers,
+        )
+        self.assertTrue(self.circles.loc[self.response_id, "searched"])
+        self.assertGreater(len(found_places), 0)
+        self.assertTrue(self.file_path.exists())
+        self.assertTrue(self.circles_path.exists())
+
+    def test_no_places_found(self):
+        global_requests_counter.value = 0
+        global_requests_counter_limit.value = 100
+        found_places = process_single_circle(
+            response_id=self.response_id,
+            circle=self.circle,
+            radius_in_meters=self.radius_in_meters,
+            found_places=self.found_places,
+            circles=self.circles,
+            file_path=self.file_path,
+            circles_path=self.circles_path,
+            pbar=self.pbar,
+            included_types=self.included_types,
+            query_headers=self.query_headers,
+            has_places=False,
+        )
+        self.assertTrue(self.circles.loc[self.response_id, "searched"])
+        self.assertTrue(found_places.empty)
+
+    def test_should_save_state(self):
+        global_requests_counter.value = 0
+        global_requests_counter_limit.value = 100
+        process_single_circle(
+            response_id=self.response_id,
+            circle=self.circle,
+            radius_in_meters=self.radius_in_meters,
+            found_places=self.found_places,
+            circles=self.circles,
+            file_path=self.file_path,
+            circles_path=self.circles_path,
+            pbar=self.pbar,
+            included_types=self.included_types,
+            query_headers=self.query_headers,
+        )
+        self.assertTrue(self.file_path.exists())
+        self.assertTrue(self.circles_path.exists())
+
+    def test_invalid_query_headers(self):
+        global_requests_counter.value = 0
+        global_requests_counter_limit.value = 100
+        with self.assertRaises(RuntimeError):
+            process_single_circle(
+                response_id=self.response_id,
+                circle=self.circle,
+                radius_in_meters=self.radius_in_meters,
+                found_places=self.found_places,
+                circles=self.circles,
+                file_path=self.file_path,
+                circles_path=self.circles_path,
+                pbar=self.pbar,
+                included_types=self.included_types,
+                query_headers={"X-Goog-Api-Key": "invalid_key"},
+            )
+
+    def test_no_search_due_to_limit(self):
+        global_requests_counter.value = 1000
+        global_requests_counter_limit.value = 1000
+        found_places = process_single_circle(
+            response_id=self.response_id,
+            circle=self.circle,
+            radius_in_meters=self.radius_in_meters,
+            found_places=self.found_places,
+            circles=self.circles,
+            file_path=self.file_path,
+            circles_path=self.circles_path,
+            pbar=self.pbar,
+            included_types=self.included_types,
+            query_headers=self.query_headers,
+        )
+        self.assertFalse(self.circles.loc[self.response_id, "searched"])
+        self.assertTrue(found_places.empty)
+        self.assertFalse(self.file_path.exists())
+        self.assertFalse(self.circles_path.exists())
 
 
 if __name__ == "__main__":
