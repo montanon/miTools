@@ -1,7 +1,9 @@
 import math
 import unittest
 from dataclasses import asdict
+from io import StringIO
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
@@ -12,7 +14,9 @@ from pandas import DataFrame, Series
 from shapely import Point
 from shapely.geometry import MultiPolygon, Polygon
 from shapely.geometry.polygon import orient
+from tqdm import tqdm
 
+from mitools.context import Context
 from mitools.exceptions import (
     ArgumentKeyError,
     ArgumentStructureError,
@@ -50,12 +54,11 @@ from mitools.google.places import (
     nearby_search_request,
     places_search_step,
     process_circles,
-    read_or_initialize_places,
     sample_polygon_with_circles,
     sample_polygons_with_circles,
     search_and_update_places,
     search_places_in_polygon,
-    update_progress_and_save,
+    update_progress_bar,
 )
 
 
@@ -980,6 +983,55 @@ class TestSearchAndUpdatePlaces(TestCase):
         )
         self.assertTrue(success)
         self.assertIsInstance(places_df, DataFrame)
+
+
+class TestUpdateProgressBar(TestCase):
+    def setUp(self):
+        self.circles = GeoDataFrame(
+            {"id": [1, 2, 3, 4, 5], "searched": [False, True, False, True, False]}
+        )
+        self.found_places = DataFrame({"id": [1, 2, 3, 2]})  # Duplicate ID (2)
+        self.tqdm_out = StringIO()
+        self.pbar = tqdm(total=len(self.circles), file=self.tqdm_out)
+
+    def tearDown(self):
+        self.pbar.close()
+
+    def test_update_progress_bar_values(self):
+        update_progress_bar(self.pbar, self.circles, self.found_places)
+        postfix = self.pbar.format_dict["postfix"]
+        self.assertEqual(
+            postfix, "Remaining Circles=3, Found Places=3, Searched Circles=2"
+        )
+
+    def test_update_progress_bar_complete(self):
+        self.circles["searched"] = True  # All circles searched
+        update_progress_bar(self.pbar, self.circles, self.found_places)
+        postfix = self.pbar.format_dict["postfix"]
+        self.assertEqual(
+            postfix, "Remaining Circles=0, Found Places=3, Searched Circles=5"
+        )
+
+    def test_update_progress_bar_empty_data(self):
+        empty_circles = GeoDataFrame(columns=["id", "searched"])
+        empty_places = DataFrame(columns=["id"])
+        update_progress_bar(self.pbar, empty_circles, empty_places)
+        postfix = self.pbar.format_dict["postfix"]
+        self.assertEqual(
+            postfix, "Remaining Circles=0, Found Places=0, Searched Circles=0"
+        )
+
+    def test_progress_bar_increment(self):
+        initial_progress = self.pbar.n  # Initial progress value
+        update_progress_bar(self.pbar, self.circles, self.found_places)
+        self.assertEqual(self.pbar.n, initial_progress + 1)
+
+    def test_progress_bar_output(self):
+        update_progress_bar(self.pbar, self.circles, self.found_places)
+        output = self.tqdm_out.getvalue()
+        self.assertIn("Remaining Circles", output)
+        self.assertIn("Found Places", output)
+        self.assertIn("Searched Circles", output)
 
 
 if __name__ == "__main__":
