@@ -459,7 +459,8 @@ def process_single_circle(
     circles.loc[response_id, "searched"] = searched
     global_requests_counter.value += 1
     if should_save_state(response_id, circles.shape[0]):
-        save_state(found_places, file_path, circles, circles_path)
+        found_places.to_parquet(file_path)
+        circles.to_file(circles_path, driver="GeoJSON")
     update_progress_bar(pbar, circles, found_places)
 
 
@@ -471,16 +472,6 @@ def should_save_state(
         or (response_id == total_circles - 1)
         or (global_requests_counter.value >= global_requests_counter_limit.value - 1)
     )
-
-
-def save_state(
-    found_places: DataFrame,
-    file_path: PathLike,
-    circles: GeoDataFrame,
-    circles_path: PathLike,
-) -> None:
-    found_places.to_parquet(file_path)
-    circles.to_file(circles_path, driver="GeoJSON")
 
 
 def update_progress_bar(
