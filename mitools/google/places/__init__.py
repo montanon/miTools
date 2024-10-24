@@ -14,12 +14,15 @@ from .places import (
     nearby_search_request,
     places_search_step,
     process_circles,
-    read_or_initialize_places,
+    process_single_circle,
     sample_polygon_with_circles,
     sample_polygons_with_circles,
+    save_state,
     search_and_update_places,
     search_places_in_polygon,
-    update_progress_and_save,
+    should_process_circles,
+    should_save_state,
+    update_progress_bar,
 )
 from .places_objects import (
     AccessibilityOptions,
