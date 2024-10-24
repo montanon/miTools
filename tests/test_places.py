@@ -901,5 +901,86 @@ class TestGetResponsePlaces(TestCase):
         self.assertIn("No 'places' key found in the response", str(context.exception))
 
 
+class TestSearchAndUpdatePlaces(TestCase):
+    def setUp(self):
+        self.circle = Point(151.2099, -33.865143)  # Small area near Sydney
+        self.radius_in_meters = 1000.0
+        self.response_id = "test_circle"
+        self.query_headers = {"X-Goog-Api-Key": ""}
+        self.valid_place_1 = {
+            "id": "place_1",
+            "types": ["restaurant"],
+            "location": {"latitude": -33.865, "longitude": 151.209},
+            "displayName": {"text": "Test Place 1"},
+            "primaryType": "restaurant",
+        }
+        self.valid_place_2 = {
+            "id": "place_2",
+            "types": ["cafe"],
+            "location": {"latitude": -33.866, "longitude": 151.208},
+            "displayName": {"text": "Test Place 2"},
+            "primaryType": "cafe",
+        }
+
+    def create_dummy_response(self, has_places: bool) -> DummyResponse:
+        data = (
+            {"places": [self.valid_place_1, self.valid_place_2]} if has_places else {}
+        )
+        return DummyResponse(data=data)
+
+    def test_successful_search_with_places(self):
+        success, places_df = search_and_update_places(
+            circle=self.circle,
+            radius_in_meters=self.radius_in_meters,
+            response_id=self.response_id,
+            query_headers=self.query_headers,
+        )
+        self.assertTrue(success)
+        self.assertIsInstance(places_df, DataFrame)
+        self.assertIn("id", places_df.columns)
+        self.assertIn("circle", places_df.columns)
+
+    def test_unsucessful_search_without_places(self):
+        searched, places_df = search_and_update_places(
+            circle=self.circle,
+            radius_in_meters=self.radius_in_meters,
+            response_id=self.response_id,
+            query_headers=self.query_headers,
+            has_places=False,
+        )
+        self.assertFalse(searched)
+        self.assertIsNone(places_df)
+
+    def test_failed_request_with_invalid_key(self):
+        with self.assertRaises(RuntimeError):
+            search_and_update_places(
+                circle=self.circle,
+                radius_in_meters=self.radius_in_meters,
+                response_id=self.response_id,
+                query_headers={"X-Goog-Api-Key": "invalid_key"},  # Invalid key
+            )
+
+    def test_large_radius_handling(self):
+        success, places_df = search_and_update_places(
+            circle=self.circle,
+            radius_in_meters=100000.0,  # Large search radius
+            response_id=self.response_id,
+            query_headers=self.query_headers,
+        )
+        self.assertTrue(success)  # Ensure the search succeeds
+        self.assertIsInstance(places_df, DataFrame)
+
+    def test_request_with_included_types(self):
+        success, places_df = search_and_update_places(
+            circle=self.circle,
+            radius_in_meters=self.radius_in_meters,
+            response_id=self.response_id,
+            query_headers=self.query_headers,
+            included_types=["restaurant"],
+        )
+        self.assertTrue(success)
+        self.assertIsInstance(places_df, DataFrame)
+
+
 if __name__ == "__main__":
     unittest.main()
