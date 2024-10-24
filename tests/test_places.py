@@ -49,6 +49,8 @@ from mitools.google.places import (
     get_circles_search,
     get_response_places,
     get_saturated_area,
+    global_requests_counter,
+    global_requests_counter_limit,
     intersection_condition_factory,
     meters_to_degree,
     nearby_search_request,
@@ -58,6 +60,7 @@ from mitools.google.places import (
     sample_polygons_with_circles,
     search_and_update_places,
     search_places_in_polygon,
+    should_save_state,
     update_progress_bar,
 )
 
@@ -1032,6 +1035,37 @@ class TestUpdateProgressBar(TestCase):
         self.assertIn("Remaining Circles", output)
         self.assertIn("Found Places", output)
         self.assertIn("Searched Circles", output)
+
+
+class TestShouldSaveState(TestCase):
+    def setUp(self):
+        global_requests_counter.value = 0
+        global_requests_counter_limit.value = 1000
+
+    def test_save_on_exact_n_amount(self):
+        self.assertTrue(should_save_state(response_id=200, total_circles=500))
+
+    def test_save_on_last_circle(self):
+        self.assertTrue(should_save_state(response_id=499, total_circles=500))
+
+    def test_save_on_global_counter_limit(self):
+        global_requests_counter.value = 999
+        self.assertTrue(should_save_state(response_id=150, total_circles=500))
+
+    def test_no_save_mid_execution(self):
+        self.assertFalse(should_save_state(response_id=150, total_circles=500))
+
+    def test_save_on_counter_limit_edge_case(self):
+        global_requests_counter.value = 998
+        global_requests_counter_limit.value = 999
+        self.assertTrue(should_save_state(response_id=150, total_circles=500))
+
+    def test_not_save_when_global_counter_not_reached(self):
+        global_requests_counter.value = 500
+        self.assertFalse(should_save_state(response_id=150, total_circles=500))
+
+    def test_save_when_total_circles_is_one(self):
+        self.assertTrue(should_save_state(response_id=0, total_circles=1))
 
 
 if __name__ == "__main__":
