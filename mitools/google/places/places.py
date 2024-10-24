@@ -23,7 +23,11 @@ from shapely.geometry import MultiPolygon, Point, Polygon
 from shapely.ops import transform
 from tqdm import tqdm
 
-from mitools.exceptions import ArgumentTypeError, ArgumentValueError
+from mitools.exceptions import (
+    ArgumentStructureError,
+    ArgumentTypeError,
+    ArgumentValueError,
+)
 
 from .places_objects import (
     CityGeojson,
@@ -337,9 +341,9 @@ def get_response_places(
     response_id: str, response: Union[requests.Response, DummyResponse]
 ) -> DataFrame:
     try:
-        places = response.json().get("places", [])
+        places = response.json()["places"]
     except (AttributeError, KeyError) as e:
-        raise ArgumentValueError(f"Invalid response structure: {e}")
+        raise ArgumentStructureError(f"No 'places' key found in the response: {e}")
     place_series_list = []
     for place in places:
         place_series = NewPlace.from_json(place).to_series()
