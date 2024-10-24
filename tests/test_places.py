@@ -282,7 +282,7 @@ class TestSamplePolygonsWithCircles(TestCase):
         self.assertEqual(len(circles), 0)
 
     def test_invalid_condition_rule(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ArgumentValueError):
             sample_polygons_with_circles(
                 polygons=self.square_polygon,
                 radius_in_meters=self.radius_in_meters,
