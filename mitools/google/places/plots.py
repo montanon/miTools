@@ -84,6 +84,16 @@ def polygon_plot_with_sampling_circles(
     zoom_level: Optional[float] = 1.0,
     output_file_path: PathLike = None,
 ) -> Axes:
+    if not isinstance(polygon, Polygon):
+        raise ArgumentTypeError(
+            f"'polygon' of type {type(polygon)} must of be type Polyong."
+        )
+    if not isinstance(circles, (list, GeoSeries)):
+        raise ArgumentTypeError(
+            f"'circles' of type {type(circles)} must be of type list."
+        )
+    if not all(isinstance(circle, Polygon) for circle in circles):
+        raise ArgumentTypeError("All elements in 'circles' must be of type Polygon.")
     minx, miny, maxx, maxy = polygon.bounds
     out_circles, in_circles = [], []
     for circle in tqdm(circles):
