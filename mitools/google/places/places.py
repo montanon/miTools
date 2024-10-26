@@ -753,49 +753,52 @@ def _plot_polygon_with_circles_and_points(
 
 
 def places_search_step(
-    project_folder,
-    plots_folder,
-    tag,
-    polygon,
-    radius_in_meters,
-    step_in_degrees,
-    global_requests_counter=None,
-    global_requests_counter_limit=None,
-    query_headers=None,
-    restaurants=False,
-    show=False,
-    recalculate=False,
-):
+    project_folder: Path,
+    plots_folder: Path,
+    tag: str,
+    polygon: Polygon,
+    radius_in_meters: float,
+    step_in_degrees: float,
+    query_headers: Dict[str, str] = None,
+    included_types: List[str] = None,
+    recalculate: bool = False,
+    show: bool = False,
+    threshold: int = 20,
+) -> Tuple[GeoDataFrame, GeoDataFrame, Polygon, GeoDataFrame]:
+    if not project_folder.exists() or not project_folder.is_dir():
+        raise ArgumentValueError(f"Invalid folder path: {project_folder}")
+    if not plots_folder.exists() or not plots_folder.is_dir():
+        raise ArgumentValueError(f"Invalid folder path: {plots_folder}")
     circles, found_places = search_places_in_polygon(
-        project_folder,
-        plots_folder,
-        tag,
-        polygon,
-        radius_in_meters,
-        step_in_degrees,
+        root_folder=project_folder,
+        plot_folder=plots_folder,
+        tag=tag,
+        polygon=polygon,
+        radius_in_meters=radius_in_meters,
+        step_in_degrees=step_in_degrees,
         condition_rule="center",
-        global_requests_counter=global_requests_counter,
-        global_requests_counter_limit=global_requests_counter_limit,
         query_headers=query_headers,
-        restaurants=restaurants,
+        included_types=included_types,
         recalculate=recalculate,
         show=show,
     )
     saturated_circles_plot_path = plots_folder / f"{tag}_saturated_circles_plot.png"
     saturated_area_plot_path = plots_folder / f"{tag}_saturated_area_plot.png"
     saturated_circles = get_saturated_circles(
-        polygon,
-        found_places,
-        circles,
-        threshold=20,
+        polygon=polygon,
+        found_places=found_places,
+        circles=circles,
+        threshold=threshold,
         show=show,
         output_file_path=saturated_circles_plot_path,
     )
     saturated_area = get_saturated_area(
-        polygon, saturated_circles, show=show, output_path=saturated_area_plot_path
+        polygon=polygon,
+        saturated_circles=saturated_circles,
+        show=show,
+        output_path=saturated_area_plot_path,
     )
     plt.close("all")
-
     return found_places, circles, saturated_area, saturated_circles
 
 
