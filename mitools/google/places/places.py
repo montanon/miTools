@@ -17,7 +17,7 @@ import numpy as np
 import pandas as pd
 import requests
 import seaborn as sns
-from geopandas import GeoDataFrame
+from geopandas import GeoDataFrame, GeoSeries
 from matplotlib.axes import Axes
 from pandas import DataFrame, Series
 from shapely.geometry import MultiPolygon, Point, Polygon
@@ -500,6 +500,98 @@ def update_progress_bar(
     )
 
 
+def filter_saturated_circles(
+    found_places: DataFrame,
+    circles: GeoDataFrame,
+    threshold: int,
+) -> GeoDataFrame:
+    places_by_circle = (
+        found_places.groupby("circle")["id"].nunique().sort_values(ascending=False)
+    )
+    saturated_circle_indices = places_by_circle[places_by_circle >= threshold].index
+    saturated_circles = circles.loc[saturated_circle_indices]
+    return saturated_circles
+
+
+def plot_saturated_circles(
+    polygon: Polygon,
+    circles: List[Polygon],
+    points: List[List[float]],
+    output_file_path: Union[str, Path] = None,
+    show: bool = False,
+) -> None:
+    _ = polygon_plot_with_circles_and_points(
+        polygon=polygon,
+        circles=circles,
+        points=points,
+        output_file_path=output_file_path,
+    )
+    if show:
+        plt.show()
+
+
+def get_saturated_circles(
+    polygon: Polygon,
+    found_places: DataFrame,
+    circles: GeoDataFrame,
+    threshold: int,
+    show: bool = False,
+    output_file_path: Union[str, Path] = None,
+) -> GeoDataFrame:
+    saturated_circles = filter_saturated_circles(
+        found_places=found_places,
+        circles=circles,
+        threshold=threshold,
+    )
+    points = found_places.loc[
+        found_places["circle"].isin(saturated_circles.index),
+        ["longitude", "latitude"],
+    ].values.tolist()
+    plot_saturated_circles(
+        polygon=polygon,
+        circles=saturated_circles.geometry.tolist(),
+        points=points,
+        output_file_path=output_file_path,
+        show=show,
+    )
+    return saturated_circles
+
+
+def get_saturated_area(
+    polygon: Polygon,
+    saturated_circles: GeoDataFrame,
+    show: bool = False,
+    output_path: Union[str, Path] = None,
+) -> Union[Polygon, MultiPolygon]:
+    saturated_area = saturated_circles.geometry.unary_union
+    plot_saturated_area(polygon, saturated_area, show=show, output_path=output_path)
+    return saturated_area
+
+
+def plot_saturated_area(
+    polygon: Polygon,
+    saturated_area: Union[Polygon, MultiPolygon],
+    show: bool = False,
+    output_path: Union[str, Path] = None,
+) -> None:
+    ax = GeoSeries(polygon).plot(
+        facecolor=sns.color_palette("Paired")[0],
+        edgecolor="none",
+        alpha=0.5,
+        figsize=(WIDTH, HEIGHT),
+    )
+    GeoSeries(saturated_area).plot(
+        ax=ax, facecolor="none", edgecolor=sns.color_palette("Paired")[0]
+    )
+    ax.set_title("Saturated Sampled Areas")
+    ax.set_ylabel("Latitude")
+    ax.set_xlabel("Longitude")
+    if output_path:
+        plt.savefig(output_path, dpi=DPI)
+    if show:
+        plt.show()
+
+
 def generate_unique_place_id():
     return datetime.now().strftime("%Y%m%d%H%M%S%f")
 
@@ -595,50 +687,6 @@ def search_places_in_polygon(
         if show:
             plt.show()
     return circles, found_places
-
-
-def get_saturated_circles(
-    polygon, found_places, circles, threshold, show=False, output_file_path=None
-):
-    places_by_circle = (
-        found_places.groupby("circle")["id"].nunique().sort_values(ascending=False)
-    )
-    saturated_circles = places_by_circle[places_by_circle >= threshold].index
-    saturated_circles = circles.loc[saturated_circles, :]
-    _ = polygon_plot_with_circles_and_points(
-        polygon=polygon,
-        circles=saturated_circles.geometry.tolist(),
-        points=found_places.loc[
-            found_places["circle"].isin(saturated_circles.index),
-            ["longitude", "latitude"],
-        ].values.tolist(),
-        output_file_path=output_file_path,
-    )
-    if show:
-        plt.show()
-    return saturated_circles
-
-
-def get_saturated_area(polygon, saturated_circles, show=False, output_path=None):
-    saturated_area = saturated_circles.geometry.unary_union
-    polygon = gpd.GeoSeries(polygon)
-    ax = polygon.plot(
-        facecolor=sns.color_palette("Paired")[0],
-        edgecolor="none",
-        alpha=0.5,
-        figsize=(WIDTH, HEIGHT),
-    )
-    gpd.GeoSeries(saturated_area).plot(
-        ax=ax, facecolor="none", edgecolor=sns.color_palette("Paired")[0]
-    )
-    ax.set_title("Saturated Sampled Areas")
-    ax.set_ylabel("Latitude")
-    ax.set_xlabel("Longitude")
-    if output_path:
-        plt.savefig(output_path, dpi=DPI)
-    if show:
-        plt.show()
-    return saturated_area
 
 
 def places_search_step(
