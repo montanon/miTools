@@ -42,6 +42,8 @@ from .places_objects import (
 from .plots import (
     plot_saturated_area,
     plot_saturated_circles,
+    polygon_plot_with_circles_and_points,
+    polygon_plot_with_sampling_circles,
 )
 
 CircleType = NewType("CircleType", Polygon)
@@ -583,96 +585,151 @@ def generate_unique_place_id():
 
 
 def search_places_in_polygon(
-    root_folder,
-    plot_folder,
-    tag,
-    polygon,
-    radius_in_meters,
-    step_in_degrees,
-    condition_rule,
-    global_requests_counter=None,
-    global_requests_counter_limit=None,
-    query_headers=None,
-    restaurants=False,
-    recalculate=False,
-    show=False,
-):
-    circles_path = root_folder / Path(
-        f"{tag}_{radius_in_meters}_radius_{step_in_degrees}_step_circles.geojson"
+    root_folder: PathLike,
+    plot_folder: PathLike,
+    tag: str,
+    polygon: GeoDataFrame,
+    radius_in_meters: float,
+    step_in_degrees: float,
+    condition_rule: str,
+    global_requests_counter: int = None,
+    global_requests_counter_limit: int = None,
+    query_headers: Dict[str, str] = None,
+    included_types: List[str] = None,
+    recalculate: bool = False,
+    show: bool = False,
+) -> Tuple[GeoDataFrame, GeoDataFrame]:
+    circles_path = _generate_file_path(
+        root_folder, tag, radius_in_meters, step_in_degrees, "circles.geojson"
     )
-    places_path = root_folder / Path(
-        f"{tag}_{radius_in_meters}_radius_{step_in_degrees}_step_places.parquet"
+    places_path = _generate_file_path(
+        root_folder, tag, radius_in_meters, step_in_degrees, "places.parquet"
     )
-    polygon_with_circles_plot_path = plot_folder / Path(
-        f"{tag}_polygon_with_circles_plot.png"
-    )
-    polygon_with_circles_zoom_plot_path = plot_folder / Path(
-        f"{tag}_polygon_with_circles_zoom_plot.png"
-    )
-    polygon_with_circles_and_points_plot_path = plot_folder / Path(
-        f"{tag}_polygon_with_circles_and_places_plot.png"
-    )
-    polygon_with_circles_and_points_zoom_plot_path = plot_folder / Path(
-        f"{tag}_polygon_with_circles_and_places_zoom_plot.png"
-    )
+    plot_paths = _generate_plot_paths(plot_folder, tag)
     circles = get_circles_search(
-        circles_path,
-        polygon,
-        radius_in_meters,
-        step_in_degrees,
+        circles_path=circles_path,
+        polygon=polygon,
+        radius_in_meters=radius_in_meters,
+        step_in_degrees=step_in_degrees,
         condition_rule=condition_rule,
         recalculate=recalculate,
     )
     if show or recalculate:
-        _ = polygon_plot_with_sampling_circles(
-            polygon=polygon,
-            circles=circles.geometry.tolist(),
-            output_file_path=polygon_with_circles_plot_path,
-        )
-        if show:
-            plt.show()
-        random_circle = random.choice(circles.geometry.tolist())
-        _ = polygon_plot_with_sampling_circles(
-            polygon=polygon,
-            circles=circles.geometry.tolist(),
-            point_of_interest=random_circle,
-            zoom_level=5 * meters_to_degree(radius_in_meters, random_circle.centroid.y),
-            output_file_path=polygon_with_circles_zoom_plot_path,
-        )
-        if show:
-            plt.show()
+        _generate_sampling_plots(polygon, circles, plot_paths, radius_in_meters, show)
     found_places = process_circles(
-        circles,
-        radius_in_meters,
-        places_path,
-        circles_path,
+        circles=circles,
+        radius_in_meters=radius_in_meters,
+        file_path=places_path,
+        circles_path=circles_path,
+        query_headers=query_headers,
+        included_types=included_types,
+        recalculate=recalculate,
         global_requests_counter=global_requests_counter,
         global_requests_counter_limit=global_requests_counter_limit,
-        query_headers=query_headers,
-        restaurants=restaurants,
-        recalculate=recalculate,
     )
     if show or recalculate:
-        _ = polygon_plot_with_circles_and_points(
-            polygon=polygon,
-            circles=circles.geometry.tolist(),
-            points=found_places[["longitude", "latitude"]].values.tolist(),
-            output_file_path=polygon_with_circles_and_points_plot_path,
+        _generate_results_plots(
+            polygon, circles, found_places, plot_paths, radius_in_meters, show
         )
-        if show:
-            plt.show()
-        random_circle = random.choice(circles.geometry.tolist())
-        _ = polygon_plot_with_circles_and_points(
-            polygon=polygon,
-            circles=circles.geometry.tolist(),
-            point_of_interest=random_circle,
-            zoom_level=5 * meters_to_degree(radius_in_meters, random_circle.centroid.y),
-            points=found_places[["longitude", "latitude"]].values.tolist(),
-            output_file_path=polygon_with_circles_and_points_zoom_plot_path,
-        )
-        if show:
-            plt.show()
     return circles, found_places
+
+
+def _generate_file_path(
+    folder: PathLike, tag: str, radius: float, step: float, suffix: str
+) -> Path:
+    return Path(folder) / f"{tag}_{radius}_radius_{step}_step_{suffix}"
+
+
+def _generate_plot_paths(plot_folder: Path, tag: str) -> Dict[str, Path]:
+    return {
+        "circles": plot_folder / f"{tag}_polygon_with_circles_plot.png",
+        "circles_zoom": plot_folder / f"{tag}_polygon_with_circles_zoom_plot.png",
+        "places": plot_folder / f"{tag}_polygon_with_circles_and_places_plot.png",
+        "places_zoom": plot_folder
+        / f"{tag}_polygon_with_circles_and_places_zoom_plot.png",
+    }
+
+
+def _generate_sampling_plots(
+    polygon: GeoDataFrame,
+    circles: GeoDataFrame,
+    plot_paths: Dict[str, Path],
+    radius_in_meters: float,
+    show: bool,
+) -> None:
+    _plot_polygon_with_circles(polygon, circles, plot_paths["circles"], show)
+
+    random_circle = random.choice(circles.geometry.tolist())
+    zoom_level = 5 * meters_to_degree(radius_in_meters, random_circle.centroid.y)
+    _plot_polygon_with_circles(
+        polygon, circles, plot_paths["circles_zoom"], show, random_circle, zoom_level
+    )
+
+
+def _generate_results_plots(
+    polygon: GeoDataFrame,
+    circles: GeoDataFrame,
+    found_places: GeoDataFrame,
+    plot_paths: Dict[str, Path],
+    radius_in_meters: float,
+    show: bool,
+) -> None:
+    points = found_places[["longitude", "latitude"]].values.tolist()
+    _plot_polygon_with_circles_and_points(
+        polygon, circles, points, plot_paths["places"], show
+    )
+
+    random_circle = random.choice(circles.geometry.tolist())
+    zoom_level = 5 * meters_to_degree(radius_in_meters, random_circle.centroid.y)
+    _plot_polygon_with_circles_and_points(
+        polygon,
+        circles,
+        points,
+        plot_paths["places_zoom"],
+        show,
+        random_circle,
+        zoom_level,
+    )
+
+
+def _plot_polygon_with_circles(
+    polygon: GeoDataFrame,
+    circles: List[Polygon],
+    output_path: Path,
+    show: bool,
+    point_of_interest: Optional[Polygon] = None,
+    zoom_level: Optional[float] = None,
+) -> None:
+    _ = polygon_plot_with_sampling_circles(
+        polygon=polygon,
+        circles=circles,
+        point_of_interest=point_of_interest,
+        zoom_level=zoom_level,
+        output_file_path=output_path,
+    )
+    if show:
+        plt.show()
+
+
+def _plot_polygon_with_circles_and_points(
+    polygon: GeoDataFrame,
+    circles: List[Polygon],
+    points: List[Tuple[float, float]],
+    output_path: Path,
+    show: bool,
+    point_of_interest: Optional[Polygon] = None,
+    zoom_level: Optional[float] = None,
+) -> None:
+    _ = polygon_plot_with_circles_and_points(
+        polygon=polygon,
+        circles=circles,
+        points=points,
+        point_of_interest=point_of_interest,
+        zoom_level=zoom_level,
+        output_file_path=output_path,
+    )
+    if show:
+        plt.show()
 
 
 def places_search_step(
