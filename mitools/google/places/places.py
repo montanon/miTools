@@ -137,6 +137,20 @@ def meters_to_degree(distance_in_meters: float, reference_latitude: float) -> fl
     return max(lat_degrees, lon_degrees)
 
 
+def calculate_degree_steps(
+    meter_radiuses: List[float], step_in_degrees: float = 0.00375
+) -> List[float]:
+    if not meter_radiuses:
+        raise ArgumentValueError("Radius values must be a non-empty list of numbers.")
+    if any(r <= 0 for r in meter_radiuses):
+        raise ArgumentValueError("All radius values must be positive.")
+    degree_steps = [step_in_degrees]  # Start with the initial step
+    for i in range(1, len(meter_radiuses)):
+        step = degree_steps[-1] * (meter_radiuses[i] / meter_radiuses[i - 1])
+        degree_steps.append(step)
+    return degree_steps
+
+
 def sample_polygon_with_circles(
     polygon: Polygon,
     radius_in_meters: float,
@@ -706,17 +720,6 @@ def places_search_step(
     plt.close("all")
 
     return found_places, circles, saturated_area, saturated_circles
-
-
-def calculate_degree_steps(meter_radiuses, step_in_degrees=0.00375):
-    degree_steps = []
-    for i, radius in enumerate(meter_radiuses):
-        if i == 0:
-            step = step_in_degrees
-        else:
-            step *= radius / meter_radiuses[i - 1]
-        degree_steps.append(step)
-    return degree_steps
 
 
 if __name__ == "__main__":
