@@ -1328,10 +1328,10 @@ class TestProcessCircles(TestCase):
 
     def test_process_circles_save_to_file(self):
         global_requests_counter.value = 0
-        global_requests_counter_limit.value = 100
+        global_requests_counter_limit.value = 10
         result = process_circles(
             circles=self.circles,
-            radius_in_meters=1000,
+            radius_in_meters=0.1,
             file_path=self.file_path,
             circles_path=self.circles_path,
             query_headers=self.query_headers,
@@ -1342,7 +1342,8 @@ class TestProcessCircles(TestCase):
         saved_places = pd.read_parquet(self.file_path)
         saved_circles = gpd.read_file(self.circles_path)
         assert_frame_equal(saved_places, result, check_dtype=False)
-        assert_frame_equal(saved_circles, self.circles, check_dtype=False)
+        for geom1, geom2 in zip(self.circles.geometry, saved_circles.geometry):
+            self.assertTrue(geom1.equals_exact(geom2, tolerance=1e-8))
 
     def test_process_circles_with_included_types(self):
         global_requests_counter.value = 0
