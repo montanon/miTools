@@ -629,7 +629,7 @@ def search_places_in_polygon(
         condition_rule=condition_rule,
         recalculate=recalculate,
     )
-    if show and recalculate:
+    if show or recalculate:
         _generate_sampling_plots(
             polygon, circles.geometry, plot_paths, radius_in_meters, show
         )
@@ -643,7 +643,7 @@ def search_places_in_polygon(
         recalculate=recalculate,
         has_places=has_places,
     )
-    if show and recalculate:
+    if show or recalculate:
         _generate_results_plots(
             polygon, circles.geometry, found_places, plot_paths, radius_in_meters, show
         )
