@@ -214,25 +214,31 @@ def sample_polygons_with_circles(
 
 
 def get_circles_search(
-    circles_path,
+    circles_path: Path,
     polygon: Polygon,
-    radius_in_meters,
-    step_in_degrees,
-    condition_rule="center",
-    recalculate=False,
-):
-    if not circles_path.exists() or recalculate:
+    radius_in_meters: float,
+    step_in_degrees: float,
+    condition_rule: str = "center",
+    recalculate: bool = False,
+) -> GeoDataFrame:
+    if not circles_path or not isinstance(circles_path, Path):
+        raise ArgumentValueError("`circles_path` must be a valid Path object.")
+    if not isinstance(polygon, Polygon):
+        raise ArgumentTypeError("`polygon` must be a Shapely Polygon object.")
+    if recalculate or not circles_path.exists():
         circles = sample_polygons_with_circles(
             polygons=polygon,
             radius_in_meters=radius_in_meters,
             step_in_degrees=step_in_degrees,
             condition_rule=condition_rule,
         )
-        circles = GeoDataFrame(geometry=circles).reset_index(drop=True)
-        circles["searched"] = False
+        circles = (
+            GeoDataFrame(geometry=circles).reset_index(drop=True).assign(searched=False)
+        )
         circles.to_file(circles_path, driver="GeoJSON")
     else:
         circles = gpd.read_file(circles_path)
+
     return circles
 
 
@@ -390,7 +396,9 @@ def search_and_update_places(
     query_headers: Dict[str, str] = None,
     included_types: List[str] = None,
     has_places: bool = True,
-) -> Tuple[bool, Optional[DataFrame]]:
+) -> Tuple[bool, Union[DataFrame, None]]:
+    if not isinstance(circle, Polygon):
+        raise ArgumentTypeError("Invalid 'circle' is not of type Polygon.")
     response = nearby_search_request(
         circle=circle,
         radius_in_meters=radius_in_meters,
