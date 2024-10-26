@@ -6,6 +6,7 @@ from .places import (
     create_dummy_place,
     create_dummy_response,
     create_subsampled_circles,
+    filter_saturated_circles,
     generate_unique_place_id,
     get_circles_search,
     get_response_places,
