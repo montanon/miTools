@@ -251,5 +251,46 @@ def polygon_plot_with_points(
     return ax
 
 
+def plot_saturated_circles(
+    polygon: Polygon,
+    circles: List[Polygon],
+    points: List[List[float]],
+    output_file_path: Union[str, Path] = None,
+    show: bool = False,
+) -> None:
+    _ = polygon_plot_with_circles_and_points(
+        polygon=polygon,
+        circles=circles,
+        points=points,
+        output_file_path=output_file_path,
+    )
+    if show:
+        plt.show()
+
+
+def plot_saturated_area(
+    polygon: Polygon,
+    saturated_area: Union[Polygon, MultiPolygon],
+    show: bool = False,
+    output_path: Union[str, Path] = None,
+) -> None:
+    ax = GeoSeries(polygon).plot(
+        facecolor=sns.color_palette("Paired")[0],
+        edgecolor="none",
+        alpha=0.5,
+        figsize=(WIDTH, HEIGHT),
+    )
+    GeoSeries(saturated_area).plot(
+        ax=ax, facecolor="none", edgecolor=sns.color_palette("Paired")[0]
+    )
+    ax.set_title("Saturated Sampled Areas")
+    ax.set_ylabel("Latitude")
+    ax.set_xlabel("Longitude")
+    if output_path:
+        plt.savefig(output_path, dpi=DPI)
+    if show:
+        plt.show()
+
+
 if __name__ == "__main__":
     pass
