@@ -47,6 +47,7 @@ from mitools.google.places import (
     create_dummy_place,
     create_dummy_response,
     create_subsampled_circles,
+    filter_saturated_circles,
     generate_unique_place_id,
     get_circles_search,
     get_response_places,
@@ -1310,6 +1311,68 @@ class TestProcessCircles(TestCase):
         self.assertTrue(self.circles["searched"].values[0])
         self.assertFalse(self.circles["searched"].values[1])
         self.assertFalse(result.empty)
+
+
+class TestFilterSaturatedCircles(TestCase):
+    def setUp(self):
+        self.found_places = pd.DataFrame(
+            {"circle": [1, 1, 1, 2, 2, 3, 4], "id": ["A", "B", "C", "D", "E", "F", "G"]}
+        )
+        self.circles = gpd.GeoDataFrame(
+            {
+                "geometry": [
+                    Point(1, 1).buffer(1),
+                    Point(2, 2).buffer(1),
+                    Point(3, 3).buffer(1),
+                    Point(4, 4).buffer(1),
+                ]
+            },
+            index=[1, 2, 3, 4],
+        )
+
+    def test_filter_with_valid_threshold(self):
+        threshold = 2
+        result = filter_saturated_circles(self.found_places, self.circles, threshold)
+        expected_indices = [1, 2]  # Circles 1 and 2 meet the threshold
+        self.assertListEqual(result.index.tolist(), expected_indices)
+
+    def test_filter_with_no_saturated_circles(self):
+        threshold = 4  # No circle has 4 or more places
+        result = filter_saturated_circles(self.found_places, self.circles, threshold)
+        self.assertTrue(result.empty)
+
+    def test_filter_with_all_circles_saturated(self):
+        threshold = 1  # All circles have at least 1 place
+        result = filter_saturated_circles(self.found_places, self.circles, threshold)
+        expected_indices = [1, 2, 3, 4]
+        self.assertListEqual(result.index.tolist(), expected_indices)
+
+    def test_filter_with_empty_found_places(self):
+        found_places = DataFrame(columns=["circle", "id"])  # Empty DataFrame
+        threshold = 1
+        result = filter_saturated_circles(found_places, self.circles, threshold)
+        self.assertTrue(result.empty)
+
+    def test_filter_with_empty_circles(self):
+        empty_circles = GeoDataFrame(columns=["geometry"])  # Empty GeoDataFrame
+        empty_circles.index.name = "id"
+        threshold = 1
+        with self.assertRaises(ArgumentValueError):
+            filter_saturated_circles(self.found_places, empty_circles, threshold)
+
+    def test_filter_with_invalid_threshold(self):
+        with self.assertRaises(ArgumentValueError):
+            filter_saturated_circles(
+                self.found_places, self.circles, -1
+            )  # Negative threshold
+
+    def test_filter_with_missing_circle_in_circles(self):
+        self.found_places = pd.concat(
+            [self.found_places, DataFrame({"circle": [5], "id": ["H"]})]
+        )
+        threshold = 1
+        with self.assertRaises(ArgumentValueError):
+            filter_saturated_circles(self.found_places, self.circles, threshold)
 
 
 if __name__ == "__main__":
