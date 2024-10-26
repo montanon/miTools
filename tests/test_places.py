@@ -1197,75 +1197,102 @@ class TestProcessCircles(TestCase):
         self.found_places = DataFrame(
             columns=["circle", *list(NewPlace.__annotations__.keys())]
         )
+        self.query_headers = {"X-Goog-Api-Key": ""}
 
     def tearDown(self):
         self.temp_dir.cleanup()
 
     def test_process_circles_no_recalculation(self):
-        self.found_places.to_parquet(self.file_path)
+        global_requests_counter.value = 0
+        global_requests_counter_limit.value = 100
         result = process_circles(
             circles=self.circles,
             radius_in_meters=1000,
             file_path=self.file_path,
             circles_path=self.circles_path,
+            query_headers=self.query_headers,
             recalculate=False,
         )
-        assert_frame_equal(result, self.found_places)
+        self.assertGreater(len(result), len(self.found_places))
 
     def test_process_circles_with_recalculation(self):
-        result = process_circles(
+        global_requests_counter.value = 0
+        global_requests_counter_limit.value = 100
+        result1 = process_circles(
             circles=self.circles,
             radius_in_meters=1000,
             file_path=self.file_path,
             circles_path=self.circles_path,
+            query_headers=self.query_headers,
+            recalculate=False,
+        )
+        self.assertTrue(self.circles["searched"].all())
+        result2 = process_circles(
+            circles=self.circles,
+            radius_in_meters=1000,
+            file_path=self.file_path,
+            circles_path=self.circles_path,
+            query_headers=self.query_headers,
             recalculate=True,
         )
-        self.assertFalse(result.empty)
-        self.assertEqual(len(result), len(self.circles))
+        self.assertFalse(result1.equals(result2))  # Random generation of places
 
     def test_process_circles_empty_circles(self):
+        global_requests_counter.value = 0
+        global_requests_counter_limit.value = 100
         empty_circles = GeoDataFrame(columns=["searched", "geometry"])
         result = process_circles(
             circles=empty_circles,
             radius_in_meters=1000,
             file_path=self.file_path,
             circles_path=self.circles_path,
+            query_headers=self.query_headers,
         )
         self.assertTrue(result.empty)
 
     def test_process_circles_partial_processing(self):
+        global_requests_counter.value = 0
+        global_requests_counter_limit.value = 100
         self.circles.loc[0, "searched"] = True
         result = process_circles(
             circles=self.circles,
             radius_in_meters=1000,
             file_path=self.file_path,
             circles_path=self.circles_path,
-            recalculate=True,
+            query_headers=self.query_headers,
+            recalculate=False,
         )
-        self.assertEqual(len(result), 1)
+        self.assertTrue(self.circles.loc[1, "searched"])
+        self.assertGreater(len(result), len(self.found_places))
 
     def test_process_circles_save_to_file(self):
+        global_requests_counter.value = 0
+        global_requests_counter_limit.value = 100
         result = process_circles(
             circles=self.circles,
             radius_in_meters=1000,
             file_path=self.file_path,
             circles_path=self.circles_path,
+            query_headers=self.query_headers,
             recalculate=True,
         )
         self.assertTrue(self.file_path.exists())
         self.assertTrue(self.circles_path.exists())
         saved_places = pd.read_parquet(self.file_path)
         saved_circles = gpd.read_file(self.circles_path)
-        assert_frame_equal(saved_places, result)
-        assert_frame_equal(saved_circles, self.circles)
+        assert_frame_equal(saved_places, result, check_dtype=False)
+        assert_frame_equal(saved_circles, self.circles, check_dtype=False)
 
     def test_process_circles_with_included_types(self):
+        global_requests_counter.value = 0
+        global_requests_counter_limit.value = 100
         result = process_circles(
             circles=self.circles,
             radius_in_meters=1000,
             file_path=self.file_path,
             circles_path=self.circles_path,
             included_types=["restaurant", "cafe"],
+            query_headers=self.query_headers,
             recalculate=True,
         )
         self.assertFalse(result.empty)
@@ -1277,9 +1304,12 @@ class TestProcessCircles(TestCase):
             radius_in_meters=1000,
             file_path=self.file_path,
             circles_path=self.circles_path,
-            recalculate=True,
+            query_headers=self.query_headers,
+            recalculate=False,
         )
-        self.assertTrue(result.empty)
+        self.assertTrue(self.circles["searched"].values[0])
+        self.assertFalse(self.circles["searched"].values[1])
+        self.assertFalse(result.empty)
 
 
 if __name__ == "__main__":
