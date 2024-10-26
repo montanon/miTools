@@ -1,4 +1,6 @@
 import math
+import shutil
+import tempfile
 import unittest
 from dataclasses import asdict
 from io import StringIO
@@ -1429,6 +1431,154 @@ class TestCalculateDegreeSteps(TestCase):
         expected_steps = [0.002, 0.004, 0.008]
         result = calculate_degree_steps(meter_radiuses, step_in_degrees)
         self.assertEqual(result, expected_steps)
+
+
+class TestSearchPlacesInPolygon(TestCase):
+    def setUp(self):
+        self.root_folder = Path(tempfile.mkdtemp())
+        self.plot_folder = Path(tempfile.mkdtemp())
+        self.test_polygon = Polygon([(0, 0), (1, 0), (1, 1), (0, 1)])
+        self.circles = GeoDataFrame(
+            {"geometry": [self.test_polygon.buffer(0.1)], "searched": [False]}
+        )
+        self.found_places = DataFrame(
+            {
+                "id": ["1", "2"],
+                "circle": [0, 0],
+                "latitude": [0.5, 0.6],
+                "longitude": [0.5, 0.6],
+            }
+        )
+        self.circles_path = self.root_folder / "test_circles.geojson"
+        self.places_path = self.root_folder / "test_places.parquet"
+        self.circles.to_file(self.circles_path, driver="GeoJSON")
+        self.query_headers = {"X-Goog-Api-Key": ""}
+
+    def tearDown(self):
+        shutil.rmtree(self.root_folder)
+        shutil.rmtree(self.plot_folder)
+
+    def test_successful_execution_with_recalculation(self):
+        circles, found_places = search_places_in_polygon(
+            root_folder=self.root_folder,
+            plot_folder=self.plot_folder,
+            tag="test",
+            polygon=self.test_polygon,
+            radius_in_meters=100,
+            step_in_degrees=0.01,
+            condition_rule="center",
+            query_headers=self.query_headers,
+            recalculate=False,
+        )
+        self.assertIsInstance(circles, GeoDataFrame)
+        self.assertIsInstance(found_places, DataFrame)
+
+    def test_load_existing_files_without_recalculation(self):
+        self.found_places.to_parquet(self.places_path)
+        circles, found_places = search_places_in_polygon(
+            root_folder=self.root_folder,
+            plot_folder=self.plot_folder,
+            tag="test",
+            polygon=self.test_polygon,
+            radius_in_meters=100,
+            step_in_degrees=0.01,
+            condition_rule="center",
+            recalculate=False,
+        )
+        self.assertEqual(len(found_places), 2)  # Ensure correct data is loaded
+
+    def test_with_global_request_counter(self):
+        circles, found_places = search_places_in_polygon(
+            root_folder=self.root_folder,
+            plot_folder=self.plot_folder,
+            tag="test",
+            polygon=self.test_polygon,
+            radius_in_meters=100,
+            step_in_degrees=0.01,
+            condition_rule="center",
+            global_requests_counter=10,
+            global_requests_counter_limit=20,
+            recalculate=True,
+        )
+        self.assertIsInstance(circles, GeoDataFrame)
+        self.assertIsInstance(found_places, DataFrame)
+
+    def test_invalid_polygon(self):
+        with self.assertRaises(ValueError):
+            search_places_in_polygon(
+                root_folder=self.root_folder,
+                plot_folder=self.plot_folder,
+                tag="test",
+                polygon=GeoSeries([Polygon()]),  # Invalid polygon
+                radius_in_meters=100,
+                step_in_degrees=0.01,
+                condition_rule="center",
+            )
+
+    def test_missing_files(self):
+        self.circles_path.unlink()
+        circles, found_places = search_places_in_polygon(
+            root_folder=self.root_folder,
+            plot_folder=self.plot_folder,
+            tag="test",
+            polygon=self.test_polygon,
+            radius_in_meters=100,
+            step_in_degrees=0.01,
+            condition_rule="center",
+            recalculate=True,
+        )
+        self.assertIsInstance(circles, GeoDataFrame)
+
+    def test_with_query_headers_and_included_types(self):
+        query_headers = {"X-Goog-Api-Key": "test_key"}
+        included_types = ["restaurant"]
+        circles, found_places = search_places_in_polygon(
+            root_folder=self.root_folder,
+            plot_folder=self.plot_folder,
+            tag="test",
+            polygon=self.test_polygon,
+            radius_in_meters=100,
+            step_in_degrees=0.01,
+            condition_rule="center",
+            query_headers=query_headers,
+            included_types=included_types,
+            recalculate=True,
+        )
+        self.assertIsInstance(circles, GeoDataFrame)
+        self.assertIsInstance(found_places, DataFrame)
+
+    def test_handles_no_found_places(self):
+        self.found_places = DataFrame(columns=["id", "circle", "latitude", "longitude"])
+        self.found_places.to_parquet(self.places_path)
+        circles, found_places = search_places_in_polygon(
+            root_folder=self.root_folder,
+            plot_folder=self.plot_folder,
+            tag="test",
+            polygon=self.test_polygon,
+            radius_in_meters=100,
+            step_in_degrees=0.01,
+            condition_rule="center",
+            recalculate=False,
+        )
+        self.assertEqual(len(found_places), 0)
+
+    def test_large_number_of_circles(self):
+        large_circles = GeoDataFrame(
+            {"geometry": [self.test_polygon[0].buffer(0.1) for _ in range(1000)]}
+        )
+        large_circles.to_file(self.circles_path, driver="GeoJSON")
+
+        circles, found_places = search_places_in_polygon(
+            root_folder=self.root_folder,
+            plot_folder=self.plot_folder,
+            tag="test_large",
+            polygon=self.test_polygon,
+            radius_in_meters=100,
+            step_in_degrees=0.01,
+            condition_rule="center",
+            recalculate=True,
+        )
+        self.assertEqual(len(circles), 1000)
 
 
 if __name__ == "__main__":
