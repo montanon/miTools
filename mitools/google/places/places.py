@@ -412,6 +412,8 @@ def process_circles(
         found_places = DataFrame(
             columns=["circle", *list(NewPlace.__annotations__.keys())]
         )
+    if circles.empty:
+        return found_places
     if should_process_circles(circles, recalculate):
         with tqdm(total=len(circles), desc="Processing circles") as pbar:
             for response_id, circle in circles[~circles["searched"]].iterrows():
