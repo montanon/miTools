@@ -371,7 +371,7 @@ def nearby_search_request(
         )
         response.raise_for_status()  # Raise an error for non-2xx responses
         return response
-    except requests.exceptions.RequestException as e:
+    except (requests.exceptions.RequestException, RuntimeError) as e:
         raise RuntimeError(f"Request to {NEW_NEARBY_SEARCH_URL} failed: {e}")
 
 
@@ -596,15 +596,24 @@ def search_places_in_polygon(
     root_folder: PathLike,
     plot_folder: PathLike,
     tag: str,
-    polygon: GeoDataFrame,
+    polygon: Polygon,
     radius_in_meters: float,
     step_in_degrees: float,
     condition_rule: str,
     query_headers: Dict[str, str] = None,
     included_types: List[str] = None,
     recalculate: bool = False,
+    has_places: bool = True,
     show: bool = False,
 ) -> Tuple[GeoDataFrame, GeoDataFrame]:
+    if not isinstance(root_folder, Path) or not root_folder.exists():
+        raise ArgumentValueError("`root_folder` must be a valid Path object.")
+    if not isinstance(plot_folder, Path) or not plot_folder.exists():
+        raise ArgumentValueError("`plot_folder` must be a valid Path object.")
+    if not isinstance(polygon, Polygon):
+        raise ArgumentTypeError(
+            f"Invalid 'polygon' of type {type(polygon)} is not of type Polygon."
+        )
     circles_path = _generate_file_path(
         root_folder, tag, radius_in_meters, step_in_degrees, "circles.geojson"
     )
@@ -620,8 +629,10 @@ def search_places_in_polygon(
         condition_rule=condition_rule,
         recalculate=recalculate,
     )
-    if show or recalculate:
-        _generate_sampling_plots(polygon, circles, plot_paths, radius_in_meters, show)
+    if show and recalculate:
+        _generate_sampling_plots(
+            polygon, circles.geometry, plot_paths, radius_in_meters, show
+        )
     found_places = process_circles(
         circles=circles,
         radius_in_meters=radius_in_meters,
@@ -630,10 +641,11 @@ def search_places_in_polygon(
         query_headers=query_headers,
         included_types=included_types,
         recalculate=recalculate,
+        has_places=has_places,
     )
-    if show or recalculate:
+    if show and recalculate:
         _generate_results_plots(
-            polygon, circles, found_places, plot_paths, radius_in_meters, show
+            polygon, circles.geometry, found_places, plot_paths, radius_in_meters, show
         )
     return circles, found_places
 
@@ -655,12 +667,16 @@ def _generate_plot_paths(plot_folder: Path, tag: str) -> Dict[str, Path]:
 
 
 def _generate_sampling_plots(
-    polygon: GeoDataFrame,
-    circles: GeoDataFrame,
+    polygon: Polygon,
+    circles: GeoSeries,
     plot_paths: Dict[str, Path],
     radius_in_meters: float,
     show: bool,
 ) -> None:
+    if not isinstance(polygon, Polygon):
+        raise ArgumentTypeError("Invalid 'polygon' is not of type Polygon.")
+    if not isinstance(circles, GeoSeries):
+        raise ArgumentTypeError("Invalid 'circles' is not of type GeoSeries.")
     _plot_polygon_with_circles(polygon, circles, plot_paths["circles"], show)
 
     random_circle = random.choice(circles.geometry.tolist())
@@ -697,12 +713,12 @@ def _generate_results_plots(
 
 
 def _plot_polygon_with_circles(
-    polygon: GeoDataFrame,
-    circles: List[Polygon],
+    polygon: Polygon,
+    circles: List[CircleType],
     output_path: Path,
     show: bool,
-    point_of_interest: Optional[Polygon] = None,
-    zoom_level: Optional[float] = None,
+    point_of_interest: Polygon = None,
+    zoom_level: float = None,
 ) -> None:
     _ = polygon_plot_with_sampling_circles(
         polygon=polygon,
