@@ -142,6 +142,9 @@ test_python_module skbuild
 conda install -c conda-forge pybind11 -y
 test_python_module pybind11
 
+python -m pip install pytubefix
+test_python_module countryinfo
+
 #sudo rm -rf ~/.racplusplus
 #sudo rm -rf ~/.racplusplus/RACplusplus/_skbuild
 #sudo rm -rf ~/.racplusplus && mkdir ~/.racplusplus && cd ~/.racplusplus
