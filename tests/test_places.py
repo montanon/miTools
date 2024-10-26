@@ -762,7 +762,7 @@ class TestCreateDummyResponse(TestCase):
 
 class TestNearbySearchRequest(TestCase):
     def setUp(self):
-        self.circle = Point(151.2099, -33.865143)  # Sydney
+        self.circle = Point(151.2099, -33.865143).buffer(10)  # Sydney
         self.radius_in_meters = 1000.0  # 1 km radius
         self.valid_headers = {"X-Goog-Api-Key": "valid_api_key"}
         self.restaurants = ["restaurant", "cafe", "bar"]
@@ -785,7 +785,7 @@ class TestNearbySearchRequest(TestCase):
             NEW_NEARBY_SEARCH_URL,
             headers=self.valid_headers,
             json=NewNearbySearchRequest(
-                location=self.circle.centroid,
+                location=self.circle,
                 distance_in_meters=self.radius_in_meters,
                 included_types=self.restaurants,
             ).json_query(),
@@ -826,7 +826,7 @@ class TestNearbySearchRequest(TestCase):
                 NEW_NEARBY_SEARCH_URL,
                 headers=QUERY_HEADERS,
                 json=NewNearbySearchRequest(
-                    location=self.circle.centroid,
+                    location=self.circle,
                     distance_in_meters=self.radius_in_meters,
                     included_types=[],
                 ).json_query(),
@@ -1195,7 +1195,7 @@ class TestProcessCircles(TestCase):
         self.temp_dir = TemporaryDirectory()
         self.file_path = Path(self.temp_dir.name) / "found_places.parquet"
         self.circles_path = Path(self.temp_dir.name) / "circles.geojson"
-        geometry = [Point(0, 0), Point(1, 1)]
+        geometry = [Point(0, 0).buffer(0.1), Point(1, 1).buffer(0.1)]
         self.circles = GeoDataFrame({"searched": [False, False], "geometry": geometry})
         self.found_places = DataFrame(
             columns=["circle", *list(NewPlace.__annotations__.keys())]
@@ -1439,7 +1439,7 @@ class TestSearchPlacesInPolygon(TestCase):
         self.plot_folder = Path(tempfile.mkdtemp())
         self.test_polygon = Polygon([(0, 0), (1, 0), (1, 1), (0, 1)])
         self.circles = GeoDataFrame(
-            {"geometry": [self.test_polygon.buffer(0.1)], "searched": [False]}
+            {"geometry": [Point(0.5, 0.5)], "searched": [False]}
         )
         self.found_places = DataFrame(
             {
@@ -1465,7 +1465,7 @@ class TestSearchPlacesInPolygon(TestCase):
             tag="test",
             polygon=self.test_polygon,
             radius_in_meters=100,
-            step_in_degrees=0.01,
+            step_in_degrees=0.1,
             condition_rule="center",
             query_headers=self.query_headers,
             recalculate=False,
@@ -1483,11 +1483,14 @@ class TestSearchPlacesInPolygon(TestCase):
             radius_in_meters=100,
             step_in_degrees=0.01,
             condition_rule="center",
+            query_headers=self.query_headers,
             recalculate=False,
         )
         self.assertEqual(len(found_places), 2)  # Ensure correct data is loaded
 
     def test_with_global_request_counter(self):
+        global_requests_counter.value = 10
+        global_requests_counter_limit.value = 20
         circles, found_places = search_places_in_polygon(
             root_folder=self.root_folder,
             plot_folder=self.plot_folder,
@@ -1496,8 +1499,7 @@ class TestSearchPlacesInPolygon(TestCase):
             radius_in_meters=100,
             step_in_degrees=0.01,
             condition_rule="center",
-            global_requests_counter=10,
-            global_requests_counter_limit=20,
+            query_headers=self.query_headers,
             recalculate=True,
         )
         self.assertIsInstance(circles, GeoDataFrame)
@@ -1512,6 +1514,7 @@ class TestSearchPlacesInPolygon(TestCase):
                 polygon=GeoSeries([Polygon()]),  # Invalid polygon
                 radius_in_meters=100,
                 step_in_degrees=0.01,
+                query_headers=self.query_headers,
                 condition_rule="center",
             )
 
@@ -1525,12 +1528,12 @@ class TestSearchPlacesInPolygon(TestCase):
             radius_in_meters=100,
             step_in_degrees=0.01,
             condition_rule="center",
+            query_headers=self.query_headers,
             recalculate=True,
         )
         self.assertIsInstance(circles, GeoDataFrame)
 
     def test_with_query_headers_and_included_types(self):
-        query_headers = {"X-Goog-Api-Key": "test_key"}
         included_types = ["restaurant"]
         circles, found_places = search_places_in_polygon(
             root_folder=self.root_folder,
@@ -1540,7 +1543,7 @@ class TestSearchPlacesInPolygon(TestCase):
             radius_in_meters=100,
             step_in_degrees=0.01,
             condition_rule="center",
-            query_headers=query_headers,
+            query_headers=self.query_headers,
             included_types=included_types,
             recalculate=True,
         )
@@ -1558,6 +1561,7 @@ class TestSearchPlacesInPolygon(TestCase):
             radius_in_meters=100,
             step_in_degrees=0.01,
             condition_rule="center",
+            query_headers=self.query_headers,
             recalculate=False,
         )
         self.assertEqual(len(found_places), 0)
