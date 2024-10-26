@@ -764,6 +764,7 @@ def places_search_step(
     recalculate: bool = False,
     show: bool = False,
     threshold: int = 20,
+    has_places: bool = True,
 ) -> Tuple[GeoDataFrame, GeoDataFrame, Polygon, GeoDataFrame]:
     if not project_folder.exists() or not project_folder.is_dir():
         raise ArgumentValueError(f"Invalid folder path: {project_folder}")
@@ -781,6 +782,7 @@ def places_search_step(
         included_types=included_types,
         recalculate=recalculate,
         show=show,
+        has_places=has_places,
     )
     saturated_circles_plot_path = plots_folder / f"{tag}_saturated_circles_plot.png"
     saturated_area_plot_path = plots_folder / f"{tag}_saturated_area_plot.png"
