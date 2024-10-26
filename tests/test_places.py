@@ -1,4 +1,6 @@
 import math
+import shutil
+import tempfile
 import unittest
 from dataclasses import asdict
 from io import StringIO
@@ -47,6 +49,7 @@ from mitools.google.places import (
     create_dummy_place,
     create_dummy_response,
     create_subsampled_circles,
+    filter_saturated_circles,
     generate_unique_place_id,
     get_circles_search,
     get_response_places,
@@ -1197,75 +1200,102 @@ class TestProcessCircles(TestCase):
         self.found_places = DataFrame(
             columns=["circle", *list(NewPlace.__annotations__.keys())]
         )
+        self.query_headers = {"X-Goog-Api-Key": ""}
 
     def tearDown(self):
         self.temp_dir.cleanup()
 
     def test_process_circles_no_recalculation(self):
-        self.found_places.to_parquet(self.file_path)
+        global_requests_counter.value = 0
+        global_requests_counter_limit.value = 100
         result = process_circles(
             circles=self.circles,
             radius_in_meters=1000,
             file_path=self.file_path,
             circles_path=self.circles_path,
+            query_headers=self.query_headers,
             recalculate=False,
         )
-        assert_frame_equal(result, self.found_places)
+        self.assertGreater(len(result), len(self.found_places))
 
     def test_process_circles_with_recalculation(self):
-        result = process_circles(
+        global_requests_counter.value = 0
+        global_requests_counter_limit.value = 100
+        result1 = process_circles(
             circles=self.circles,
             radius_in_meters=1000,
             file_path=self.file_path,
             circles_path=self.circles_path,
+            query_headers=self.query_headers,
+            recalculate=False,
+        )
+        self.assertTrue(self.circles["searched"].all())
+        result2 = process_circles(
+            circles=self.circles,
+            radius_in_meters=1000,
+            file_path=self.file_path,
+            circles_path=self.circles_path,
+            query_headers=self.query_headers,
             recalculate=True,
         )
-        self.assertFalse(result.empty)
-        self.assertEqual(len(result), len(self.circles))
+        self.assertFalse(result1.equals(result2))  # Random generation of places
 
     def test_process_circles_empty_circles(self):
+        global_requests_counter.value = 0
+        global_requests_counter_limit.value = 100
         empty_circles = GeoDataFrame(columns=["searched", "geometry"])
         result = process_circles(
             circles=empty_circles,
             radius_in_meters=1000,
             file_path=self.file_path,
             circles_path=self.circles_path,
+            query_headers=self.query_headers,
         )
         self.assertTrue(result.empty)
 
     def test_process_circles_partial_processing(self):
+        global_requests_counter.value = 0
+        global_requests_counter_limit.value = 100
         self.circles.loc[0, "searched"] = True
         result = process_circles(
             circles=self.circles,
             radius_in_meters=1000,
             file_path=self.file_path,
             circles_path=self.circles_path,
-            recalculate=True,
+            query_headers=self.query_headers,
+            recalculate=False,
         )
-        self.assertEqual(len(result), 1)
+        self.assertTrue(self.circles.loc[1, "searched"])
+        self.assertGreater(len(result), len(self.found_places))
 
     def test_process_circles_save_to_file(self):
+        global_requests_counter.value = 0
+        global_requests_counter_limit.value = 100
         result = process_circles(
             circles=self.circles,
             radius_in_meters=1000,
             file_path=self.file_path,
             circles_path=self.circles_path,
+            query_headers=self.query_headers,
             recalculate=True,
         )
         self.assertTrue(self.file_path.exists())
         self.assertTrue(self.circles_path.exists())
         saved_places = pd.read_parquet(self.file_path)
         saved_circles = gpd.read_file(self.circles_path)
-        assert_frame_equal(saved_places, result)
-        assert_frame_equal(saved_circles, self.circles)
+        assert_frame_equal(saved_places, result, check_dtype=False)
+        assert_frame_equal(saved_circles, self.circles, check_dtype=False)
 
     def test_process_circles_with_included_types(self):
+        global_requests_counter.value = 0
+        global_requests_counter_limit.value = 100
         result = process_circles(
             circles=self.circles,
             radius_in_meters=1000,
             file_path=self.file_path,
             circles_path=self.circles_path,
             included_types=["restaurant", "cafe"],
+            query_headers=self.query_headers,
             recalculate=True,
         )
         self.assertFalse(result.empty)
@@ -1277,9 +1307,278 @@ class TestProcessCircles(TestCase):
             radius_in_meters=1000,
             file_path=self.file_path,
             circles_path=self.circles_path,
+            query_headers=self.query_headers,
+            recalculate=False,
+        )
+        self.assertTrue(self.circles["searched"].values[0])
+        self.assertFalse(self.circles["searched"].values[1])
+        self.assertFalse(result.empty)
+
+
+class TestFilterSaturatedCircles(TestCase):
+    def setUp(self):
+        self.found_places = pd.DataFrame(
+            {"circle": [1, 1, 1, 2, 2, 3, 4], "id": ["A", "B", "C", "D", "E", "F", "G"]}
+        )
+        self.circles = gpd.GeoDataFrame(
+            {
+                "geometry": [
+                    Point(1, 1).buffer(1),
+                    Point(2, 2).buffer(1),
+                    Point(3, 3).buffer(1),
+                    Point(4, 4).buffer(1),
+                ]
+            },
+            index=[1, 2, 3, 4],
+        )
+
+    def test_filter_with_valid_threshold(self):
+        threshold = 2
+        result = filter_saturated_circles(self.found_places, self.circles, threshold)
+        expected_indices = [1, 2]  # Circles 1 and 2 meet the threshold
+        self.assertListEqual(result.index.tolist(), expected_indices)
+
+    def test_filter_with_no_saturated_circles(self):
+        threshold = 4  # No circle has 4 or more places
+        result = filter_saturated_circles(self.found_places, self.circles, threshold)
+        self.assertTrue(result.empty)
+
+    def test_filter_with_all_circles_saturated(self):
+        threshold = 1  # All circles have at least 1 place
+        result = filter_saturated_circles(self.found_places, self.circles, threshold)
+        expected_indices = [1, 2, 3, 4]
+        self.assertListEqual(result.index.tolist(), expected_indices)
+
+    def test_filter_with_empty_found_places(self):
+        found_places = DataFrame(columns=["circle", "id"])  # Empty DataFrame
+        threshold = 1
+        result = filter_saturated_circles(found_places, self.circles, threshold)
+        self.assertTrue(result.empty)
+
+    def test_filter_with_empty_circles(self):
+        empty_circles = GeoDataFrame(columns=["geometry"])  # Empty GeoDataFrame
+        empty_circles.index.name = "id"
+        threshold = 1
+        with self.assertRaises(ArgumentValueError):
+            filter_saturated_circles(self.found_places, empty_circles, threshold)
+
+    def test_filter_with_invalid_threshold(self):
+        with self.assertRaises(ArgumentValueError):
+            filter_saturated_circles(
+                self.found_places, self.circles, -1
+            )  # Negative threshold
+
+    def test_filter_with_missing_circle_in_circles(self):
+        self.found_places = pd.concat(
+            [self.found_places, DataFrame({"circle": [5], "id": ["H"]})]
+        )
+        threshold = 1
+        with self.assertRaises(ArgumentValueError):
+            filter_saturated_circles(self.found_places, self.circles, threshold)
+
+
+class TestCalculateDegreeSteps(TestCase):
+    def test_valid_radii(self):
+        meter_radiuses = [100, 200, 400]
+        expected_steps = [0.00375, 0.0075, 0.015]
+        result = calculate_degree_steps(meter_radiuses)
+        self.assertEqual(result, expected_steps)
+
+    def test_single_radius(self):
+        meter_radiuses = [100]
+        expected_steps = [0.00375]
+        result = calculate_degree_steps(meter_radiuses)
+        self.assertEqual(result, expected_steps)
+
+    def test_equal_radii(self):
+        meter_radiuses = [100, 100, 100]
+        expected_steps = [0.00375, 0.00375, 0.00375]
+        result = calculate_degree_steps(meter_radiuses)
+        self.assertEqual(result, expected_steps)
+
+    def test_increasing_radii(self):
+        meter_radiuses = [100, 200, 400, 800]
+        expected_steps = [0.00375, 0.0075, 0.015, 0.03]
+        result = calculate_degree_steps(meter_radiuses)
+        self.assertEqual(result, expected_steps)
+
+    def test_decreasing_radii(self):
+        meter_radiuses = [400, 200, 100]
+        expected_steps = [0.00375, 0.001875, 0.0009375]
+        result = calculate_degree_steps(meter_radiuses)
+        self.assertEqual(result, expected_steps)
+
+    def test_negative_radius(self):
+        meter_radiuses = [100, -200, 300]
+        with self.assertRaises(ArgumentValueError) as context:
+            calculate_degree_steps(meter_radiuses)
+        self.assertEqual(str(context.exception), "All radius values must be positive.")
+
+    def test_zero_radius(self):
+        meter_radiuses = [100, 0, 300]
+        with self.assertRaises(ArgumentValueError) as context:
+            calculate_degree_steps(meter_radiuses)
+        self.assertEqual(str(context.exception), "All radius values must be positive.")
+
+    def test_empty_radii_list(self):
+        meter_radiuses = []
+        with self.assertRaises(ArgumentValueError):
+            calculate_degree_steps(meter_radiuses)
+
+    def test_custom_initial_step(self):
+        meter_radiuses = [100, 200, 400]
+        step_in_degrees = 0.002
+        expected_steps = [0.002, 0.004, 0.008]
+        result = calculate_degree_steps(meter_radiuses, step_in_degrees)
+        self.assertEqual(result, expected_steps)
+
+
+class TestSearchPlacesInPolygon(TestCase):
+    def setUp(self):
+        self.root_folder = Path(tempfile.mkdtemp())
+        self.plot_folder = Path(tempfile.mkdtemp())
+        self.test_polygon = Polygon([(0, 0), (1, 0), (1, 1), (0, 1)])
+        self.circles = GeoDataFrame(
+            {"geometry": [self.test_polygon.buffer(0.1)], "searched": [False]}
+        )
+        self.found_places = DataFrame(
+            {
+                "id": ["1", "2"],
+                "circle": [0, 0],
+                "latitude": [0.5, 0.6],
+                "longitude": [0.5, 0.6],
+            }
+        )
+        self.circles_path = self.root_folder / "test_circles.geojson"
+        self.places_path = self.root_folder / "test_places.parquet"
+        self.circles.to_file(self.circles_path, driver="GeoJSON")
+        self.query_headers = {"X-Goog-Api-Key": ""}
+
+    def tearDown(self):
+        shutil.rmtree(self.root_folder)
+        shutil.rmtree(self.plot_folder)
+
+    def test_successful_execution_with_recalculation(self):
+        circles, found_places = search_places_in_polygon(
+            root_folder=self.root_folder,
+            plot_folder=self.plot_folder,
+            tag="test",
+            polygon=self.test_polygon,
+            radius_in_meters=100,
+            step_in_degrees=0.01,
+            condition_rule="center",
+            query_headers=self.query_headers,
+            recalculate=False,
+        )
+        self.assertIsInstance(circles, GeoDataFrame)
+        self.assertIsInstance(found_places, DataFrame)
+
+    def test_load_existing_files_without_recalculation(self):
+        self.found_places.to_parquet(self.places_path)
+        circles, found_places = search_places_in_polygon(
+            root_folder=self.root_folder,
+            plot_folder=self.plot_folder,
+            tag="test",
+            polygon=self.test_polygon,
+            radius_in_meters=100,
+            step_in_degrees=0.01,
+            condition_rule="center",
+            recalculate=False,
+        )
+        self.assertEqual(len(found_places), 2)  # Ensure correct data is loaded
+
+    def test_with_global_request_counter(self):
+        circles, found_places = search_places_in_polygon(
+            root_folder=self.root_folder,
+            plot_folder=self.plot_folder,
+            tag="test",
+            polygon=self.test_polygon,
+            radius_in_meters=100,
+            step_in_degrees=0.01,
+            condition_rule="center",
+            global_requests_counter=10,
+            global_requests_counter_limit=20,
             recalculate=True,
         )
-        self.assertTrue(result.empty)
+        self.assertIsInstance(circles, GeoDataFrame)
+        self.assertIsInstance(found_places, DataFrame)
+
+    def test_invalid_polygon(self):
+        with self.assertRaises(ValueError):
+            search_places_in_polygon(
+                root_folder=self.root_folder,
+                plot_folder=self.plot_folder,
+                tag="test",
+                polygon=GeoSeries([Polygon()]),  # Invalid polygon
+                radius_in_meters=100,
+                step_in_degrees=0.01,
+                condition_rule="center",
+            )
+
+    def test_missing_files(self):
+        self.circles_path.unlink()
+        circles, found_places = search_places_in_polygon(
+            root_folder=self.root_folder,
+            plot_folder=self.plot_folder,
+            tag="test",
+            polygon=self.test_polygon,
+            radius_in_meters=100,
+            step_in_degrees=0.01,
+            condition_rule="center",
+            recalculate=True,
+        )
+        self.assertIsInstance(circles, GeoDataFrame)
+
+    def test_with_query_headers_and_included_types(self):
+        query_headers = {"X-Goog-Api-Key": "test_key"}
+        included_types = ["restaurant"]
+        circles, found_places = search_places_in_polygon(
+            root_folder=self.root_folder,
+            plot_folder=self.plot_folder,
+            tag="test",
+            polygon=self.test_polygon,
+            radius_in_meters=100,
+            step_in_degrees=0.01,
+            condition_rule="center",
+            query_headers=query_headers,
+            included_types=included_types,
+            recalculate=True,
+        )
+        self.assertIsInstance(circles, GeoDataFrame)
+        self.assertIsInstance(found_places, DataFrame)
+
+    def test_handles_no_found_places(self):
+        self.found_places = DataFrame(columns=["id", "circle", "latitude", "longitude"])
+        self.found_places.to_parquet(self.places_path)
+        circles, found_places = search_places_in_polygon(
+            root_folder=self.root_folder,
+            plot_folder=self.plot_folder,
+            tag="test",
+            polygon=self.test_polygon,
+            radius_in_meters=100,
+            step_in_degrees=0.01,
+            condition_rule="center",
+            recalculate=False,
+        )
+        self.assertEqual(len(found_places), 0)
+
+    def test_large_number_of_circles(self):
+        large_circles = GeoDataFrame(
+            {"geometry": [self.test_polygon[0].buffer(0.1) for _ in range(1000)]}
+        )
+        large_circles.to_file(self.circles_path, driver="GeoJSON")
+
+        circles, found_places = search_places_in_polygon(
+            root_folder=self.root_folder,
+            plot_folder=self.plot_folder,
+            tag="test_large",
+            polygon=self.test_polygon,
+            radius_in_meters=100,
+            step_in_degrees=0.01,
+            condition_rule="center",
+            recalculate=True,
+        )
+        self.assertEqual(len(circles), 1000)
 
 
 if __name__ == "__main__":

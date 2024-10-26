@@ -17,7 +17,7 @@ import numpy as np
 import pandas as pd
 import requests
 import seaborn as sns
-from geopandas import GeoDataFrame
+from geopandas import GeoDataFrame, GeoSeries
 from matplotlib.axes import Axes
 from pandas import DataFrame, Series
 from shapely.geometry import MultiPolygon, Point, Polygon
@@ -38,6 +38,12 @@ from .places_objects import (
     NewPlace,
     Place,
     intersection_condition_factory,
+)
+from .plots import (
+    plot_saturated_area,
+    plot_saturated_circles,
+    polygon_plot_with_circles_and_points,
+    polygon_plot_with_sampling_circles,
 )
 
 CircleType = NewType("CircleType", Polygon)
@@ -133,6 +139,20 @@ def meters_to_degree(distance_in_meters: float, reference_latitude: float) -> fl
     return max(lat_degrees, lon_degrees)
 
 
+def calculate_degree_steps(
+    meter_radiuses: List[float], step_in_degrees: float = 0.00375
+) -> List[float]:
+    if not meter_radiuses:
+        raise ArgumentValueError("Radius values must be a non-empty list of numbers.")
+    if any(r <= 0 for r in meter_radiuses):
+        raise ArgumentValueError("All radius values must be positive.")
+    degree_steps = [step_in_degrees]  # Start with the initial step
+    for i in range(1, len(meter_radiuses)):
+        step = degree_steps[-1] * (meter_radiuses[i] / meter_radiuses[i - 1])
+        degree_steps.append(step)
+    return degree_steps
+
+
 def sample_polygon_with_circles(
     polygon: Polygon,
     radius_in_meters: float,
@@ -195,7 +215,7 @@ def sample_polygons_with_circles(
 
 def get_circles_search(
     circles_path,
-    polygon,
+    polygon: Polygon,
     radius_in_meters,
     step_in_degrees,
     condition_rule="center",
@@ -208,7 +228,7 @@ def get_circles_search(
             step_in_degrees=step_in_degrees,
             condition_rule=condition_rule,
         )
-        circles = gpd.GeoDataFrame(geometry=circles).reset_index(drop=True)
+        circles = GeoDataFrame(geometry=circles).reset_index(drop=True)
         circles["searched"] = False
         circles.to_file(circles_path, driver="GeoJSON")
     else:
@@ -412,6 +432,8 @@ def process_circles(
         found_places = DataFrame(
             columns=["circle", *list(NewPlace.__annotations__.keys())]
         )
+    if circles.empty:
+        return found_places
     if should_process_circles(circles, recalculate):
         with tqdm(total=len(circles), desc="Processing circles") as pbar:
             for response_id, circle in circles[~circles["searched"]].iterrows():
@@ -498,145 +520,212 @@ def update_progress_bar(
     )
 
 
+def filter_saturated_circles(
+    found_places: DataFrame,
+    circles: GeoDataFrame,
+    threshold: int,
+) -> GeoDataFrame:
+    if circles.empty:
+        raise ArgumentValueError("'circles' cannot be empty.")
+    if threshold < 0:
+        raise ArgumentValueError("'threshold' must be a positive integer or 0.")
+    places_by_circle = (
+        found_places.groupby("circle")["id"].nunique().sort_values(ascending=False)
+    )
+    saturated_circle_indices = places_by_circle[places_by_circle >= threshold].index
+    try:
+        saturated_circles = circles.loc[saturated_circle_indices]
+        return saturated_circles
+    except KeyError as e:
+        raise ArgumentValueError(
+            f"Invalid 'circles' and 'found_places' Circles indexes: {e}"
+        )
+
+
+def get_saturated_circles(
+    polygon: Polygon,
+    found_places: DataFrame,
+    circles: GeoDataFrame,
+    threshold: int,
+    show: bool = False,
+    output_file_path: Union[str, Path] = None,
+) -> GeoDataFrame:
+    saturated_circles = filter_saturated_circles(
+        found_places=found_places,
+        circles=circles,
+        threshold=threshold,
+    )
+    points = found_places.loc[
+        found_places["circle"].isin(saturated_circles.index),
+        ["longitude", "latitude"],
+    ].values.tolist()
+    plot_saturated_circles(
+        polygon=polygon,
+        circles=saturated_circles.geometry.tolist(),
+        points=points,
+        output_file_path=output_file_path,
+        show=show,
+    )
+    return saturated_circles
+
+
+def get_saturated_area(
+    polygon: Polygon,
+    saturated_circles: GeoDataFrame,
+    show: bool = False,
+    output_path: Union[str, Path] = None,
+) -> Union[Polygon, MultiPolygon]:
+    saturated_area = saturated_circles.geometry.unary_union
+    plot_saturated_area(polygon, saturated_area, show=show, output_path=output_path)
+    return saturated_area
+
+
 def generate_unique_place_id():
     return datetime.now().strftime("%Y%m%d%H%M%S%f")
 
 
 def search_places_in_polygon(
-    root_folder,
-    plot_folder,
-    tag,
-    polygon,
-    radius_in_meters,
-    step_in_degrees,
-    condition_rule,
-    global_requests_counter=None,
-    global_requests_counter_limit=None,
-    query_headers=None,
-    restaurants=False,
-    recalculate=False,
-    show=False,
-):
-    circles_path = root_folder / Path(
-        f"{tag}_{radius_in_meters}_radius_{step_in_degrees}_step_circles.geojson"
+    root_folder: PathLike,
+    plot_folder: PathLike,
+    tag: str,
+    polygon: GeoDataFrame,
+    radius_in_meters: float,
+    step_in_degrees: float,
+    condition_rule: str,
+    query_headers: Dict[str, str] = None,
+    included_types: List[str] = None,
+    recalculate: bool = False,
+    show: bool = False,
+) -> Tuple[GeoDataFrame, GeoDataFrame]:
+    circles_path = _generate_file_path(
+        root_folder, tag, radius_in_meters, step_in_degrees, "circles.geojson"
     )
-    places_path = root_folder / Path(
-        f"{tag}_{radius_in_meters}_radius_{step_in_degrees}_step_places.parquet"
+    places_path = _generate_file_path(
+        root_folder, tag, radius_in_meters, step_in_degrees, "places.parquet"
     )
-    polygon_with_circles_plot_path = plot_folder / Path(
-        f"{tag}_polygon_with_circles_plot.png"
-    )
-    polygon_with_circles_zoom_plot_path = plot_folder / Path(
-        f"{tag}_polygon_with_circles_zoom_plot.png"
-    )
-    polygon_with_circles_and_points_plot_path = plot_folder / Path(
-        f"{tag}_polygon_with_circles_and_places_plot.png"
-    )
-    polygon_with_circles_and_points_zoom_plot_path = plot_folder / Path(
-        f"{tag}_polygon_with_circles_and_places_zoom_plot.png"
-    )
+    plot_paths = _generate_plot_paths(plot_folder, tag)
     circles = get_circles_search(
-        circles_path,
-        polygon,
-        radius_in_meters,
-        step_in_degrees,
+        circles_path=circles_path,
+        polygon=polygon,
+        radius_in_meters=radius_in_meters,
+        step_in_degrees=step_in_degrees,
         condition_rule=condition_rule,
         recalculate=recalculate,
     )
     if show or recalculate:
-        _ = polygon_plot_with_sampling_circles(
-            polygon=polygon,
-            circles=circles.geometry.tolist(),
-            output_file_path=polygon_with_circles_plot_path,
-        )
-        if show:
-            plt.show()
-        random_circle = random.choice(circles.geometry.tolist())
-        _ = polygon_plot_with_sampling_circles(
-            polygon=polygon,
-            circles=circles.geometry.tolist(),
-            point_of_interest=random_circle,
-            zoom_level=5 * meters_to_degree(radius_in_meters, random_circle.centroid.y),
-            output_file_path=polygon_with_circles_zoom_plot_path,
-        )
-        if show:
-            plt.show()
+        _generate_sampling_plots(polygon, circles, plot_paths, radius_in_meters, show)
     found_places = process_circles(
-        circles,
-        radius_in_meters,
-        places_path,
-        circles_path,
-        global_requests_counter=global_requests_counter,
-        global_requests_counter_limit=global_requests_counter_limit,
+        circles=circles,
+        radius_in_meters=radius_in_meters,
+        file_path=places_path,
+        circles_path=circles_path,
         query_headers=query_headers,
-        restaurants=restaurants,
+        included_types=included_types,
         recalculate=recalculate,
     )
     if show or recalculate:
-        _ = polygon_plot_with_circles_and_points(
-            polygon=polygon,
-            circles=circles.geometry.tolist(),
-            points=found_places[["longitude", "latitude"]].values.tolist(),
-            output_file_path=polygon_with_circles_and_points_plot_path,
+        _generate_results_plots(
+            polygon, circles, found_places, plot_paths, radius_in_meters, show
         )
-        if show:
-            plt.show()
-        random_circle = random.choice(circles.geometry.tolist())
-        _ = polygon_plot_with_circles_and_points(
-            polygon=polygon,
-            circles=circles.geometry.tolist(),
-            point_of_interest=random_circle,
-            zoom_level=5 * meters_to_degree(radius_in_meters, random_circle.centroid.y),
-            points=found_places[["longitude", "latitude"]].values.tolist(),
-            output_file_path=polygon_with_circles_and_points_zoom_plot_path,
-        )
-        if show:
-            plt.show()
     return circles, found_places
 
 
-def get_saturated_circles(
-    polygon, found_places, circles, threshold, show=False, output_file_path=None
-):
-    places_by_circle = (
-        found_places.groupby("circle")["id"].nunique().sort_values(ascending=False)
+def _generate_file_path(
+    folder: PathLike, tag: str, radius: float, step: float, suffix: str
+) -> Path:
+    return Path(folder) / f"{tag}_{radius}_radius_{step}_step_{suffix}"
+
+
+def _generate_plot_paths(plot_folder: Path, tag: str) -> Dict[str, Path]:
+    return {
+        "circles": plot_folder / f"{tag}_polygon_with_circles_plot.png",
+        "circles_zoom": plot_folder / f"{tag}_polygon_with_circles_zoom_plot.png",
+        "places": plot_folder / f"{tag}_polygon_with_circles_and_places_plot.png",
+        "places_zoom": plot_folder
+        / f"{tag}_polygon_with_circles_and_places_zoom_plot.png",
+    }
+
+
+def _generate_sampling_plots(
+    polygon: GeoDataFrame,
+    circles: GeoDataFrame,
+    plot_paths: Dict[str, Path],
+    radius_in_meters: float,
+    show: bool,
+) -> None:
+    _plot_polygon_with_circles(polygon, circles, plot_paths["circles"], show)
+
+    random_circle = random.choice(circles.geometry.tolist())
+    zoom_level = 5 * meters_to_degree(radius_in_meters, random_circle.centroid.y)
+    _plot_polygon_with_circles(
+        polygon, circles, plot_paths["circles_zoom"], show, random_circle, zoom_level
     )
-    saturated_circles = places_by_circle[places_by_circle >= threshold].index
-    saturated_circles = circles.loc[saturated_circles, :]
+
+
+def _generate_results_plots(
+    polygon: GeoDataFrame,
+    circles: GeoDataFrame,
+    found_places: GeoDataFrame,
+    plot_paths: Dict[str, Path],
+    radius_in_meters: float,
+    show: bool,
+) -> None:
+    points = found_places[["longitude", "latitude"]].values.tolist()
+    _plot_polygon_with_circles_and_points(
+        polygon, circles, points, plot_paths["places"], show
+    )
+
+    random_circle = random.choice(circles.geometry.tolist())
+    zoom_level = 5 * meters_to_degree(radius_in_meters, random_circle.centroid.y)
+    _plot_polygon_with_circles_and_points(
+        polygon,
+        circles,
+        points,
+        plot_paths["places_zoom"],
+        show,
+        random_circle,
+        zoom_level,
+    )
+
+
+def _plot_polygon_with_circles(
+    polygon: GeoDataFrame,
+    circles: List[Polygon],
+    output_path: Path,
+    show: bool,
+    point_of_interest: Optional[Polygon] = None,
+    zoom_level: Optional[float] = None,
+) -> None:
+    _ = polygon_plot_with_sampling_circles(
+        polygon=polygon,
+        circles=circles,
+        point_of_interest=point_of_interest,
+        zoom_level=zoom_level,
+        output_file_path=output_path,
+    )
+    if show:
+        plt.show()
+
+
+def _plot_polygon_with_circles_and_points(
+    polygon: GeoDataFrame,
+    circles: List[Polygon],
+    points: List[Tuple[float, float]],
+    output_path: Path,
+    show: bool,
+    point_of_interest: Optional[Polygon] = None,
+    zoom_level: Optional[float] = None,
+) -> None:
     _ = polygon_plot_with_circles_and_points(
         polygon=polygon,
-        circles=saturated_circles.geometry.tolist(),
-        points=found_places.loc[
-            found_places["circle"].isin(saturated_circles.index),
-            ["longitude", "latitude"],
-        ].values.tolist(),
-        output_file_path=output_file_path,
+        circles=circles,
+        points=points,
+        point_of_interest=point_of_interest,
+        zoom_level=zoom_level,
+        output_file_path=output_path,
     )
     if show:
         plt.show()
-    return saturated_circles
-
-
-def get_saturated_area(polygon, saturated_circles, show=False, output_path=None):
-    saturated_area = saturated_circles.geometry.unary_union
-    polygon = gpd.GeoSeries(polygon)
-    ax = polygon.plot(
-        facecolor=sns.color_palette("Paired")[0],
-        edgecolor="none",
-        alpha=0.5,
-        figsize=(WIDTH, HEIGHT),
-    )
-    gpd.GeoSeries(saturated_area).plot(
-        ax=ax, facecolor="none", edgecolor=sns.color_palette("Paired")[0]
-    )
-    ax.set_title("Saturated Sampled Areas")
-    ax.set_ylabel("Latitude")
-    ax.set_xlabel("Longitude")
-    if output_path:
-        plt.savefig(output_path, dpi=DPI)
-    if show:
-        plt.show()
-    return saturated_area
 
 
 def places_search_step(
@@ -684,17 +773,6 @@ def places_search_step(
     plt.close("all")
 
     return found_places, circles, saturated_area, saturated_circles
-
-
-def calculate_degree_steps(meter_radiuses, step_in_degrees=0.00375):
-    degree_steps = []
-    for i, radius in enumerate(meter_radiuses):
-        if i == 0:
-            step = step_in_degrees
-        else:
-            step *= radius / meter_radiuses[i - 1]
-        degree_steps.append(step)
-    return degree_steps
 
 
 if __name__ == "__main__":
