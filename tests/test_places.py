@@ -126,6 +126,62 @@ class TestMetersToDegree(TestCase):
             self.assertAlmostEqual(result, expected, places=6)
 
 
+class TestCalculateDegreeSteps(TestCase):
+    def test_valid_radii(self):
+        meter_radiuses = [100, 200, 400]
+        expected_steps = [0.00375, 0.0075, 0.015]
+        result = calculate_degree_steps(meter_radiuses)
+        self.assertEqual(result, expected_steps)
+
+    def test_single_radius(self):
+        meter_radiuses = [100]
+        expected_steps = [0.00375]
+        result = calculate_degree_steps(meter_radiuses)
+        self.assertEqual(result, expected_steps)
+
+    def test_equal_radii(self):
+        meter_radiuses = [100, 100, 100]
+        expected_steps = [0.00375, 0.00375, 0.00375]
+        result = calculate_degree_steps(meter_radiuses)
+        self.assertEqual(result, expected_steps)
+
+    def test_increasing_radii(self):
+        meter_radiuses = [100, 200, 400, 800]
+        expected_steps = [0.00375, 0.0075, 0.015, 0.03]
+        result = calculate_degree_steps(meter_radiuses)
+        self.assertEqual(result, expected_steps)
+
+    def test_decreasing_radii(self):
+        meter_radiuses = [400, 200, 100]
+        expected_steps = [0.00375, 0.001875, 0.0009375]
+        result = calculate_degree_steps(meter_radiuses)
+        self.assertEqual(result, expected_steps)
+
+    def test_negative_radius(self):
+        meter_radiuses = [100, -200, 300]
+        with self.assertRaises(ArgumentValueError) as context:
+            calculate_degree_steps(meter_radiuses)
+        self.assertEqual(str(context.exception), "All radius values must be positive.")
+
+    def test_zero_radius(self):
+        meter_radiuses = [100, 0, 300]
+        with self.assertRaises(ArgumentValueError) as context:
+            calculate_degree_steps(meter_radiuses)
+        self.assertEqual(str(context.exception), "All radius values must be positive.")
+
+    def test_empty_radii_list(self):
+        meter_radiuses = []
+        with self.assertRaises(ArgumentValueError):
+            calculate_degree_steps(meter_radiuses)
+
+    def test_custom_initial_step(self):
+        meter_radiuses = [100, 200, 400]
+        step_in_degrees = 0.002
+        expected_steps = [0.002, 0.004, 0.008]
+        result = calculate_degree_steps(meter_radiuses, step_in_degrees)
+        self.assertEqual(result, expected_steps)
+
+
 class TestSamplePolygonWithCircles(TestCase):
     def setUp(self):
         self.valid_polygon = Polygon([(0, 0), (0, 1), (1, 1), (1, 0), (0, 0)])
@@ -915,7 +971,9 @@ class TestGetResponsePlaces(TestCase):
 
 class TestSearchAndUpdatePlaces(TestCase):
     def setUp(self):
-        self.circle = Point(151.2099, -33.865143)  # Small area near Sydney
+        self.circle = Point(151.2099, -33.865143).buffer(
+            meters_to_degree(100, -33.865143)
+        )  # Small area near Sydney
         self.radius_in_meters = 1000.0
         self.response_id = "test_circle"
         self.query_headers = {"X-Goog-Api-Key": ""}
@@ -1078,7 +1136,7 @@ class TestProcessSingleCircle(TestCase):
     def setUp(self):
         self.response_id = 0
         self.radius_in_meters = 1000.0
-        self.circle = Point(0, 1)
+        self.circle = Point(0, 1).buffer(0.1)
         self.found_places = DataFrame(columns=["id", "name", "circle"])
         self.circles = GeoDataFrame(
             {"geometry": [None], "searched": [False]}, index=[self.response_id]
@@ -1375,62 +1433,6 @@ class TestFilterSaturatedCircles(TestCase):
         threshold = 1
         with self.assertRaises(ArgumentValueError):
             filter_saturated_circles(self.found_places, self.circles, threshold)
-
-
-class TestCalculateDegreeSteps(TestCase):
-    def test_valid_radii(self):
-        meter_radiuses = [100, 200, 400]
-        expected_steps = [0.00375, 0.0075, 0.015]
-        result = calculate_degree_steps(meter_radiuses)
-        self.assertEqual(result, expected_steps)
-
-    def test_single_radius(self):
-        meter_radiuses = [100]
-        expected_steps = [0.00375]
-        result = calculate_degree_steps(meter_radiuses)
-        self.assertEqual(result, expected_steps)
-
-    def test_equal_radii(self):
-        meter_radiuses = [100, 100, 100]
-        expected_steps = [0.00375, 0.00375, 0.00375]
-        result = calculate_degree_steps(meter_radiuses)
-        self.assertEqual(result, expected_steps)
-
-    def test_increasing_radii(self):
-        meter_radiuses = [100, 200, 400, 800]
-        expected_steps = [0.00375, 0.0075, 0.015, 0.03]
-        result = calculate_degree_steps(meter_radiuses)
-        self.assertEqual(result, expected_steps)
-
-    def test_decreasing_radii(self):
-        meter_radiuses = [400, 200, 100]
-        expected_steps = [0.00375, 0.001875, 0.0009375]
-        result = calculate_degree_steps(meter_radiuses)
-        self.assertEqual(result, expected_steps)
-
-    def test_negative_radius(self):
-        meter_radiuses = [100, -200, 300]
-        with self.assertRaises(ArgumentValueError) as context:
-            calculate_degree_steps(meter_radiuses)
-        self.assertEqual(str(context.exception), "All radius values must be positive.")
-
-    def test_zero_radius(self):
-        meter_radiuses = [100, 0, 300]
-        with self.assertRaises(ArgumentValueError) as context:
-            calculate_degree_steps(meter_radiuses)
-        self.assertEqual(str(context.exception), "All radius values must be positive.")
-
-    def test_empty_radii_list(self):
-        meter_radiuses = []
-        with self.assertRaises(ArgumentValueError):
-            calculate_degree_steps(meter_radiuses)
-
-    def test_custom_initial_step(self):
-        meter_radiuses = [100, 200, 400]
-        step_in_degrees = 0.002
-        expected_steps = [0.002, 0.004, 0.008]
-        result = calculate_degree_steps(meter_radiuses, step_in_degrees)
-        self.assertEqual(result, expected_steps)
 
 
 class TestSearchPlacesInPolygon(TestCase):
