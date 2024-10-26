@@ -215,7 +215,7 @@ def sample_polygons_with_circles(
 
 def get_circles_search(
     circles_path,
-    polygon,
+    polygon: Polygon,
     radius_in_meters,
     step_in_degrees,
     condition_rule="center",
@@ -228,7 +228,7 @@ def get_circles_search(
             step_in_degrees=step_in_degrees,
             condition_rule=condition_rule,
         )
-        circles = gpd.GeoDataFrame(geometry=circles).reset_index(drop=True)
+        circles = GeoDataFrame(geometry=circles).reset_index(drop=True)
         circles["searched"] = False
         circles.to_file(circles_path, driver="GeoJSON")
     else:
@@ -592,8 +592,6 @@ def search_places_in_polygon(
     radius_in_meters: float,
     step_in_degrees: float,
     condition_rule: str,
-    global_requests_counter: int = None,
-    global_requests_counter_limit: int = None,
     query_headers: Dict[str, str] = None,
     included_types: List[str] = None,
     recalculate: bool = False,
@@ -624,8 +622,6 @@ def search_places_in_polygon(
         query_headers=query_headers,
         included_types=included_types,
         recalculate=recalculate,
-        global_requests_counter=global_requests_counter,
-        global_requests_counter_limit=global_requests_counter_limit,
     )
     if show or recalculate:
         _generate_results_plots(
