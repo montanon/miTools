@@ -8,8 +8,9 @@ import matplotlib.lines as mlines
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import seaborn as sns
+from geopandas import GeoDataFrame, GeoSeries
 from matplotlib.axes import Axes
-from shapely.geometry import Point, Polygon
+from shapely.geometry import MultiPolygon, Point, Polygon
 from shapely.ops import transform
 from tqdm import tqdm
 
@@ -31,7 +32,7 @@ PLACE_CLASSES = Union[Place, NewPlace]
 
 def polygons_folium_map(
     polygons: Union[Iterable[Polygon], Polygon],
-    output_file_path: Optional[PathLike] = None,
+    output_file_path: PathLike = None,
 ) -> folium.Map:
     if isinstance(polygons, Polygon):
         polygons = [polygons]
@@ -62,7 +63,7 @@ def polygons_folium_map(
 def polygons_folium_map_with_pois(
     polygons: Union[Iterable[Polygon], Polygon],
     pois: Iterable[Tuple[str, Point]],
-    output_file_path: Optional[PathLike] = None,
+    output_file_path: PathLike = None,
 ) -> folium.Map:
     folium_map = polygons_folium_map(polygons=polygons, output_file_path=None)
     for poi_name, poi_point in pois:
@@ -81,7 +82,7 @@ def polygon_plot_with_sampling_circles(
     circles: List[CircleType],
     point_of_interest: Optional[Point] = None,
     zoom_level: Optional[float] = 1.0,
-    output_file_path: Optional[PathLike] = None,
+    output_file_path: PathLike = None,
 ) -> Axes:
     minx, miny, maxx, maxy = polygon.bounds
     out_circles, in_circles = [], []
@@ -90,7 +91,7 @@ def polygon_plot_with_sampling_circles(
             in_circles.append(circle)
         else:
             out_circles.append(circle)
-    polygon = gpd.GeoSeries(polygon)
+    polygon = GeoSeries(polygon)
     ax = polygon.plot(
         facecolor=sns.color_palette("Paired")[0],
         edgecolor="none",
@@ -112,7 +113,7 @@ def polygon_plot_with_sampling_circles(
     )
     ax.add_patch(rectangle)
     if out_circles:
-        ax = gpd.GeoSeries(out_circles).plot(
+        ax = GeoSeries(out_circles).plot(
             facecolor="none", edgecolor="r", ax=ax, alpha=0.5, label="Out Circles"
         )
         out_circle_proxy = mlines.Line2D(
@@ -124,7 +125,7 @@ def polygon_plot_with_sampling_circles(
             label="Out Circles",
             linestyle="None",
         )
-    ax = gpd.GeoSeries(in_circles).plot(
+    ax = GeoSeries(in_circles).plot(
         facecolor="none", edgecolor="g", ax=ax, alpha=0.5, label="In Circles"
     )
     in_circle_proxy = mlines.Line2D(
@@ -195,7 +196,7 @@ def polygon_plot_with_points(
     output_file_path=None,
 ):
     minx, miny, maxx, maxy = polygon.bounds
-    polygon = gpd.GeoSeries(polygon)
+    polygon = GeoSeries(polygon)
     ax = polygon.plot(
         facecolor=sns.color_palette("Paired")[0],
         edgecolor="none",
@@ -255,7 +256,7 @@ def plot_saturated_circles(
     polygon: Polygon,
     circles: List[Polygon],
     points: List[List[float]],
-    output_file_path: Union[str, Path] = None,
+    output_file_path: PathLike = None,
     show: bool = False,
 ) -> None:
     _ = polygon_plot_with_circles_and_points(
@@ -272,7 +273,7 @@ def plot_saturated_area(
     polygon: Polygon,
     saturated_area: Union[Polygon, MultiPolygon],
     show: bool = False,
-    output_path: Union[str, Path] = None,
+    output_path: PathLike = None,
 ) -> None:
     ax = GeoSeries(polygon).plot(
         facecolor=sns.color_palette("Paired")[0],
