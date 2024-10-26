@@ -509,12 +509,21 @@ def filter_saturated_circles(
     circles: GeoDataFrame,
     threshold: int,
 ) -> GeoDataFrame:
+    if circles.empty:
+        raise ArgumentValueError("'circles' cannot be empty.")
+    if threshold < 0:
+        raise ArgumentValueError("'threshold' must be a positive integer or 0.")
     places_by_circle = (
         found_places.groupby("circle")["id"].nunique().sort_values(ascending=False)
     )
     saturated_circle_indices = places_by_circle[places_by_circle >= threshold].index
-    saturated_circles = circles.loc[saturated_circle_indices]
-    return saturated_circles
+    try:
+        saturated_circles = circles.loc[saturated_circle_indices]
+        return saturated_circles
+    except KeyError as e:
+        raise ArgumentValueError(
+            f"Invalid 'circles' and 'found_places' Circles indexes: {e}"
+        )
 
 
 def get_saturated_circles(
