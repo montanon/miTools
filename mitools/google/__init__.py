@@ -27,6 +27,8 @@ from .places import (
     meters_to_degree,
     nearby_search_request,
     places_search_step,
+    plot_saturated_area,
+    plot_saturated_circles,
     polygon_plot_with_circles_and_points,
     polygon_plot_with_points,
     polygon_plot_with_sampling_circles,

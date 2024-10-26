@@ -43,6 +43,8 @@ from .places_objects import (
     intersection_condition_factory,
 )
 from .plots import (
+    plot_saturated_area,
+    plot_saturated_circles,
     polygon_plot_with_circles_and_points,
     polygon_plot_with_points,
     polygon_plot_with_sampling_circles,
