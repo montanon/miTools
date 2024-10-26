@@ -39,6 +39,10 @@ from .places_objects import (
     Place,
     intersection_condition_factory,
 )
+from .plots import (
+    plot_saturated_area,
+    plot_saturated_circles,
+)
 
 CircleType = NewType("CircleType", Polygon)
 
