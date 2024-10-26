@@ -1375,5 +1375,61 @@ class TestFilterSaturatedCircles(TestCase):
             filter_saturated_circles(self.found_places, self.circles, threshold)
 
 
+class TestCalculateDegreeSteps(TestCase):
+    def test_valid_radii(self):
+        meter_radiuses = [100, 200, 400]
+        expected_steps = [0.00375, 0.0075, 0.015]
+        result = calculate_degree_steps(meter_radiuses)
+        self.assertEqual(result, expected_steps)
+
+    def test_single_radius(self):
+        meter_radiuses = [100]
+        expected_steps = [0.00375]
+        result = calculate_degree_steps(meter_radiuses)
+        self.assertEqual(result, expected_steps)
+
+    def test_equal_radii(self):
+        meter_radiuses = [100, 100, 100]
+        expected_steps = [0.00375, 0.00375, 0.00375]
+        result = calculate_degree_steps(meter_radiuses)
+        self.assertEqual(result, expected_steps)
+
+    def test_increasing_radii(self):
+        meter_radiuses = [100, 200, 400, 800]
+        expected_steps = [0.00375, 0.0075, 0.015, 0.03]
+        result = calculate_degree_steps(meter_radiuses)
+        self.assertEqual(result, expected_steps)
+
+    def test_decreasing_radii(self):
+        meter_radiuses = [400, 200, 100]
+        expected_steps = [0.00375, 0.001875, 0.0009375]
+        result = calculate_degree_steps(meter_radiuses)
+        self.assertEqual(result, expected_steps)
+
+    def test_negative_radius(self):
+        meter_radiuses = [100, -200, 300]
+        with self.assertRaises(ArgumentValueError) as context:
+            calculate_degree_steps(meter_radiuses)
+        self.assertEqual(str(context.exception), "All radius values must be positive.")
+
+    def test_zero_radius(self):
+        meter_radiuses = [100, 0, 300]
+        with self.assertRaises(ArgumentValueError) as context:
+            calculate_degree_steps(meter_radiuses)
+        self.assertEqual(str(context.exception), "All radius values must be positive.")
+
+    def test_empty_radii_list(self):
+        meter_radiuses = []
+        with self.assertRaises(ArgumentValueError):
+            calculate_degree_steps(meter_radiuses)
+
+    def test_custom_initial_step(self):
+        meter_radiuses = [100, 200, 400]
+        step_in_degrees = 0.002
+        expected_steps = [0.002, 0.004, 0.008]
+        result = calculate_degree_steps(meter_radiuses, step_in_degrees)
+        self.assertEqual(result, expected_steps)
+
+
 if __name__ == "__main__":
     unittest.main()
