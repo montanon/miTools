@@ -1612,7 +1612,6 @@ class TestSearchPlacesInPolygon(TestCase):
     def test_show_option(self):
         global_requests_counter.value = 0
         global_requests_counter_limit.value = 5
-        plt.switch_backend("Agg")
         search_places_in_polygon(
             root_folder=self.root_folder,
             plot_folder=self.plot_folder,
@@ -1622,11 +1621,10 @@ class TestSearchPlacesInPolygon(TestCase):
             step_in_degrees=self.step_in_degrees,
             condition_rule=self.condition_rule,
             query_headers=self.query_headers,
-            show=True,
+            show=False,
             recalculate=True,
             has_places=True,
         )
-        plt.switch_backend("TkAgg")
 
 
 if __name__ == "__main__":
