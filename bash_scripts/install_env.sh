@@ -197,6 +197,8 @@ $PYTHON_PATH -m pip install pystata
 
 $PYTHON_PATH -m pip install adapters
 
+$PYTHON_PATH -m pip install icalendar
+
 $PYTHON_PATH -m pip install treelib
 treelib_path=$($PYTHON_PATH -m pip show treelib | grep -E '^Location: ' | awk '{print $2}')
 treelib_path=$treelib_path/treelib/tree.py
