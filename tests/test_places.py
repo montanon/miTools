@@ -1627,5 +1627,141 @@ class TestSearchPlacesInPolygon(TestCase):
         )
 
 
+class TestPlacesSearchStep(TestCase):
+    def setUp(self):
+        self.project_folder = Path("./test_project_folder")
+        self.plots_folder = Path("./test_plots_folder")
+        self.project_folder.mkdir(exist_ok=True)
+        self.plots_folder.mkdir(exist_ok=True)
+        self.polygon = Polygon([(0, 0), (1, 0), (1, 1), (0, 1)])
+        self.gdf_polygon = GeoDataFrame({"geometry": [self.polygon]})
+        self.tag = "test_tag"
+        self.radius_in_meters = 1.0
+        self.step_in_degrees = 0.5
+        self.query_headers = {"X-Goog-Api-Key": ""}
+        self.included_types = ["restaurant"]
+
+    def tearDown(self):
+        for folder in [self.project_folder, self.plots_folder]:
+            for f in folder.iterdir():
+                f.unlink()
+            folder.rmdir()
+
+    def test_valid_execution(self):
+        found_places, circles, saturated_area, saturated_circles = places_search_step(
+            project_folder=self.project_folder,
+            plots_folder=self.plots_folder,
+            tag=self.tag,
+            polygon=self.polygon,
+            radius_in_meters=self.radius_in_meters,
+            step_in_degrees=self.step_in_degrees,
+            query_headers=self.query_headers,
+            included_types=self.included_types,
+            recalculate=True,
+            show=False,
+            has_places=None,
+        )
+        self.assertIsInstance(found_places, DataFrame)
+        self.assertIsInstance(circles, GeoDataFrame)
+        self.assertIsInstance(saturated_area, Polygon)
+        self.assertIsInstance(saturated_circles, GeoDataFrame)
+        self.assertFalse(found_places.empty)
+        self.assertFalse(circles.empty)
+
+    def test_invalid_project_folder(self):
+        with self.assertRaises(ArgumentValueError):
+            places_search_step(
+                project_folder=Path("./invalid_folder"),
+                plots_folder=self.plots_folder,
+                tag=self.tag,
+                polygon=self.polygon,
+                radius_in_meters=self.radius_in_meters,
+                step_in_degrees=self.step_in_degrees,
+            )
+
+    def test_invalid_plots_folder(self):
+        with self.assertRaises(ArgumentValueError):
+            places_search_step(
+                project_folder=self.project_folder,
+                plots_folder=Path("./invalid_folder"),
+                tag=self.tag,
+                polygon=self.polygon,
+                radius_in_meters=self.radius_in_meters,
+                step_in_degrees=self.step_in_degrees,
+            )
+
+    def test_empty_polygon(self):
+        empty_polygon = Polygon()
+        with self.assertRaises(ValueError):
+            places_search_step(
+                project_folder=self.project_folder,
+                plots_folder=self.plots_folder,
+                tag=self.tag,
+                polygon=empty_polygon,
+                radius_in_meters=self.radius_in_meters,
+                step_in_degrees=self.step_in_degrees,
+            )
+
+    def test_show_option(self):
+        with plt.ioff():  # Prevent plots from displaying during the test
+            places_search_step(
+                project_folder=self.project_folder,
+                plots_folder=self.plots_folder,
+                tag=self.tag,
+                polygon=self.polygon,
+                radius_in_meters=self.radius_in_meters,
+                step_in_degrees=self.step_in_degrees,
+                query_headers=self.query_headers,
+                included_types=self.included_types,
+                show=True,
+                recalculate=True,
+            )
+            expected_files = [
+                "test_tag_saturated_circles_plot.png",
+                "test_tag_saturated_area_plot.png",
+            ]
+            for file_name in expected_files:
+                plot_file = self.plots_folder / file_name
+                self.assertTrue(plot_file.exists())
+
+    def test_threshold_logic(self):
+        found_places, circles, _, saturated_circles = places_search_step(
+            project_folder=self.project_folder,
+            plots_folder=self.plots_folder,
+            tag=self.tag,
+            polygon=self.polygon,
+            radius_in_meters=self.radius_in_meters,
+            step_in_degrees=self.step_in_degrees,
+            query_headers=self.query_headers,
+            included_types=self.included_types,
+            threshold=5,  # Set a low threshold to test filtering logic
+            recalculate=True,
+            show=False,
+        )
+        self.assertGreaterEqual(len(saturated_circles), 1)
+
+    def test_no_recalculation(self):
+        (
+            self.project_folder / "test_tag_1000.0_radius_0.005_step_circles.geojson"
+        ).touch()
+        (
+            self.project_folder / "test_tag_1000.0_radius_0.005_step_places.parquet"
+        ).touch()
+        found_places, circles, _, _ = places_search_step(
+            project_folder=self.project_folder,
+            plots_folder=self.plots_folder,
+            tag=self.tag,
+            polygon=self.polygon,
+            radius_in_meters=self.radius_in_meters,
+            step_in_degrees=self.step_in_degrees,
+            query_headers=self.query_headers,
+            included_types=self.included_types,
+            recalculate=False,
+            show=False,
+        )
+        self.assertTrue(found_places.empty)
+        self.assertTrue(circles.empty)
+
+
 if __name__ == "__main__":
     unittest.main()
