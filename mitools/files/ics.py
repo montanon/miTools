@@ -19,28 +19,30 @@ def extract_events(cal: Calendar) -> List[Dict[str, Optional[str]]]:
         if component.get("ATTENDEE"):
             attendees_raw = component.get("ATTENDEE")
             if isinstance(attendees_raw, list):
-                attendees = [attendee for attendee in attendees_raw]
+                attendees = [
+                    attendee.replace("mailto:", "") for attendee in attendees_raw
+                ]
             else:
-                attendees = [attendees_raw]
+                attendees = [attendees_raw.replace("mailto:", "")]
         event_details = {
-            "summary": component.get("SUMMARY", ""),
-            "description": component.get("DESCRIPTION", ""),
+            "summary": str(component.get("SUMMARY", "")),
+            "description": str(component.get("DESCRIPTION", "")),
             "start": component.decoded("DTSTART").strftime("%Y-%m-%d %H:%M:%S")
             if component.get("DTSTART")
             else None,
             "end": component.decoded("DTEND").strftime("%Y-%m-%d %H:%M:%S")
             if component.get("DTEND")
             else None,
-            "organizer": component.get("ORGANIZER", ""),
+            "organizer": component.get("ORGANIZER", "").replace("mailto:", ""),
             "attendees": [str(attendee) for attendee in attendees],
             "url": component.get("URL", ""),
-            "uid": component.get("UID", ""),
-            "transp": component.get("TRANSP", ""),
-            "status": component.get("STATUS", ""),
+            "uid": str(component.get("UID", "")),
+            "transp": str(component.get("TRANSP", "")),
+            "status": str(component.get("STATUS", "")),
             "sequence": component.get("SEQUENCE", ""),
             "rrule": component.get("RRULE", ""),
             "recurrence_id": component.get("RECURRENCE-ID", ""),
-            "location": component.get("LOCATION", ""),
+            "location": str(component.get("LOCATION", "")),
             "last_modified": component.decoded("LAST-MODIFIED").strftime(
                 "%Y-%m-%d %H:%M:%S"
             )
