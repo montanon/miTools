@@ -14,28 +14,49 @@ def read_ics_file(filepath: str) -> Calendar:
 
 def extract_events(cal: Calendar) -> List[Dict[str, Optional[str]]]:
     events = []
-    for component in cal.walk():
-        if component.name == "VEVENT":
-            attendees = []
-            if component.get("ATTENDEE"):
-                attendees_raw = component.get("ATTENDEE")
-                if isinstance(attendees_raw, list):
-                    attendees = [attendee for attendee in attendees_raw]
-                else:
-                    attendees = [attendees_raw]
-            event_details = {
-                "summary": component.get("SUMMARY", ""),
-                "description": component.get("DESCRIPTION", ""),
-                "start": component.decoded("DTSTART").strftime("%Y-%m-%d %H:%M:%S")
-                if component.get("DTSTART")
-                else None,
-                "end": component.decoded("DTEND").strftime("%Y-%m-%d %H:%M:%S")
-                if component.get("DTEND")
-                else None,
-                "organizer": component.get("ORGANIZER", ""),
-                "attendees": [str(attendee) for attendee in attendees],
-            }
-            events.append(event_details)
+    for component in cal.walk(name="VEVENT"):
+        attendees = []
+        if component.get("ATTENDEE"):
+            attendees_raw = component.get("ATTENDEE")
+            if isinstance(attendees_raw, list):
+                attendees = [attendee for attendee in attendees_raw]
+            else:
+                attendees = [attendees_raw]
+        event_details = {
+            "summary": component.get("SUMMARY", ""),
+            "description": component.get("DESCRIPTION", ""),
+            "start": component.decoded("DTSTART").strftime("%Y-%m-%d %H:%M:%S")
+            if component.get("DTSTART")
+            else None,
+            "end": component.decoded("DTEND").strftime("%Y-%m-%d %H:%M:%S")
+            if component.get("DTEND")
+            else None,
+            "organizer": component.get("ORGANIZER", ""),
+            "attendees": [str(attendee) for attendee in attendees],
+            "url": component.get("URL", ""),
+            "uid": component.get("UID", ""),
+            "transp": component.get("TRANSP", ""),
+            "status": component.get("STATUS", ""),
+            "sequence": component.get("SEQUENCE", ""),
+            "rrule": component.get("RRULE", ""),
+            "recurrence_id": component.get("RECURRENCE-ID", ""),
+            "location": component.get("LOCATION", ""),
+            "last_modified": component.decoded("LAST-MODIFIED").strftime(
+                "%Y-%m-%d %H:%M:%S"
+            )
+            if component.get("LAST-MODIFIED")
+            else None,
+            "exdate": component.get("EXDATE", ""),
+            "dtstamp": component.decoded("DTSTAMP").strftime("%Y-%m-%d %H:%M:%S")
+            if component.get("DTSTAMP")
+            else None,
+            "created": component.decoded("CREATED").strftime("%Y-%m-%d %H:%M:%S")
+            if component.get("CREATED")
+            else None,
+            "class": component.get("CLASS", ""),
+            "attach": component.get("ATTACH", ""),
+        }
+        events.append(event_details)
     return events
 
 
