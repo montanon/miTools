@@ -2,6 +2,7 @@ import os
 from datetime import datetime
 from typing import Dict, List, Optional, Set
 
+import pandas as pd
 from icalendar import Calendar, Event
 from pandas import DataFrame
 
@@ -27,10 +28,14 @@ def extract_events(cal: Calendar) -> List[Dict[str, Optional[str]]]:
         event_details = {
             "summary": str(component.get("SUMMARY", "")),
             "description": str(component.get("DESCRIPTION", "")),
-            "start": component.decoded("DTSTART").strftime("%Y-%m-%d %H:%M:%S")
+            "start": pd.to_datetime(
+                component.decoded("DTSTART").strftime("%Y-%m-%d %H:%M:%S")
+            )
             if component.get("DTSTART")
             else None,
-            "end": component.decoded("DTEND").strftime("%Y-%m-%d %H:%M:%S")
+            "end": pd.to_datetime(
+                component.decoded("DTEND").strftime("%Y-%m-%d %H:%M:%S")
+            )
             if component.get("DTEND")
             else None,
             "organizer": component.get("ORGANIZER", "").replace("mailto:", ""),
@@ -43,16 +48,20 @@ def extract_events(cal: Calendar) -> List[Dict[str, Optional[str]]]:
             "rrule": component.get("RRULE", ""),
             "recurrence_id": component.get("RECURRENCE-ID", ""),
             "location": str(component.get("LOCATION", "")),
-            "last_modified": component.decoded("LAST-MODIFIED").strftime(
-                "%Y-%m-%d %H:%M:%S"
+            "last_modified": pd.to_datetime(
+                component.decoded("LAST-MODIFIED").strftime("%Y-%m-%d %H:%M:%S")
             )
             if component.get("LAST-MODIFIED")
             else None,
             "exdate": component.get("EXDATE", ""),
-            "dtstamp": component.decoded("DTSTAMP").strftime("%Y-%m-%d %H:%M:%S")
+            "dtstamp": pd.to_datetime(
+                component.decoded("DTSTAMP").strftime("%Y-%m-%d %H:%M:%S")
+            )
             if component.get("DTSTAMP")
             else None,
-            "created": component.decoded("CREATED").strftime("%Y-%m-%d %H:%M:%S")
+            "created": pd.to_datetime(
+                component.decoded("CREATED").strftime("%Y-%m-%d %H:%M:%S")
+            )
             if component.get("CREATED")
             else None,
             "class": component.get("CLASS", ""),
