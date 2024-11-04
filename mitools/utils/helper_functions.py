@@ -7,6 +7,7 @@ from os import PathLike
 from pathlib import Path
 from typing import (
     Any,
+    Callable,
     Dict,
     Generator,
     Iterable,
@@ -27,6 +28,8 @@ from numpy import ndarray
 from openpyxl.worksheet.worksheet import Worksheet
 from pandas import DataFrame, Series
 from treelib import Tree
+
+from mitools.exceptions import ArgumentValueError
 
 T = TypeVar("T")
 COLOR_CODES = {
@@ -310,3 +313,19 @@ def save_dataframes_to_excel(
 def read_html_file(file_path: PathLike) -> str:
     with open(file_path, "r", encoding="utf-8") as file:
         return file.read()
+
+
+def sort_dict_keys(
+    input_dict: Dict, key: Callable = None, reverse: bool = False
+) -> List:
+    try:
+        sorted_dict = dict(
+            sorted(
+                input_dict.items(),
+                key=key if key else lambda item: item[0],
+                reverse=reverse,
+            )
+        )
+        return sorted_dict
+    except Exception as e:
+        raise ArgumentValueError(f"An error occured shile sorting the dict: {e}")
