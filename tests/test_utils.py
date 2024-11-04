@@ -7,6 +7,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import TestCase
 from unittest.mock import call, mock_open, patch
 
 import numpy as np
@@ -15,6 +16,7 @@ from openpyxl import Workbook
 from pandas import DataFrame, Series
 from treelib import Tree
 
+from mitools.exceptions import ArgumentValueError
 from mitools.utils import (
     BitArray,
     add_significance,
@@ -40,6 +42,7 @@ from mitools.utils import (
     remove_dataframe_duplicates,
     remove_multiple_spaces,
     replace_prefix,
+    sort_dict_keys,
     split_strings,
     store_pkl_object,
     str_is_number,
@@ -664,6 +667,55 @@ class TestCleanStr(unittest.TestCase):
         sub_char = ";"
         result = clean_str(string, pattern, sub_char)
         self.assertEqual(result, "Hello; World!")
+
+
+class TestSortDictKeys(TestCase):
+    def test_sort_by_keys_ascending(self):
+        input_dict = {"b": 2, "a": 3, "d": 1, "c": 4}
+        expected_output = {"a": 3, "b": 2, "c": 4, "d": 1}
+        self.assertEqual(sort_dict_keys(input_dict), expected_output)
+
+    def test_sort_by_keys_descending(self):
+        input_dict = {"b": 2, "a": 3, "d": 1, "c": 4}
+        expected_output = {"d": 1, "c": 4, "b": 2, "a": 3}
+        self.assertEqual(sort_dict_keys(input_dict, reverse=True), expected_output)
+
+    def test_sort_by_values_ascending(self):
+        input_dict = {"b": 2, "a": 3, "d": 1, "c": 4}
+        expected_output = {"d": 1, "b": 2, "a": 3, "c": 4}
+        self.assertEqual(
+            sort_dict_keys(input_dict, key=lambda item: item[1]), expected_output
+        )
+
+    def test_sort_by_values_descending(self):
+        input_dict = {"b": 2, "a": 3, "d": 1, "c": 4}
+        expected_output = {"c": 4, "a": 3, "b": 2, "d": 1}
+        self.assertEqual(
+            sort_dict_keys(input_dict, key=lambda item: item[1], reverse=True),
+            expected_output,
+        )
+
+    def test_empty_dict(self):
+        input_dict = {}
+        expected_output = {}
+        self.assertEqual(sort_dict_keys(input_dict), expected_output)
+
+    def test_single_element_dict(self):
+        input_dict = {"a": 1}
+        expected_output = {"a": 1}
+        self.assertEqual(sort_dict_keys(input_dict), expected_output)
+
+    def test_invalid_input_type(self):
+        with self.assertRaises(ArgumentValueError):
+            sort_dict_keys(None)
+
+    def test_sort_with_custom_key_function(self):
+        input_dict = {"b": "banana", "a": "apple", "c": "cherry"}
+        # Custom key function: sort by the length of the values
+        expected_output = {"a": "apple", "c": "cherry", "b": "banana"}
+        self.assertEqual(
+            sort_dict_keys(input_dict, key=lambda item: len(item[1])), expected_output
+        )
 
 
 if __name__ == "__main__":
