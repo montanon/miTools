@@ -1,3 +1,4 @@
+import inspect
 import warnings
 from functools import wraps
 from multiprocessing import Pool, cpu_count
@@ -42,30 +43,26 @@ def suppress_user_warning(func: Callable):
 
 def validate_args_types(**type_hints):
     def decorator(func):
+        signature = inspect.signature(func)
+
         @wraps(func)
         def wrapper(*args, **kwargs):
+            bound_args = signature.bind(*args, **kwargs)
+            bound_args.apply_defaults()  # Applies default values to missing arguments
+
             for name, expected_type in type_hints.items():
-                if name in kwargs:
-                    value = kwargs[name]
+                if name in bound_args.arguments:
+                    value = bound_args.arguments[name]
                 else:
-                    arg_names = func.__code__.co_varnames[: func.__code__.co_argcount]
-                    if name in arg_names:
-                        arg_index = arg_names.index(name)
-                        if arg_index < len(args):
-                            value = args[arg_index]
-                        else:
-                            raise ArgumentValueError(
-                                f"Argument '{name}' missing in positional arguments"
-                            )
-                    else:
-                        raise ArgumentValueError(
-                            f"Argument '{name}' not found in function signature"
-                        )
+                    raise ArgumentValueError(
+                        f"Argument '{name}' not found in function signature"
+                    )
 
                 if not isinstance(value, expected_type):
                     raise ArgumentTypeError(
                         f"Argument '{name}' must be of type {expected_type.__name__}"
                     )
+
             return func(*args, **kwargs)
 
         return wrapper
