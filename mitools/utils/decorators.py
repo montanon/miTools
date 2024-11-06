@@ -48,13 +48,16 @@ def validate_args_types(**type_hints):
                 if name in kwargs:
                     value = kwargs[name]
                 else:
-                    try:
-                        arg_names = func.__code__.co_varnames[
-                            : func.__code__.co_argcount
-                        ]
+                    arg_names = func.__code__.co_varnames[: func.__code__.co_argcount]
+                    if name in arg_names:
                         arg_index = arg_names.index(name)
-                        value = args[arg_index]
-                    except (ValueError, IndexError):
+                        if arg_index < len(args):
+                            value = args[arg_index]
+                        else:
+                            raise ArgumentValueError(
+                                f"Argument '{name}' missing in positional arguments"
+                            )
+                    else:
                         raise ArgumentValueError(
                             f"Argument '{name}' not found in function signature"
                         )
@@ -63,7 +66,6 @@ def validate_args_types(**type_hints):
                     raise ArgumentTypeError(
                         f"Argument '{name}' must be of type {expected_type.__name__}"
                     )
-
             return func(*args, **kwargs)
 
         return wrapper
