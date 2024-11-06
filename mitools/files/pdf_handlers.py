@@ -2,6 +2,8 @@ from os import PathLike
 from pathlib import Path
 from typing import Dict, Union
 
+import pymupdf
+import pymupdf4llm
 import PyPDF2
 
 from mitools.exceptions import ArgumentTypeError, ArgumentValueError
@@ -72,6 +74,17 @@ def set_folder_pdfs_titles_as_filenames(
             set_pdf_title_as_filename(file, overwrite=overwrite, attempt=attempt)
         except Exception as e:
             print(f"Error processing '{file.name}': {e}")
+
+
+def pdf_to_markdown(pdf_path: PathLike, page_number: bool = False) -> str:
+    document = pymupdf.open(pdf_path)
+    md_document = []
+    for n in range(document.page_count):
+        md_page = pymupdf4llm.to_markdown(document, pages=[n], show_progress=False)
+        if not page_number:
+            md_page = "\n".join(md_page.split("\n")[:-6])
+        md_document.append(md_page)
+    return "\n".join(md_document)
 
 
 if __name__ == "__main__":

@@ -142,6 +142,9 @@ test_python_module skbuild
 conda install -c conda-forge pybind11 -y
 test_python_module pybind11
 
+python -m pip install pytubefix
+test_python_module countryinfo
+
 #sudo rm -rf ~/.racplusplus
 #sudo rm -rf ~/.racplusplus/RACplusplus/_skbuild
 #sudo rm -rf ~/.racplusplus && mkdir ~/.racplusplus && cd ~/.racplusplus
@@ -197,6 +200,9 @@ $PYTHON_PATH -m pip install adapters
 $PYTHON_PATH -m pip install chardet
 $PYTHON_PATH -m pip install cairosvg
 $PYTHON_PATH -m pip install selenium-requests
+$PYTHON_PATH -m pip install icalendar
+$PYTHON_PATH -m pip install python-docx
+$PYTHON_PATH -m pip install pymupdf4llm
 
 $PYTHON_PATH -m pip install treelib
 treelib_path=$($PYTHON_PATH -m pip show treelib | grep -E '^Location: ' | awk '{print $2}')
