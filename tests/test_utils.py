@@ -16,7 +16,7 @@ from openpyxl import Workbook
 from pandas import DataFrame, Series
 from treelib import Tree
 
-from mitools.exceptions import ArgumentValueError
+from mitools.exceptions import ArgumentTypeError, ArgumentValueError
 from mitools.utils import (
     BitArray,
     add_significance,
@@ -48,6 +48,7 @@ from mitools.utils import (
     str_is_number,
     stretch_string,
     unpack_list_of_lists,
+    validate_args_types,
 )
 
 
@@ -716,6 +717,108 @@ class TestSortDictKeys(TestCase):
         self.assertEqual(
             sort_dict_keys(input_dict, key=lambda item: len(item[1])), expected_output
         )
+
+
+class TestValidateTypesDecorator(TestCase):
+    def test_correct_types_positional_arguments(self):
+        @validate_args_types(x=int, y=str)
+        def test_func(x, y):
+            return True
+
+        self.assertTrue(test_func(10, "hello"))
+
+    def test_correct_types_keyword_arguments(self):
+        @validate_args_types(x=int, y=str)
+        def test_func(x, y):
+            return True
+
+        self.assertTrue(test_func(x=10, y="hello"))
+
+    def test_incorrect_type_positional_argument(self):
+        @validate_args_types(x=int, y=str)
+        def test_func(x, y):
+            return True
+
+        with self.assertRaises(ArgumentTypeError) as context:
+            test_func(10, 20)  # y should be a str, not an int
+        self.assertIn("Argument 'y' must be of type str", str(context.exception))
+
+    def test_incorrect_type_keyword_argument(self):
+        @validate_args_types(x=int, y=str)
+        def test_func(x, y):
+            return True
+
+        with self.assertRaises(ArgumentTypeError) as context:
+            test_func(x=10, y=20)  # y should be a str, not an int
+        self.assertIn("Argument 'y' must be of type str", str(context.exception))
+
+    def test_missing_argument(self):
+        @validate_args_types(x=int, y=str)
+        def test_func(x):
+            return True
+
+        with self.assertRaises(ArgumentValueError):
+            test_func(10)  # Missing argument 'y'
+
+    def test_extra_argument(self):
+        @validate_args_types(x=int, y=str)
+        def test_func(x, y, z):
+            return True
+
+        self.assertTrue(test_func(10, "hello", "extra argument"))
+
+    def test_multiple_arguments_different_types(self):
+        @validate_args_types(a=int, b=float, c=str)
+        def test_func(a, b, c):
+            return True
+
+        self.assertTrue(test_func(5, 3.14, "test"))
+
+    def test_multiple_incorrect_arguments(self):
+        @validate_args_types(a=int, b=float, c=str)
+        def test_func(a, b, c):
+            return True
+
+        with self.assertRaises(ArgumentTypeError) as context:
+            test_func(5, "not a float", 10)  # b is incorrect
+        self.assertIn("Argument 'b' must be of type float", str(context.exception))
+
+    def test_unexpected_argument_name(self):
+        @validate_args_types(a=int, b=str)
+        def test_func(x, y):
+            return True
+
+        with self.assertRaises(ArgumentValueError) as context:
+            test_func(5, "hello")
+        self.assertIn(
+            "Argument 'a' not found in function signature", str(context.exception)
+        )
+
+    def test_with_default_values(self):
+        @validate_args_types(x=int, y=str)
+        def test_func(x, y="default"):
+            return True
+
+        self.assertTrue(test_func(5))  # y should use the default value, no TypeError
+
+    def test_type_check_on_default_value(self):
+        @validate_args_types(x=int, y=str)
+        def test_func(x, y="default"):
+            return True
+
+        with self.assertRaises(TypeError):
+            test_func(
+                5, y=10
+            )  # y should be a str, not an int, even with default values present
+
+    def test_no_type_validation_when_not_specified(self):
+        @validate_args_types(x=int)
+        def test_func(x, y):
+            return True
+
+        self.assertTrue(
+            test_func(5, "anything")
+        )  # y has no specified type, so any type is allowed
 
 
 if __name__ == "__main__":
