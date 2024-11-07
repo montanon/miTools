@@ -1,4 +1,9 @@
-from .doc_handlers import batch_convert_docx_to_pdf, convert_docx_to_pdf, read_docx_file
+from .doc_handlers import (
+    convert_directory_docxs_to_pdfs,
+    convert_directory_files,
+    convert_docx_to_pdf,
+    read_docx_file,
+)
 from .file_handlers import (
     can_move_file_or_folder,
     folder_in_subtree,
