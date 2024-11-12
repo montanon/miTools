@@ -29,7 +29,7 @@ from .ics import (
 from .pdf_handlers import (
     extract_pdf_metadata,
     extract_pdf_title,
-    pdf_to_markdown,
+    pdf_to_markdown_file,
     set_folder_pdfs_titles_as_filenames,
     set_pdf_title_as_filename,
 )

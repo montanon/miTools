@@ -76,7 +76,7 @@ def set_folder_pdfs_titles_as_filenames(
             print(f"Error processing '{file.name}': {e}")
 
 
-def pdf_to_markdown(pdf_path: PathLike, page_number: bool = False) -> str:
+def pdf_to_markdown_file(pdf_path: PathLike, page_number: bool = False) -> str:
     document = pymupdf.open(pdf_path)
     md_document = []
     for n in range(document.page_count):
@@ -85,6 +85,16 @@ def pdf_to_markdown(pdf_path: PathLike, page_number: bool = False) -> str:
             md_page = "\n".join(md_page.split("\n")[:-6])
         md_document.append(md_page)
     return "\n".join(md_document)
+
+
+def pdf_to_markdown_file(
+    pdf_path: PathLike, output_path: PathLike = None, page_number: bool = False
+) -> str:
+    md_document = pdf_to_markdown_file(pdf_path=pdf_path, page_number=page_number)
+    if output_path is None:
+        output_path = Path(pdf_path).with_suffix(".md")
+    with open(output_path, "w") as f:
+        f.write(md_document)
 
 
 if __name__ == "__main__":

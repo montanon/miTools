@@ -5,7 +5,7 @@ from pathlib import Path
 sys.path.append("/Users/sebastian/Desktop/MontagnaInc/miTools/mitools")
 from mitools.files import (
     convert_file,
-    pdf_to_markdown,
+    pdf_to_markdown_file,
     rename_files_in_folder,
     set_folder_pdfs_titles_as_filenames,
     set_pdf_title_as_filename,
@@ -73,7 +73,7 @@ if __name__ == "__main__":
         action="store_true",
         help="Include page numbers in the Markdown output.",
     )
-    pdf_to_md_parser.set_defaults(func=pdf_to_markdown)
+    pdf_to_md_parser.set_defaults(func=pdf_to_markdown_file)
 
     args = parser.parse_args()
     if args.command:
