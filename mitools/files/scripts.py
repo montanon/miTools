@@ -5,6 +5,7 @@ from pathlib import Path
 sys.path.append("/Users/sebastian/Desktop/MontagnaInc/miTools/mitools")
 from mitools.files import (
     convert_file,
+    pdf_to_markdown,
     rename_files_in_folder,
     set_folder_pdfs_titles_as_filenames,
     set_pdf_title_as_filename,
@@ -60,10 +61,23 @@ if __name__ == "__main__":
     )
     convert_parser.set_defaults(func=convert_file)
 
+    # Command to convert a PDF to Markdown
+    pdf_to_md_parser = subparsers.add_parser(
+        "pdf_to_md", help="Convert a PDF to Markdown."
+    )
+    pdf_to_md_parser.add_argument(
+        "pdf_path", type=Path, help="Path to the PDF file to convert."
+    )
+    pdf_to_md_parser.add_argument(
+        "--page_number",
+        action="store_true",
+        help="Include page numbers in the Markdown output.",
+    )
+    pdf_to_md_parser.set_defaults(func=pdf_to_markdown)
+
     args = parser.parse_args()
     if args.command:
         if args.command in ["rename", "rename_folder", "convert_file"]:
-            # Call the function with the specified arguments
             if args.command == "convert_file":
                 args.func(
                     source_file=args.source_file,
@@ -72,6 +86,9 @@ if __name__ == "__main__":
                     exist_ok=args.exist_ok,
                     overwrite=args.overwrite,
                 )
+            elif args.command == "pdf_to_md":
+                output = args.func(pdf_path=args.pdf_path, page_number=args.page_number)
+                print(output)
             else:
                 args.func(args.path)
         elif args.command == "rename_files":
