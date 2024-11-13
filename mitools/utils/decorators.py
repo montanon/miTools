@@ -2,8 +2,10 @@ import inspect
 import warnings
 from functools import wraps
 from multiprocessing import Pool, cpu_count
-from typing import Callable, Iterable
+from typing import Callable, Dict, Iterable, List
 
+import pandas as pd
+from pandas import DataFrame
 from tqdm import tqdm
 
 from mitools.exceptions import ArgumentTypeError, ArgumentValueError
@@ -62,6 +64,46 @@ def validate_args_types(**type_hints):
                     raise ArgumentTypeError(
                         f"Argument '{name}' must be of type {expected_type.__name__}"
                     )
+
+            return func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+def validate_dataframe_structure(
+    dataframe_name: str,
+    required_columns: List[str] = None,
+    column_types: Dict[str, str] = None,
+):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            dataframe = kwargs.get(dataframe_name, None)
+            if dataframe is None:
+                raise ArgumentValueError(
+                    f"Dataframe argument '{dataframe}' is missing."
+                )
+            if not isinstance(dataframe, DataFrame):
+                raise ArgumentTypeError(f"Argument '{dataframe}' must be a DataFrame.")
+            # Validation
+            if required_columns:
+                missing_columns = [
+                    col for col in required_columns if col not in dataframe.columns
+                ]
+                if missing_columns:
+                    raise ArgumentValueError(
+                        f"DataFrame is missing required columns: {missing_columns}"
+                    )
+            if column_types:
+                for col, expected_type in column_types.items():
+                    if col in dataframe.columns and not pd.api.types.is_dtype_equal(
+                        dataframe[col].dtype, expected_type
+                    ):
+                        raise ArgumentTypeError(
+                            f"Column '{col}' must be of type {expected_type}. Found {dataframe[col].dtype} instead."
+                        )
 
             return func(*args, **kwargs)
 
