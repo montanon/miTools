@@ -2,11 +2,17 @@ import unittest
 from typing import Dict, List
 from unittest import TestCase
 
+import numpy as np
 import pandas as pd
-from pandas import DataFrame, Series
+from pandas import DataFrame, MultiIndex, Series
 
-from mitools.exceptions import ArgumentTypeError, ArgumentValueError
+from mitools.exceptions import (
+    ArgumentTypeError,
+    ArgumentValueError,
+    ColumnValidationError,
+)
 from mitools.utils import (
+    sankey_plot_validation,
     validate_args_types,
     validate_dataframe_structure,
 )
@@ -249,6 +255,109 @@ class TestValidateDataFrameStructureDecorator(TestCase):
         self.assertIn(
             "DataFrame is missing required columns: ['column2']", str(context.exception)
         )
+
+
+class TestValidateDataFrameColumns(TestCase):
+    def setUp(self):
+        correct_index = MultiIndex.from_tuples(
+            [
+                ("(2000, 2020)", "2_3-Gram", "Gram"),
+                ("(2000, 2020)", "2_3-Gram", "Count"),
+                ("(2010, 2020)", "1_2-Gram", "Gram"),
+                ("(2010, 2020)", "1_2-Gram", "Count"),
+            ],
+            names=["year_range", "n-gram", "values"],
+        )
+        self.correct_df = pd.DataFrame(
+            [
+                ["example1", 10, "example2", 15],
+                [None, 20, "example3", np.nan],
+            ],
+            columns=correct_index,
+        )
+        invalid_level_0_index = MultiIndex.from_tuples(
+            [
+                ("2000-2020", "2_3-Gram", "Gram"),
+                ("2000-2020", "2_3-Gram", "Count"),
+            ],
+            names=["year_range", "n-gram", "values"],
+        )
+        self.invalid_level_0_df = pd.DataFrame(
+            [["example", 5], [None, 10]], columns=invalid_level_0_index
+        )
+        invalid_level_1_index = MultiIndex.from_tuples(
+            [
+                ("(2000, 2020)", "3_2-Gram", "Gram"),
+                ("(2000, 2020)", "3_2-Gram", "Count"),
+            ],
+            names=["year_range", "n-gram", "values"],
+        )
+        self.invalid_level_1_df = pd.DataFrame(
+            [["example", 5], [None, 10]], columns=invalid_level_1_index
+        )
+        invalid_level_2_index = MultiIndex.from_tuples(
+            [
+                ("(2000, 2020)", "2_3-Gram", "Frequency"),
+                ("(2000, 2020)", "2_3-Gram", "Sum"),
+            ],
+            names=["year_range", "n-gram", "values"],
+        )
+        self.invalid_level_2_df = pd.DataFrame(
+            [["example", 5], [None, 10]], columns=invalid_level_2_index
+        )
+        self.invalid_gram_column_df = self.correct_df.copy()
+        self.invalid_gram_column_df[("(2000, 2020)", "2_3-Gram", "Gram")] = [123, None]
+        self.invalid_count_column_df = self.correct_df.copy()
+        self.invalid_count_column_df[("(2000, 2020)", "2_3-Gram", "Count")] = [
+            "not a number",
+            np.nan,
+        ]
+
+    def test_correct_dataframe(self):
+        self.assertTrue(sankey_plot_validation(self.correct_df))
+
+    def test_invalid_level_0_format(self):
+        with self.assertRaises(ColumnValidationError) as context:
+            sankey_plot_validation(self.invalid_level_0_df)
+        self.assertIn("Level 0 column", str(context.exception))
+
+    def test_invalid_level_1_format(self):
+        with self.assertRaises(ColumnValidationError) as context:
+            sankey_plot_validation(self.invalid_level_1_df)
+        self.assertIn("Level 1 column", str(context.exception))
+
+    def test_invalid_level_2_names(self):
+        with self.assertRaises(ColumnValidationError) as context:
+            sankey_plot_validation(self.invalid_level_2_df)
+        self.assertIn("Level 2 column", str(context.exception))
+
+    def test_invalid_gram_column_values(self):
+        with self.assertRaises(ColumnValidationError) as context:
+            sankey_plot_validation(self.invalid_gram_column_df)
+        self.assertIn(
+            "Level 2 'Gram' columns must contain strings or NaN", str(context.exception)
+        )
+
+    def test_invalid_count_column_values(self):
+        with self.assertRaises(ColumnValidationError) as context:
+            sankey_plot_validation(self.invalid_count_column_df)
+        self.assertIn(
+            "Level 2 'Count' columns must contain numeric values or NaN",
+            str(context.exception),
+        )
+
+    def test_empty_dataframe(self):
+        empty_correct_index = MultiIndex.from_tuples(
+            [
+                ("(2000, 2020)", "2_3-Gram", "Gram"),
+                ("(2000, 2020)", "2_3-Gram", "Count"),
+                ("(2010, 2020)", "1_2-Gram", "Gram"),
+                ("(2010, 2020)", "1_2-Gram", "Count"),
+            ],
+            names=["year_range", "n-gram", "values"],
+        )
+        empty_correct_df = pd.DataFrame(columns=empty_correct_index)
+        self.assertTrue(sankey_plot_validation(empty_correct_df))
 
 
 if __name__ == "__main__":
