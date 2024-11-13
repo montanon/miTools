@@ -91,7 +91,7 @@ def plot_df_col_distribution(
     if ax is None:
         fig, ax = plt.subplots(1, 1, figsize=(14, 6))
     if color is None:
-        color = sns.color_palette("husl", 1)
+        color = sns.color_palette("husl", 1)[0]
     df_values = dataframe.iloc[:, column].values
     col_name = (
         dataframe.columns[0].title().replace("_", " ")
