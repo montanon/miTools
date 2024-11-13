@@ -4,7 +4,7 @@ from nltk.corpus import stopwords
 
 
 class StopwordsManager:
-    def __init__(self, language='english'):
+    def __init__(self, language="english"):
         self.language = language
         self._words = set(stopwords.words(language))
 
@@ -21,15 +21,14 @@ class StopwordsManager:
         self._words.difference_update(words)
 
     def save(self, filename):
-        with open(filename, 'wb') as file:
+        with open(filename, "wb") as file:
             pickle.dump(self, file)
 
     @classmethod
     def load(cls, filename):
-        with open(filename, 'rb') as file:
+        with open(filename, "rb") as file:
             return pickle.load(file)
 
     @property
     def words(self):
         return list(self._words)
-

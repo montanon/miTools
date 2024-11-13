@@ -1,4 +1,10 @@
-from .doc_handlers import batch_convert_docx_to_pdf, convert_docx_to_pdf, read_docx_file
+from .doc_handlers import (
+    convert_directory_docxs_to_pdfs,
+    convert_directory_files,
+    convert_docx_to_pdf,
+    convert_file,
+    read_docx_file,
+)
 from .file_handlers import (
     can_move_file_or_folder,
     folder_in_subtree,
@@ -23,7 +29,7 @@ from .ics import (
 from .pdf_handlers import (
     extract_pdf_metadata,
     extract_pdf_title,
-    pdf_to_markdown,
+    pdf_to_markdown_file,
     set_folder_pdfs_titles_as_filenames,
     set_pdf_title_as_filename,
 )

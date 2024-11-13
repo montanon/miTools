@@ -87,5 +87,15 @@ def pdf_to_markdown(pdf_path: PathLike, page_number: bool = False) -> str:
     return "\n".join(md_document)
 
 
+def pdf_to_markdown_file(
+    pdf_path: PathLike, output_path: PathLike = None, page_number: bool = False
+) -> str:
+    md_document = pdf_to_markdown(pdf_path=pdf_path, page_number=page_number)
+    if output_path is None:
+        output_path = Path(pdf_path).with_suffix(".md")
+    with open(output_path, "w") as f:
+        f.write(md_document)
+
+
 if __name__ == "__main__":
     pass

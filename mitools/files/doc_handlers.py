@@ -56,32 +56,74 @@ def read_docx_file(file_path: Union[str, Path], indent: str = "-") -> List[str]:
 
 
 def convert_docx_to_pdf(
-    file_path: PathLike,
-    output_path: PathLike,
+    source_file: PathLike,
+    output_file: PathLike,
     exist_ok: bool = True,
     overwrite: bool = True,
 ) -> None:
-    if Path(output_path).exists() and not exist_ok and not overwrite:
-        raise ArgumentValueError(f"'{output_path}' already exists.")
-    elif Path(output_path).exists() and exist_ok and not overwrite:
+    convert_file(
+        source_file=source_file,
+        output_file=output_file,
+        output_format="pdf",
+        exist_ok=exist_ok,
+        overwrite=overwrite,
+    )
+
+
+def convert_file(
+    source_file: PathLike,
+    output_file: PathLike,
+    output_format: str,
+    exist_ok: bool = True,
+    overwrite: bool = True,
+) -> None:
+    if Path(output_file).exists() and not exist_ok and not overwrite:
+        raise ArgumentValueError(f"'{output_file}' already exists.")
+    elif Path(output_file).exists() and exist_ok and not overwrite:
         return
-    output = pypandoc.convert_file(str(file_path), "pdf", outputfile=str(output_path))
+    output = pypandoc.convert_file(
+        source_file=source_file, to=output_format, outputfile=output_file
+    )
     assert output == "", f"Conversion failed: {output}"
 
 
-def batch_convert_docx_to_pdf(
-    directory: PathLike,
+def convert_directory_files(
+    source_directory: PathLike,
+    output_directory: PathLike,
+    input_format: str,
+    output_format: str,
+    exist_ok: bool = True,
+    overwrite: bool = True,
+) -> None:
+    for file in source_directory.glob(f"*.{input_format}"):
+        output_file = (
+            output_directory / file.with_suffix(f".{output_format}").name
+            if output_directory
+            else file.with_suffix(f".{output_format}")
+        )
+        convert_file(
+            source_file=file,
+            output_file=output_file,
+            output_format=output_format,
+            exist_ok=exist_ok,
+            overwrite=overwrite,
+        )
+
+
+def convert_directory_docxs_to_pdfs(
+    source_directory: PathLike,
     output_directory: PathLike = None,
     exist_ok: bool = True,
     overwrite: bool = True,
 ) -> None:
-    for docx_file in directory.glob("*.docx"):
-        pdf_file = (
-            output_directory / docx_file.with_suffix(".pdf").name
-            if output_directory
-            else docx_file.with_suffix(".pdf")
-        )
-        convert_docx_to_pdf(docx_file, pdf_file, exist_ok, overwrite)
+    convert_directory_files(
+        source_directory=source_directory,
+        output_directory=output_directory,
+        input_format="docx",
+        output_format="pdf",
+        exist_ok=exist_ok,
+        overwrite=overwrite,
+    )
 
 
 if __name__ == "__main__":
