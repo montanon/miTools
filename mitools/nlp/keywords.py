@@ -26,6 +26,8 @@ from sklearn.feature_extraction.text import (
 from tqdm import tqdm
 from unidecode import unidecode
 
+from mitools.utils import sankey_plot_validation, validate_dataframe_structure
+
 from ..pandas import idxslice
 from ..utils import lcs_similarity
 
@@ -1186,7 +1188,7 @@ def create_sankey_data(
             dict(
                 font=dict(color="black", size=14, family="Helvetica, sans-serif"),
                 x=x,
-                y=1.1,
+                y=1.2,
                 showarrow=False,
                 text=f"<b>{label}</b>",
             )
@@ -1195,6 +1197,9 @@ def create_sankey_data(
     return fig
 
 
+@validate_dataframe_structure(
+    dataframe_name="yearly_ranges_ngrams", validation=sankey_plot_validation
+)
 def evolution_sankey_plot_clusters_ngrams(
     yearly_ranges_ngrams: DataFrame,
     n_gram: int,

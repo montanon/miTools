@@ -34,7 +34,9 @@ def get_clusters_centroids(
     return DataFrame(
         clf.centroids_,
         columns=data.columns,
-        index=np.unique(data.index.get_level_values(cluster_level)),
+        index=pd.Index(
+            np.unique(data.index.get_level_values(cluster_level)), name=cluster_level
+        ),
     )
 
 

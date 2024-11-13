@@ -1,10 +1,9 @@
 import inspect
 import warnings
 from functools import wraps
-from multiprocessing import Pool, cpu_count
-from typing import Callable, Dict, Iterable, List
+from multiprocessing import Pool
+from typing import Any, Callable, Iterable
 
-import pandas as pd
 from pandas import DataFrame
 from tqdm import tqdm
 
@@ -74,8 +73,9 @@ def validate_args_types(**type_hints):
 
 def validate_dataframe_structure(
     dataframe_name: str,
-    required_columns: List[str] = None,
-    column_types: Dict[str, str] = None,
+    validation: Callable[[DataFrame, Any], None],
+    *validation_args,
+    **validation_kwargs,
 ):
     def decorator(func):
         @wraps(func)
@@ -87,24 +87,11 @@ def validate_dataframe_structure(
                 )
             if not isinstance(dataframe, DataFrame):
                 raise ArgumentTypeError(f"Argument '{dataframe}' must be a DataFrame.")
-            # Validation
-            if required_columns:
-                missing_columns = [
-                    col for col in required_columns if col not in dataframe.columns
-                ]
-                if missing_columns:
-                    raise ArgumentValueError(
-                        f"DataFrame is missing required columns: {missing_columns}"
-                    )
-            if column_types:
-                for col, expected_type in column_types.items():
-                    if col in dataframe.columns and not pd.api.types.is_dtype_equal(
-                        dataframe[col].dtype, expected_type
-                    ):
-                        raise ArgumentTypeError(
-                            f"Column '{col}' must be of type {expected_type}. Found {dataframe[col].dtype} instead."
-                        )
-
+            validation(
+                dataframe,
+                *validation_args,
+                **validation_kwargs,
+            )
             return func(*args, **kwargs)
 
         return wrapper
