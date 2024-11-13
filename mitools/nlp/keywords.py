@@ -1198,7 +1198,7 @@ def create_sankey_data(
 
 
 @validate_dataframe_structure(
-    dataframe_name="yearly_ranges_ngrams", template=sankey_plot_validation
+    dataframe_name="yearly_ranges_ngrams", validation=sankey_plot_validation
 )
 def evolution_sankey_plot_clusters_ngrams(
     yearly_ranges_ngrams: DataFrame,
