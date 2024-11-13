@@ -1,6 +1,8 @@
 import unittest
+from typing import Dict, List
 from unittest import TestCase
 
+import pandas as pd
 from pandas import DataFrame, Series
 
 from mitools.exceptions import ArgumentTypeError, ArgumentValueError
@@ -112,8 +114,32 @@ class TestValidateTypesDecorator(TestCase):
         )  # y has no specified type, so any type is allowed
 
 
+def custom_validation(
+    dataframe: DataFrame,
+    required_columns: List[str] = None,
+    column_types: Dict[str, str] = None,
+) -> bool:
+    if required_columns:
+        missing_columns = [
+            col for col in required_columns if col not in dataframe.columns
+        ]
+        if missing_columns:
+            raise ArgumentValueError(
+                f"DataFrame is missing required columns: {missing_columns}"
+            )
+    if column_types:
+        for col, expected_type in column_types.items():
+            if col in dataframe.columns and not pd.api.types.is_dtype_equal(
+                dataframe[col].dtype, expected_type
+            ):
+                raise ArgumentTypeError(
+                    f"Column '{col}' must be of type {expected_type}. Found {dataframe[col].dtype} instead."
+                )
+
+
 @validate_dataframe_structure(
     dataframe_name="data",
+    validation=custom_validation,
     required_columns=["column1", "column2"],
     column_types={"column1": "int64", "column2": "float64"},
 )
@@ -188,6 +214,7 @@ class TestValidateDataFrameStructureDecorator(TestCase):
     def test_partial_column_types(self):
         @validate_dataframe_structure(
             dataframe_name="data",
+            validation=custom_validation,
             required_columns=["column1"],
             column_types={"column1": "int64"},
         )
@@ -198,7 +225,10 @@ class TestValidateDataFrameStructureDecorator(TestCase):
         self.assertEqual(result, "Data processed with partial column type check")
 
     def test_no_validation_criteria(self):
-        @validate_dataframe_structure(dataframe_name="data")
+        @validate_dataframe_structure(
+            dataframe_name="data",
+            validation=custom_validation,
+        )
         def no_criteria_check(data: DataFrame) -> str:
             return "Data processed with no criteria"
 
@@ -207,7 +237,9 @@ class TestValidateDataFrameStructureDecorator(TestCase):
 
     def test_missing_required_column_with_partial_check(self):
         @validate_dataframe_structure(
-            dataframe_name="data", required_columns=["column1", "column2"]
+            dataframe_name="data",
+            validation=custom_validation,
+            required_columns=["column1", "column2"],
         )
         def partial_column_check(data: DataFrame) -> str:
             return "Data processed with partial column check"
