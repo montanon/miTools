@@ -26,8 +26,7 @@ from sklearn.feature_extraction.text import (
 from tqdm import tqdm
 from unidecode import unidecode
 
-from mitools.utils.decorators import validate_dataframe_structure
-from mitools.utils.validation_templates import sankey_plot_validation
+from mitools.utils import sankey_plot_validation, validate_dataframe_structure
 
 from ..pandas import idxslice
 from ..utils import lcs_similarity
