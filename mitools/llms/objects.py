@@ -4,7 +4,7 @@ from typing import Dict, List, Optional, Union
 from mitools.exceptions import ArgumentKeyError, ArgumentTypeError, ArgumentValueError
 
 
-class LMMModel(ABC):
+class LMMClient(ABC):
     @abstractmethod
     def request(self, prompt: str, **kwargs) -> Dict:
         pass
