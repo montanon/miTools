@@ -22,6 +22,19 @@ class LMMModel(ABC):
         pass
 
 
+class LLMFactory:
+    def __init__(self):
+        self.registry = {}
+
+    def register_client(self, name, client_class):
+        self.registry[name] = client_class
+
+    def get_client(self, name, **kwargs):
+        if name not in self.registry:
+            raise ValueError(f"Model '{name}' not supported.")
+        return self.registry[name](**kwargs)
+
+
 class Prompt:
     def __init__(self, text: str, metadata: Optional[Dict[str, str]] = None):
         if not isinstance(text, str) or not text.strip():
