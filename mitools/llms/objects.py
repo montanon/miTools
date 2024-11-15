@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Union
 
-from mitools.exceptions import ArgumentTypeError, ArgumentValueError
+from mitools.exceptions import ArgumentKeyError, ArgumentTypeError, ArgumentValueError
 
 
 class LMMModel(ABC):
@@ -29,8 +29,8 @@ class Prompt:
         self.text = text.strip()
         self.metadata = metadata or {}
 
-    def __reprt__(self) -> str:
-        return f"Prompt(\ntext={self.text},\n\n metadata={self.metadata}\n)"
+    def __repr__(self) -> str:
+        return f"Prompt(\ntext={self.text},\n metadata={self.metadata}\n)"
 
     def __add__(self, other: Union["Prompt", str]) -> "Prompt":
         if isinstance(other, Prompt):
@@ -44,7 +44,7 @@ class Prompt:
             combined_text = f"{self.text}\n{other.strip()}"
             return Prompt(combined_text, self.metadata)
         else:
-            ArgumentTypeError("Can only concatenate with a Prompt or a string.")
+            raise ArgumentTypeError("Can only concatenate with a Prompt or a string.")
 
     def __iadd__(self, other: Union["Prompt", str]) -> "Prompt":
         concatenated = self + other
@@ -53,8 +53,11 @@ class Prompt:
         return self
 
     def format(self, **kwargs) -> "Prompt":
-        formatted_text = self.text.format(**kwargs)
-        return Prompt(text=formatted_text, metadata=self.metadata)
+        try:
+            formatted_text = self.text.format(**kwargs)
+            return Prompt(text=formatted_text, metadata=self.metadata)
+        except KeyError as e:
+            raise ArgumentKeyError(f"String missing formatting key: {e}")
 
     def update_metadata(self, key: str, value: str) -> None:
         if not isinstance(key, str) or not isinstance(value, str):
