@@ -1,4 +1,9 @@
+import json
 from abc import ABC, abstractmethod
+from dataclasses import asdict, dataclass
+from datetime import datetime
+from os import PathLike
+from pathlib import Path
 from typing import Dict, List, Optional, Union
 
 from mitools.exceptions import ArgumentKeyError, ArgumentTypeError, ArgumentValueError
@@ -114,3 +119,99 @@ class LLMFactory:
         if name not in self.registry:
             raise ValueError(f"Model '{name}' not supported.")
         return self.registry[name](**kwargs)
+
+
+@dataclass
+class TokenUsageStats:
+    total_tokens: int
+    prompt_tokens: int
+    completion_tokens: int
+    cost: float
+    timestamp: datetime
+
+
+class TokensCounter(ABC):
+    def __init__(self, cost_per_1k_tokens: float = 0.0):
+        self.usage_history: List[TokenUsageStats] = []
+        self.prompt_tokens_count: int = 0
+        self.completion_tokens_count: int = 0
+        self.total_tokens_count: int = 0
+        self.cost_per_1k_tokens = cost_per_1k_tokens
+        self.max_context_length: Optional[int] = None
+
+    @abstractmethod
+    def get_usage_stats(self, response: Dict) -> TokenUsageStats:
+        pass
+
+    def update(self, usage: TokenUsageStats) -> None:
+        self.usage_history.append(usage)
+        self.prompt_tokens_count += usage.prompt_tokens
+        self.completion_tokens_count += usage.completion_tokens
+        self.total_count = self.prompt_tokens_count + self.completion_tokens_count
+
+    @abstractmethod
+    def count_tokens(self, text: str) -> int:
+        pass
+
+    def set_max_context_length(self, max_length: int) -> None:
+        self.max_context_length = max_length
+
+    def would_exceed_context(self, text: str) -> bool:
+        if self.max_context_length is None:
+            return False
+        return self.count_tokens(text) > self.max_context_length
+
+    def _calculate_cost(self, token_count: int) -> float:
+        return self.cost_per_1k_tokens * (token_count / 1000)
+
+    @property
+    def count(self) -> int:
+        return self.total_tokens_count
+
+    @property
+    def cost(self) -> float:
+        return self._calculate_cost(self.total_tokens_count)
+
+    @property
+    def cost_detail(self) -> Dict:
+        return {
+            "cost": {
+                "total_tokens": self._calculate_cost(self.total_tokens_count),
+                "prompt_tokens": self._calculate_cost(self.prompt_tokens_count),
+                "completion_tokens": self._calculate_cost(self.completion_tokens_count),
+                "cost": self._calculate_cost(self.cost),
+            },
+            "cost_per_1k_tokens": self.cost_per_1k_tokens,
+        }
+
+    def json(self) -> str:
+        data = {
+            "usage_history": [asdict(usage) for usage in self.usage_history],
+            "prompt_tokens_count": self.prompt_tokens_count,
+            "completion_tokens_count": self.completion_tokens_count,
+            "total_tokens_count": self.total_tokens_count,
+            "cost_per_1k_tokens": self.cost_per_1k_tokens,
+            "max_context_length": self.max_context_length,
+            "cost_detail": self.cost_detail,
+        }
+        return json.dumps(data, indent=4, default=str)
+
+    def save(self, file_path: PathLike) -> None:
+        if Path(file_path).suffix != ".json":
+            raise ArgumentValueError("File path must have a .json extension.")
+        with open(file_path, "w") as f:
+            f.write(self.json())
+
+    @staticmethod
+    def load(cls, file_path: PathLike) -> "TokensCounter":
+        with open(file_path, "r") as f:
+            data = json.load(f)
+        instance = cls(data["cost_per_1k_tokens"])
+        instance.prompt_tokens_count = data["prompt_tokens_count"]
+        instance.completion_tokens_count = data["completion_tokens_count"]
+        instance.total_tokens_count = data["total_tokens_count"]
+        instance.max_context_length = data["max_context_length"]
+        instance.usage_history = [
+            TokenUsageStats(**usage) for usage in data["usage_history"]
+        ]
+        return instance
