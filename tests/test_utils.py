@@ -48,6 +48,7 @@ from mitools.utils import (
     str_is_number,
     stretch_string,
     unpack_list_of_lists,
+    write_text_file,
 )
 
 
@@ -180,6 +181,16 @@ class TestReadTextFile(unittest.TestCase):
         result = read_text_file(text_path)
         self.assertEqual(result, "abc\ndef\nghi")
         mock_file.assert_called_once_with(text_path, "r")
+
+
+class TestWriteTextFile(unittest.TestCase):
+    @patch("builtins.open", new_callable=mock_open)
+    def test_write_text_file(self, mock_file):
+        text_path = "dummy_path"
+        text_to_write = "abc\ndef\nghi"
+        write_text_file(text_to_write, text_path)
+        mock_file.assert_called_once_with(text_path, "w")
+        mock_file().write.assert_called_once_with(text_to_write)
 
 
 class TestDictFromKwargs(unittest.TestCase):
