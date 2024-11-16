@@ -147,7 +147,9 @@ class TokensCounter(ABC):
         self.usage_history.append(usage)
         self.prompt_tokens_count += usage.prompt_tokens
         self.completion_tokens_count += usage.completion_tokens
-        self.total_count = self.prompt_tokens_count + self.completion_tokens_count
+        self.total_tokens_count = (
+            self.prompt_tokens_count + self.completion_tokens_count
+        )
 
     @abstractmethod
     def count_tokens(self, text: str) -> int:
@@ -202,7 +204,7 @@ class TokensCounter(ABC):
         with open(file_path, "w") as f:
             f.write(self.json())
 
-    @staticmethod
+    @classmethod
     def load(cls, file_path: PathLike) -> "TokensCounter":
         with open(file_path, "r") as f:
             data = json.load(f)
