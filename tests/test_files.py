@@ -426,6 +426,12 @@ class TestRenameFile(TestCase):
         self.assertTrue(expected_file.exists())
         self.assertFalse(self.test_file.exists())
 
+    def test_callable_new_name(self):
+        rename_file(self.test_file, new_name=lambda file: "custom_name.txt")
+        expected_file = self.test_dir / "custom_name.txt"
+        self.assertTrue(expected_file.exists())
+        self.assertFalse(self.test_file.exists())
+
 
 class TestRenameFilesInFolder(TestCase):
     def setUp(self):
