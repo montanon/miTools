@@ -1,10 +1,12 @@
 import os
+from datetime import datetime
 from typing import Dict
 
 import openai
 from openai import OpenAI
+from openai.types.chat import ChatCompletion
 
-from mitools.llms.objects import LLMModel, Prompt
+from mitools.llms.objects import LLMModel, Prompt, TokensCounter, TokenUsageStats
 
 
 class OpenAIClient(LLMModel):
@@ -40,3 +42,15 @@ class OpenAIClient(LLMModel):
 
     def model_name(self) -> str:
         return self.model
+
+
+class OpenAITokensCounter(TokensCounter):
+    def get_usage_stats(self, response: ChatCompletion) -> TokenUsageStats:
+        total_tokens = response.usage.total_tokens
+        return TokenUsageStats(
+            total_tokens=total_tokens,
+            prompt_tokens=response.usage.prompt_tokens,
+            completion_tokens=response.usage.completion_tokens,
+            cost=total_tokens * (self.cost_per_1k_tokens / 1000),
+            timestamp=datetime.fromtimestamp(response.created),
+        )
