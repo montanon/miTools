@@ -4,37 +4,6 @@ from typing import Dict, List, Optional, Union
 from mitools.exceptions import ArgumentKeyError, ArgumentTypeError, ArgumentValueError
 
 
-class LMMModel(ABC):
-    @abstractmethod
-    def request(self, prompt: str, **kwargs) -> Dict:
-        pass
-
-    @abstractmethod
-    def parse_response(self, response: Dict) -> str:
-        pass
-
-    @abstractmethod
-    def get_model_info(self) -> Dict:
-        pass
-
-    @abstractmethod
-    def model_name(self) -> str:
-        pass
-
-
-class LLMFactory:
-    def __init__(self):
-        self.registry = {}
-
-    def register_client(self, name, client_class):
-        self.registry[name] = client_class
-
-    def get_client(self, name, **kwargs):
-        if name not in self.registry:
-            raise ValueError(f"Model '{name}' not supported.")
-        return self.registry[name](**kwargs)
-
-
 class Prompt:
     def __init__(self, text: str, metadata: Optional[Dict[str, str]] = None):
         if not isinstance(text, str) or not text.strip():
@@ -106,3 +75,46 @@ class Prompt:
                     "List must contain only Prompt instances or strings."
                 )
         return Prompt(text=separator.join(combined_texts), metadata=combined_metadata)
+
+
+class LLMModel(ABC):
+    @abstractmethod
+    def request(self, request: Prompt, **kwargs) -> Dict:
+        pass
+
+    @abstractmethod
+    def send_request(self, request: Dict, **kwargs) -> Dict:
+        pass
+
+    @abstractmethod
+    def parse_request(self, prompt: Prompt, **kwargs) -> Dict:
+        pass
+
+    @abstractmethod
+    def get_response(self, prompt) -> Dict:
+        pass
+
+    @abstractmethod
+    def parse_response(self, response: Dict) -> str:
+        pass
+
+    @abstractmethod
+    def get_model_info(self) -> Dict:
+        pass
+
+    @abstractmethod
+    def model_name(self) -> str:
+        pass
+
+
+class LLMFactory:
+    def __init__(self):
+        self.registry = {}
+
+    def register_client(self, name, client_class):
+        self.registry[name] = client_class
+
+    def get_client(self, name, **kwargs):
+        if name not in self.registry:
+            raise ValueError(f"Model '{name}' not supported.")
+        return self.registry[name](**kwargs)
