@@ -15,6 +15,7 @@ class OpenAIClient(LLMModel):
         self.client = OpenAI(
             api_key=api_key if api_key is not None else os.environ.get("OPENAI_API_KEY")
         )
+        self.raw_responses = []
 
     def parse_request(self, prompt: Prompt) -> Dict:
         return {
@@ -25,6 +26,7 @@ class OpenAIClient(LLMModel):
     def request(self, request: Prompt, **kwargs) -> Dict:
         request = self.parse_request(request)
         response = self.get_response(request, **kwargs)
+        self.raw_responses.append(response)
         return self.parse_response(response)
 
     def parse_response(self, response: Dict) -> str:
