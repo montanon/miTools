@@ -148,7 +148,7 @@ def rename_file(
 ) -> None:
     file = Path(file)
     if callable(new_name):
-        new_name_str = new_name(file)
+        new_name_str = new_name(file.name)
     elif isinstance(new_name, str) or new_name is None:
         new_name_str = new_name
     else:
