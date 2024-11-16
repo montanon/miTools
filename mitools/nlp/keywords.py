@@ -1018,6 +1018,9 @@ def create_grams_data(
         grams_data.append(range_grams)
     grams_data = pd.concat(grams_data, axis=0).reset_index(drop=True)
     grams_data["x_pos"] = [pos for pos in range(n_periods) for _ in range(max_ngram)]
+    grams_data.loc[grams_data["x_pos"] == n_periods - 1, "x_pos"] += 0.25 * (
+        len(grams_data.iloc[0, 0].split(" ")) - 1
+    )  # Heuristic for wider last period
     grams_data["y_pos"] = [pos for _ in range(n_periods) for pos in range(max_ngram)]
     return grams_data
 
