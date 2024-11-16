@@ -87,6 +87,11 @@ def read_text_file(text_path: PathLike) -> str:
         return f.read()
 
 
+def write_text_file(text: str, text_path: PathLike) -> None:
+    with open(text_path, "w") as f:
+        f.write(text)
+
+
 def dict_from_kwargs(**kwargs: Dict[str, Any]) -> Dict:
     return kwargs
 
