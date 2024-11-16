@@ -83,10 +83,6 @@ class LLMModel(ABC):
         pass
 
     @abstractmethod
-    def send_request(self, request: Dict, **kwargs) -> Dict:
-        pass
-
-    @abstractmethod
     def parse_request(self, prompt: Prompt, **kwargs) -> Dict:
         pass
 
