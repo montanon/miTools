@@ -1,4 +1,5 @@
 import json
+import threading
 from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass
 from datetime import datetime
@@ -222,3 +223,36 @@ class TokensCounter(ABC):
 
     def usage(self) -> DataFrame:
         return DataFrame([asdict(usage) for usage in self.usage_history])
+
+
+class PersistentTokensCounter(TokensCounter):
+    _instances = []
+    _lock = threading.Lock()
+
+    def __new__(cls, file_path: PathLike, *args, **kwargs):
+        with cls._lock:
+            if file_path not in cls._instances:
+                cls._instances[file_path] = super(PersistentTokensCounter, cls).__new__(
+                    cls
+                )
+        return cls._instances[file_path]
+
+    def __init__(self, file_path: PathLike, cost_per_1k_tokens: float = 0.0):
+        if not hasattr(self, "_initialized"):
+            self.file_path = Path(file_path)
+            self.cost_per_1k_tokens = cost_per_1k_tokens
+            if self.file_path.exists():
+                instance = self.load(self.file_path)
+                self.__dict__.update(instance.__dict__)
+            else:
+                super().__init__(cost_per_1k_tokens)
+                self.save(self.file_path)
+            self._initialized = True
+
+    def update(self, usage: TokenUsageStats) -> None:
+        super().update()
+        self.save(self.file_path)
+
+    def save(self, file_path: PathLike = None) -> None:
+        file_path = file_path or self.file_path
+        super().save(file_path)
