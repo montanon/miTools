@@ -92,6 +92,16 @@ def write_text_file(text: str, text_path: PathLike) -> None:
         f.write(text)
 
 
+def read_json_file(json_path: PathLike) -> Dict:
+    with open(json_path, "r") as f:
+        return json.load(f)
+
+
+def write_json_file(data: Dict, json_path: PathLike) -> None:
+    with open(json_path, "w") as f:
+        json.dump(data, f, indent=4)
+
+
 def dict_from_kwargs(**kwargs: Dict[str, Any]) -> Dict:
     return kwargs
 
