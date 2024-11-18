@@ -262,7 +262,7 @@ class TestPersistentTokensCounter(PersistentTokensCounter):
         return len(text.split())
 
 
-class PersistentTokensCounterTests(unittest.TestCase):
+class PersistentTokensCounterTests(TestCase):
     def setUp(self):
         self.test_dir = tempfile.TemporaryDirectory()
         self.file_path = Path(self.test_dir.name) / "token_counter.json"
@@ -271,15 +271,22 @@ class PersistentTokensCounterTests(unittest.TestCase):
         self.test_dir.cleanup()
 
     def test_singleton_behavior(self):
-        counter1 = TestPersistentTokensCounter(self.file_path, cost_per_1k_tokens=0.02)
-        counter2 = TestPersistentTokensCounter(self.file_path, cost_per_1k_tokens=0.05)
+        counter1 = TestPersistentTokensCounter(
+            self.file_path, cost_per_1M_input_tokens=0.02, cost_per_1M_output_tokens=0.2
+        )
+        counter2 = TestPersistentTokensCounter(
+            self.file_path, cost_per_1M_input_tokens=0.05, cost_per_1M_output_tokens=0.5
+        )
         self.assertIs(counter1, counter2)  # Both should refer to the same instance
+        self.assertEqual(counter1.cost_per_1M_input_tokens, 0.02)
         self.assertEqual(
-            counter1.cost_per_1k_tokens, 0.02
+            counter1.cost_per_1M_output_tokens, 0.2
         )  # The first initialization value is retained
 
     def test_file_based_initialization(self):
-        counter1 = TestPersistentTokensCounter(self.file_path, cost_per_1k_tokens=0.02)
+        counter1 = TestPersistentTokensCounter(
+            self.file_path, cost_per_1M_input_tokens=0.02
+        )
         usage_stats = TokenUsageStats(
             total_tokens=1000,
             prompt_tokens=700,
@@ -293,7 +300,9 @@ class PersistentTokensCounterTests(unittest.TestCase):
         self.assertEqual(counter2.count, 1000)
 
     def test_update_and_auto_save(self):
-        counter = TestPersistentTokensCounter(self.file_path, cost_per_1k_tokens=0.02)
+        counter = TestPersistentTokensCounter(
+            self.file_path, cost_per_1M_input_tokens=0.02
+        )
         usage_stats = TokenUsageStats(
             total_tokens=1000,
             prompt_tokens=700,
@@ -308,7 +317,9 @@ class PersistentTokensCounterTests(unittest.TestCase):
         self.assertEqual(new_counter.completion_tokens_count, 300)
 
     def test_usage_dataframe(self):
-        counter = TestPersistentTokensCounter(self.file_path, cost_per_1k_tokens=0.02)
+        counter = TestPersistentTokensCounter(
+            self.file_path, cost_per_1M_input_tokens=0.02
+        )
         usage_stats1 = TokenUsageStats(
             total_tokens=1000,
             prompt_tokens=700,
@@ -332,36 +343,45 @@ class PersistentTokensCounterTests(unittest.TestCase):
 
     def test_multiple_instances_with_different_paths(self):
         file_path2 = Path(self.test_dir.name) / "token_counter_2.json"
-        counter1 = TestPersistentTokensCounter(self.file_path, cost_per_1k_tokens=0.02)
-        counter2 = TestPersistentTokensCounter(file_path2, cost_per_1k_tokens=0.05)
+        counter1 = TestPersistentTokensCounter(
+            self.file_path, cost_per_1M_input_tokens=0.02
+        )
+        counter2 = TestPersistentTokensCounter(
+            file_path2, cost_per_1M_input_tokens=0.05
+        )
         self.assertIsNot(counter1, counter2)  # Different instances
-        self.assertNotEqual(counter1.cost_per_1k_tokens, counter2.cost_per_1k_tokens)
+        self.assertNotEqual(
+            counter1.cost_per_1M_input_tokens, counter2.cost_per_1M_input_tokens
+        )
 
     def test_empty_file_initialization(self):
         self.assertFalse(self.file_path.exists())
-
-        counter = TestPersistentTokensCounter(self.file_path, cost_per_1k_tokens=0.02)
+        counter = TestPersistentTokensCounter(
+            self.file_path, cost_per_1M_input_tokens=0.02
+        )
         self.assertTrue(self.file_path.exists())
         self.assertEqual(len(counter.usage_history), 0)
 
     def test_data_integrity_after_reload(self):
-        counter = TestPersistentTokensCounter(self.file_path, cost_per_1k_tokens=0.02)
+        counter = TestPersistentTokensCounter(
+            self.file_path, cost_per_1M_input_tokens=0.02
+        )
         usage_stats = TokenUsageStats(
             total_tokens=2000,
             prompt_tokens=1500,
             completion_tokens=500,
-            cost=0.04,
+            cost=3e-5,
             timestamp=datetime.now(),
         )
         counter.update(usage_stats)
         new_counter = TestPersistentTokensCounter(self.file_path)
         self.assertEqual(new_counter.total_tokens_count, 2000)
-        self.assertEqual(new_counter.cost, 0.04)
+        self.assertEqual(new_counter.cost, 3e-5)
 
     def test_invalid_file_path(self):
         with self.assertRaises(FileNotFoundError):
             TestPersistentTokensCounter(
-                "/invalid/path/token_counter.json", cost_per_1k_tokens=0.02
+                "/invalid/path/token_counter.json", cost_per_1M_input_tokens=0.02
             )
 
 

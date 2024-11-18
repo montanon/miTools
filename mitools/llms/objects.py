@@ -272,15 +272,21 @@ class PersistentTokensCounter(TokensCounter):
                 )
         return cls._instances[file_path]
 
-    def __init__(self, file_path: PathLike, cost_per_1k_tokens: float = 0.0):
+    def __init__(
+        self,
+        file_path: PathLike,
+        cost_per_1M_input_tokens: float = 0.0,
+        cost_per_1M_output_tokens: float = 0.0,
+    ):
         if not hasattr(self, "_initialized"):
             self.file_path = Path(file_path)
-            self.cost_per_1k_tokens = cost_per_1k_tokens
+            self.cost_per_1M_input_tokens = cost_per_1M_input_tokens
+            self.cost_per_1M_output_tokens = cost_per_1M_output_tokens
             if self.file_path.exists():
                 instance = self.load(self.file_path)
                 self.__dict__.update(instance.__dict__)
             else:
-                super().__init__(cost_per_1k_tokens)
+                super().__init__(cost_per_1M_input_tokens, cost_per_1M_output_tokens)
                 self.save(self.file_path)
             self._initialized = True
 
