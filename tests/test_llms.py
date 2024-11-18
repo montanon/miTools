@@ -384,6 +384,28 @@ class PersistentTokensCounterTests(TestCase):
                 "/invalid/path/token_counter.json", cost_per_1M_input_tokens=0.02
             )
 
+    def test_save_and_load(self):
+        counter = TestPersistentTokensCounter(
+            self.file_path,
+            cost_per_1M_input_tokens=0.02,
+            cost_per_1M_output_tokens=0.05,
+        )
+        usage_stats = TokenUsageStats(
+            total_tokens=1500,
+            prompt_tokens=1000,
+            completion_tokens=500,
+            cost=0.02,
+            timestamp=datetime.now(),
+        )
+        counter.update(usage_stats)
+        counter.save()
+        loaded_counter = TestPersistentTokensCounter.load(self.file_path)
+        self.assertEqual(len(loaded_counter.usage_history), 1)
+        self.assertEqual(loaded_counter.prompt_tokens_count, 1000)
+        self.assertEqual(loaded_counter.completion_tokens_count, 500)
+        self.assertEqual(loaded_counter.total_tokens_count, 1500)
+        self.assertEqual(loaded_counter.cost, 4.5e-5)
+
 
 if __name__ == "__main__":
     unittest.main()

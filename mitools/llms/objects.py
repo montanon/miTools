@@ -279,12 +279,12 @@ class PersistentTokensCounter(TokensCounter):
         cost_per_1M_output_tokens: float = 0.0,
     ):
         if not hasattr(self, "_initialized"):
-            self.file_path = Path(file_path)
+            self.file_path = Path(file_path).absolute()
             self.cost_per_1M_input_tokens = cost_per_1M_input_tokens
             self.cost_per_1M_output_tokens = cost_per_1M_output_tokens
             if self.file_path.exists():
-                instance = self.load(self.file_path)
-                self.__dict__.update(instance.__dict__)
+                instance_data = self._load_instance_data(self.file_path)
+                self.__dict__.update(instance_data)
             else:
                 super().__init__(cost_per_1M_input_tokens, cost_per_1M_output_tokens)
                 self.save(self.file_path)
@@ -297,3 +297,21 @@ class PersistentTokensCounter(TokensCounter):
     def save(self, file_path: PathLike = None) -> None:
         file_path = file_path or self.file_path
         super().save(file_path)
+
+    def _load_instance_data(self, file_path: PathLike) -> Dict:
+        with open(file_path, "r") as f:
+            data = json.load(f)
+        data["usage_history"] = [
+            TokenUsageStats(**usage) for usage in data["usage_history"]
+        ]
+        return data
+
+    @classmethod
+    def load(cls, file_path: PathLike) -> "PersistentTokensCounter":
+        file_path = Path(file_path)
+        if not file_path.exists():
+            raise FileNotFoundError(f"No file found at {file_path}")
+        instance_data = cls._load_instance_data(cls, file_path)
+        instance = cls(file_path)
+        instance.__dict__.update(instance_data)
+        return instance
