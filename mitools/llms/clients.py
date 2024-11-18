@@ -23,6 +23,7 @@ class OpenAIClient(LLMModel):
         api_key: str = None,
         model: str = "gpt-4o-mini",
         counter: "OpenAITokensCounter" = None,
+        beta: bool = False,
     ):
         self.model = model
         self.client = OpenAI(
@@ -30,6 +31,7 @@ class OpenAIClient(LLMModel):
         )
         self.raw_responses = []
         self.counter = counter
+        self.beta = beta
 
     def parse_request(self, prompt: Prompt) -> Dict:
         return {
@@ -53,7 +55,10 @@ class OpenAIClient(LLMModel):
         return {"name": "OpenAI", "model": self.model}
 
     def _get_response(self, request: Dict, **kwargs) -> Dict:
-        return self.client.chat.completions.create(**request, **kwargs)
+        if not self.beta:
+            return self.client.chat.completions.create(**request, **kwargs)
+        else:
+            return self.client.beta.chat.completions.parse(**request, **kwargs)
 
     def model_name(self) -> str:
         return self.model
@@ -66,7 +71,10 @@ class OpenAITokensCounter(PersistentTokensCounter):
             total_tokens=total_tokens,
             prompt_tokens=response.usage.prompt_tokens,
             completion_tokens=response.usage.completion_tokens,
-            cost=total_tokens * (self.cost_per_1k_tokens / 1000),
+            cost=response.usage.prompt_tokens
+            * (self.cost_per_1M_input_tokens / 1_000_000)
+            + response.usage.completion_tokens
+            * (self.cost_per_1M_output_tokens / 1_000_000),
             timestamp=datetime.fromtimestamp(response.created),
         )
 
