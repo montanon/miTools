@@ -95,7 +95,7 @@ class LLMModel(ABC):
         pass
 
     @abstractmethod
-    def get_response(self, prompt) -> Dict:
+    def _get_response(self, prompt) -> Dict:
         pass
 
     @abstractmethod
