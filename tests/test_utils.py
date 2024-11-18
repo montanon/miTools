@@ -37,6 +37,7 @@ from mitools.utils import (
     lcs_similarity,
     load_pkl_object,
     pretty_dict_str,
+    read_json_file,
     read_text_file,
     remove_chars,
     remove_dataframe_duplicates,
@@ -48,11 +49,12 @@ from mitools.utils import (
     str_is_number,
     stretch_string,
     unpack_list_of_lists,
+    write_json_file,
     write_text_file,
 )
 
 
-class TestIterableChunks(unittest.TestCase):
+class TestIterableChunks(TestCase):
     def test_list_input(self):
         iterable = [1, 2, 3, 4, 5, 6]
         chunk_size = 2
@@ -84,7 +86,7 @@ class TestIterableChunks(unittest.TestCase):
             list(iterable_chunks(iterable, chunk_size))
 
 
-class TestStrIsNumber(unittest.TestCase):
+class TestStrIsNumber(TestCase):
     def test_integer_string(self):
         self.assertTrue(str_is_number("123"))
 
@@ -104,7 +106,7 @@ class TestStrIsNumber(unittest.TestCase):
         self.assertFalse(str_is_number(""))
 
 
-class TestGetNumbersFromStr(unittest.TestCase):
+class TestGetNumbersFromStr(TestCase):
     def test_integer_string(self):
         string = "abc 123 def 456"
         self.assertEqual(get_numbers_from_str(string), [123.0, 456.0])
@@ -130,7 +132,7 @@ class TestGetNumbersFromStr(unittest.TestCase):
         self.assertEqual(get_numbers_from_str(string, 1), 456.0)
 
 
-class TestRemoveMultipleSpaces(unittest.TestCase):
+class TestRemoveMultipleSpaces(TestCase):
     def test_multiple_spaces(self):
         string = "abc   def   ghi"
         self.assertEqual(remove_multiple_spaces(string), "abc def ghi")
@@ -152,7 +154,7 @@ class TestRemoveMultipleSpaces(unittest.TestCase):
         self.assertEqual(remove_multiple_spaces(string), "abc def ghi")
 
 
-class TestFindStrLineNumberInText(unittest.TestCase):
+class TestFindStrLineNumberInText(TestCase):
     def test_substring_at_start(self):
         text = "abc\ndef\nghi"
         substring = "abc"
@@ -174,7 +176,7 @@ class TestFindStrLineNumberInText(unittest.TestCase):
         self.assertEqual(find_str_line_number_in_text(text, substring), None)
 
 
-class TestReadTextFile(unittest.TestCase):
+class TestReadTextFile(TestCase):
     @patch("builtins.open", new_callable=mock_open, read_data="abc\ndef\nghi")
     def test_read_text_file(self, mock_file):
         text_path = "dummy_path"
@@ -183,7 +185,7 @@ class TestReadTextFile(unittest.TestCase):
         mock_file.assert_called_once_with(text_path, "r")
 
 
-class TestWriteTextFile(unittest.TestCase):
+class TestWriteTextFile(TestCase):
     @patch("builtins.open", new_callable=mock_open)
     def test_write_text_file(self, mock_file):
         text_path = "dummy_path"
@@ -191,6 +193,66 @@ class TestWriteTextFile(unittest.TestCase):
         write_text_file(text_to_write, text_path)
         mock_file.assert_called_once_with(text_path, "w")
         mock_file().write.assert_called_once_with(text_to_write)
+
+
+class TestReadJsonFile(TestCase):
+    def setUp(self):
+        self.test_dir = tempfile.TemporaryDirectory()
+        self.file_path = Path(self.test_dir.name) / "test.json"
+
+    def tearDown(self):
+        self.test_dir.cleanup()
+
+    def test_read_valid_json(self):
+        test_data = {"name": "Alice", "age": 30}
+        with open(self.file_path, "w") as f:
+            json.dump(test_data, f)
+        result = read_json_file(self.file_path)
+        self.assertEqual(result, test_data)
+
+    def test_read_nonexistent_file(self):
+        nonexistent_path = Path(self.test_dir.name) / "nonexistent.json"
+        with self.assertRaises(FileNotFoundError):
+            read_json_file(nonexistent_path)
+
+    def test_read_invalid_json(self):
+        with open(self.file_path, "w") as f:
+            f.write("{invalid_json}")
+        with self.assertRaises(json.JSONDecodeError):
+            read_json_file(self.file_path)
+
+
+class TestWriteJsonFile(TestCase):
+    def setUp(self):
+        self.test_dir = tempfile.TemporaryDirectory()
+        self.file_path = Path(self.test_dir.name) / "test.json"
+
+    def tearDown(self):
+        self.test_dir.cleanup()
+
+    def test_write_valid_json(self):
+        test_data = {"name": "Alice", "age": 30}
+        write_json_file(test_data, self.file_path)
+        with open(self.file_path, "r") as f:
+            result = json.load(f)
+        self.assertEqual(result, test_data)
+
+    def test_write_empty_json(self):
+        test_data = {}
+        write_json_file(test_data, self.file_path)
+        with open(self.file_path, "r") as f:
+            result = json.load(f)
+        self.assertEqual(result, test_data)
+
+    def test_write_overwrites_existing_file(self):
+        initial_data = {"name": "Bob"}
+        with open(self.file_path, "w") as f:
+            json.dump(initial_data, f)
+        new_data = {"name": "Alice", "age": 30}
+        write_json_file(new_data, self.file_path)
+        with open(self.file_path, "r") as f:
+            result = json.load(f)
+        self.assertEqual(result, new_data)
 
 
 class TestDictFromKwargs(unittest.TestCase):
