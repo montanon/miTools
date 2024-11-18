@@ -197,6 +197,19 @@ class TokensCounterTests(TestCase):
         self.assertEqual(data["cost_per_1k_tokens"], 0.02)
         file_path.unlink()  # Cleanup
 
+    def test_usage_dataframe(self):
+        self.counter.update(self.usage_sample)
+        self.counter.update(self.usage_sample)
+        self.counter.update(self.usage_sample)
+        self.counter.update(self.usage_sample)
+        self.counter.update(self.usage_sample)
+        df = self.counter.usage()
+        self.assertEqual(df.shape, (5, 5))
+        self.assertEqual(df.loc[0, "total_tokens"], 100)
+        self.assertEqual(df.loc[0, "prompt_tokens"], 60)
+        self.assertEqual(df.loc[0, "completion_tokens"], 40)
+        self.assertAlmostEqual(df.loc[0, "cost"], 0.002)
+
     def test_load_from_json(self):
         file_path = Path("test_tokens_counter.json")
         self.counter.update(self.usage_sample)
