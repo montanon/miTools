@@ -226,7 +226,7 @@ class TokensCounter(ABC):
 
 
 class PersistentTokensCounter(TokensCounter):
-    _instances = []
+    _instances = {}
     _lock = threading.Lock()
 
     def __new__(cls, file_path: PathLike, *args, **kwargs):
@@ -250,7 +250,7 @@ class PersistentTokensCounter(TokensCounter):
             self._initialized = True
 
     def update(self, usage: TokenUsageStats) -> None:
-        super().update()
+        super().update(usage)
         self.save(self.file_path)
 
     def save(self, file_path: PathLike = None) -> None:
