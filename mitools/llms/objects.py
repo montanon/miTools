@@ -176,11 +176,27 @@ class TokensCounter(ABC):
             self.prompt_tokens_count
         ) + self._calculate_output_cost(self.completion_tokens_count)
 
-    def _calculate_input_cost(self, input_token_count: int) -> float:
-        return self.cost_per_1M_input_tokens * (input_token_count / 1_000_000)
+    def _calculate_input_cost(self, input_token_count: int = None) -> float:
+        return (
+            self.cost_per_1M_input_tokens
+            * (
+                self.prompt_tokens_count
+                if input_token_count is None
+                else input_token_count
+            )
+            / 1_000_000
+        )
 
-    def _calculate_output_cost(self, output_token_count: int) -> float:
-        return self.cost_per_1M_output_tokens * (output_token_count / 1_000_000)
+    def _calculate_output_cost(self, output_token_count: int = None) -> float:
+        return (
+            self.cost_per_1M_output_tokens
+            * (
+                self.completion_tokens_count
+                if output_token_count is None
+                else output_token_count
+            )
+            / 1_000_000
+        )
 
     @property
     def count(self) -> int:
