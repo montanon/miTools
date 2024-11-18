@@ -6,6 +6,8 @@ from os import PathLike
 from pathlib import Path
 from typing import Dict, List, Optional, Union
 
+from pandas import DataFrame
+
 from mitools.exceptions import ArgumentKeyError, ArgumentTypeError, ArgumentValueError
 
 
@@ -217,3 +219,6 @@ class TokensCounter(ABC):
             TokenUsageStats(**usage) for usage in data["usage_history"]
         ]
         return instance
+
+    def usage(self) -> DataFrame:
+        return DataFrame([asdict(usage) for usage in self.usage_history])
