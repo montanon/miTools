@@ -138,7 +138,9 @@ class TestTokensCounter(TokensCounter):
 
 class TokensCounterTests(TestCase):
     def setUp(self):
-        self.counter = TestTokensCounter(cost_per_1k_tokens=0.02)
+        self.counter = TestTokensCounter(
+            cost_per_1M_input_tokens=0.02, cost_per_1M_output_tokens=0.2
+        )
         self.usage_sample = TokenUsageStats(
             total_tokens=100,
             prompt_tokens=60,
@@ -148,7 +150,8 @@ class TokensCounterTests(TestCase):
         )
 
     def test_initialization(self):
-        self.assertEqual(self.counter.cost_per_1k_tokens, 0.02)
+        self.assertEqual(self.counter.cost_per_1M_input_tokens, 0.02)
+        self.assertEqual(self.counter.cost_per_1M_output_tokens, 0.2)
         self.assertEqual(self.counter.prompt_tokens_count, 0)
         self.assertEqual(self.counter.completion_tokens_count, 0)
         self.assertEqual(self.counter.total_tokens_count, 0)
@@ -171,15 +174,17 @@ class TokensCounterTests(TestCase):
         self.assertFalse(self.counter.would_exceed_context("word " * 49))
 
     def test_cost_calculation(self):
-        self.assertEqual(self.counter._calculate_cost(1000), 0.02)
-        self.assertEqual(self.counter._calculate_cost(500), 0.01)
+        self.counter.update(self.usage_sample)
+        self.assertEqual(self.counter._calculate_cost(), 9.2e-6)
+        self.assertEqual(self.counter._calculate_input_cost(), 1.2e-6)
+        self.assertEqual(self.counter._calculate_output_cost(), 8e-6)
 
     def test_cost_detail(self):
         self.counter.update(self.usage_sample)
         cost_detail = self.counter.cost_detail
-        self.assertAlmostEqual(cost_detail["cost"]["total_tokens"], 0.002)
-        self.assertAlmostEqual(cost_detail["cost"]["prompt_tokens"], 0.0012)
-        self.assertAlmostEqual(cost_detail["cost"]["completion_tokens"], 0.0008)
+        self.assertAlmostEqual(cost_detail["cost"]["total"], 9.2e-6)
+        self.assertAlmostEqual(cost_detail["cost"]["prompt_tokens"], 1.2e-6)
+        self.assertAlmostEqual(cost_detail["cost"]["completion_tokens"], 8e-6)
 
     def test_json_serialization(self):
         self.counter.update(self.usage_sample)
@@ -188,19 +193,20 @@ class TokensCounterTests(TestCase):
         self.assertEqual(data["prompt_tokens_count"], 60)
         self.assertEqual(data["completion_tokens_count"], 40)
         self.assertEqual(data["total_tokens_count"], 100)
-        self.assertEqual(data["cost_per_1k_tokens"], 0.02)
+        self.assertEqual(data["cost_per_1M_input_tokens"], 0.02)
+        self.assertEqual(data["cost_per_1M_output_tokens"], 0.2)
 
     def test_save_to_json(self):
         file_path = Path("test_tokens_counter.json")
         self.counter.update(self.usage_sample)
         self.counter.save(file_path)
-
         with open(file_path, "r") as f:
             data = json.load(f)
         self.assertEqual(data["prompt_tokens_count"], 60)
         self.assertEqual(data["completion_tokens_count"], 40)
         self.assertEqual(data["total_tokens_count"], 100)
-        self.assertEqual(data["cost_per_1k_tokens"], 0.02)
+        self.assertEqual(data["cost_per_1M_input_tokens"], 0.02)
+        self.assertEqual(data["cost_per_1M_output_tokens"], 0.2)
         file_path.unlink()  # Cleanup
 
     def test_usage_dataframe(self):
@@ -226,7 +232,7 @@ class TokensCounterTests(TestCase):
         self.assertEqual(loaded_counter.completion_tokens_count, 40)
         self.assertEqual(loaded_counter.total_tokens_count, 100)
         self.assertEqual(len(loaded_counter.usage_history), 1)
-        self.assertAlmostEqual(loaded_counter.cost, 0.002)
+        self.assertAlmostEqual(loaded_counter.cost, 9.2e-6)
         file_path.unlink()  # Cleanup
 
     def test_invalid_file_extension(self):
