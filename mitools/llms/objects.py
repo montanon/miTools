@@ -134,12 +134,17 @@ class TokenUsageStats:
 
 
 class TokensCounter(ABC):
-    def __init__(self, cost_per_1k_tokens: float = 0.0):
+    def __init__(
+        self,
+        cost_per_1M_input_tokens: float = 0.0,
+        cost_per_1M_output_tokens: float = 0.0,
+    ):
         self.usage_history: List[TokenUsageStats] = []
         self.prompt_tokens_count: int = 0
         self.completion_tokens_count: int = 0
         self.total_tokens_count: int = 0
-        self.cost_per_1k_tokens = cost_per_1k_tokens
+        self.cost_per_1M_input_tokens: float = cost_per_1M_input_tokens
+        self.cost_per_1M_output_tokens: float = cost_per_1M_output_tokens
         self.max_context_length: Optional[int] = None
 
     @abstractmethod
@@ -166,8 +171,16 @@ class TokensCounter(ABC):
             return False
         return self.count_tokens(text) > self.max_context_length
 
-    def _calculate_cost(self, token_count: int) -> float:
-        return self.cost_per_1k_tokens * (token_count / 1000)
+    def _calculate_cost(self) -> float:
+        return self._calculate_input_cost(
+            self.prompt_tokens_count
+        ) + self._calculate_output_cost(self.completion_tokens_count)
+
+    def _calculate_input_cost(self, input_token_count: int) -> float:
+        return self.cost_per_1M_input_tokens * (input_token_count / 1_000_000)
+
+    def _calculate_output_cost(self, output_token_count: int) -> float:
+        return self.cost_per_1M_output_tokens * (output_token_count / 1_000_000)
 
     @property
     def count(self) -> int:
@@ -175,18 +188,20 @@ class TokensCounter(ABC):
 
     @property
     def cost(self) -> float:
-        return self._calculate_cost(self.total_tokens_count)
+        return self._calculate_cost()
 
     @property
     def cost_detail(self) -> Dict:
         return {
             "cost": {
-                "total_tokens": self._calculate_cost(self.total_tokens_count),
-                "prompt_tokens": self._calculate_cost(self.prompt_tokens_count),
-                "completion_tokens": self._calculate_cost(self.completion_tokens_count),
-                "cost": self._calculate_cost(self.cost),
+                "prompt_tokens": self._calculate_input_cost(self.prompt_tokens_count),
+                "completion_tokens": self._calculate_output_cost(
+                    self.completion_tokens_count
+                ),
+                "total": self.cost,
             },
-            "cost_per_1k_tokens": self.cost_per_1k_tokens,
+            "cost_per_1M_input_tokens": self.cost_per_1M_input_tokens,
+            "cost_per_1M_output_tokens": self.cost_per_1M_output_tokens,
         }
 
     def json(self) -> str:
@@ -195,7 +210,8 @@ class TokensCounter(ABC):
             "prompt_tokens_count": self.prompt_tokens_count,
             "completion_tokens_count": self.completion_tokens_count,
             "total_tokens_count": self.total_tokens_count,
-            "cost_per_1k_tokens": self.cost_per_1k_tokens,
+            "cost_per_1M_input_tokens": self.cost_per_1M_input_tokens,
+            "cost_per_1M_output_tokens": self.cost_per_1M_output_tokens,
             "max_context_length": self.max_context_length,
             "cost_detail": self.cost_detail,
         }
@@ -211,7 +227,9 @@ class TokensCounter(ABC):
     def load(cls, file_path: PathLike) -> "TokensCounter":
         with open(file_path, "r") as f:
             data = json.load(f)
-        instance = cls(data["cost_per_1k_tokens"])
+        instance = cls(
+            data["cost_per_1M_input_tokens"], data["cost_per_1M_output_tokens"]
+        )
         instance.prompt_tokens_count = data["prompt_tokens_count"]
         instance.completion_tokens_count = data["completion_tokens_count"]
         instance.total_tokens_count = data["total_tokens_count"]
@@ -230,6 +248,7 @@ class PersistentTokensCounter(TokensCounter):
     _lock = threading.Lock()
 
     def __new__(cls, file_path: PathLike, *args, **kwargs):
+        file_path = Path(file_path).absolute()
         with cls._lock:
             if file_path not in cls._instances:
                 cls._instances[file_path] = super(PersistentTokensCounter, cls).__new__(
