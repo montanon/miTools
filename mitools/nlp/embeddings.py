@@ -2,7 +2,7 @@ import sqlite3
 import warnings
 from ast import literal_eval
 from os import PathLike
-from typing import Callable, Iterable, List, Optional, Tuple, Union
+from typing import Callable, Dict, Iterable, List, Literal, Optional, Tuple, Union
 
 import pandas as pd
 import torch
@@ -12,8 +12,10 @@ from numba.core.errors import NumbaDeprecationWarning, NumbaPendingDeprecationWa
 from numpy import float64, ndarray
 from pandas import DataFrame, Series
 from tqdm import tqdm
-from transformers import AutoModel, AutoTokenizer
+from transformers import AutoModel, AutoTokenizer, PreTrainedTokenizer
 from umap import UMAP
+
+from mitools.exceptions import ArgumentValueError
 
 from ..etl import CustomConnection
 from ..utils import iterable_chunks
@@ -34,6 +36,52 @@ def get_device() -> str:
         if torch.cuda.is_available()
         else "cpu"
     )
+
+
+def huggingface_embed_texts(
+    texts: Union[List[str], str],
+    tokenizer: Union[AutoTokenizer, str],
+    model: Union[AutoModel, str],
+    device: str = None,
+    return_device: str = "cpu",
+    pooling: Literal["mean", "cls"] = "cls",
+    output_type: Literal["tensor", "numpy", "list"] = "numpy",
+):
+    if pooling not in ["mean", "cls"]:
+        raise ArgumentValueError(
+            f"'pooling'={pooling} must be one from ['mean', 'cls']"
+        )
+    if output_type not in ["tensor", "numpy", "list"]:
+        raise ArgumentValueError(
+            f"'output_type'={output_type} must be one from ['tensor', 'numpy', 'list']"
+        )
+    if isinstance(texts, str):
+        texts = [texts]
+    if isinstance(tokenizer, str):
+        tokenizer = AutoTokenizer.from_pretrained(tokenizer)
+    if isinstance(model, str):
+        model = AutoModel.from_pretrained(model)
+    if device is None:
+        device = get_device()
+    model = model.to(device)
+    inputs = tokenizer(
+        texts, padding=True, truncation=True, return_tensors="pt", max_length=512
+    ).to(device)
+    result = model(**inputs)
+    if pooling == "cls":
+        embeddings = result.last_hidden_state[:, 0, :]
+    elif pooling == "mean":
+        attention_mask = inputs["attention_mask"].unsqueeze(-1)
+        sum_embeddings = torch.sum(result.last_hidden_state * attention_mask, dim=1)
+        sum_mask = attention_mask.sum(dim=1).clamp(min=1e-9)  # Avoid division by zero
+        embeddings = sum_embeddings / sum_mask
+    embeddings = embeddings.detach().to(return_device)
+    if output_type == "tensor":
+        return embeddings
+    elif output_type == "numpy":
+        return embeddings.cpu().numpy()
+    elif output_type == "list":
+        return embeddings.cpu().numpy().tolist()
 
 
 def huggingface_specter_embed_texts_and_store(
@@ -76,7 +124,7 @@ def huggingface_specter_embed_texts_and_store(
 def huggingface_specter_embed_texts(
     texts: Union[List[str], str], batch_size: Optional[int] = MAX_BATCH_SIZE
 ) -> List[ndarray]:
-    device = "mps" if torch.backends.mps.is_available() else "cpu"
+    device = get_device()
     tokenizer = AutoTokenizer.from_pretrained("allenai/specter")
     model = AutoModel.from_pretrained("allenai/specter").to(device)
     embeddings = []
@@ -91,7 +139,7 @@ def huggingface_specter_embed_chunk(
     inputs = tokenizer(
         chunk, padding=True, truncation=True, return_tensors="pt", max_length=512
     )
-    device = "mps" if torch.backends.mps.is_available() else "cpu"
+    device = get_device()
     inputs = inputs.to(device)
     result = model(**inputs)
     return result.last_hidden_state[:, 0, :].detach().to("cpu").numpy().tolist()
