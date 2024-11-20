@@ -40,13 +40,18 @@ def get_device() -> str:
 
 def huggingface_embed_texts(
     texts: Union[List[str], str],
-    tokenizer: Union[AutoTokenizer, str],
     model: Union[AutoModel, str],
+    tokenizer: Union[AutoTokenizer, str],
+    tokenizer_length: int = 512,
     device: str = None,
     return_device: str = "cpu",
     pooling: Literal["mean", "cls"] = "cls",
     output_type: Literal["tensor", "numpy", "list"] = "numpy",
 ):
+    if not texts:
+        raise ArgumentValueError(
+            "'texts' must be a non-empty list of strings or single string."
+        )
     if pooling not in ["mean", "cls"]:
         raise ArgumentValueError(
             f"'pooling'={pooling} must be one from ['mean', 'cls']"
@@ -55,19 +60,24 @@ def huggingface_embed_texts(
         raise ArgumentValueError(
             f"'output_type'={output_type} must be one from ['tensor', 'numpy', 'list']"
         )
-    if isinstance(texts, str):
-        texts = [texts]
-    if isinstance(tokenizer, str):
-        tokenizer = AutoTokenizer.from_pretrained(tokenizer)
-    if isinstance(model, str):
-        model = AutoModel.from_pretrained(model)
-    if device is None:
-        device = get_device()
+    texts = [texts] if isinstance(texts, str) else texts
+    tokenizer = (
+        AutoTokenizer.from_pretrained(tokenizer)
+        if isinstance(tokenizer, str)
+        else tokenizer
+    )
+    model = AutoModel.from_pretrained(model) if isinstance(model, str) else model
+    device = device or get_device()
     model = model.to(device)
     inputs = tokenizer(
-        texts, padding=True, truncation=True, return_tensors="pt", max_length=512
+        texts,
+        padding=True,
+        truncation=True,
+        return_tensors="pt",
+        max_length=tokenizer_length,
     ).to(device)
-    result = model(**inputs)
+    with torch.no_grad():
+        result = model(**inputs)
     if pooling == "cls":
         embeddings = result.last_hidden_state[:, 0, :]
     elif pooling == "mean":
