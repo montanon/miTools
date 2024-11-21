@@ -94,6 +94,69 @@ def huggingface_embed_texts(
         return embeddings.cpu().numpy().tolist()
 
 
+def huggingface_embed_texts_chunks(
+    texts: Union[List[str], str],
+    model: Union[AutoModel, str],
+    tokenizer: Union[AutoTokenizer, str],
+    tokenizer_length: int = 512,
+    batch_size: Optional[int] = MAX_BATCH_SIZE,
+    device: str = None,
+    return_device: str = "cpu",
+    pooling: Literal["mean", "cls"] = "cls",
+    output_type: Literal["tensor", "numpy", "list"] = "numpy",
+):
+    if not texts:
+        raise ArgumentValueError(
+            "'texts' must be a non-empty list of strings or single string."
+        )
+    if pooling not in ["mean", "cls"]:
+        raise ArgumentValueError(
+            f"'pooling'={pooling} must be one from ['mean', 'cls']"
+        )
+    if output_type not in ["tensor", "numpy", "list"]:
+        raise ArgumentValueError(
+            f"'output_type'={output_type} must be one from ['tensor', 'numpy', 'list']"
+        )
+    texts = [texts] if isinstance(texts, str) else texts
+    tokenizer = (
+        AutoTokenizer.from_pretrained(tokenizer)
+        if isinstance(tokenizer, str)
+        else tokenizer
+    )
+    model = AutoModel.from_pretrained(model) if isinstance(model, str) else model
+    device = device or get_device()
+    model = model.to(device)
+    embeddings_chunks = []
+    for chunk in iterable_chunks(texts, batch_size):
+        inputs = tokenizer(
+            chunk,
+            padding=True,
+            truncation=True,
+            return_tensors="pt",
+            max_length=tokenizer_length,
+        ).to(device)
+        with torch.no_grad():
+            result = model(**inputs)
+        if pooling == "cls":
+            embeddings = result.last_hidden_state[:, 0, :]
+        elif pooling == "mean":
+            attention_mask = inputs["attention_mask"].unsqueeze(-1)
+            sum_embeddings = torch.sum(result.last_hidden_state * attention_mask, dim=1)
+            sum_mask = attention_mask.sum(dim=1).clamp(
+                min=1e-9
+            )  # Avoid division by zero
+            embeddings = sum_embeddings / sum_mask
+        embeddings = embeddings.detach().to(return_device)
+        embeddings_chunks.append(embeddings)
+    embeddings = torch.vstack(embeddings_chunks)
+    if output_type == "tensor":
+        return embeddings
+    elif output_type == "numpy":
+        return embeddings.cpu().numpy()
+    elif output_type == "list":
+        return embeddings.cpu().numpy().tolist()
+
+
 def huggingface_specter_embed_texts_and_store(
     ids: Union[List[str], str],
     texts: Union[List[str], str],
