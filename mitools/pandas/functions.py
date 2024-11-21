@@ -10,6 +10,7 @@ from tqdm import tqdm
 from mitools.exceptions.custom_exceptions import ArgumentTypeError, ArgumentValueError
 
 INT_COL_ERROR = "Value or values in any of columns={} cannnot be converted into int."
+BOOL_COL_ERROR = "Value or values in any of columns={} cannnot be converted into bool."
 NON_DATE_COL_ERROR = (
     "Column {} has values that cannot be converted to datetime objects."
 )
@@ -92,9 +93,26 @@ def prepare_date_cols(
     return dataframe
 
 
-def prepare_bool_cols(df: DataFrame, cols: Union[Iterable[str], str]) -> DataFrame:
-    df[cols] = df[cols].astype(bool)
-    return df
+def prepare_bool_cols(
+    dataframe: DataFrame, cols: Union[Iterable[str], str], nan_placeholder: bool = False
+) -> DataFrame:
+    cols = [cols] if isinstance(cols, str) else cols
+    if not isinstance(cols, Iterable) or not all(isinstance(c, str) for c in cols):
+        raise ArgumentTypeError(
+            "Argument 'cols' must be a string or an iterable of strings."
+        )
+    missing_cols = [col for col in cols if col not in dataframe.columns]
+    if missing_cols:
+        raise ArgumentValueError(f"Columns {missing_cols} not found in DataFrame.")
+    try:
+        for col in cols:
+            dataframe[col] = dataframe[col].fillna(nan_placeholder)
+            dataframe[col] = dataframe[col].astype(bool)
+    except Exception as e:
+        raise ArgumentTypeError(
+            f"{BOOL_COL_ERROR.format(col)}: {cols}. Details: {str(e)}"
+        )
+    return dataframe
 
 
 def build_group_subgroup(
