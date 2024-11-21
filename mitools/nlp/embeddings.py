@@ -267,3 +267,45 @@ def umap_embeddings(
         data.values if isinstance(data, DataFrame) else data
     )
     return embeddings if not return_reducer else reducer
+
+
+def plot_umap_points(
+    reducer: UMAP,
+    labels: Sequence = None,
+    color_key_cmap: str = "Paired",
+    background: str = "white",
+    theme: str = None,
+    width: int = 800,
+    height: int = 800,
+    show_legend=True,
+    ax: Axes = None,
+    alpha: float = 1.0,
+) -> Axes:
+    if not len(reducer.embedding_) == len(labels):
+        raise ArgumentValueError(
+            "The number of labels must match the number of embeddings."
+        )
+    return umap.plot.points(
+        reducer,
+        labels=labels,
+        color_key_cmap=color_key_cmap,
+        theme=theme,
+        background=background,
+        width=width,
+        height=height,
+        show_legend=show_legend,
+        ax=ax,
+        alpha=alpha,
+    )
+
+
+def plot_umap_interactive(reducer: UMAP):
+    pass
+
+
+def plot_umap_connectivity(reducer: UMAP):
+    pass
+
+
+def plot_umap_diagnostic(reducer: UMAP):
+    pass
