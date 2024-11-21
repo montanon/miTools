@@ -9,6 +9,7 @@ from pandas import DataFrame
 from sklearn.manifold import TSNE
 from torch import Tensor
 from transformers import AutoModel, AutoTokenizer
+from umap import UMAP
 
 from mitools.exceptions import ArgumentValueError
 from mitools.nlp import (
@@ -295,7 +296,7 @@ class TestSpecterEmbedTexts(TestCase):
             )
 
 
-class TestTSNEEmbeddings(unittest.TestCase):
+class TestTSNEEmbeddings(TestCase):
     def setUp(self):
         self.array_data = np.random.rand(100, 50)  # 100 samples, 50 features
         self.df_data = DataFrame(self.array_data)
@@ -322,6 +323,37 @@ class TestTSNEEmbeddings(unittest.TestCase):
 
     def test_custom_perplexity(self):
         result = tsne_embeddings(self.array_data, perplexity=50.0, random_state=42)
+        self.assertIsInstance(result, np.ndarray)
+        self.assertEqual(result.shape, (100, 2))  # Default 2 dimensions
+
+
+class TestUMAPEmbeddings(unittest.TestCase):
+    def setUp(self):
+        self.array_data = np.random.rand(100, 50)  # 100 samples, 50 features
+        self.df_data = DataFrame(self.array_data)
+
+    def test_embeddings_with_ndarray(self):
+        result = umap_embeddings(self.array_data, n_components=2, random_state=42)
+        self.assertIsInstance(result, np.ndarray)
+        self.assertEqual(result.shape, (100, 2))  # 100 samples reduced to 2 dimensions
+
+    def test_embeddings_with_dataframe(self):
+        result = umap_embeddings(self.df_data, n_components=3, random_state=42)
+        self.assertIsInstance(result, np.ndarray)
+        self.assertEqual(result.shape, (100, 3))  # 100 samples reduced to 3 dimensions
+
+    def test_return_reducer(self):
+        reducer = umap_embeddings(
+            self.array_data, n_components=2, random_state=42, return_reducer=True
+        )
+        self.assertIsInstance(reducer.embedding_, np.ndarray)
+        self.assertIsInstance(reducer, UMAP)
+        self.assertEqual(
+            reducer.embedding_.shape, (100, 2)
+        )  # 100 samples reduced to 2 dimensions
+
+    def test_custom_neighbors(self):
+        result = umap_embeddings(self.array_data, n_neighbors=10, random_state=42)
         self.assertIsInstance(result, np.ndarray)
         self.assertEqual(result.shape, (100, 2))  # Default 2 dimensions
 
