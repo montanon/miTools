@@ -1,6 +1,6 @@
 from os import PathLike
 from pathlib import Path
-from typing import Any, Iterable, List, Literal, Optional, Union
+from typing import Any, Dict, Iterable, List, Literal, Optional, Union
 
 import pandas as pd
 from pandas import DataFrame
@@ -134,14 +134,11 @@ def reshape_country_indicators(
         country_column (str): The column identifying countries.
         region_column (str): The column identifying regions or sub-regions within countries.
         year_column (str): The column representing years.
-        aggregation_function (str): The aggregation function to apply to the indicators (default is 'first').
+        agg_func (str): The aggregation function to apply to the indicators (default is 'first').
 
     Returns:
         DataFrame: A pivoted DataFrame with `year_column` as the index,
                    `region_column` values as columns, and aggregated indicators.
-
-    Raises:
-        ArgumentValueError: If required columns are missing or the specified country is not found.
     """
     return reshape_group_data(
         dataframe=data,
@@ -150,7 +147,7 @@ def reshape_country_indicators(
         group_column=country_column,
         subgroup_column=region_column,
         time_column=year_column,
-        agg_fun=aggregation_function,
+        agg_func=aggregation_function,
     )
 
 
@@ -161,7 +158,7 @@ def reshape_group_data(
     group_column: str,
     subgroup_column: str,
     time_column: str,
-    agg_fun: str = "first",
+    agg_func: str = "first",
 ) -> DataFrame:
     required_columns = {value_column, group_column, subgroup_column, time_column}
     missing_columns = required_columns - set(dataframe.columns)
@@ -178,7 +175,7 @@ def reshape_group_data(
         filtered_data.groupby(by=[time_column, group_column, subgroup_column])[
             [value_column]
         ]
-        .agg(agg_fun)
+        .agg(agg_func)
         .reset_index()
     )
     pivoted_data = grouped_data.pivot(
@@ -188,40 +185,72 @@ def reshape_group_data(
     return pivoted_data
 
 
-def build_group_subgroup(
+def reshape_countries_indicators(
+    data: DataFrame,
+    country_column: str,
+    indicator_column: str,
+    region_column: str,
+    time_column: str,
+    agg_func: str = "first",
+) -> DataFrame:
+    """
+    Reshapes data for countries by aggregating and pivoting regional indicators over years.
+
+    Args:
+        data (DataFrame): The input DataFrame.
+        country_column (str): The column identifying the country.
+        indicator_column (str): The column containing the indicator values to aggregate.
+        region_column (str): The column identifying regions within each country.
+        time_column (str): The column representing time.
+        agg_func (str): Aggregation function to apply (default is "first").
+
+    Returns:
+        DataFrame: A multi-index DataFrame with countries as primary columns
+                   and industries as secondary columns.
+    """
+    return reshape_groups_subgroups(
+        dataframe=data,
+        group_column=country_column,
+        value_column=indicator_column,
+        subgroup_column=region_column,
+        time_column=time_column,
+        agg_func=agg_func,
+    )
+
+
+def reshape_groups_subgroups(
     dataframe: DataFrame,
-    value_col: str,
-    entity: str,
-    group_col: str,
-    subgroup_col: str,
-    time_col,
+    group_column: str,
+    value_column: str,
+    subgroup_column: str,
+    time_column: str,
+    agg_func: str = "first",
 ) -> DataFrame:
-    group_df = dataframe.query(f'{group_col} == "{entity}"')
-    group_subgroups = (
-        group_df.groupby(by=[time_col, group_col, subgroup_col])[[value_col]]
-        .first()
-        .reset_index()
-    )
-    group_subgroups = group_subgroups.pivot(
-        index=time_col, columns=subgroup_col, values=value_col
-    )
-    group_subgroups.index.name = entity
-    return group_subgroups
-
-
-def build_groups_subgroups(
-    df: DataFrame, group_col: str, value_col: str, subgroup_col: str, time_col: str
-) -> DataFrame:
-    groups_subgroups = {}
-    for entity in tqdm(df[group_col].unique()):
-        groups_subgroups[entity] = build_group_subgroup(
-            df, entity, value_col, group_col, subgroup_col, time_col
+    required_columns = {value_column, group_column, subgroup_column, time_column}
+    missing_columns = required_columns - set(dataframe.columns)
+    if missing_columns:
+        raise ArgumentValueError(
+            f"Columns {missing_columns} not found in the DataFrame."
         )
-    for entity, subgroups in groups_subgroups.items():
-        subgroups.columns = pd.MultiIndex.from_product([[entity], subgroups.columns])
-    groups_subgroups = pd.concat(groups_subgroups.values(), axis=1)
-    groups_subgroups.columns.names = [group_col, groups_subgroups.columns.names[1]]
-    return groups_subgroups
+    groups_subgroups: Dict[str, DataFrame] = {}
+    for group in tqdm(dataframe[group_column].unique(), desc="Processing groups"):
+        try:
+            groups_subgroups[group] = reshape_group_data(
+                dataframe=dataframe,
+                filter_value=group,
+                value_column=value_column,
+                group_column=group_column,
+                subgroup_column=subgroup_column,
+                time_column=time_column,
+                agg_fun=agg_func,
+            )
+        except ArgumentValueError as e:
+            raise ValueError(f"Error processing group '{group}': {str(e)}")
+    for group, subgroups in groups_subgroups.items():
+        subgroups.columns = pd.MultiIndex.from_product([[group], subgroups.columns])
+    combined_groups = pd.concat(groups_subgroups.values(), axis=1)
+    combined_groups.columns.names = [group_column, subgroup_column]
+    return combined_groups
 
 
 def build_group(
