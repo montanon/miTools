@@ -6,7 +6,6 @@ from typing import Callable, Dict, List, Literal, Sequence, Union
 import numpy as np
 import pandas as pd
 import torch
-import umap.plot
 from adapters import AutoAdapterModel
 from matplotlib.axes import Axes
 from nltk.tokenize.api import StringTokenizer
@@ -24,9 +23,9 @@ from mitools.exceptions import ArgumentValueError
 from ..etl import CustomConnection
 from ..utils import iterable_chunks
 
-# warnings.simplefilter("ignore", NumbaDeprecationWarning)
-# warnings.simplefilter("ignore", NumbaPendingDeprecationWarning)
-
+warnings.simplefilter("ignore", NumbaDeprecationWarning)
+warnings.simplefilter("ignore", NumbaPendingDeprecationWarning)
+import umap.plot
 
 SPECTER_EMBEDDINGS_URL = "https://model-apis.semanticscholar.org/specter/v1/invoke"
 MAX_BATCH_SIZE = 16
@@ -200,7 +199,7 @@ def tsne_embeddings(
     perplexity: float = 30.0,
     early_exaggeration: float = 12.0,
     learning_rate: Union[float, str] = "auto",
-    max_iter: int = 1_000,
+    n_iter: int = 1_000,
     n_iter_without_progress: int = 300,
     min_grad_norm: float = 1e-7,
     metric: Union[str, Callable] = "euclidean",
@@ -211,14 +210,13 @@ def tsne_embeddings(
     method: Literal["barnes_hut", "exact"] = "barnes_hut",
     angle: float = 0.5,
     n_jobs: int = None,
-    n_iter: int = None,
 ):
     tsne = TSNE(
         n_components=n_components,
         perplexity=perplexity,
         early_exaggeration=early_exaggeration,
         learning_rate=learning_rate,
-        max_iter=max_iter,
+        n_iter=n_iter,
         n_iter_without_progress=n_iter_without_progress,
         min_grad_norm=min_grad_norm,
         metric=metric,
@@ -229,7 +227,6 @@ def tsne_embeddings(
         method=method,
         angle=angle,
         n_jobs=n_jobs,
-        n_iter=n_iter,
     )
     embeddings = tsne.fit_transform(
         data.values if isinstance(data, DataFrame) else data
@@ -410,7 +407,6 @@ def plot_umap_connectivity(
     background: str = "white",
     width: int = 800,
     height: int = 800,
-    ax: Axes = None,
 ) -> Axes:
     if values is not None and len(values) != len(reducer.embedding_):
         raise ArgumentValueError(
@@ -434,7 +430,6 @@ def plot_umap_connectivity(
         background=background,
         width=width,
         height=height,
-        ax=ax,
     )
 
 
