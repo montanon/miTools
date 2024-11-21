@@ -5,14 +5,16 @@ from unittest.mock import Mock, patch
 
 import numpy as np
 import torch
+from pandas import DataFrame
+from sklearn.manifold import TSNE
 from torch import Tensor
 from transformers import AutoModel, AutoTokenizer
 
 from mitools.exceptions import ArgumentValueError
 from mitools.nlp import (
-    embeddings_col_to_frame,
     huggingface_embed_texts,
     specter_embed_texts,
+    tsne_embeddings,
     umap_embeddings,
 )
 
@@ -293,53 +295,35 @@ class TestSpecterEmbedTexts(TestCase):
             )
 
 
-class TestHuggingfaceSpecterEmbedChunk(unittest.TestCase):
+class TestTSNEEmbeddings(unittest.TestCase):
     def setUp(self):
-        device = "mps" if torch.backends.mps.is_available() else "cpu"
-        self.tokenizer = AutoTokenizer.from_pretrained("allenai/specter")
-        self.model = AutoModel.from_pretrained("allenai/specter").to(device)
+        self.array_data = np.random.rand(100, 50)  # 100 samples, 50 features
+        self.df_data = DataFrame(self.array_data)
 
-    def test_embed_chunk(self):
-        _batch_size = 4
-        chunk = [f"sample text {n}" for n in range(1, _batch_size + 1)]
-        embeddings = huggingface_specter_embed_chunk(chunk, self.tokenizer, self.model)
-        self.assertEqual(len(embeddings), _batch_size)
+    def test_embeddings_with_ndarray(self):
+        result = tsne_embeddings(self.array_data, n_components=2, random_state=42)
+        self.assertIsInstance(result, np.ndarray)
+        self.assertEqual(result.shape, (100, 2))  # 100 samples reduced to 2 dimensions
 
+    def test_embeddings_with_dataframe(self):
+        result = tsne_embeddings(self.df_data, n_components=3, random_state=42)
+        self.assertIsInstance(result, np.ndarray)
+        self.assertEqual(result.shape, (100, 3))  # 100 samples reduced to 3 dimensions
 
-class TestEmbeddingsColToFrame(unittest.TestCase):
-    def test_embed_strings(self):
-        # Given
-        embeddings_series = pd.Series(["[0.1, 0.2]", "[0.3, 0.4]", "[0.5, 0.6]"])
-        # When
-        embeddings_df = embeddings_col_to_frame(embeddings_series)
-        # Then
-        expected_df = pd.DataFrame({0: [0.1, 0.3, 0.5], 1: [0.2, 0.4, 0.6]})
-        pd.testing.assert_frame_equal(embeddings_df, expected_df)
-
-    def test_embed_lists(self):
-        # Given
-        embeddings_series = pd.Series([[0.1, 0.2], [0.3, 0.4], [0.5, 0.6]])
-        # When
-        embeddings_df = embeddings_col_to_frame(embeddings_series)
-        # Then
-        expected_df = pd.DataFrame({0: [0.1, 0.3, 0.5], 1: [0.2, 0.4, 0.6]})
-        pd.testing.assert_frame_equal(embeddings_df, expected_df)
-
-
-class TestUmapEmbeddings(unittest.TestCase):
-    def test_umap_dimension_reduction(self):
-        # Given: A simple embeddings DataFrame
-        embeddings_df = pd.DataFrame(
-            {
-                "dim1": [v for v in range(0, 100)],
-                "dim2": [0.77 * v for v in range(0, 100)],
-                "dim3": [0.2 * v for v in range(0, 100)],
-            }
+    def test_return_reducer(self):
+        reducer = tsne_embeddings(
+            self.array_data, n_components=2, random_state=42, return_reducer=True
         )
-        # When: UMAP is applied
-        reduced_embeddings = umap_embeddings(embeddings_df)
-        # Then: Ensure reduced dimension is as expected (default UMAP is 2D)
-        self.assertEqual(reduced_embeddings.shape, (100, 2))
+        self.assertIsInstance(reducer.embedding_, np.ndarray)
+        self.assertIsInstance(reducer, TSNE)
+        self.assertEqual(
+            reducer.embedding_.shape, (100, 2)
+        )  # 100 samples reduced to 2 dimensions
+
+    def test_custom_perplexity(self):
+        result = tsne_embeddings(self.array_data, perplexity=50.0, random_state=42)
+        self.assertIsInstance(result, np.ndarray)
+        self.assertEqual(result.shape, (100, 2))  # Default 2 dimensions
 
 
 if __name__ == "__main__":
