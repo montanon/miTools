@@ -61,12 +61,35 @@ def prepare_str_cols(
     return dataframe
 
 
-def prepare_date_cols(df: DataFrame, cols: Union[Iterable[str], str]) -> DataFrame:
+def prepare_date_cols(
+    dataframe: DataFrame,
+    cols: Union[Iterable[str], str],
+    nan_placeholder: Union[str, pd.Timestamp],
+    errors: Literal["raise", "coerce", "ignore"] = "coerce",
+    date_format: str = None,
+) -> DataFrame:
+    if errors not in ["raise", "coerce", "ignore"]:
+        raise ArgumentValueError(
+            "Argument 'errors' must be one of ['raise', 'coerce', 'ignore']."
+        )
+    cols = [cols] if isinstance(cols, str) else cols
+    if not isinstance(cols, Iterable) or not all(isinstance(c, str) for c in cols):
+        raise ArgumentTypeError(
+            "Argument 'cols' must be a string or an iterable of strings."
+        )
+    missing_cols = [col for col in cols if col not in dataframe.columns]
+    if missing_cols:
+        raise ArgumentValueError(f"Columns {missing_cols} not found in DataFrame.")
     try:
-        df[cols] = df[cols].apply(pd.to_datetime)
-    except (ValueError, DateParseError):
-        raise ArgumentValueError(NON_DATE_COL_ERROR)
-    return df
+        for col in cols:
+            dataframe[col] = pd.to_datetime(
+                dataframe[col], errors=errors, format=date_format
+            )
+            if errors != "ignore":
+                dataframe[col] = dataframe[col].fillna(pd.to_datetime(nan_placeholder))
+    except (ValueError, DateParseError) as e:
+        raise ArgumentTypeError(f"{NON_DATE_COL_ERROR.format(col)}, Details: {str(e)}")
+    return dataframe
 
 
 def prepare_bool_cols(df: DataFrame, cols: Union[Iterable[str], str]) -> DataFrame:
