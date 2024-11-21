@@ -299,8 +299,56 @@ def plot_umap_points(
     )
 
 
-def plot_umap_interactive(reducer: UMAP):
-    pass
+def plot_umap_interactive(
+    reducer: UMAP,
+    labels: Sequence = None,
+    values: Sequence = None,
+    hover_data: DataFrame = None,
+    tools: List = None,
+    theme: str = None,
+    cmap: str = "Blues",
+    color_key: Union[Dict, ndarray] = None,
+    color_key_cmap: str = "Paired",
+    background: str = "white",
+    width: int = 800,
+    height: int = 800,
+    alpha: float = 1.0,
+    point_size: int = None,
+    subset_points: Sequence[bool] = None,
+    interactive_text_search: bool = False,
+    interactive_text_search_columns: bool = None,
+    interactive_text_search_alpha_contrast: float = 0.95,
+):
+    if values is not None and len(values) != len(reducer.embedding_):
+        raise ArgumentValueError(
+            "The number of 'values' must match the number of embeddings."
+        )
+    if labels is not None and len(labels) != len(reducer.embedding_):
+        raise ArgumentValueError(
+            "The number of labels must match the number of embeddings."
+        )
+    umap.plot.output_notebook()
+    pl = umap.plot.interactive(
+        umap_object=reducer,
+        labels=labels,
+        values=values,
+        hover_data=hover_data,
+        tools=tools,
+        theme=theme,
+        cmap=cmap,
+        color_key=color_key,
+        color_key_cmap=color_key_cmap,
+        background=background,
+        width=width,
+        height=height,
+        alpha=alpha,
+        point_size=point_size,
+        subset_points=subset_points,
+        interactive_text_search=interactive_text_search,
+        interactive_text_search_columns=interactive_text_search_columns,
+        interactive_text_search_alpha_contrast=interactive_text_search_alpha_contrast,
+    )
+    umap.plot.show(pl)
 
 
 def plot_umap_connectivity(
@@ -309,7 +357,7 @@ def plot_umap_connectivity(
     edge_bundling: Union[Literal["hammer"], None] = None,
     edge_cmap: str = "gray_r",
     show_points: bool = False,
-    values: ndarray = None,
+    values: Sequence = None,
     theme: str = None,
     cmap: str = "Blues",
     color_key: Union[Dict, ndarray] = None,
