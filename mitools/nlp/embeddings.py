@@ -11,6 +11,7 @@ from nltk.tokenize.api import StringTokenizer
 from numba.core.errors import NumbaDeprecationWarning, NumbaPendingDeprecationWarning
 from numpy import float64, ndarray
 from pandas import DataFrame, Series
+from torch import Tensor
 from tqdm import tqdm
 from transformers import AutoModel, AutoTokenizer, PreTrainedTokenizer
 from umap import UMAP
@@ -38,6 +39,37 @@ def get_device() -> str:
     )
 
 
+def specter_embed_texts(
+    texts: Union[List[str], str],
+    tokenizer_length: int = 512,
+    batch_size: int = None,
+    device: str = None,
+    return_device: str = "cpu",
+    pooling: Literal["mean", "cls"] = "cls",
+    output_type: Literal["tensor", "numpy", "list"] = "numpy",
+    task: Literal[
+        "proximity", "classification", "regression", "adhoc_query"
+    ] = "proximity",
+) -> Union[Tensor, ndarray, List[List]]:
+    if task not in ["proximity", "classification", "regression", "adhoc_query"]:
+        raise ArgumentValueError(
+            f"'task'={task} must be one from ['proximity', 'classification', 'regression', 'adhoc_query']"
+        )
+    model = AutoAdapterModel.from_pretrained("allenai/specter2_base")
+    model.load_adapter("allenai/specter2", source="hf", load_as=task, set_active=True)
+    return huggingface_embed_texts(
+        texts=texts,
+        model=model,
+        tokenizer="allenai/specter2_base",
+        tokenizer_length=tokenizer_length,
+        batch_size=batch_size,
+        device=device,
+        return_device=return_device,
+        pooling=pooling,
+        output_type=output_type,
+    )
+
+
 def huggingface_embed_texts(
     texts: Union[List[str], str],
     model: Union[AutoModel, str],
@@ -48,7 +80,7 @@ def huggingface_embed_texts(
     return_device: str = "cpu",
     pooling: Literal["mean", "cls"] = "cls",
     output_type: Literal["tensor", "numpy", "list"] = "numpy",
-):
+) -> Union[Tensor, ndarray, List[List]]:
     if not texts:
         raise ArgumentValueError(
             "'texts' must be a non-empty list of strings or single string."
@@ -112,7 +144,7 @@ def _generate_embeddings(
     device: str = None,
     return_device: str = "cpu",
     pooling: Literal["mean", "cls"] = "cls",
-):
+) -> Tensor:
     inputs = tokenizer(
         texts,
         padding=True,
@@ -167,30 +199,6 @@ def huggingface_specter_embed_texts_and_store(
         f"SELECT * FROM {embeddings_tablename}", embeddings_conn
     ).set_index("id")
     return embeddings
-
-
-def huggingface_specter_embed_texts(
-    texts: Union[List[str], str], batch_size: Optional[int] = MAX_BATCH_SIZE
-) -> List[ndarray]:
-    device = get_device()
-    tokenizer = AutoTokenizer.from_pretrained("allenai/specter")
-    model = AutoModel.from_pretrained("allenai/specter").to(device)
-    embeddings = []
-    for chunk in iterable_chunks(texts, batch_size):
-        embeddings.extend(huggingface_specter_embed_chunk(chunk, tokenizer, model))
-    return embeddings
-
-
-def huggingface_specter_embed_chunk(
-    chunk: Iterable, tokenizer: StringTokenizer, model: AutoModel
-) -> List[ndarray]:
-    inputs = tokenizer(
-        chunk, padding=True, truncation=True, return_tensors="pt", max_length=512
-    )
-    device = get_device()
-    inputs = inputs.to(device)
-    result = model(**inputs)
-    return result.last_hidden_state[:, 0, :].detach().to("cpu").numpy().tolist()
 
 
 def create_embeddings_data_table(
