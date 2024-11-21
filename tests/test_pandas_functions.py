@@ -15,6 +15,7 @@ from mitools.pandas.functions import (
     prepare_date_cols,
     prepare_int_cols,
     prepare_str_cols,
+    reshape_group_data,
     store_dataframe_by_level,
 )
 
@@ -408,6 +409,144 @@ class TestPrepareBoolCols(TestCase):
         df = DataFrame({"bool_col": [True, False, True]})
         result = prepare_bool_cols(df.copy(), cols="bool_col")
         self.assertTrue((result["bool_col"] == df["bool_col"]).all())
+
+
+class TestReshapeGroupData(TestCase):
+    def setUp(self):
+        self.df = DataFrame(
+            {
+                "group": ["A", "A", "A", "B", "B", "A"],
+                "subgroup": ["X", "Y", "Z", "X", "Y", "X"],
+                "value": [10, 20, 30, 40, 50, 60],
+                "time": [
+                    "2021-01",
+                    "2021-01",
+                    "2021-01",
+                    "2021-02",
+                    "2021-02",
+                    "2021-03",
+                ],
+            }
+        )
+
+    def test_valid_input(self):
+        result = reshape_group_data(
+            dataframe=self.df,
+            filter_value="A",
+            value_column="value",
+            group_column="group",
+            subgroup_column="subgroup",
+            time_column="time",
+        )
+        expected = pd.DataFrame(
+            {"X": [10.0, 60.0], "Y": [20.0, None], "Z": [30.0, None]},
+            index=["2021-01", "2021-03"],
+        )
+        expected.columns.name = "subgroup"
+        expected.index.name = "A"
+        pd.testing.assert_frame_equal(result, expected)
+
+    def test_custom_aggregation_function(self):
+        df = self.df.copy()
+        df.loc[len(df)] = ["A", "X", 15, "2021-01"]  # Add duplicate to test aggregation
+        result = reshape_group_data(
+            dataframe=df,
+            filter_value="A",
+            value_column="value",
+            group_column="group",
+            subgroup_column="subgroup",
+            time_column="time",
+            agg_fun="mean",
+        )
+        expected = pd.DataFrame(
+            {"X": [12.5, 60.0], "Y": [20.0, None], "Z": [30.0, None]},
+            index=["2021-01", "2021-03"],
+        )
+        expected.columns.name = "subgroup"
+        expected.index.name = "A"
+        pd.testing.assert_frame_equal(result, expected)
+
+    def test_missing_required_columns(self):
+        df = self.df.drop(columns=["subgroup"])
+        with self.assertRaises(ArgumentValueError) as context:
+            reshape_group_data(
+                dataframe=df,
+                filter_value="A",
+                value_column="value",
+                group_column="group",
+                subgroup_column="subgroup",
+                time_column="time",
+            )
+        self.assertIn(
+            "Columns {'subgroup'} not found in the DataFrame.", str(context.exception)
+        )
+
+    def test_no_matching_filter_value(self):
+        with self.assertRaises(ArgumentValueError) as context:
+            reshape_group_data(
+                dataframe=self.df,
+                filter_value="C",
+                value_column="value",
+                group_column="group",
+                subgroup_column="subgroup",
+                time_column="time",
+            )
+        self.assertIn(
+            "No data found for group 'C' in column 'group'.", str(context.exception)
+        )
+
+    def test_empty_dataframe(self):
+        empty_df = DataFrame(columns=self.df.columns)
+        with self.assertRaises(ArgumentValueError) as context:
+            reshape_group_data(
+                dataframe=empty_df,
+                filter_value="A",
+                value_column="value",
+                group_column="group",
+                subgroup_column="subgroup",
+                time_column="time",
+            )
+        self.assertIn(
+            "No data found for group 'A' in column 'group'.", str(context.exception)
+        )
+
+    def test_preserves_column_order(self):
+        result = reshape_group_data(
+            dataframe=self.df,
+            filter_value="A",
+            value_column="value",
+            group_column="group",
+            subgroup_column="subgroup",
+            time_column="time",
+        )
+        self.assertEqual(list(result.columns), ["X", "Y", "Z"])
+
+    def test_large_dataframe(self):
+        large_df = pd.concat([self.df] * 10000, ignore_index=True)
+        result = reshape_group_data(
+            dataframe=large_df,
+            filter_value="A",
+            value_column="value",
+            group_column="group",
+            subgroup_column="subgroup",
+            time_column="time",
+        )
+        self.assertTrue(result.shape[0] > 0)  # Ensure the result is non-empty
+
+    def test_single_subgroup(self):
+        df = self.df[self.df["subgroup"] == "X"]
+        result = reshape_group_data(
+            dataframe=df,
+            filter_value="A",
+            value_column="value",
+            group_column="group",
+            subgroup_column="subgroup",
+            time_column="time",
+        )
+        expected = pd.DataFrame({"X": [10.0, 60.0]}, index=["2021-01", "2021-03"])
+        expected.columns.name = "subgroup"
+        expected.index.name = "A"
+        pd.testing.assert_frame_equal(result, expected, check_dtype=False)
 
 
 class TestStoreDataframeByLevel(unittest.TestCase):
