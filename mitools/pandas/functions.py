@@ -1,6 +1,6 @@
 from os import PathLike
 from pathlib import Path
-from typing import Any, Iterable, List, Optional, Union
+from typing import Any, Iterable, List, Literal, Optional, Union
 
 import pandas as pd
 from pandas import DataFrame
@@ -19,10 +19,14 @@ def prepare_int_cols(
     dataframe: DataFrame,
     cols: Union[Iterable[str], str],
     nan_placeholder: int,
-    errors: Optional[str] = "coerce",
+    errors: Literal["raise", "coerce", "ignore"] = "coerce",
 ) -> DataFrame:
+    if errors not in ["raise", "coerce", "ignore"]:
+        raise ArgumentValueError(
+            "Argument 'errors' must be one of ['raise', 'coerce', 'ignore']."
+        )
     cols = [cols] if isinstance(cols, str) else cols
-    if not isinstance(cols, Iterable) and not all(isinstance(c, str) for c in cols):
+    if not isinstance(cols, Iterable) or not all(isinstance(c, str) for c in cols):
         raise ArgumentTypeError(
             "Argument 'cols' must be a string or an iterable of strings."
         )
@@ -30,12 +34,15 @@ def prepare_int_cols(
     if missing_cols:
         raise ArgumentValueError(f"Columns {missing_cols} not found in DataFrame.")
     try:
-        dataframe[cols] = dataframe[cols].apply(pd.to_numeric, errors=errors)
-        dataframe[cols] = dataframe[cols].fillna(nan_placeholder)
-        if errors != "ignore":
-            dataframe[cols] = dataframe[cols].astype(int)
+        for col in cols:
+            dataframe[col] = pd.to_numeric(
+                dataframe[col], errors=errors, downcast="integer"
+            )
+            if errors != "ignore":
+                dataframe[col] = dataframe[col].fillna(nan_placeholder)
+                dataframe[col] = dataframe[col].astype(int)
     except (ValueError, KeyError) as e:
-        raise ArgumentTypeError(f"{INT_COL_ERROR}, Details: {str(e)}")
+        raise ArgumentTypeError(f"{INT_COL_ERROR.format(col)}, Details: {str(e)}")
     return dataframe
 
 
