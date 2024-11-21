@@ -345,5 +345,29 @@ def plot_umap_connectivity(
     )
 
 
-def plot_umap_diagnostic(reducer: UMAP):
-    pass
+def plot_umap_diagnostic(
+    reducer: UMAP,
+    diagnostic_type: Literal[
+        "pca", "ica", "vq", "local_dim", "neighborhood", "all"
+    ] = "pca",
+    nhood_size: int = 15,
+    local_variance_threshold: float = 0.8,
+    cmap: str = "viridis",
+    point_size: int = None,
+    background: str = "white",
+    width: int = 800,
+    height: int = 800,
+    ax: Axes = None,
+) -> Axes:
+    return umap.plot.diagnostic(
+        umap_object=reducer,
+        diagnostic_type=diagnostic_type,
+        nhood_size=nhood_size,
+        local_variance_threshold=local_variance_threshold,
+        cmap=cmap,
+        point_size=point_size,
+        background=background,
+        width=width,
+        height=height,
+        ax=ax,
+    )
