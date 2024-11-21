@@ -115,6 +115,45 @@ def prepare_bool_cols(
     return dataframe
 
 
+def reshape_country_indicators(
+    data: DataFrame,
+    country: str,
+    indicator_column: str,
+    country_column: str,
+    region_column: str,
+    year_column: str,
+    aggregation_function: str = "first",
+) -> DataFrame:
+    """
+    Reshapes data for a specific country by aggregating and pivoting regional indicators over years.
+
+    Args:
+        data (DataFrame): The input DataFrame containing country data.
+        country (str): The name of the country to filter data for.
+        indicator_column (str): The column containing indicator values (e.g., GDP, population).
+        country_column (str): The column identifying countries.
+        region_column (str): The column identifying regions or sub-regions within countries.
+        year_column (str): The column representing years.
+        aggregation_function (str): The aggregation function to apply to the indicators (default is 'first').
+
+    Returns:
+        DataFrame: A pivoted DataFrame with `year_column` as the index,
+                   `region_column` values as columns, and aggregated indicators.
+
+    Raises:
+        ArgumentValueError: If required columns are missing or the specified country is not found.
+    """
+    return reshape_group_data(
+        dataframe=data,
+        filter_value=country,
+        value_column=indicator_column,
+        group_column=country_column,
+        subgroup_column=region_column,
+        time_column=year_column,
+        agg_fun=aggregation_function,
+    )
+
+
 def reshape_group_data(
     dataframe: DataFrame,
     filter_value: str,
