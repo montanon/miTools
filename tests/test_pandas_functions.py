@@ -11,6 +11,7 @@ from mitools.pandas.functions import (
     ArgumentValueError,
     idxslice,
     load_level_destructured_dataframe,
+    prepare_bool_cols,
     prepare_date_cols,
     prepare_int_cols,
     prepare_str_cols,
@@ -305,6 +306,108 @@ class TestPrepareDateCols(TestCase):
         large_df = DataFrame({"dates": ["2021-01-01"] * 100000 + [None] * 100000})
         result = prepare_date_cols(large_df, cols="dates", nan_placeholder="2000-01-01")
         self.assertEqual(result["dates"].iloc[-1], pd.Timestamp("2000-01-01"))
+
+
+class TestPrepareBoolCols(TestCase):
+    def setUp(self):
+        self.df = DataFrame(
+            {
+                "col1": [1, 0, None],
+                "col2": [True, False, None],
+                "col3": ["yes", "no", None],
+            }
+        )
+
+    def test_single_column_conversion(self):
+        result = prepare_bool_cols(self.df.copy(), cols="col1")
+        self.assertTrue(result["col1"].dtype == bool)
+        self.assertTrue((result["col1"] == [True, False, False]).all())
+
+    def test_multiple_column_conversion(self):
+        result = prepare_bool_cols(self.df.copy(), cols=["col1", "col2"])
+        self.assertTrue(result["col1"].dtype == bool)
+        self.assertTrue(result["col2"].dtype == bool)
+        self.assertTrue((result["col1"] == [True, False, False]).all())
+        self.assertTrue((result["col2"] == [True, False, False]).all())
+
+    def test_with_nan_placeholder_true(self):
+        result = prepare_bool_cols(self.df.copy(), cols=["col1"], nan_placeholder=True)
+        self.assertTrue((result["col1"] == [True, False, True]).all())
+
+    def test_with_nan_placeholder_false(self):
+        result = prepare_bool_cols(self.df.copy(), cols=["col1"], nan_placeholder=False)
+        self.assertTrue((result["col1"] == [True, False, False]).all())
+
+    def test_preserves_other_columns(self):
+        result = prepare_bool_cols(self.df.copy(), cols=["col1"])
+        pd.testing.assert_frame_equal(
+            result[["col2", "col3"]], self.df[["col2", "col3"]]
+        )
+
+    def test_invalid_cols_type(self):
+        with self.assertRaises(ArgumentTypeError) as context:
+            prepare_bool_cols(self.df.copy(), cols=123)
+        self.assertIn(
+            "Argument 'cols' must be a string or an iterable of strings.",
+            str(context.exception),
+        )
+
+    def test_invalid_cols_elements(self):
+        with self.assertRaises(ArgumentTypeError) as context:
+            prepare_bool_cols(self.df.copy(), cols=["col1", 123])
+        self.assertIn(
+            "Argument 'cols' must be a string or an iterable of strings.",
+            str(context.exception),
+        )
+
+    def test_nonexistent_columns(self):
+        with self.assertRaises(ArgumentValueError) as context:
+            prepare_bool_cols(self.df.copy(), cols=["nonexistent"])
+        self.assertIn(
+            "Columns ['nonexistent'] not found in DataFrame.", str(context.exception)
+        )
+
+    def test_empty_dataframe(self):
+        empty_df = DataFrame()
+        with self.assertRaises(ArgumentValueError) as context:
+            prepare_bool_cols(empty_df, cols="col1")
+        self.assertIn(
+            "Columns ['col1'] not found in DataFrame.", str(context.exception)
+        )
+
+    def test_empty_cols_list(self):
+        result = prepare_bool_cols(self.df.copy(), cols=[])
+        pd.testing.assert_frame_equal(result, self.df)
+
+    def test_large_dataframe(self):
+        large_df = DataFrame({"col1": [1, 0, None] * 100000})
+        result = prepare_bool_cols(large_df, cols="col1", nan_placeholder=False)
+        self.assertTrue(result["col1"].dtype == bool)
+        self.assertTrue((result["col1"].iloc[2] == False))
+
+    def test_mixed_data_types(self):
+        df = DataFrame(
+            {
+                "col1": [1, "yes", None],
+                "col2": [0, "no", "yes"],
+            }
+        )
+        result = prepare_bool_cols(
+            df.copy(), cols=["col1", "col2"], nan_placeholder=True
+        )
+        self.assertTrue(result["col1"].dtype == bool)
+        self.assertTrue(result["col2"].dtype == bool)
+        self.assertTrue((result["col1"] == [True, True, True]).all())
+        self.assertTrue((result["col2"] == [False, True, True]).all())
+
+    def test_preserves_column_order(self):
+        result = prepare_bool_cols(self.df.copy(), cols=["col1"])
+        self.assertTrue(list(result.columns) == ["col1", "col2", "col3"])
+
+    def test_no_changes_for_all_boolean_columns(self):
+        df = DataFrame({"bool_col": [True, False, True]})
+        result = prepare_bool_cols(df.copy(), cols="bool_col")
+        self.assertTrue((result["bool_col"] == df["bool_col"]).all())
 
 
 class TestStoreDataframeByLevel(unittest.TestCase):
