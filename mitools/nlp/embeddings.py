@@ -281,12 +281,12 @@ def plot_umap_points(
     ax: Axes = None,
     alpha: float = 1.0,
 ) -> Axes:
-    if not len(reducer.embedding_) == len(labels):
+    if labels is not None and len(labels) != len(reducer.embedding_):
         raise ArgumentValueError(
             "The number of labels must match the number of embeddings."
         )
     return umap.plot.points(
-        reducer,
+        umap_object=reducer,
         labels=labels,
         color_key_cmap=color_key_cmap,
         theme=theme,
@@ -303,8 +303,46 @@ def plot_umap_interactive(reducer: UMAP):
     pass
 
 
-def plot_umap_connectivity(reducer: UMAP):
-    pass
+def plot_umap_connectivity(
+    reducer: UMAP,
+    labels: Sequence = None,
+    edge_bundling: Union[Literal["hammer"], None] = None,
+    edge_cmap: str = "gray_r",
+    show_points: bool = False,
+    values: ndarray = None,
+    theme: str = None,
+    cmap: str = "Blues",
+    color_key: Union[Dict, ndarray] = None,
+    color_key_cmap: str = "Paired",
+    background: str = "white",
+    width: int = 800,
+    height: int = 800,
+    ax: Axes = None,
+) -> Axes:
+    if values is not None and len(values) != len(reducer.embedding_):
+        raise ArgumentValueError(
+            "The number of 'values' must match the number of embeddings."
+        )
+    if labels is not None and len(labels) != len(reducer.embedding_):
+        raise ArgumentValueError(
+            "The number of labels must match the number of embeddings."
+        )
+    return umap.plot.connectivity(
+        umap_object=reducer,
+        labels=labels,
+        edge_bundling=edge_bundling,
+        edge_cmap=edge_cmap,
+        show_points=show_points,
+        values=values,
+        theme=theme,
+        cmap=cmap,
+        color_key=color_key,
+        color_key_cmap=color_key_cmap,
+        background=background,
+        width=width,
+        height=height,
+        ax=ax,
+    )
 
 
 def plot_umap_diagnostic(reducer: UMAP):
