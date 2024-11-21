@@ -115,15 +115,49 @@ def prepare_bool_cols(
     return dataframe
 
 
+def reshape_group_data(
+    dataframe: DataFrame,
+    filter_value: str,
+    value_column: str,
+    group_column: str,
+    subgroup_column: str,
+    time_column: str,
+    agg_fun: str = "first",
+) -> DataFrame:
+    required_columns = {value_column, group_column, subgroup_column, time_column}
+    missing_columns = required_columns - set(dataframe.columns)
+    if missing_columns:
+        raise ArgumentValueError(
+            f"Columns {missing_columns} not found in the DataFrame."
+        )
+    filtered_data = dataframe.query(f"{group_column} == @filter_value")
+    if filtered_data.empty:
+        raise ArgumentValueError(
+            f"No data found for group '{filter_value}' in column '{group_column}'."
+        )
+    grouped_data = (
+        filtered_data.groupby(by=[time_column, group_column, subgroup_column])[
+            [value_column]
+        ]
+        .agg(agg_fun)
+        .reset_index()
+    )
+    pivoted_data = grouped_data.pivot(
+        index=time_column, columns=subgroup_column, values=value_column
+    )
+    pivoted_data.index.name = filter_value
+    return pivoted_data
+
+
 def build_group_subgroup(
-    df: DataFrame,
+    dataframe: DataFrame,
     value_col: str,
     entity: str,
     group_col: str,
     subgroup_col: str,
     time_col,
 ) -> DataFrame:
-    group_df = df.query(f'{group_col} == "{entity}"')
+    group_df = dataframe.query(f'{group_col} == "{entity}"')
     group_subgroups = (
         group_df.groupby(by=[time_col, group_col, subgroup_col])[[value_col]]
         .first()
