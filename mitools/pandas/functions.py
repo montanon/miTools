@@ -7,7 +7,7 @@ from pandas import DataFrame
 from pandas._libs.tslibs.parsing import DateParseError
 from tqdm import tqdm
 
-from ..exceptions.custom_exceptions import ArgumentTypeError, ArgumentValueError
+from mitools.exceptions.custom_exceptions import ArgumentTypeError, ArgumentValueError
 
 INT_COL_ERROR = "Value or values in any of columns={} cannnot be converted into int."
 NON_DATE_COL_ERROR = (
@@ -16,19 +16,27 @@ NON_DATE_COL_ERROR = (
 
 
 def prepare_int_cols(
-    df: DataFrame,
+    dataframe: DataFrame,
     cols: Union[Iterable[str], str],
     nan_placeholder: int,
     errors: Optional[str] = "coerce",
 ) -> DataFrame:
+    cols = [cols] if isinstance(cols, str) else cols
+    if not isinstance(cols, Iterable) and not all(isinstance(c, str) for c in cols):
+        raise ArgumentTypeError(
+            "Argument 'cols' must be a string or an iterable of strings."
+        )
+    missing_cols = [col for col in cols if col not in dataframe.columns]
+    if missing_cols:
+        raise ArgumentValueError(f"Columns {missing_cols} not found in DataFrame.")
     try:
-        df[cols] = df[cols].apply(pd.to_numeric, args=(errors,))
-        df[cols] = df[cols].fillna(nan_placeholder)
-    except (ValueError, KeyError):
-        raise ArgumentTypeError(INT_COL_ERROR)
-    if not errors == "ignore":
-        df[cols] = df[cols].astype(int)
-    return df
+        dataframe[cols] = dataframe[cols].apply(pd.to_numeric, errors=errors)
+        dataframe[cols] = dataframe[cols].fillna(nan_placeholder)
+        if errors != "ignore":
+            dataframe[cols] = dataframe[cols].astype(int)
+    except (ValueError, KeyError) as e:
+        raise ArgumentTypeError(f"{INT_COL_ERROR}, Details: {str(e)}")
+    return dataframe
 
 
 def prepare_str_cols(df: DataFrame, cols: Union[Iterable[str], str]) -> DataFrame:
