@@ -25,6 +25,8 @@ class TestHuggingfaceEmbedTexts(TestCase):
         self.texts_multiple = [
             "This is the first sentence.",
             "This is the second sentence.",
+            "Here is the third one.",
+            "Another one for the batch test.",
         ]
 
     def test_single_text_input(self):
@@ -35,6 +37,72 @@ class TestHuggingfaceEmbedTexts(TestCase):
         )
         self.assertIsInstance(result, np.ndarray)
         self.assertEqual(result.shape[1], self.model.config.hidden_size)
+
+    def test_batch_size_single_batch(self):
+        result = huggingface_embed_texts(
+            texts=self.texts_multiple,
+            tokenizer=self.tokenizer,
+            model=self.model,
+            batch_size=len(self.texts_multiple),  # Single batch
+        )
+        self.assertIsInstance(result, np.ndarray)
+        self.assertEqual(result.shape[0], len(self.texts_multiple))
+
+    def test_batch_size_multiple_batches(self):
+        batch_size = 2
+        result = huggingface_embed_texts(
+            texts=self.texts_multiple,
+            tokenizer=self.tokenizer,
+            model=self.model,
+            batch_size=batch_size,  # Multiple batches
+        )
+        self.assertIsInstance(result, np.ndarray)
+        self.assertEqual(result.shape[0], len(self.texts_multiple))  # Total items
+        self.assertEqual(result.shape[1], self.model.config.hidden_size)
+
+    def test_batch_size_equal_to_one(self):
+        result = huggingface_embed_texts(
+            texts=self.texts_multiple,
+            tokenizer=self.tokenizer,
+            model=self.model,
+            batch_size=1,  # Each text in its own batch
+        )
+        self.assertIsInstance(result, np.ndarray)
+        self.assertEqual(result.shape[0], len(self.texts_multiple))
+        self.assertEqual(result.shape[1], self.model.config.hidden_size)
+
+    def test_batch_size_with_large_input(self):
+        large_texts = ["Sentence " + str(i) for i in range(100)]  # Large input
+        batch_size = 10
+        result = huggingface_embed_texts(
+            texts=large_texts,
+            tokenizer=self.tokenizer,
+            model=self.model,
+            batch_size=batch_size,
+        )
+        self.assertIsInstance(result, np.ndarray)
+        self.assertEqual(result.shape[0], len(large_texts))
+        self.assertEqual(result.shape[1], self.model.config.hidden_size)
+
+    def test_no_batch_size(self):
+        result = huggingface_embed_texts(
+            texts=self.texts_multiple,
+            tokenizer=self.tokenizer,
+            model=self.model,
+            batch_size=None,  # No batching
+        )
+        self.assertIsInstance(result, np.ndarray)
+        self.assertEqual(result.shape[0], len(self.texts_multiple))
+        self.assertEqual(result.shape[1], self.model.config.hidden_size)
+
+    def test_invalid_batch_size(self):
+        with self.assertRaises(ArgumentValueError):
+            huggingface_embed_texts(
+                texts=self.texts_multiple,
+                tokenizer=self.tokenizer,
+                model=self.model,
+                batch_size=0,  # Invalid batch size
+            )
 
     def test_multiple_text_input(self):
         result = huggingface_embed_texts(

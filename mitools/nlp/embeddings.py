@@ -61,6 +61,8 @@ def huggingface_embed_texts(
         raise ArgumentValueError(
             f"'output_type'={output_type} must be one from ['tensor', 'numpy', 'list']"
         )
+    if batch_size is not None and (not isinstance(batch_size, int) or batch_size < 1):
+        raise ArgumentValueError("'batch_size' must be an integer larger than 0.")
     texts = [texts] if isinstance(texts, str) else texts
     tokenizer = (
         AutoTokenizer.from_pretrained(tokenizer)
@@ -70,11 +72,11 @@ def huggingface_embed_texts(
     model = AutoModel.from_pretrained(model) if isinstance(model, str) else model
     device = device or get_device()
     model = model.to(device)
-    if batch_size:
+    if batch_size is not None:
         embeddings_chunks = []
         for chunk in iterable_chunks(texts, batch_size):
             embeddings = _generate_embeddings(
-                texts=texts,
+                texts=chunk,
                 model=model,
                 tokenizer=tokenizer,
                 tokenizer_length=tokenizer_length,
