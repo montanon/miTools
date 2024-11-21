@@ -99,6 +99,10 @@ class TestPrepareIntCols(TestCase):
         result = prepare_int_cols(empty_df, cols=[], nan_placeholder=0)
         pd.testing.assert_frame_equal(result, empty_df)
 
+    def test_empty_columns(self):
+        result = prepare_int_cols(self.df, cols=[], nan_placeholder=0)
+        pd.testing.assert_frame_equal(result, self.df)
+
     def test_no_conversion_needed(self):
         df = DataFrame({"col1": [1, 2, 3], "col2": [4, 5, 6]})
         result = prepare_int_cols(df.copy(), cols="col1", nan_placeholder=0)
@@ -127,43 +131,80 @@ class TestPrepareIntCols(TestCase):
         pd.testing.assert_frame_equal(result, expected)
 
 
-class TestPrepareStrCols(unittest.TestCase):
+class TestPrepareStrCols(TestCase):
     def setUp(self):
-        # Create a sample DataFrame
-        self.sample_data = DataFrame(
-            {
-                "A": [1, 2, 3],
-                "B": [4.5, 5.5, 6.5],
-                "C": ["x", "y", "z"],
-                "D": [True, False, True],
-            }
+        self.df = pd.DataFrame(
+            {"col1": [1, 2, 3], "col2": [4.5, 5.5, None], "col3": ["a", "b", "c"]}
         )
 
-    def test_convert_to_string(self):
-        # Test that all columns are converted to strings
-        df = prepare_str_cols(self.sample_data, ["A", "B", "C", "D"])
-        for dtype in df.dtypes:
-            self.assertEqual(dtype, "object")
-        # Ensure that the values are indeed strings
-        for val in df.values.flatten():
-            self.assertIsInstance(val, str)
+    def test_single_column_conversion(self):
+        result = prepare_str_cols(self.df.copy(), cols="col1")
+        self.assertTrue((result["col1"] == ["1", "2", "3"]).all())
+        self.assertEqual(result["col1"].dtype, "object")
 
-    def test_non_existent_column(self):
-        # Test that a KeyError is raised when a non-existent column is passed
-        with self.assertRaises(KeyError):
-            prepare_str_cols(self.sample_data, ["E"])
+    def test_multiple_column_conversion(self):
+        result = prepare_str_cols(self.df.copy(), cols=["col1", "col2"])
+        self.assertTrue((result["col1"] == ["1", "2", "3"]).all())
+        self.assertTrue((result["col2"] == ["4.5", "5.5", "nan"]).all())
+        self.assertEqual(result["col1"].dtype, "object")
+        self.assertEqual(result["col2"].dtype, "object")
+
+    def test_no_conversion_needed(self):
+        result = prepare_str_cols(self.df.copy(), cols="col3")
+        self.assertTrue((result["col3"] == ["a", "b", "c"]).all())
+        self.assertEqual(result["col3"].dtype, "object")
+
+    def test_nonexistent_column(self):
+        with self.assertRaises(ArgumentValueError) as context:
+            prepare_str_cols(self.df.copy(), cols="nonexistent_col")
+        self.assertIn("Columns ['nonexistent_col'] not found", str(context.exception))
+
+    def test_mixed_column_input(self):
+        with self.assertRaises(ArgumentValueError) as context:
+            prepare_str_cols(self.df.copy(), cols=["col1", "nonexistent_col"])
+        self.assertIn("Columns ['nonexistent_col'] not found", str(context.exception))
+
+    def test_invalid_cols_type(self):
+        with self.assertRaises(ArgumentTypeError) as context:
+            prepare_str_cols(self.df.copy(), cols=123)
+        self.assertIn(
+            "Argument 'cols' must be a string or an iterable of strings",
+            str(context.exception),
+        )
+
+    def test_invalid_cols_elements(self):
+        with self.assertRaises(ArgumentTypeError) as context:
+            prepare_str_cols(self.df.copy(), cols=["col1", 123])
+        self.assertIn(
+            "Argument 'cols' must be a string or an iterable of strings",
+            str(context.exception),
+        )
+
+    def test_empty_cols_list(self):
+        result = prepare_str_cols(self.df.copy(), cols=[])
+        pd.testing.assert_frame_equal(result, self.df)
 
     def test_empty_dataframe(self):
-        # Test that the function handles an empty DataFrame
-        empty_df = DataFrame()
-        result_df = prepare_str_cols(empty_df, [])
-        self.assertTrue(result_df.empty)
+        empty_df = pd.DataFrame()
+        with self.assertRaises(ArgumentValueError) as context:
+            prepare_str_cols(empty_df, cols="col1")
+        self.assertIn("Columns ['col1'] not found in DataFrame", str(context.exception))
 
-    def test_no_columns_provided(self):
-        # Test that the function doesn't change the DataFrame if no columns are provided
-        df_copy = self.sample_data.copy()
-        result_df = prepare_str_cols(df_copy, [])
-        testing.assert_frame_equal(df_copy, result_df)
+    def test_preserves_other_columns(self):
+        result = prepare_str_cols(self.df.copy(), cols="col1")
+        pd.testing.assert_frame_equal(
+            result[["col2", "col3"]], self.df[["col2", "col3"]]
+        )
+
+    def test_large_dataframe(self):
+        large_df = pd.DataFrame(
+            {
+                "col1": range(10000),
+                "col2": [str(x) for x in range(10000)],
+            }
+        )
+        result = prepare_str_cols(large_df, cols="col1")
+        self.assertTrue((result["col1"] == large_df["col1"].astype(str)).all())
 
 
 class TestPrepareDateCols(unittest.TestCase):

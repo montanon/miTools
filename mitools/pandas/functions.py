@@ -46,9 +46,19 @@ def prepare_int_cols(
     return dataframe
 
 
-def prepare_str_cols(df: DataFrame, cols: Union[Iterable[str], str]) -> DataFrame:
-    df[cols] = df[cols].astype(str)
-    return df
+def prepare_str_cols(
+    dataframe: DataFrame, cols: Union[Iterable[str], str]
+) -> DataFrame:
+    cols = [cols] if isinstance(cols, str) else cols
+    if not isinstance(cols, Iterable) or not all(isinstance(c, str) for c in cols):
+        raise ArgumentTypeError(
+            "Argument 'cols' must be a string or an iterable of strings."
+        )
+    missing_cols = [col for col in cols if col not in dataframe.columns]
+    if missing_cols:
+        raise ArgumentValueError(f"Columns {missing_cols} not found in DataFrame.")
+    dataframe[cols] = dataframe[cols].astype(str)
+    return dataframe
 
 
 def prepare_date_cols(df: DataFrame, cols: Union[Iterable[str], str]) -> DataFrame:
