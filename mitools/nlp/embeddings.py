@@ -1,7 +1,7 @@
 import warnings
 from ast import literal_eval
 from os import PathLike
-from typing import Dict, List, Literal, Sequence, Union
+from typing import Callable, Dict, List, Literal, Sequence, Union
 
 import numpy as np
 import pandas as pd
@@ -13,6 +13,7 @@ from nltk.tokenize.api import StringTokenizer
 from numba.core.errors import NumbaDeprecationWarning, NumbaPendingDeprecationWarning
 from numpy import float64, ndarray
 from pandas import DataFrame, Series
+from sklearn.manifold import TSNE
 from torch import Tensor
 from tqdm import tqdm
 from transformers import AutoModel, AutoTokenizer, PreTrainedTokenizer
@@ -190,6 +191,50 @@ def _generate_embeddings(
         sum_mask = attention_mask.sum(dim=1).clamp(min=1e-9)  # Avoid division by zero
         embeddings = sum_embeddings / sum_mask
     return embeddings.detach().to(return_device)
+
+
+def tsne_embeddings(
+    data: Union[DataFrame, ndarray],
+    return_reducer: bool = False,
+    n_components: int = 2,
+    perplexity: float = 30.0,
+    early_exaggeration: float = 12.0,
+    learning_rate: Union[float, str] = "auto",
+    max_iter: int = 1_000,
+    n_iter_without_progress: int = 300,
+    min_grad_norm: float = 1e-7,
+    metric: Union[str, Callable] = "euclidean",
+    metric_params: Dict = None,
+    init: Union[str, ndarray] = "pca",
+    verbose: int = 0,
+    random_state: int = 42,
+    method: Literal["barnes_hut", "exact"] = "barnes_hut",
+    angle: float = 0.5,
+    n_jobs: int = None,
+    n_iter: int = None,
+):
+    tsne = TSNE(
+        n_components=n_components,
+        perplexity=perplexity,
+        early_exaggeration=early_exaggeration,
+        learning_rate=learning_rate,
+        max_iter=max_iter,
+        n_iter_without_progress=n_iter_without_progress,
+        min_grad_norm=min_grad_norm,
+        metric=metric,
+        metric_params=metric_params,
+        init=init,
+        verbose=verbose,
+        random_state=random_state,
+        method=method,
+        angle=angle,
+        n_jobs=n_jobs,
+        n_iter=n_iter,
+    )
+    embeddings = tsne.fit_transform(
+        data.values if isinstance(data, DataFrame) else data
+    )
+    return embeddings if not return_reducer else tsne
 
 
 # https://umap-learn.readthedocs.io/en/latest/api.html
