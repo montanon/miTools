@@ -133,7 +133,7 @@ class TestPrepareIntCols(TestCase):
 
 class TestPrepareStrCols(TestCase):
     def setUp(self):
-        self.df = pd.DataFrame(
+        self.df = DataFrame(
             {"col1": [1, 2, 3], "col2": [4.5, 5.5, None], "col3": ["a", "b", "c"]}
         )
 
@@ -185,7 +185,7 @@ class TestPrepareStrCols(TestCase):
         pd.testing.assert_frame_equal(result, self.df)
 
     def test_empty_dataframe(self):
-        empty_df = pd.DataFrame()
+        empty_df = DataFrame()
         with self.assertRaises(ArgumentValueError) as context:
             prepare_str_cols(empty_df, cols="col1")
         self.assertIn("Columns ['col1'] not found in DataFrame", str(context.exception))
@@ -197,7 +197,7 @@ class TestPrepareStrCols(TestCase):
         )
 
     def test_large_dataframe(self):
-        large_df = pd.DataFrame(
+        large_df = DataFrame(
             {
                 "col1": range(10000),
                 "col2": [str(x) for x in range(10000)],
@@ -207,33 +207,104 @@ class TestPrepareStrCols(TestCase):
         self.assertTrue((result["col1"] == large_df["col1"].astype(str)).all())
 
 
-class TestPrepareDateCols(unittest.TestCase):
+class TestPrepareDateCols(TestCase):
     def setUp(self):
         self.df = DataFrame(
             {
-                "valid_date": ["2021-01-01", "2021/02/01", "01-03-2021", None],
-                "invalid_date": ["2021-01-01", "2021/02/01", "not a date", None],
-                "mixed": [1, "2", "2021-01-01", None],
+                "valid_dates": ["2021-01-01", "2021-02-01", None],
+                "invalid_dates": ["invalid_date", "2021-01-01", None],
+                "mixed_dates": ["2021-01-01", "invalid_date", "2021-02-01"],
             }
         )
 
-    def test_valid_dates_conversion(self):
-        valid_col = ["valid_date"]
-        df_converted = prepare_date_cols(self.df.copy(), valid_col)
-        expected_df = self.df.copy(deep=True)
-        expected_df[valid_col] = expected_df[valid_col].apply(pd.to_datetime)
-        testing.assert_frame_equal(
-            pd.to_datetime(self.df, errors="coerce")[["valid_date"]],
-            df_converted[["valid_date"]],
+    def test_basic_conversion(self):
+        result = prepare_date_cols(
+            self.df.copy(), cols="valid_dates", nan_placeholder="2000-01-01"
+        )
+        self.assertTrue(isinstance(result["valid_dates"].iloc[0], pd.Timestamp))
+        self.assertEqual(result["valid_dates"].iloc[2], pd.Timestamp("2000-01-01"))
+
+    def test_multiple_column_conversion(self):
+        result = prepare_date_cols(
+            self.df.copy(),
+            cols=["valid_dates", "mixed_dates"],
+            nan_placeholder="2000-01-01",
+        )
+        self.assertTrue(isinstance(result["valid_dates"].iloc[0], pd.Timestamp))
+        self.assertTrue(isinstance(result["mixed_dates"].iloc[0], pd.Timestamp))
+        self.assertEqual(result["mixed_dates"].iloc[1], pd.Timestamp("2000-01-01"))
+
+    def test_invalid_date_handling_coerce(self):
+        result = prepare_date_cols(
+            self.df.copy(),
+            cols="invalid_dates",
+            nan_placeholder="2000-01-01",
+            errors="coerce",
+        )
+        self.assertEqual(result["invalid_dates"].iloc[0], pd.Timestamp("2000-01-01"))
+
+    def test_invalid_date_handling_ignore(self):
+        result = prepare_date_cols(
+            self.df.copy(),
+            cols="invalid_dates",
+            nan_placeholder="2000-01-01",
+            errors="ignore",
+        )
+        self.assertEqual(result["invalid_dates"].iloc[0], "invalid_date")
+        self.assertTrue(pd.isna(result["invalid_dates"].iloc[2]))
+
+    def test_invalid_date_handling_raise(self):
+        with self.assertRaises(ArgumentTypeError):
+            prepare_date_cols(
+                self.df.copy(),
+                cols="invalid_dates",
+                nan_placeholder="2000-01-01",
+                errors="raise",
+            )
+
+    def test_custom_date_format(self):
+        df = DataFrame({"custom_dates": ["01-01-2021", "02-01-2021", None]})
+        result = prepare_date_cols(
+            df,
+            cols="custom_dates",
+            nan_placeholder="2000-01-01",
+            date_format="%d-%m-%Y",
+        )
+        self.assertEqual(result["custom_dates"].iloc[0], pd.Timestamp("2021-01-01"))
+        self.assertEqual(result["custom_dates"].iloc[2], pd.Timestamp("2000-01-01"))
+
+    def test_invalid_cols_type(self):
+        with self.assertRaises(ArgumentTypeError):
+            prepare_date_cols(self.df.copy(), cols=123, nan_placeholder="2000-01-01")
+
+    def test_nonexistent_column(self):
+        with self.assertRaises(ArgumentValueError):
+            prepare_date_cols(
+                self.df.copy(), cols="nonexistent", nan_placeholder="2000-01-01"
+            )
+
+    def test_empty_dataframe(self):
+        empty_df = DataFrame()
+        with self.assertRaises(ArgumentValueError):
+            prepare_date_cols(empty_df, cols="any_column", nan_placeholder="2000-01-01")
+
+    def test_missing_placeholder(self):
+        df = DataFrame({"dates": ["2021-01-01", None]})
+        result = prepare_date_cols(df, cols="dates", nan_placeholder=None)
+        self.assertTrue(pd.isna(result["dates"].iloc[1]))
+
+    def test_preserves_other_columns(self):
+        result = prepare_date_cols(
+            self.df.copy(), cols="valid_dates", nan_placeholder="2000-01-01"
+        )
+        pd.testing.assert_frame_equal(
+            result[["invalid_dates"]], self.df[["invalid_dates"]]
         )
 
-    def test_error_on_invalid_dates(self):
-        with self.assertRaises(ArgumentValueError):
-            prepare_date_cols(self.df.copy(), "invalid_date")
-
-    def test_error_on_mixed_data(self):
-        with self.assertRaises(ArgumentValueError):
-            prepare_date_cols(self.df.copy(), "mixed")
+    def test_large_dataframe(self):
+        large_df = DataFrame({"dates": ["2021-01-01"] * 100000 + [None] * 100000})
+        result = prepare_date_cols(large_df, cols="dates", nan_placeholder="2000-01-01")
+        self.assertEqual(result["dates"].iloc[-1], pd.Timestamp("2000-01-01"))
 
 
 class TestStoreDataframeByLevel(unittest.TestCase):

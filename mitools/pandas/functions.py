@@ -85,7 +85,7 @@ def prepare_date_cols(
             dataframe[col] = pd.to_datetime(
                 dataframe[col], errors=errors, format=date_format
             )
-            if errors != "ignore":
+            if errors != "ignore" and nan_placeholder is not None:
                 dataframe[col] = dataframe[col].fillna(pd.to_datetime(nan_placeholder))
     except (ValueError, DateParseError) as e:
         raise ArgumentTypeError(f"{NON_DATE_COL_ERROR.format(col)}, Details: {str(e)}")
