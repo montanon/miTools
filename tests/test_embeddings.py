@@ -5,13 +5,14 @@ from unittest.mock import Mock, patch
 
 import numpy as np
 import torch
+from torch import Tensor
 from transformers import AutoModel, AutoTokenizer
 
 from mitools.exceptions import ArgumentValueError
 from mitools.nlp import (
     embeddings_col_to_frame,
     huggingface_embed_texts,
-    huggingface_specter_embed_chunk,
+    specter_embed_texts,
     umap_embeddings,
 )
 
@@ -240,25 +241,56 @@ class TestHuggingfaceEmbedTexts(TestCase):
             )
 
 
-class TestHuggingfaceSpecterEmbedTexts(unittest.TestCase):
+class TestSpecterEmbedTexts(TestCase):
     def setUp(self):
-        os.environ["TOKENIZERS_PARALLELISM"] = "true"
+        self.texts_single = "This is a test sentence."
+        self.texts_multiple = [
+            "This is the first test sentence.",
+            "Here is another one.",
+            "Testing Specter embedding function.",
+        ]
 
-    def tearDown(self):
-        del os.environ["TOKENIZERS_PARALLELISM"]
+    def test_single_text(self):
+        result = specter_embed_texts(
+            texts=self.texts_single,
+            output_type="numpy",
+        )
+        self.assertIsInstance(result, np.ndarray)
+        self.assertEqual(result.ndim, 2)  # Should return 2D array
+        self.assertEqual(result.shape[0], 1)  # Single input
 
-    def test_single_thread(self):
-        texts = ["sample text 1", "sample text 2"]
-        embeddings = huggingface_specter_embed_texts(texts, batch_size=1)
-        # Assuming embeddings are list of lists/tensors, checking basic structure
-        self.assertEqual(len(embeddings), 2)
+    def test_multiple_texts(self):
+        result = specter_embed_texts(
+            texts=self.texts_multiple,
+            output_type="numpy",
+        )
+        self.assertIsInstance(result, np.ndarray)
+        self.assertEqual(result.ndim, 2)
+        self.assertEqual(result.shape[0], len(self.texts_multiple))
 
-    def test_multiple_batch(self):
-        _batch_size = 4
-        texts = [f"sample text {n}" for n in range(1, _batch_size + 1)]
-        embeddings = huggingface_specter_embed_texts(texts, batch_size=_batch_size)
-        # Assuming embeddings are list of lists/tensors, checking basic structure
-        self.assertEqual(len(embeddings), _batch_size)
+    def test_output_type_tensor(self):
+        result = specter_embed_texts(
+            texts=self.texts_multiple,
+            output_type="tensor",
+        )
+        self.assertIsInstance(result, Tensor)
+
+    def test_batch_size(self):
+        result = specter_embed_texts(
+            texts=self.texts_multiple,
+            batch_size=2,
+            output_type="numpy",
+        )
+        self.assertIsInstance(result, np.ndarray)
+        self.assertEqual(result.shape[0], len(self.texts_multiple))
+
+    def test_invalid_pooling(self):
+        with self.assertRaises(ArgumentValueError):
+            specter_embed_texts(
+                texts=self.texts_multiple,
+                pooling="invalid",
+                output_type="numpy",
+            )
 
 
 class TestHuggingfaceSpecterEmbedChunk(unittest.TestCase):
