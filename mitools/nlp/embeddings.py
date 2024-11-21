@@ -1,12 +1,14 @@
-import sqlite3
 import warnings
 from ast import literal_eval
 from os import PathLike
-from typing import Callable, Dict, Iterable, List, Literal, Optional, Tuple, Union
+from typing import Dict, List, Literal, Sequence, Union
 
+import numpy as np
 import pandas as pd
 import torch
+import umap.plot
 from adapters import AutoAdapterModel
+from matplotlib.axes import Axes
 from nltk.tokenize.api import StringTokenizer
 from numba.core.errors import NumbaDeprecationWarning, NumbaPendingDeprecationWarning
 from numpy import float64, ndarray
@@ -21,12 +23,38 @@ from mitools.exceptions import ArgumentValueError
 from ..etl import CustomConnection
 from ..utils import iterable_chunks
 
-warnings.simplefilter("ignore", NumbaDeprecationWarning)
-warnings.simplefilter("ignore", NumbaPendingDeprecationWarning)
+# warnings.simplefilter("ignore", NumbaDeprecationWarning)
+# warnings.simplefilter("ignore", NumbaPendingDeprecationWarning)
 
 
 SPECTER_EMBEDDINGS_URL = "https://model-apis.semanticscholar.org/specter/v1/invoke"
 MAX_BATCH_SIZE = 16
+
+UMAP_METRICS = Literal[
+    "euclidean",
+    "manhattan",
+    "chebyshev",
+    "minkowski",
+    "canberra",
+    "braycurtis",
+    "mahalanobis",
+    "wminkowski",
+    "seuclidean",
+    "cosine",
+    "correlation",
+    "haversine",
+    "hamming",
+    "jaccard",
+    "dice",
+    "russelrao",
+    "kulsinski",
+    "ll_dirichlet",
+    "hellinger",
+    "rogerstanimoto",
+    "sokalmichener",
+    "sokalsneath",
+    "yule",
+]
 
 
 def get_device() -> str:
@@ -164,109 +192,78 @@ def _generate_embeddings(
     return embeddings.detach().to(return_device)
 
 
-def huggingface_specter_embed_texts_and_store(
-    ids: Union[List[str], str],
-    texts: Union[List[str], str],
-    embeddings_conn: CustomConnection,
-    embeddings_db: PathLike,
-    embeddings_tablename: str,
-    batch_size: Optional[int] = MAX_BATCH_SIZE,
-) -> List[ndarray]:
-    if isinstance(ids, str):
-        ids = [ids]
-    if isinstance(texts, str):
-        texts = [texts]
-    assert len(ids) == len(texts), "Ids and Texts len doesnt match"
-    device = get_device()
-    tokenizer = AutoTokenizer.from_pretrained("allenai/specter2_base")
-    model = AutoAdapterModel.from_pretrained("allenai/specter2_base")
-    model.load_adapter(
-        "allenai/specter2_classification",
-        source="hf",
-        load_as="classification",
-        set_active=True,
+# https://umap-learn.readthedocs.io/en/latest/api.html
+def umap_embeddings(
+    data: Union[DataFrame, ndarray],
+    return_reducer: bool = False,
+    n_neighbors: float = 15,
+    n_components: int = 2,
+    metric: UMAP_METRICS = "euclidean",
+    n_epochs: int = None,
+    learning_rate: float = 1.0,
+    init: Literal["spectral", "random", "pca", "tswspectral"] = "spectral",
+    min_dist: float = 0.1,
+    spread: float = 1.0,
+    low_memory: bool = False,
+    set_op_mix_ratio: float = 1.0,
+    local_connectivity: int = 1,
+    repulsion_strength: float = 1.0,
+    negative_sample_rate: int = 5,
+    transform_queue_size: float = 4.0,
+    a: float = None,
+    b: float = None,
+    random_state: int = 42,
+    angular_rp_forest: bool = False,
+    target_n_neighbors: int = -1,
+    target_metric: Literal["categorical", "l1", "l2"] = "categorical",
+    target_metric_kwds: Dict = None,
+    target_weight: float = 0.5,
+    transform_seed: int = 42,
+    verbose: bool = False,
+    unique: bool = False,
+    densmap: bool = False,
+    dens_lambda: float = 2.0,
+    dens_frac: float = 0.3,
+    dens_var_shift: float = 0.1,
+    output_dens: bool = False,
+    disconnection_distance: float = np.inf,
+    precomputed_knn: tuple = (None, None, None),
+) -> ndarray:
+    reducer = UMAP(
+        n_neighbors=n_neighbors,
+        n_components=n_components,
+        metric=metric,
+        n_epochs=n_epochs,
+        learning_rate=learning_rate,
+        init=init,
+        min_dist=min_dist,
+        spread=spread,
+        low_memory=low_memory,
+        set_op_mix_ratio=set_op_mix_ratio,
+        local_connectivity=local_connectivity,
+        repulsion_strength=repulsion_strength,
+        negative_sample_rate=negative_sample_rate,
+        transform_queue_size=transform_queue_size,
+        a=a,
+        b=b,
+        random_state=random_state,
+        angular_rp_forest=angular_rp_forest,
+        target_n_neighbors=target_n_neighbors,
+        target_metric=target_metric,
+        target_metric_kwds=target_metric_kwds,
+        target_weight=target_weight,
+        transform_seed=transform_seed,
+        verbose=verbose,
+        unique=unique,
+        densmap=densmap,
+        dens_lambda=dens_lambda,
+        dens_frac=dens_frac,
+        dens_var_shift=dens_var_shift,
+        output_dens=output_dens,
+        disconnection_distance=disconnection_distance,
+        precomputed_knn=precomputed_knn,
     )
-    model = model.to(device)
-    for chunk in iterable_chunks(list(zip(ids, texts)), batch_size):
-        texts_chunk = [c[1] for c in chunk]
-        ids_chunk = [c[0] for c in chunk]
-        embeddings = huggingface_specter_embed_chunk(texts_chunk, tokenizer, model)
-        for _id, embedding in zip(ids_chunk, embeddings):
-            add_embedding_to_table(
-                embeddings_db, (_id, embedding), embeddings_tablename
-            )
-    embeddings = pd.read_sql(
-        f"SELECT * FROM {embeddings_tablename}", embeddings_conn
-    ).set_index("id")
-    return embeddings
-
-
-def create_embeddings_data_table(
-    db_path: PathLike, embeddings_tablename: str, id_col: Optional[str] = "id"
-) -> None:
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    sql_query = f"""CREATE TABLE IF NOT EXISTS {embeddings_tablename} ({id_col} TEXT PRIMARY KEY,"""
-    sql_query += ", ".join([f"col_{i} REAL" for i in range(768)])
-    sql_query += """)"""
-    cursor.execute(sql_query)
-    conn.commit()
-    conn.close()
-
-
-def read_embedding_indexes(
-    db_path: PathLike, embeddings_tablename: str, id_col: Optional[str] = "id"
-) -> List[str]:
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    cursor.execute(f"SELECT {id_col} FROM {embeddings_tablename}")
-    indexes = cursor.fetchall()
-    conn.close()
-    return [index[0] for index in indexes]
-
-
-def add_embedding_to_table(
-    db_path: PathLike,
-    embedding: Tuple[str, ndarray],
-    embeddings_tablename: str,
-    id_col: Optional[str] = "id",
-) -> None:
-    embedding_id, embedding_vector = embedding
-    assert isinstance(embedding_id, str), "ID must be an string"
-    assert all(
-        isinstance(x, (int, float)) for x in embedding_vector
-    ), "All embedding values must be numeric"
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    col_names = [f"col_{i}" for i in range(768)]
-    sql_query = f"""INSERT OR REPLACE INTO {embeddings_tablename} ({id_col}, """
-    sql_query += ", ".join(col_names)
-    sql_query += """) VALUES (?, """
-    sql_query += ", ".join(["?"] * 768)
-    sql_query += """)"""
-    cursor.execute(sql_query, [embedding_id] + embedding_vector)
-    conn.commit()
-    conn.close()
-
-
-def embeddings_col_to_frame(embeddings: Series) -> DataFrame:
-    if all(isinstance(value, str) for value in embeddings):
-        embeddings = embeddings.apply(literal_eval)
-    embeddings = embeddings.apply(Series).astype(float64)
-    return embeddings
-
-
-def umap_embeddings(embeddings: DataFrame, random_state: int = 42) -> ndarray:
-    reducer = UMAP(random_state=random_state)
-    return reducer.fit_transform(embeddings)
-
-
-def semantic_scholar_specter_embed_texts(
-    texts: Union[List[str], str], batch_size: Optional[int] = MAX_BATCH_SIZE
-) -> List[ndarray]:
-    embeddings = []
-    for chunk in tqdm(
-        iterable_chunks(texts, batch_size), total=len(texts) / batch_size
-    ):
-        pass
-    return embeddings
+    embeddings = reducer.fit_transform(
+        data.values if isinstance(data, DataFrame) else data
+    )
+    return embeddings if not return_reducer else reducer
