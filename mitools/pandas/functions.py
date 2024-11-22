@@ -123,15 +123,6 @@ def prepare_quantile_columns(
     return dataframe
 
 
-def quantize_columns(
-    dataframe: DataFrame, columns: Union[str, List[str]], n_cuts: int = 10
-):
-    quantiles = pd.qcut(dataframe[columns], n_cuts, labels=False)
-    quantiles = quantiles / (n_cuts - 1)
-    dataframe[columns] = quantiles + 0.1
-    return dataframe
-
-
 def prepare_str_columns(
     dataframe: DataFrame, columns: Union[Iterable[str], str]
 ) -> DataFrame:
