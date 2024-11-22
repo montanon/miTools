@@ -181,6 +181,10 @@ def reshape_group_data(
     pivoted_data = grouped_data.pivot(
         index=time_column, columns=subgroup_column, values=value_column
     )
+    all_times = dataframe[time_column].unique()
+    pivoted_data = pivoted_data.reindex(all_times, fill_value=None)
+    pivoted_data = pivoted_data.sort_index()
+    pivoted_data = pivoted_data.sort_index(axis=1)
     pivoted_data.index.name = filter_value
     return pivoted_data
 
@@ -242,13 +246,20 @@ def reshape_groups_subgroups(
                 group_column=group_column,
                 subgroup_column=subgroup_column,
                 time_column=time_column,
-                agg_fun=agg_func,
+                agg_func=agg_func,
             )
         except ArgumentValueError as e:
-            raise ValueError(f"Error processing group '{group}': {str(e)}")
+            raise ArgumentValueError(f"Error processing group '{group}': {str(e)}")
     for group, subgroups in groups_subgroups.items():
         subgroups.columns = pd.MultiIndex.from_product([[group], subgroups.columns])
-    combined_groups = pd.concat(groups_subgroups.values(), axis=1)
+    try:
+        combined_groups = pd.concat(groups_subgroups.values(), axis=1)
+    except ValueError as e:
+        raise ArgumentValueError(f"Error concatenating groups: {str(e)}")
+    # all_times = dataframe[time_column].unique()
+    # combined_groups = combined_groups.reindex(all_times, fill_value=None)
+    combined_groups = combined_groups.sort_index()
+    combined_groups = combined_groups.sort_index(axis=1)
     combined_groups.columns.names = [group_column, subgroup_column]
     return combined_groups
 
