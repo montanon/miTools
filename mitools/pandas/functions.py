@@ -54,7 +54,7 @@ def prepare_categorical_columns(
     columns: Union[Iterable[str], str],
     categories: List[str] = None,
     ordered: bool = False,
-):
+) -> DataFrame:
     columns = [columns] if isinstance(columns, str) else columns
     if not isinstance(columns, Iterable) or not all(
         isinstance(c, str) for c in columns
@@ -69,6 +69,27 @@ def prepare_categorical_columns(
         dataframe[col] = pd.Categorical(
             dataframe[col], categories=categories, ordered=ordered
         )
+    return dataframe
+
+
+def prepare_rank_columns(
+    dataframe: DataFrame,
+    columns: Union[str, List[str]],
+    method: str = "average",
+    ascending: bool = True,
+):
+    columns = [columns] if isinstance(columns, str) else columns
+    if not isinstance(columns, Iterable) or not all(
+        isinstance(c, str) for c in columns
+    ):
+        raise ArgumentTypeError(
+            "Argument 'cols' must be a string or an iterable of strings."
+        )
+    missing_cols = [col for col in columns if col not in dataframe.columns]
+    if missing_cols:
+        raise ArgumentValueError(f"Columns {missing_cols} not found in DataFrame.")
+    for col in columns:
+        dataframe[col] = dataframe[col].rank(method=method, ascending=ascending)
     return dataframe
 
 
