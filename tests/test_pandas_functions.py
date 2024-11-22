@@ -12,6 +12,7 @@ from mitools.pandas.functions import (
     get_entity_data,
     idxslice,
     load_level_destructured_dataframe,
+    melt_hierarchical_data,
     prepare_bool_cols,
     prepare_date_cols,
     prepare_int_cols,
@@ -997,6 +998,134 @@ class TestGetEntitiesData(TestCase):
         self.assertEqual(
             list(result.columns.get_level_values(1)), ["indicator1", "indicator2"] * 2
         )
+
+
+class TestMeltHierarchicalData(TestCase):
+    def setUp(self):
+        self.hierarchical_df = DataFrame(
+            {
+                ("USA", "indicator1"): [100, 200, 300],
+                ("USA", "indicator2"): [10, 20, 30],
+                ("CAN", "indicator1"): [400, 500, None],
+                ("CAN", "indicator2"): [40, 50, None],
+            },
+            index=["2021-Q1", "2021-Q2", "2021-Q3"],
+        )
+        self.hierarchical_df.index.name = "time"
+
+    def test_valid_input(self):
+        result = melt_hierarchical_data(
+            dataframe=self.hierarchical_df,
+            data_column="indicator1",
+            entities=["USA", "CAN"],
+            group_column="country",
+            subgroup_column="indicator",
+            time_column="time",
+        )
+        expected = DataFrame(
+            {
+                "indicator": ["USA", "USA", "USA", "CAN", "CAN", "CAN"],
+                "country": ["USA", "USA", "USA", "CAN", "CAN", "CAN"],
+                "time": [
+                    "2021-Q1",
+                    "2021-Q2",
+                    "2021-Q3",
+                    "2021-Q1",
+                    "2021-Q2",
+                    "2021-Q3",
+                ],
+                "indicator1": [100.0, 200.0, 300.0, 400.0, 500.0, None],
+            }
+        )
+        pd.testing.assert_frame_equal(result, expected)
+
+    def test_single_entity(self):
+        result = melt_hierarchical_data(
+            dataframe=self.hierarchical_df,
+            data_column="indicator2",
+            entities=["USA"],
+            group_column="country",
+            subgroup_column="indicator",
+            time_column="time",
+        )
+        expected = DataFrame(
+            {
+                "indicator": ["USA", "USA", "USA"],
+                "country": ["USA", "USA", "USA"],
+                "time": ["2021-Q1", "2021-Q2", "2021-Q3"],
+                "indicator2": [10.0, 20.0, 30.0],
+            }
+        )
+        pd.testing.assert_frame_equal(result, expected)
+
+    def test_no_matching_entities(self):
+        with self.assertRaises(KeyError):
+            melt_hierarchical_data(
+                dataframe=self.hierarchical_df,
+                data_column="indicator1",
+                entities=["MEX"],
+                group_column="country",
+                subgroup_column="indicator",
+                time_column="time",
+            )
+
+    def test_invalid_data_column(self):
+        with self.assertRaises(KeyError):
+            melt_hierarchical_data(
+                dataframe=self.hierarchical_df,
+                data_column="nonexistent_indicator",
+                entities=["USA", "CAN"],
+                group_column="country",
+                subgroup_column="indicator",
+                time_column="time",
+            )
+
+    def test_empty_dataframe(self):
+        empty_df = DataFrame(columns=self.hierarchical_df.columns)
+        with self.assertRaises(KeyError):
+            melt_hierarchical_data(
+                dataframe=empty_df,
+                data_column="indicator1",
+                entities=["USA", "CAN"],
+                group_column="country",
+                subgroup_column="indicator",
+                time_column="time",
+            )
+
+    def test_large_dataframe(self):
+        large_df = pd.concat([self.hierarchical_df] * 1000, ignore_index=False)
+        result = melt_hierarchical_data(
+            dataframe=large_df,
+            data_column="indicator1",
+            entities=["USA", "CAN"],
+            group_column="country",
+            subgroup_column="indicator",
+            time_column="time",
+        )
+        self.assertTrue(len(result) > 0)  # Ensure output has rows
+
+    def test_preserves_column_order(self):
+        result = melt_hierarchical_data(
+            dataframe=self.hierarchical_df,
+            data_column="indicator2",
+            entities=["USA", "CAN"],
+            group_column="country",
+            subgroup_column="indicator",
+            time_column="time",
+        )
+        expected_columns = ["indicator", "country", "time", "indicator2"]
+        self.assertEqual(list(result.columns), expected_columns)
+
+    def test_handles_nan_values(self):
+        result = melt_hierarchical_data(
+            dataframe=self.hierarchical_df,
+            data_column="indicator1",
+            entities=["CAN"],
+            group_column="country",
+            subgroup_column="indicator",
+            time_column="time",
+        )
+        self.assertTrue(result["indicator1"].isna().sum() > 0)
 
 
 class TestStoreDataframeByLevel(unittest.TestCase):
