@@ -32,6 +32,71 @@ from mitools.pandas.functions import (
 )
 
 
+class TestPrepareStandardizedColumns(TestCase):
+    def setUp(self):
+        self.df = DataFrame(
+            {
+                "A": [1, 2, 3, 4, 5],
+                "B": [10, 20, 30, 40, 50],
+                "C": ["x", "y", "z", "w", "v"],  # Non-numeric column
+            }
+        )
+
+    def test_single_column_standardization(self):
+        result = prepare_standardized_columns(self.df.copy(), columns="A")
+        expected = self.df.copy()
+        expected["A"] = (self.df["A"] - self.df["A"].mean()) / self.df["A"].std()
+        assert_frame_equal(result, expected)
+
+    def test_multiple_columns_standardization(self):
+        result = prepare_standardized_columns(self.df.copy(), columns=["A", "B"])
+        expected = self.df.copy()
+        expected["A"] = (self.df["A"] - self.df["A"].mean()) / self.df["A"].std()
+        expected["B"] = (self.df["B"] - self.df["B"].mean()) / self.df["B"].std()
+        assert_frame_equal(result, expected)
+
+    def test_missing_column(self):
+        with self.assertRaises(ValueError):
+            prepare_standardized_columns(self.df.copy(), columns="D")
+
+    def test_non_numeric_column(self):
+        with self.assertRaises(TypeError):
+            prepare_standardized_columns(self.df.copy(), columns="C")
+
+    def test_inferred_numeric_column(self):
+        df = self.df.copy()
+        df["D"] = [1.1, 2.2, 3.3, 4.4, 5.5]
+        result = prepare_standardized_columns(df, columns="D")
+        expected = df.copy()
+        expected["D"] = (df["D"] - df["D"].mean()) / df["D"].std()
+        assert_frame_equal(result, expected)
+
+    def test_standardized_column_mean(self):
+        result = prepare_standardized_columns(self.df.copy(), columns="A")
+        self.assertAlmostEqual(result["A"].mean(), 0, places=6)
+
+    def test_standardized_column_std(self):
+        result = prepare_standardized_columns(self.df.copy(), columns="A")
+        self.assertAlmostEqual(result["A"].std(), 1, places=6)
+
+    def test_no_modification_to_untouched_columns(self):
+        result = prepare_standardized_columns(self.df.copy(), columns="A")
+        self.assertTrue(result["B"].equals(self.df["B"]))
+
+    def test_empty_dataframe(self):
+        empty_df = DataFrame()
+        result = prepare_standardized_columns(empty_df, columns=[])
+        assert_frame_equal(result, empty_df)
+
+    def test_all_columns_standardized(self):
+        numeric_columns = self.df.select_dtypes(include=np.number).columns.tolist()
+        result = prepare_standardized_columns(self.df.copy(), columns=numeric_columns)
+        expected = self.df.copy()
+        for col in numeric_columns:
+            expected[col] = (self.df[col] - self.df[col].mean()) / self.df[col].std()
+        assert_frame_equal(result, expected)
+
+
 class TestPrepareQuantileColumns(TestCase):
     def setUp(self):
         self.df = DataFrame(
