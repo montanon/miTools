@@ -32,6 +32,89 @@ from mitools.pandas.functions import (
 )
 
 
+class TestPrepareRankColumns(TestCase):
+    def setUp(self):
+        self.df = pd.DataFrame(
+            {
+                "A": [10, 20, 20, 30],
+                "B": [100, 50, 50, 25],
+                "C": ["x", "y", "z", "w"],  # Non-numeric column
+            }
+        )
+
+    def test_single_column_default_ranking(self):
+        result = prepare_rank_columns(self.df.copy(), columns="A")
+        expected = self.df.copy()
+        expected["A"] = [1.0, 2.5, 2.5, 4.0]  # Default "average" ranking
+        assert_frame_equal(result, expected)
+
+    def test_multiple_columns_default_ranking(self):
+        result = prepare_rank_columns(self.df.copy(), columns=["A", "B"])
+        expected = self.df.copy()
+        expected["A"] = [1.0, 2.5, 2.5, 4.0]
+        expected["B"] = [4.0, 2.5, 2.5, 1.0]
+        assert_frame_equal(result, expected)
+
+    def test_single_column_descending_ranking(self):
+        result = prepare_rank_columns(self.df.copy(), columns="A", ascending=False)
+        expected = self.df.copy()
+        expected["A"] = [4.0, 2.5, 2.5, 1.0]
+        assert_frame_equal(result, expected)
+
+    def test_single_column_min_ranking(self):
+        result = prepare_rank_columns(self.df.copy(), columns="A", method="min")
+        expected = self.df.copy()
+        expected["A"] = [
+            1.0,
+            2.0,
+            2.0,
+            4.0,
+        ]  # "min" ranking assigns lowest rank for ties
+        assert_frame_equal(result, expected)
+
+    def test_single_column_max_ranking(self):
+        result = prepare_rank_columns(self.df.copy(), columns="A", method="max")
+        expected = self.df.copy()
+        expected["A"] = [
+            1.0,
+            3.0,
+            3.0,
+            4.0,
+        ]  # "max" ranking assigns highest rank for ties
+        assert_frame_equal(result, expected)
+
+    def test_single_column_dense_ranking(self):
+        result = prepare_rank_columns(self.df.copy(), columns="A", method="dense")
+        expected = self.df.copy()
+        expected["A"] = [1.0, 2.0, 2.0, 3.0]  # "dense" ranking skips no ranks
+        assert_frame_equal(result, expected)
+
+    def test_single_column_ordinal_ranking(self):
+        with self.assertRaises(ArgumentValueError):
+            prepare_rank_columns(self.df.copy(), columns="A", method="ordinal")
+
+    def test_invalid_column(self):
+        with self.assertRaises(ArgumentValueError):
+            prepare_rank_columns(self.df.copy(), columns="D")
+
+    def test_non_numeric_column(self):
+        result = prepare_rank_columns(self.df.copy(), columns="C")
+        expected = DataFrame({"C": [2.0, 3.0, 4.0, 1.0]})
+        assert_frame_equal(result[["C"]], expected)
+
+    def test_inferred_numeric_column(self):
+        df = self.df.copy()
+        df["D"] = [1.1, 2.2, 3.3, 4.4]
+        result = prepare_rank_columns(df, columns="D")
+        expected = df.copy()
+        expected["D"] = [1.0, 2.0, 3.0, 4.0]
+        assert_frame_equal(result, expected)
+
+    def test_no_modification_to_untouched_columns(self):
+        result = prepare_rank_columns(self.df.copy(), columns="A")
+        self.assertTrue(result["B"].equals(self.df["B"]))
+
+
 class TestPrepareCategoricalColumns(TestCase):
     def setUp(self):
         self.df = pd.DataFrame(
