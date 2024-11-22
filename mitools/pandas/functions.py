@@ -16,16 +16,7 @@ NON_DATE_COL_ERROR = (
 )
 
 
-def prepare_int_columns(
-    dataframe: DataFrame,
-    columns: Union[Iterable[str], str],
-    nan_placeholder: int,
-    errors: Literal["raise", "coerce", "ignore"] = "coerce",
-) -> DataFrame:
-    if errors not in ["raise", "coerce", "ignore"]:
-        raise ArgumentValueError(
-            "Argument 'errors' must be one of ['raise', 'coerce', 'ignore']."
-        )
+def validate_columns(dataframe: DataFrame, columns: Union[Iterable[str], str]) -> None:
     columns = [columns] if isinstance(columns, str) else columns
     if not isinstance(columns, Iterable) or not all(
         isinstance(c, str) for c in columns
@@ -36,6 +27,20 @@ def prepare_int_columns(
     missing_cols = [col for col in columns if col not in dataframe.columns]
     if missing_cols:
         raise ArgumentValueError(f"Columns {missing_cols} not found in DataFrame.")
+    return columns
+
+
+def prepare_int_columns(
+    dataframe: DataFrame,
+    columns: Union[Iterable[str], str],
+    nan_placeholder: int,
+    errors: Literal["raise", "coerce", "ignore"] = "coerce",
+) -> DataFrame:
+    if errors not in ["raise", "coerce", "ignore"]:
+        raise ArgumentValueError(
+            "Argument 'errors' must be one of ['raise', 'coerce', 'ignore']."
+        )
+    columns = validate_columns(dataframe, columns)
     try:
         for col in columns:
             dataframe[col] = pd.to_numeric(
@@ -55,16 +60,7 @@ def prepare_categorical_columns(
     categories: List[str] = None,
     ordered: bool = False,
 ) -> DataFrame:
-    columns = [columns] if isinstance(columns, str) else columns
-    if not isinstance(columns, Iterable) or not all(
-        isinstance(c, str) for c in columns
-    ):
-        raise ArgumentTypeError(
-            "Argument 'cols' must be a string or an iterable of strings."
-        )
-    missing_cols = [col for col in columns if col not in dataframe.columns]
-    if missing_cols:
-        raise ArgumentValueError(f"Columns {missing_cols} not found in DataFrame.")
+    columns = validate_columns(dataframe, columns)
     for col in columns:
         dataframe[col] = pd.Categorical(
             dataframe[col], categories=categories, ordered=ordered
@@ -78,16 +74,7 @@ def prepare_rank_columns(
     method: str = "average",
     ascending: bool = True,
 ):
-    columns = [columns] if isinstance(columns, str) else columns
-    if not isinstance(columns, Iterable) or not all(
-        isinstance(c, str) for c in columns
-    ):
-        raise ArgumentTypeError(
-            "Argument 'cols' must be a string or an iterable of strings."
-        )
-    missing_cols = [col for col in columns if col not in dataframe.columns]
-    if missing_cols:
-        raise ArgumentValueError(f"Columns {missing_cols} not found in DataFrame.")
+    columns = validate_columns(dataframe, columns)
     for col in columns:
         dataframe[col] = dataframe[col].rank(method=method, ascending=ascending)
     return dataframe
@@ -96,16 +83,7 @@ def prepare_rank_columns(
 def prepare_standardized_columns(
     dataframe: DataFrame, columns: Union[str, List[str]]
 ) -> DataFrame:
-    columns = [columns] if isinstance(columns, str) else columns
-    if not isinstance(columns, Iterable) or not all(
-        isinstance(c, str) for c in columns
-    ):
-        raise ArgumentTypeError(
-            "Argument 'cols' must be a string or an iterable of strings."
-        )
-    missing_cols = [col for col in columns if col not in dataframe.columns]
-    if missing_cols:
-        raise ArgumentValueError(f"Columns {missing_cols} not found in DataFrame.")
+    columns = validate_columns(dataframe, columns)
     for col in columns:
         dataframe[col] = (dataframe[col] - dataframe[col].mean()) / dataframe[col].std()
     return dataframe
@@ -117,16 +95,7 @@ def prepare_bin_columns(
     bins: Union[int, List[float]] = 10,
     labels: List[Any] = None,
 ):
-    columns = [columns] if isinstance(columns, str) else columns
-    if not isinstance(columns, Iterable) or not all(
-        isinstance(c, str) for c in columns
-    ):
-        raise ArgumentTypeError(
-            "Argument 'cols' must be a string or an iterable of strings."
-        )
-    missing_cols = [col for col in columns if col not in dataframe.columns]
-    if missing_cols:
-        raise ArgumentValueError(f"Columns {missing_cols} not found in DataFrame.")
+    columns = validate_columns(dataframe, columns)
     for col in columns:
         dataframe[col] = pd.cut(dataframe[col], bins=bins, labels=labels)
     return dataframe
@@ -144,16 +113,7 @@ def quantize_columns(
 def prepare_str_columns(
     dataframe: DataFrame, columns: Union[Iterable[str], str]
 ) -> DataFrame:
-    columns = [columns] if isinstance(columns, str) else columns
-    if not isinstance(columns, Iterable) or not all(
-        isinstance(c, str) for c in columns
-    ):
-        raise ArgumentTypeError(
-            "Argument 'cols' must be a string or an iterable of strings."
-        )
-    missing_cols = [col for col in columns if col not in dataframe.columns]
-    if missing_cols:
-        raise ArgumentValueError(f"Columns {missing_cols} not found in DataFrame.")
+    columns = validate_columns(dataframe, columns)
     dataframe[columns] = dataframe[columns].astype(str)
     return dataframe
 
@@ -169,16 +129,7 @@ def prepare_date_columns(
         raise ArgumentValueError(
             "Argument 'errors' must be one of ['raise', 'coerce', 'ignore']."
         )
-    columns = [columns] if isinstance(columns, str) else columns
-    if not isinstance(columns, Iterable) or not all(
-        isinstance(c, str) for c in columns
-    ):
-        raise ArgumentTypeError(
-            "Argument 'cols' must be a string or an iterable of strings."
-        )
-    missing_cols = [col for col in columns if col not in dataframe.columns]
-    if missing_cols:
-        raise ArgumentValueError(f"Columns {missing_cols} not found in DataFrame.")
+    columns = validate_columns(dataframe, columns)
     try:
         for col in columns:
             dataframe[col] = pd.to_datetime(
@@ -196,16 +147,7 @@ def prepare_bool_columns(
     columns: Union[Iterable[str], str],
     nan_placeholder: bool = False,
 ) -> DataFrame:
-    columns = [columns] if isinstance(columns, str) else columns
-    if not isinstance(columns, Iterable) or not all(
-        isinstance(c, str) for c in columns
-    ):
-        raise ArgumentTypeError(
-            "Argument 'cols' must be a string or an iterable of strings."
-        )
-    missing_cols = [col for col in columns if col not in dataframe.columns]
-    if missing_cols:
-        raise ArgumentValueError(f"Columns {missing_cols} not found in DataFrame.")
+    columns = validate_columns(dataframe, columns)
     try:
         for col in columns:
             dataframe[col] = dataframe[col].fillna(nan_placeholder)
