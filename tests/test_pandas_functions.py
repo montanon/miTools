@@ -9,6 +9,7 @@ from pandas import DataFrame, Series, testing
 from mitools.exceptions.custom_exceptions import ArgumentTypeError
 from mitools.pandas.functions import (
     ArgumentValueError,
+    get_entity_data,
     idxslice,
     load_level_destructured_dataframe,
     prepare_bool_cols,
@@ -709,6 +710,156 @@ class TestReshapeGroupsSubgroups(TestCase):
         self.assertEqual(
             result.columns.get_level_values(1).tolist(), ["X", "Y", "Z", "X", "Y"]
         )
+
+
+class TestGetEntityData(TestCase):
+    def setUp(self):
+        self.df = DataFrame(
+            {
+                "country": ["USA", "USA", "USA", "CAN", "CAN", "USA"],
+                "indicator1": [100, 200, 300, 400, 500, 600],
+                "indicator2": [10, 20, 30, 40, 50, 60],
+                "time": [
+                    "2021-Q1",
+                    "2021-Q2",
+                    "2021-Q3",
+                    "2021-Q1",
+                    "2021-Q2",
+                    "2021-Q4",
+                ],
+            }
+        )
+
+    def test_valid_input(self):
+        result = get_entity_data(
+            dataframe=self.df,
+            data_columns=["indicator1", "indicator2"],
+            entity="USA",
+            entity_column="country",
+            time_column="time",
+        )
+        expected = DataFrame(
+            {
+                "indicator1": [100, 200, 300, 600],
+                "indicator2": [10, 20, 30, 60],
+            },
+            index=["2021-Q1", "2021-Q2", "2021-Q3", "2021-Q4"],
+        )
+        expected.index.name = "USA"
+        pd.testing.assert_frame_equal(result, expected)
+
+    def test_custom_aggregation_function(self):
+        df = self.df.copy()
+        df.loc[len(df)] = ["USA", 150, 15, "2021-Q1"]  # Add duplicate for aggregation
+        result = get_entity_data(
+            dataframe=df,
+            data_columns=["indicator1", "indicator2"],
+            entity="USA",
+            entity_column="country",
+            time_column="time",
+            agg_func="mean",
+        )
+        expected = DataFrame(
+            {
+                "indicator1": [125.0, 200.0, 300.0, 600.0],
+                "indicator2": [12.5, 20.0, 30.0, 60.0],
+            },
+            index=["2021-Q1", "2021-Q2", "2021-Q3", "2021-Q4"],
+        )
+        expected.index.name = "USA"
+        pd.testing.assert_frame_equal(result, expected)
+
+    def test_missing_required_columns(self):
+        df = self.df.drop(columns=["indicator1"])
+        with self.assertRaises(ArgumentValueError) as context:
+            get_entity_data(
+                dataframe=df,
+                data_columns=["indicator1", "indicator2"],
+                entity="USA",
+                entity_column="country",
+                time_column="time",
+            )
+        self.assertIn(
+            "Columns {'indicator1'} not found in the DataFrame.", str(context.exception)
+        )
+
+    def test_no_matching_entity(self):
+        with self.assertRaises(ArgumentValueError) as context:
+            get_entity_data(
+                dataframe=self.df,
+                data_columns=["indicator1", "indicator2"],
+                entity="MEX",
+                entity_column="country",
+                time_column="time",
+            )
+        self.assertIn(
+            "No data found for entity 'MEX' in column 'country'.",
+            str(context.exception),
+        )
+
+    def test_empty_dataframe(self):
+        empty_df = DataFrame(columns=self.df.columns)
+        with self.assertRaises(ArgumentValueError) as context:
+            get_entity_data(
+                dataframe=empty_df,
+                data_columns=["indicator1", "indicator2"],
+                entity="USA",
+                entity_column="country",
+                time_column="time",
+            )
+        self.assertIn("No data found for entity 'USA'", str(context.exception))
+
+    def test_column_type_mismatch(self):
+        df = self.df.copy()
+        df["time"] = pd.to_datetime(df["time"])  # Convert time to datetime
+        result = get_entity_data(
+            dataframe=df,
+            data_columns=["indicator1", "indicator2"],
+            entity="USA",
+            entity_column="country",
+            time_column="time",
+        )
+        self.assertTrue(result.index.dtype == "datetime64[ns]")
+
+    def test_reindexing_with_missing_times(self):
+        result = get_entity_data(
+            dataframe=self.df,
+            data_columns=["indicator1", "indicator2"],
+            entity="CAN",
+            entity_column="country",
+            time_column="time",
+        )
+        expected = DataFrame(
+            {
+                "indicator1": [400, 500, None, None],
+                "indicator2": [40, 50, None, None],
+            },
+            index=["2021-Q1", "2021-Q2", "2021-Q3", "2021-Q4"],
+        )
+        expected.index.name = "CAN"
+        pd.testing.assert_frame_equal(result, expected)
+
+    def test_large_dataframe(self):
+        large_df = pd.concat([self.df] * 10000, ignore_index=True)
+        result = get_entity_data(
+            dataframe=large_df,
+            data_columns=["indicator1", "indicator2"],
+            entity="USA",
+            entity_column="country",
+            time_column="time",
+        )
+        self.assertTrue(result.shape[0] > 0)  # Ensure the result has rows
+        self.assertTrue(result.shape[1] == 2)  # Ensure the result has two columns
+
+    def test_sorts_column_order(self):
+        result = get_entity_data(
+            dataframe=self.df,
+            data_columns=["indicator2", "indicator1"],
+            entity="USA",
+            entity_column="country",
+            time_column="time",
+        )
+        self.assertEqual(list(result.columns), ["indicator1", "indicator2"])
 
 
 class TestStoreDataframeByLevel(unittest.TestCase):
