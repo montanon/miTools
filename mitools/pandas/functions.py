@@ -295,15 +295,42 @@ def get_entity_data(
     return grouped_data
 
 
-def build_groups(
-    df: DataFrame, value_cols: List[str], group_col: str, time_col: str
+def get_entities_data(
+    dataframe: DataFrame,
+    data_columns: List[str],
+    entity_column: str,
+    time_column: str,
+    entities: List[str] = None,
+    agg_func: str = "first",
 ) -> DataFrame:
-    groups = {}
-    for entity in tqdm(df[group_col].unique()):
-        groups[entity] = build_group(df, entity, value_cols, group_col, time_col)
-    for entity, group in groups.items():
-        group.columns = pd.MultiIndex.from_product([[entity], group.columns])
-    return pd.concat(groups.values(), axis=1)
+    required_columns = {*data_columns, entity_column, time_column}
+    missing_columns = required_columns - set(dataframe.columns)
+    if missing_columns:
+        raise ArgumentValueError(
+            f"Columns {missing_columns} not found in the DataFrame."
+        )
+    entities = entities or dataframe[entity_column].unique()
+    entities_data = {}
+    for entity in tqdm(entities, desc="Processing entities"):
+        try:
+            entities_data[entity] = get_entity_data(
+                dataframe=dataframe,
+                data_columns=data_columns,
+                entity=entity,
+                entity_column=entity_column,
+                time_column=time_column,
+                agg_func=agg_func,
+            )
+            entities_data[entity].columns = pd.MultiIndex.from_product(
+                [[entity], entities_data[entity].columns]
+            )
+        except ArgumentValueError as e:
+            raise ArgumentValueError(f"Error processing entity '{entity}': {str(e)}")
+    combined_data = pd.concat(entities_data.values(), axis=1)
+    combined_data = combined_data.sort_index()
+    combined_data = combined_data.sort_index(axis=1)
+    combined_data.columns.names = [entity_column, "indicator"]
+    return combined_data
 
 
 def melt_dataframe(
