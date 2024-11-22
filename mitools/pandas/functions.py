@@ -105,7 +105,8 @@ def prepare_normalized_columns(
     for col in columns:
         min_val = dataframe[col].min()
         max_val = dataframe[col].max()
-        dataframe[col] = (dataframe[col] - min_val) / (max_val - min_val) * (
+        values_range = max_val - min_val if max_val != min_val else 1
+        dataframe[col] = (dataframe[col] - min_val) / values_range * (
             range_max - range_min
         ) + range_min
     return dataframe

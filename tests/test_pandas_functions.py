@@ -21,6 +21,7 @@ from mitools.pandas.functions import (
     prepare_categorical_columns,
     prepare_date_columns,
     prepare_int_columns,
+    prepare_normalized_columns,
     prepare_quantile_columns,
     prepare_rank_columns,
     prepare_standardized_columns,
@@ -30,6 +31,94 @@ from mitools.pandas.functions import (
     store_dataframe_parquet,
     wide_to_long_dataframe,
 )
+
+
+class TestPrepareNormalizedColumns(TestCase):
+    def setUp(self):
+        self.df = DataFrame(
+            {
+                "A": [1, 2, 3, 4, 5],
+                "B": [10, 20, 30, 40, 50],
+                "C": ["x", "y", "z", "w", "v"],  # Non-numeric column
+            }
+        )
+
+    def test_single_column_default_range(self):
+        result = prepare_normalized_columns(self.df.copy(), columns="A")
+        expected = self.df.copy()
+        expected["A"] = (self.df["A"] - self.df["A"].min()) / (
+            self.df["A"].max() - self.df["A"].min()
+        )
+        assert_frame_equal(result, expected)
+
+    def test_multiple_columns_default_range(self):
+        result = prepare_normalized_columns(self.df.copy(), columns=["A", "B"])
+        expected = self.df.copy()
+        expected["A"] = (self.df["A"] - self.df["A"].min()) / (
+            self.df["A"].max() - self.df["A"].min()
+        )
+        expected["B"] = (self.df["B"] - self.df["B"].min()) / (
+            self.df["B"].max() - self.df["B"].min()
+        )
+        assert_frame_equal(result, expected)
+
+    def test_single_column_custom_range(self):
+        result = prepare_normalized_columns(
+            self.df.copy(), columns="A", range_min=-1, range_max=1
+        )
+        expected = self.df.copy()
+        expected["A"] = (self.df["A"] - self.df["A"].min()) / (
+            self.df["A"].max() - self.df["A"].min()
+        ) * (1 - (-1)) + (-1)
+        assert_frame_equal(result, expected)
+
+    def test_multiple_columns_custom_range(self):
+        result = prepare_normalized_columns(
+            self.df.copy(), columns=["A", "B"], range_min=10, range_max=20
+        )
+        expected = self.df.copy()
+        expected["A"] = (self.df["A"] - self.df["A"].min()) / (
+            self.df["A"].max() - self.df["A"].min()
+        ) * (20 - 10) + 10
+        expected["B"] = (self.df["B"] - self.df["B"].min()) / (
+            self.df["B"].max() - self.df["B"].min()
+        ) * (20 - 10) + 10
+        assert_frame_equal(result, expected)
+
+    def test_missing_column(self):
+        with self.assertRaises(ValueError):
+            prepare_normalized_columns(self.df.copy(), columns="D")
+
+    def test_non_numeric_column(self):
+        with self.assertRaises(TypeError):
+            prepare_normalized_columns(self.df.copy(), columns="C")
+
+    def test_no_modification_to_untouched_columns(self):
+        result = prepare_normalized_columns(self.df.copy(), columns="A")
+        self.assertTrue(result["B"].equals(self.df["B"]))
+
+    def test_all_columns_normalized(self):
+        numeric_columns = self.df.select_dtypes(include=np.number).columns.tolist()
+        result = prepare_normalized_columns(self.df.copy(), columns=numeric_columns)
+        expected = self.df.copy()
+        for col in numeric_columns:
+            expected[col] = (self.df[col] - self.df[col].min()) / (
+                self.df[col].max() - self.df[col].min()
+            )
+        assert_frame_equal(result, expected)
+
+    def test_constant_column(self):
+        constant_df = self.df.copy()
+        constant_df["A"] = 5
+        result = prepare_normalized_columns(constant_df.copy(), columns="A")
+        expected = constant_df.copy()
+        expected["A"] = 0.0  # All values should normalize to range_min since min == max
+        assert_frame_equal(result, expected)
+
+    def test_empty_dataframe(self):
+        empty_df = DataFrame()
+        result = prepare_normalized_columns(empty_df, columns=[])
+        assert_frame_equal(result, empty_df)
 
 
 class TestPrepareStandardizedColumns(TestCase):
