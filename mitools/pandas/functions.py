@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Literal, Optional, Union
 
 import pandas as pd
-from pandas import DataFrame, IndexSlice
+from pandas import DataFrame, IndexSlice, MultiIndex
 from pandas._libs.tslibs.parsing import DateParseError
 from tqdm import tqdm
 
@@ -440,52 +440,53 @@ def long_to_wide_dataframe(
     return long_dataframe
 
 
-def store_dataframe_by_level(
-    df: DataFrame, base_path: Union[str, PathLike], level: Union[str, int]
+def store_dataframe_parquet(
+    dataframe: DataFrame,
+    base_path: Union[str, PathLike],
+    dataframe_name: str,
+    overwrite: bool = False,
 ) -> None:
-    if not isinstance(df, DataFrame):
-        raise Exception("Error: df is not a pandas DataFrame.")
-    if not isinstance(base_path, (str, PathLike)):
-        raise ValueError("Error: base_path is not a string or a PathLike object.")
-    if not isinstance(level, (int, str)):
-        raise ValueError("Error: level is not an integer.")
-    if isinstance(level, int) and (level < 0 or level >= df.columns.nlevels):
-        raise ValueError(
-            f"Error: level {level} is not a valid level for the DataFrame."
+    base_path = Path(base_path).absolute()
+    if not base_path.is_dir():
+        raise ArgumentValueError(
+            f"'base_path'={base_path} directory not found. It must be a directory."
         )
-    if isinstance(level, str) and level not in df.columns.names:
-        raise ValueError(
-            f"Error: level {level} is not a valid level for the DataFrame."
-        )
-    level_values = df.columns.get_level_values(level).unique()
-    for n, value in enumerate(level_values):
-        if value not in df.columns.get_level_values(level):
-            raise ValueError(
-                f"Error: value {value} is not in level {level} of the DataFrame."
-            )
-        sub_df = df.xs(value, axis=1, level=level, drop_level=False)
-        sub_path = Path(str(base_path).replace(".parquet", f"{n}_sub.parquet"))
-        sub_df.to_parquet(sub_path)
+    index_path = base_path / f"{dataframe_name}_index.parquet"
+    columns_path = base_path / f"{dataframe_name}_columns.parquet"
+    data_path = base_path / f"{dataframe_name}.parquet"
+    if not data_path.exists() or overwrite:
+        if isinstance(dataframe.index, MultiIndex):
+            indexes = dataframe.index.to_frame()
+            indexes.to_parquet(index_path)
+            dataframe = dataframe.reset_index(drop=True)
+        if isinstance(dataframe.columns, MultiIndex):
+            columns = dataframe.columns.to_frame(index=False)
+            columns.to_parquet(columns_path)
+            dataframe.columns = range(len(dataframe.columns))
+        dataframe.to_parquet(data_path)
 
 
-def load_level_destructured_dataframe(
-    base_path: Union[str, PathLike], level: Union[str, int]
+def load_dataframe_parquet(
+    dataframe: DataFrame, base_path: Union[str, PathLike], dataframe_name: str
 ) -> DataFrame:
-    if not isinstance(base_path, (str, PathLike)):
-        raise ValueError("base_path must be a string or a PathLike object.")
-    if not isinstance(level, int):
-        raise ValueError("level must be an integer.")
-    if isinstance(base_path, str):
-        base_path = Path(base_path)
-    base_dir, base_filename = base_path.parent, base_path.stem
-    parquet_files = list(base_dir.glob(f"{base_filename}*_sub.parquet"))
-    if not parquet_files:
-        raise FileNotFoundError(
-            f"No parquet files found in {base_dir} with prefix {base_filename}."
+    base_path = Path(base_path).absolute()
+    if not base_path.is_dir():
+        raise ArgumentValueError(
+            f"'base_path'={base_path} directory not found. It must be a directory."
         )
-    df = [pd.read_parquet(file) for file in parquet_files]
-    df = pd.concat(df, axis=1)
-    return df
+    index_path = base_path / f"{dataframe_name}_index.parquet"
+    columns_path = base_path / f"{dataframe_name}_columns.parquet"
+    data_path = base_path / f"{dataframe_name}.parquet"
+    if not data_path.exists():
+        raise ArgumentValueError(f"File {data_path} not found.")
+    dataframe = pd.read_parquet(data_path)
+    if index_path.exists():
+        indexes = pd.read_parquet(index_path)
+        dataframe.index = pd.MultiIndex.from_frame(indexes)
+    if columns_path.exists():
+        columns = pd.read_parquet(columns_path)
+        dataframe.columns = pd.MultiIndex.from_frame(columns)
+    return dataframe
 
 
 def idxslice(
