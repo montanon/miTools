@@ -24,7 +24,7 @@ from PIL import Image
 from scipy.spatial.distance import squareform
 
 from ..country_converter import country_converter
-from ..pandas import idxslice, quantize_group
+from ..pandas import idxslice, prepare_quantile_columns
 from ..utils import stretch_string
 from ..visuals import (
     adjust_axes_lims,
@@ -1476,7 +1476,7 @@ def scatter_countries_plot(
     if size_col:
         quantized_size = (
             size_data.groupby(level="Year")
-            .apply(quantize_group, column=size_col, N=size_bins)
+            .apply(prepare_quantile_columns, columns=size_col, quantiles=size_bins)
             .droplevel(0)
         )
         quantized_size = quantized_size * zoom
