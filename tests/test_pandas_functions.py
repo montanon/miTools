@@ -32,6 +32,84 @@ from mitools.pandas.functions import (
 )
 
 
+class TestPrepareCategoricalColumns(TestCase):
+    def setUp(self):
+        self.df = pd.DataFrame(
+            {
+                "A": ["a", "b", "c", "a"],
+                "B": ["x", "y", "z", "x"],
+                "C": [1, 2, 3, 4],  # Non-categorical numeric column
+            }
+        )
+
+    def test_single_column_no_categories(self):
+        result = prepare_categorical_columns(self.df.copy(), columns="A")
+        expected = self.df.copy()
+        expected["A"] = pd.Categorical(expected["A"])
+        assert_frame_equal(result, expected)
+
+    def test_multiple_columns_no_categories(self):
+        result = prepare_categorical_columns(self.df.copy(), columns=["A", "B"])
+        expected = self.df.copy()
+        expected["A"] = pd.Categorical(expected["A"])
+        expected["B"] = pd.Categorical(expected["B"])
+        assert_frame_equal(result, expected)
+
+    def test_single_column_with_categories(self):
+        result = prepare_categorical_columns(
+            self.df.copy(), columns="A", categories=["c", "b", "a"], ordered=True
+        )
+        expected = self.df.copy()
+        expected["A"] = pd.Categorical(
+            expected["A"], categories=["c", "b", "a"], ordered=True
+        )
+        assert_frame_equal(result, expected)
+
+    def test_multiple_columns_with_categories(self):
+        result = prepare_categorical_columns(
+            self.df.copy(), columns=["A", "B"], categories=["c", "b", "a"], ordered=True
+        )
+        expected = self.df.copy()
+        expected["A"] = pd.Categorical(
+            expected["A"], categories=["c", "b", "a"], ordered=True
+        )
+        expected["B"] = pd.Categorical(
+            expected["B"], categories=["c", "b", "a"], ordered=True
+        )
+        assert_frame_equal(result, expected)
+
+    def test_missing_columns(self):
+        with self.assertRaises(ArgumentValueError):
+            prepare_categorical_columns(self.df.copy(), columns="D")
+
+    def test_non_string_column(self):
+        with self.assertRaises(ArgumentTypeError):
+            prepare_categorical_columns(
+                self.df.copy(), columns=10, categories=["1", "2", "3", "4"]
+            )
+
+    def test_inferred_categories(self):
+        result = prepare_categorical_columns(self.df.copy(), columns="B")
+        expected_categories = sorted(self.df["B"].unique())
+        self.assertListEqual(result["B"].cat.categories.tolist(), expected_categories)
+
+    def test_ordered_flag(self):
+        result = prepare_categorical_columns(
+            self.df.copy(), columns="A", categories=["a", "b", "c"], ordered=True
+        )
+        self.assertTrue(result["A"].cat.ordered)
+
+    def test_unordered_flag(self):
+        result = prepare_categorical_columns(
+            self.df.copy(), columns="A", categories=["a", "b", "c"], ordered=False
+        )
+        self.assertFalse(result["A"].cat.ordered)
+
+    def test_no_modification_to_untouched_columns(self):
+        result = prepare_categorical_columns(self.df.copy(), columns="A")
+        self.assertTrue(pd.api.types.is_numeric_dtype(result["C"]))
+
+
 class TestPrepareIntCols(TestCase):
     def setUp(self):
         self.df = DataFrame(
