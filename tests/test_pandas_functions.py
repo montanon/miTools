@@ -1006,10 +1006,10 @@ class TestLongToWideDataFrame(TestCase):
             {
                 "id": [1, 1, 2, 2, 3, 3, 2],
                 "category": ["A", "B", "A", "B", "A", "B", "C"],
-                "category2": ["A", "B", "A", "B", "A", "B", "C"],
+                "category2": ["A", "D", "A", "B", "A", "B", "C"],
                 "year": [2020, 2020, 2021, 2021, 2022, 2022, 2021],
                 "value": [10, 20, 30, 40, 50, 60, 5],
-                "value2": [10, 20, 30, 40, 50, 60, 3],
+                "value2": [100, 200, 300, 400, 500, 600, 30],
             }
         )
 
@@ -1028,6 +1028,18 @@ class TestLongToWideDataFrame(TestCase):
         expected.columns = pd.MultiIndex.from_product([["value"], expected.columns])
         expected.columns.names = [None, "category"]
         pd.testing.assert_frame_equal(result, expected, check_dtype=False)
+
+    def test_multiple_transformation(self):
+        result = wide_to_long_dataframe(
+            dataframe=self.data,
+            index=["id", "year"],
+            columns=["category", "category2"],
+            values=["value", "value2"],
+            filter_columns={"category": ["A"], "category2": ["A"]},
+        )
+        self.assertTrue(result.columns.names == [None, "category", "category2"])
+        self.assertTrue(result.index.names == ["id", "year"])
+        self.assertTrue(result.shape == (3, 2))
 
     def test_multi_column_transformation(self):
         result = wide_to_long_dataframe(
