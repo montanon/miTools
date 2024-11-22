@@ -32,9 +32,76 @@ from mitools.pandas.functions import (
 )
 
 
+class TestPrepareQuantileColumns(TestCase):
+    def setUp(self):
+        self.df = DataFrame(
+            {
+                "A": [1, 2, 3, 4, 5],
+                "B": [10, 20, 30, 40, 50],
+                "C": ["x", "y", "z", "w", "v"],  # Non-numeric column
+            }
+        )
+
+    def test_single_column_default_quantiles(self):
+        result = prepare_quantile_columns(self.df.copy(), columns="A", quantiles=2)
+        expected = self.df.copy()
+        expected["A"] = pd.qcut(self.df["A"], q=2)
+        assert_frame_equal(result, expected)
+
+    def test_multiple_columns_default_quantiles(self):
+        result = prepare_quantile_columns(
+            self.df.copy(), columns=["A", "B"], quantiles=3
+        )
+        expected = self.df.copy()
+        expected["A"] = pd.qcut(self.df["A"], q=3)
+        expected["B"] = pd.qcut(self.df["B"], q=3)
+        assert_frame_equal(result, expected)
+
+    def test_single_column_custom_labels(self):
+        labels = ["Low", "Medium", "High"]
+        result = prepare_quantile_columns(
+            self.df.copy(), columns="A", quantiles=3, labels=labels
+        )
+        expected = self.df.copy()
+        expected["A"] = pd.qcut(self.df["A"], q=3, labels=labels)
+        assert_frame_equal(result, expected)
+
+    def test_multiple_columns_custom_labels(self):
+        labels = ["Low", "Medium", "High"]
+        result = prepare_quantile_columns(
+            self.df.copy(), columns=["A", "B"], quantiles=3, labels=labels
+        )
+        expected = self.df.copy()
+        expected["A"] = pd.qcut(self.df["A"], q=3, labels=labels)
+        expected["B"] = pd.qcut(self.df["B"], q=3, labels=labels)
+        assert_frame_equal(result, expected)
+
+    def test_invalid_quantiles(self):
+        with self.assertRaises(ArgumentValueError):
+            prepare_quantile_columns(self.df.copy(), columns="A", quantiles=1)
+
+    def test_invalid_labels_length(self):
+        with self.assertRaises(ArgumentValueError):
+            prepare_quantile_columns(
+                self.df.copy(), columns="A", quantiles=3, labels=["Low", "High"]
+            )
+
+    def test_missing_column(self):
+        with self.assertRaises(ValueError):
+            prepare_quantile_columns(self.df.copy(), columns="D", quantiles=3)
+
+    def test_non_numeric_column(self):
+        with self.assertRaises(TypeError):
+            prepare_quantile_columns(self.df.copy(), columns="C", quantiles=3)
+
+    def test_no_modification_to_untouched_columns(self):
+        result = prepare_quantile_columns(self.df.copy(), columns="A", quantiles=3)
+        self.assertTrue(result["B"].equals(self.df["B"]))
+
+
 class TestPrepareBinColumns(TestCase):
     def setUp(self):
-        self.df = pd.DataFrame(
+        self.df = DataFrame(
             {
                 "A": [1, 2, 3, 4, 5],
                 "B": [10, 20, 30, 40, 50],
@@ -110,7 +177,7 @@ class TestPrepareBinColumns(TestCase):
 
 class TestPrepareRankColumns(TestCase):
     def setUp(self):
-        self.df = pd.DataFrame(
+        self.df = DataFrame(
             {
                 "A": [10, 20, 20, 30],
                 "B": [100, 50, 50, 25],
@@ -193,7 +260,7 @@ class TestPrepareRankColumns(TestCase):
 
 class TestPrepareCategoricalColumns(TestCase):
     def setUp(self):
-        self.df = pd.DataFrame(
+        self.df = DataFrame(
             {
                 "A": ["a", "b", "c", "a"],
                 "B": ["x", "y", "z", "x"],
@@ -1682,12 +1749,12 @@ class TestIdxSlice(TestCase):
         self.multiindex_columns = MultiIndex.from_tuples(
             [("X", "x"), ("X", "y"), ("Y", "z")], names=["level1", "level2"]
         )
-        self.multiindex_df = pd.DataFrame(
+        self.multiindex_df = DataFrame(
             np.random.rand(4, 3),
             index=self.multiindex_index,
             columns=self.multiindex_columns,
         )
-        self.single_index_df = pd.DataFrame(
+        self.single_index_df = DataFrame(
             np.random.rand(4, 3), index=["A", "B", "C", "D"], columns=["X", "Y", "Z"]
         )
 
