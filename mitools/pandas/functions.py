@@ -93,6 +93,45 @@ def prepare_rank_columns(
     return dataframe
 
 
+def prepare_standardized_columns(
+    dataframe: DataFrame, columns: Union[str, List[str]]
+) -> DataFrame:
+    columns = [columns] if isinstance(columns, str) else columns
+    if not isinstance(columns, Iterable) or not all(
+        isinstance(c, str) for c in columns
+    ):
+        raise ArgumentTypeError(
+            "Argument 'cols' must be a string or an iterable of strings."
+        )
+    missing_cols = [col for col in columns if col not in dataframe.columns]
+    if missing_cols:
+        raise ArgumentValueError(f"Columns {missing_cols} not found in DataFrame.")
+    for col in columns:
+        dataframe[col] = (dataframe[col] - dataframe[col].mean()) / dataframe[col].std()
+    return dataframe
+
+
+def prepare_bin_columns(
+    dataframe: DataFrame,
+    columns: Union[str, List[str]],
+    bins: Union[int, List[float]] = 10,
+    labels: List[Any] = None,
+):
+    columns = [columns] if isinstance(columns, str) else columns
+    if not isinstance(columns, Iterable) or not all(
+        isinstance(c, str) for c in columns
+    ):
+        raise ArgumentTypeError(
+            "Argument 'cols' must be a string or an iterable of strings."
+        )
+    missing_cols = [col for col in columns if col not in dataframe.columns]
+    if missing_cols:
+        raise ArgumentValueError(f"Columns {missing_cols} not found in DataFrame.")
+    for col in columns:
+        dataframe[col] = pd.cut(dataframe[col], bins=bins, labels=labels)
+    return dataframe
+
+
 def quantize_columns(
     dataframe: DataFrame, columns: Union[str, List[str]], n_cuts: int = 10
 ):
