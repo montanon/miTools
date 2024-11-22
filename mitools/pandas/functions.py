@@ -337,30 +337,30 @@ def get_entities_data(
     return combined_data
 
 
-def melt_dataframe(
-    _dataframe: DataFrame,
-    value_col: str,
+def melt_hierarchical_data(
+    dataframe: DataFrame,
+    data_column: str,
     entities: Iterable,
-    group_col: str,
-    subgroup_col: str,
-    time_col: str,
+    group_column: str,
+    subgroup_column: str,
+    time_column: str,
 ) -> DataFrame:
-    value_cols = [c for c in _dataframe.columns if c[-1].split(" ")[-1] == value_col]
-    dataframe = _dataframe.loc[pd.IndexSlice[:, value_cols]]
-    dataframe = dataframe.copy(deep=True).T
-    dataframes = []
+    data_columns = [col for col in dataframe.columns if col[-1] == data_column]
+    sub_dataframe = dataframe.loc[pd.IndexSlice[:, data_columns]]
+    sub_dataframe = sub_dataframe.copy(deep=True).T
+    reshaped_data = []
     for entity in entities:
-        entity_df = dataframe.loc[entity].copy(deep=True)
-        entity_df[group_col] = entity
-        dataframes.append(entity_df)
-    combined_df = pd.concat(dataframes)
-    melted_df = pd.melt(
-        combined_df.reset_index(),
-        id_vars=[subgroup_col, group_col],
-        var_name=time_col,
-        value_name=value_col,
+        entity_data = sub_dataframe.loc[entity].copy(deep=True)
+        entity_data[group_column] = entity
+        reshaped_data.append(entity_data)
+    combined_data = pd.concat(reshaped_data)
+    melted_data = pd.melt(
+        combined_data.reset_index(),
+        id_vars=[subgroup_column, group_column],
+        var_name=time_column,
+        value_name=data_column,
     )
-    return melted_df
+    return melted_data
 
 
 def store_dataframe_by_level(
