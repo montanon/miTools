@@ -1,8 +1,10 @@
 import os
+import shutil
 import unittest
 from pathlib import Path
 from unittest import TestCase
 
+import numpy as np
 import pandas as pd
 from pandas import DataFrame, Series, testing
 from pandas.testing import assert_frame_equal
@@ -12,7 +14,7 @@ from mitools.pandas.functions import (
     get_entities_data,
     get_entity_data,
     idxslice,
-    load_level_destructured_dataframe,
+    load_dataframe_parquet,
     long_to_wide_dataframe,
     prepare_bool_cols,
     prepare_date_cols,
@@ -20,7 +22,7 @@ from mitools.pandas.functions import (
     prepare_str_cols,
     reshape_group_data,
     reshape_groups_subgroups,
-    store_dataframe_by_level,
+    store_dataframe_parquet,
     wide_to_long_dataframe,
 )
 
@@ -1320,67 +1322,100 @@ class TestLongToWideDataFrame(TestCase):
         assert_frame_equal(result, expected)
 
 
-class TestStoreDataframeByLevel(unittest.TestCase):
+class TestParquetStorage(TestCase):
     def setUp(self):
-        self.df = DataFrame(
-            {("A", "a"): [1, 2, 3], ("B", "b"): [4, 5, 6], ("C", "c"): [7, 8, 9]}
-        )
-        self.base_path = "test.parquet"
+        self.test_dir = Path("test_parquet_storage")
+        self.test_dir.mkdir(exist_ok=True)
 
     def tearDown(self):
-        # Clean up any created files
-        for path in Path(".").glob("test*_sub.parquet"):
-            os.remove(path)
+        if self.test_dir.exists():
+            shutil.rmtree(self.test_dir)
 
-    def test_invalid_df(self):
-        with self.assertRaises(Exception):
-            store_dataframe_by_level("invalid", self.base_path, 0)
+    def test_store_and_load_simple_dataframe(self):
+        df = DataFrame({"A": [1, 2, 3], "B": [4, 5, 6]})
+        store_dataframe_parquet(df, self.test_dir, "simple_df", overwrite=True)
+        loaded_df = load_dataframe_parquet(df, self.test_dir, "simple_df")
+        assert_frame_equal(df, loaded_df)
 
-    def test_invalid_base_path(self):
-        with self.assertRaises(Exception):
-            store_dataframe_by_level(self.df, 123, 0)
-
-    def test_invalid_level(self):
-        with self.assertRaises(Exception):
-            store_dataframe_by_level(self.df, self.base_path, "invalid")
-
-    def test_valid_inputs(self):
-        store_dataframe_by_level(self.df, self.base_path, 0)
-        self.assertTrue(Path("test0_sub.parquet").exists())
-        self.assertTrue(Path("test1_sub.parquet").exists())
-        self.assertTrue(Path("test2_sub.parquet").exists())
-
-
-class TestLoadLevelDestructuredDataframe(unittest.TestCase):
-    def setUp(self):
-        self.df = DataFrame(
-            {("A", "a"): [1, 2, 3], ("B", "b"): [4, 5, 6], ("C", "c"): [7, 8, 9]}
+    def test_store_and_load_multiindex_dataframe(self):
+        index = pd.MultiIndex.from_tuples(
+            [("A", 1), ("A", 2), ("B", 1), ("B", 2)], names=["group", "number"]
         )
-        self.df.columns = pd.MultiIndex.from_tuples(self.df.columns)
-        self.base_path = "test.parquet"
-        store_dataframe_by_level(self.df, self.base_path, 0)
+        columns = pd.MultiIndex.from_tuples(
+            [("X", "x"), ("X", "y"), ("Y", "z")], names=["level1", "level2"]
+        )
+        df = DataFrame(np.random.rand(4, 3), index=index, columns=columns)
+        store_dataframe_parquet(df, self.test_dir, "multiindex_df", overwrite=True)
+        loaded_df = load_dataframe_parquet(df, self.test_dir, "multiindex_df")
+        assert_frame_equal(df, loaded_df)
 
-    def tearDown(self):
-        # Clean up any created files
-        for path in Path(".").glob("test*_sub.parquet"):
-            os.remove(path)
+    def test_store_and_load_with_default_index(self):
+        df = DataFrame(np.random.rand(5, 5), columns=list("ABCDE"))
+        store_dataframe_parquet(df, self.test_dir, "default_index_df", overwrite=True)
+        loaded_df = load_dataframe_parquet(df, self.test_dir, "default_index_df")
+        assert_frame_equal(df, loaded_df)
 
-    def test_invalid_base_path(self):
-        with self.assertRaises(ValueError):
-            load_level_destructured_dataframe(123, 0)
+    def test_store_and_load_with_non_default_index(self):
+        df = DataFrame({"A": [10, 20, 30], "B": [40, 50, 60]}, index=[100, 200, 300])
+        store_dataframe_parquet(df, self.test_dir, "custom_index_df", overwrite=True)
+        loaded_df = load_dataframe_parquet(df, self.test_dir, "custom_index_df")
+        assert_frame_equal(df, loaded_df)
 
-    def test_invalid_level(self):
-        with self.assertRaises(ValueError):
-            load_level_destructured_dataframe(self.base_path, "invalid")
+    def test_overwrite_protection(self):
+        df = DataFrame({"A": [1, 2, 3], "B": [4, 5, 6]})
+        store_dataframe_parquet(df, self.test_dir, "protected_df", overwrite=True)
+        with self.assertRaises(ArgumentValueError):
+            store_dataframe_parquet(df, self.test_dir, "protected_df", overwrite=False)
 
-    def test_no_files_found(self):
-        with self.assertRaises(FileNotFoundError):
-            load_level_destructured_dataframe("nonexistent.parquet", 0)
+    def test_missing_directory(self):
+        df = DataFrame({"A": [1, 2, 3], "B": [4, 5, 6]})
+        with self.assertRaises(ArgumentValueError):
+            store_dataframe_parquet(df, "non_existent_dir", "missing_dir_df")
 
-    def test_valid_inputs(self):
-        df = load_level_destructured_dataframe(self.base_path, 0)
-        self.assertTrue(isinstance(df, DataFrame))
-        self.assertEqual(df.shape, self.df.shape)
+    def test_missing_parquet_file(self):
+        df = DataFrame({"A": [1, 2, 3], "B": [4, 5, 6]})
+        with self.assertRaises(ArgumentValueError):
+            load_dataframe_parquet(df, self.test_dir, "nonexistent_df")
+
+    def test_missing_index_file(self):
+        df = DataFrame(
+            {"A": [1, 2, 3], "B": [4, 5, 6]},
+            index=pd.MultiIndex.from_tuples(
+                [("A", 1), ("B", 2), ("C", 3)], names=["letter", "number"]
+            ),
+        )
+        store_dataframe_parquet(df, self.test_dir, "missing_index_test", overwrite=True)
+        (
+            self.test_dir / "missing_index_test_index.parquet"
+        ).unlink()  # Remove the index file
+        loaded_df = load_dataframe_parquet(df, self.test_dir, "missing_index_test")
+        self.assertTrue(
+            loaded_df.index.equals(pd.RangeIndex(start=0, stop=3))
+        )  # Default index applied
+
+    def test_missing_columns_file(self):
+        df = DataFrame(
+            np.random.rand(3, 3),
+            columns=pd.MultiIndex.from_tuples(
+                [("X", "x"), ("Y", "y"), ("Z", "z")], names=["level1", "level2"]
+            ),
+        )
+        store_dataframe_parquet(
+            df, self.test_dir, "missing_columns_test", overwrite=True
+        )
+        (
+            self.test_dir / "missing_columns_test_columns.parquet"
+        ).unlink()  # Remove the columns file
+        loaded_df = load_dataframe_parquet(df, self.test_dir, "missing_columns_test")
+        self.assertTrue(
+            loaded_df.columns.equals(pd.RangeIndex(start=0, stop=3))
+        )  # Default columns applied
+
+    def test_store_and_load_empty_dataframe(self):
+        df = DataFrame()
+        store_dataframe_parquet(df, self.test_dir, "empty_df", overwrite=True)
+        loaded_df = load_dataframe_parquet(df, self.test_dir, "empty_df")
+        assert_frame_equal(df, loaded_df)
 
 
 class TestIdxSlice(unittest.TestCase):

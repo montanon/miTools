@@ -454,6 +454,10 @@ def store_dataframe_parquet(
     index_path = base_path / f"{dataframe_name}_index.parquet"
     columns_path = base_path / f"{dataframe_name}_columns.parquet"
     data_path = base_path / f"{dataframe_name}.parquet"
+    if data_path.exists() and not overwrite:
+        raise ArgumentValueError(
+            f"File {data_path} already exists. Set 'overwrite=True' to overwrite."
+        )
     if not data_path.exists() or overwrite:
         if isinstance(dataframe.index, MultiIndex):
             indexes = dataframe.index.to_frame()
