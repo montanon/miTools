@@ -16,9 +16,9 @@ NON_DATE_COL_ERROR = (
 )
 
 
-def prepare_int_cols(
+def prepare_int_columns(
     dataframe: DataFrame,
-    cols: Union[Iterable[str], str],
+    columns: Union[Iterable[str], str],
     nan_placeholder: int,
     errors: Literal["raise", "coerce", "ignore"] = "coerce",
 ) -> DataFrame:
@@ -26,16 +26,18 @@ def prepare_int_cols(
         raise ArgumentValueError(
             "Argument 'errors' must be one of ['raise', 'coerce', 'ignore']."
         )
-    cols = [cols] if isinstance(cols, str) else cols
-    if not isinstance(cols, Iterable) or not all(isinstance(c, str) for c in cols):
+    columns = [columns] if isinstance(columns, str) else columns
+    if not isinstance(columns, Iterable) or not all(
+        isinstance(c, str) for c in columns
+    ):
         raise ArgumentTypeError(
             "Argument 'cols' must be a string or an iterable of strings."
         )
-    missing_cols = [col for col in cols if col not in dataframe.columns]
+    missing_cols = [col for col in columns if col not in dataframe.columns]
     if missing_cols:
         raise ArgumentValueError(f"Columns {missing_cols} not found in DataFrame.")
     try:
-        for col in cols:
+        for col in columns:
             dataframe[col] = pd.to_numeric(
                 dataframe[col], errors=errors, downcast="integer"
             )
@@ -47,24 +49,58 @@ def prepare_int_cols(
     return dataframe
 
 
-def prepare_str_cols(
-    dataframe: DataFrame, cols: Union[Iterable[str], str]
-) -> DataFrame:
-    cols = [cols] if isinstance(cols, str) else cols
-    if not isinstance(cols, Iterable) or not all(isinstance(c, str) for c in cols):
+def prepare_categorical_columns(
+    dataframe: DataFrame,
+    columns: Union[Iterable[str], str],
+    categories: List[str] = None,
+    ordered: bool = False,
+):
+    columns = [columns] if isinstance(columns, str) else columns
+    if not isinstance(columns, Iterable) or not all(
+        isinstance(c, str) for c in columns
+    ):
         raise ArgumentTypeError(
             "Argument 'cols' must be a string or an iterable of strings."
         )
-    missing_cols = [col for col in cols if col not in dataframe.columns]
+    missing_cols = [col for col in columns if col not in dataframe.columns]
     if missing_cols:
         raise ArgumentValueError(f"Columns {missing_cols} not found in DataFrame.")
-    dataframe[cols] = dataframe[cols].astype(str)
+    for col in columns:
+        dataframe[col] = pd.Categorical(
+            dataframe[col], categories=categories, ordered=ordered
+        )
     return dataframe
 
 
-def prepare_date_cols(
+def quantize_columns(
+    dataframe: DataFrame, columns: Union[str, List[str]], n_cuts: int = 10
+):
+    quantiles = pd.qcut(dataframe[columns], n_cuts, labels=False)
+    quantiles = quantiles / (n_cuts - 1)
+    dataframe[columns] = quantiles + 0.1
+    return dataframe
+
+
+def prepare_str_columns(
+    dataframe: DataFrame, columns: Union[Iterable[str], str]
+) -> DataFrame:
+    columns = [columns] if isinstance(columns, str) else columns
+    if not isinstance(columns, Iterable) or not all(
+        isinstance(c, str) for c in columns
+    ):
+        raise ArgumentTypeError(
+            "Argument 'cols' must be a string or an iterable of strings."
+        )
+    missing_cols = [col for col in columns if col not in dataframe.columns]
+    if missing_cols:
+        raise ArgumentValueError(f"Columns {missing_cols} not found in DataFrame.")
+    dataframe[columns] = dataframe[columns].astype(str)
+    return dataframe
+
+
+def prepare_date_columns(
     dataframe: DataFrame,
-    cols: Union[Iterable[str], str],
+    columns: Union[Iterable[str], str],
     nan_placeholder: Union[str, pd.Timestamp],
     errors: Literal["raise", "coerce", "ignore"] = "coerce",
     date_format: str = None,
@@ -73,16 +109,18 @@ def prepare_date_cols(
         raise ArgumentValueError(
             "Argument 'errors' must be one of ['raise', 'coerce', 'ignore']."
         )
-    cols = [cols] if isinstance(cols, str) else cols
-    if not isinstance(cols, Iterable) or not all(isinstance(c, str) for c in cols):
+    columns = [columns] if isinstance(columns, str) else columns
+    if not isinstance(columns, Iterable) or not all(
+        isinstance(c, str) for c in columns
+    ):
         raise ArgumentTypeError(
             "Argument 'cols' must be a string or an iterable of strings."
         )
-    missing_cols = [col for col in cols if col not in dataframe.columns]
+    missing_cols = [col for col in columns if col not in dataframe.columns]
     if missing_cols:
         raise ArgumentValueError(f"Columns {missing_cols} not found in DataFrame.")
     try:
-        for col in cols:
+        for col in columns:
             dataframe[col] = pd.to_datetime(
                 dataframe[col], errors=errors, format=date_format
             )
@@ -93,24 +131,28 @@ def prepare_date_cols(
     return dataframe
 
 
-def prepare_bool_cols(
-    dataframe: DataFrame, cols: Union[Iterable[str], str], nan_placeholder: bool = False
+def prepare_bool_columns(
+    dataframe: DataFrame,
+    columns: Union[Iterable[str], str],
+    nan_placeholder: bool = False,
 ) -> DataFrame:
-    cols = [cols] if isinstance(cols, str) else cols
-    if not isinstance(cols, Iterable) or not all(isinstance(c, str) for c in cols):
+    columns = [columns] if isinstance(columns, str) else columns
+    if not isinstance(columns, Iterable) or not all(
+        isinstance(c, str) for c in columns
+    ):
         raise ArgumentTypeError(
             "Argument 'cols' must be a string or an iterable of strings."
         )
-    missing_cols = [col for col in cols if col not in dataframe.columns]
+    missing_cols = [col for col in columns if col not in dataframe.columns]
     if missing_cols:
         raise ArgumentValueError(f"Columns {missing_cols} not found in DataFrame.")
     try:
-        for col in cols:
+        for col in columns:
             dataframe[col] = dataframe[col].fillna(nan_placeholder)
             dataframe[col] = dataframe[col].astype(bool)
     except Exception as e:
         raise ArgumentTypeError(
-            f"{BOOL_COL_ERROR.format(col)}: {cols}. Details: {str(e)}"
+            f"{BOOL_COL_ERROR.format(col)}: {columns}. Details: {str(e)}"
         )
     return dataframe
 
@@ -526,10 +568,3 @@ def idxslice(
                 f"Level '{level}' does not match the Index or Columns name."
             )
         return IndexSlice[values]
-
-
-def quantize_group(group, column, N):
-    quantiles = pd.qcut(group[column], N, labels=False)
-    quantiles = quantiles / (N - 1)
-    group[column] = quantiles + 0.1
-    return group
