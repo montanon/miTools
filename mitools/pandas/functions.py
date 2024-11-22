@@ -509,6 +509,10 @@ def idxslice(
                     f"'level'={level} is not in the MultiIndex names: {idx.names}"
                 )
             level = idx.names.index(level)
+        elif not isinstance(level, int) or level < 0 or level >= idx.nlevels:
+            raise ArgumentValueError(
+                f"Provided 'level'={level} is out of bounds for the MultiIndex with {idx.nlevels} levels."
+            )
         slices = [slice(None)] * idx.nlevels
         slices[level] = values
         return IndexSlice[tuple(slices)]

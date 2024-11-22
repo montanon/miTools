@@ -6,7 +6,7 @@ from unittest import TestCase
 
 import numpy as np
 import pandas as pd
-from pandas import DataFrame, Series, testing
+from pandas import DataFrame, IndexSlice, MultiIndex, Series, testing
 from pandas.testing import assert_frame_equal
 
 from mitools.exceptions.custom_exceptions import ArgumentTypeError, ArgumentValueError
@@ -1418,31 +1418,106 @@ class TestParquetStorage(TestCase):
         assert_frame_equal(df, loaded_df)
 
 
-class TestIdxSlice(unittest.TestCase):
+class TestIdxSlice(TestCase):
     def setUp(self):
-        self.df = DataFrame(
-            {("A", "a"): [1, 2, 3], ("B", "b"): [4, 5, 6], ("C", "c"): [7, 8, 9]}
+        self.multiindex_index = MultiIndex.from_tuples(
+            [("A", 1), ("A", 2), ("B", 1), ("B", 2)], names=["group", "number"]
         )
-        self.df.columns = pd.MultiIndex.from_tuples(self.df.columns)
-        self.df.columns.names = ["level_0", "level_1"]
+        self.multiindex_columns = MultiIndex.from_tuples(
+            [("X", "x"), ("X", "y"), ("Y", "z")], names=["level1", "level2"]
+        )
+        self.multiindex_df = pd.DataFrame(
+            np.random.rand(4, 3),
+            index=self.multiindex_index,
+            columns=self.multiindex_columns,
+        )
+        self.single_index_df = pd.DataFrame(
+            np.random.rand(4, 3), index=["A", "B", "C", "D"], columns=["X", "Y", "Z"]
+        )
+
+    def test_multilevel_index_valid_slicing(self):
+        slice_obj = idxslice(self.multiindex_df, level="group", values="A", axis=0)
+        expected = IndexSlice[(["A"], slice(None))]
+        self.assertEqual(slice_obj, expected)
+        slice_obj = idxslice(self.multiindex_df, level=1, values=[1, 2], axis=0)
+        expected = IndexSlice[(slice(None), [1, 2])]
+        self.assertEqual(slice_obj, expected)
+
+    def test_multilevel_columns_valid_slicing(self):
+        slice_obj = idxslice(self.multiindex_df, level="level1", values="X", axis=1)
+        expected = IndexSlice[(["X"], slice(None))]
+        self.assertEqual(slice_obj, expected)
+        slice_obj = idxslice(self.multiindex_df, level=1, values="z", axis=1)
+        expected = IndexSlice[(slice(None), ["z"])]
+        self.assertEqual(slice_obj, expected)
+
+    def test_single_index_valid_slicing(self):
+        slice_obj = idxslice(self.single_index_df, level=0, values=["A", "C"], axis=0)
+        expected = IndexSlice[["A", "C"]]
+        self.assertEqual(slice_obj, expected)
+
+    def test_single_columns_valid_slicing(self):
+        slice_obj = idxslice(self.single_index_df, level=0, values=["X", "Z"], axis=1)
+        expected = IndexSlice[["X", "Z"]]
+        self.assertEqual(slice_obj, expected)
 
     def test_invalid_axis(self):
-        with self.assertRaises(ValueError):
-            idxslice(self.df, 0, "A", 2)
+        with self.assertRaises(ArgumentValueError):
+            idxslice(self.multiindex_df, level="group", values="A", axis=2)
 
-    def test_invalid_level(self):
-        with self.assertRaises(ValueError):
-            idxslice(self.df, "D", "A", 1)
+    def test_invalid_level_in_multilevel_index(self):
+        with self.assertRaises(ArgumentValueError):
+            idxslice(self.multiindex_df, level="invalid_level", values="A", axis=0)
 
-    def test_valid_inputs(self):
-        result = idxslice(self.df, "level_0", "A", 1)
-        self.assertEqual(result, pd.IndexSlice[["A"], :])
-        result = idxslice(self.df, 0, "A", 1)
-        self.assertEqual(result, pd.IndexSlice[["A"], :])
-        result = idxslice(self.df, "level_1", "b", 1)
-        self.assertEqual(result, pd.IndexSlice[:, ["b"]])
-        result = idxslice(self.df, 1, "b", 1)
-        self.assertEqual(result, pd.IndexSlice[:, ["b"]])
+    def test_invalid_level_in_single_index(self):
+        with self.assertRaises(ArgumentValueError):
+            idxslice(self.single_index_df, level="invalid_level", values="A", axis=0)
+
+    def test_invalid_level_position_single_index(self):
+        with self.assertRaises(ArgumentValueError):
+            idxslice(self.single_index_df, level=1, values="A", axis=0)
+
+    def test_invalid_level_position_multilevel_index(self):
+        with self.assertRaises(ArgumentValueError):
+            idxslice(self.multiindex_df, level=10, values="A", axis=0)
+
+    def test_invalid_level_name_single_index(self):
+        with self.assertRaises(ArgumentValueError):
+            idxslice(self.single_index_df, level="invalid", values="A", axis=0)
+
+    def test_invalid_level_name_multilevel_columns(self):
+        with self.assertRaises(ArgumentValueError):
+            idxslice(self.multiindex_df, level="invalid", values="X", axis=1)
+
+    def test_non_list_values(self):
+        slice_obj = idxslice(self.single_index_df, level=0, values="A", axis=0)
+        expected = IndexSlice[["A"]]
+        self.assertEqual(slice_obj, expected)
+        slice_obj = idxslice(self.multiindex_df, level="group", values="B", axis=0)
+        expected = IndexSlice[(["B"], slice(None))]
+        self.assertEqual(slice_obj, expected)
+
+    def test_multilevel_index_no_matching_level(self):
+        with self.assertRaises(ArgumentValueError):
+            idxslice(self.multiindex_df, level="nonexistent", values="X", axis=0)
+
+    def test_multilevel_columns_invalid_axis(self):
+        with self.assertRaises(ArgumentValueError):
+            idxslice(self.multiindex_df, level="level1", values="X", axis=2)
+
+    def test_single_index_invalid_axis(self):
+        with self.assertRaises(ArgumentValueError):
+            idxslice(self.single_index_df, level=0, values="A", axis=2)
+
+    def test_single_index_invalid_values(self):
+        with self.assertRaises(KeyError):
+            self.single_index_df.loc[
+                idxslice(self.single_index_df, level=0, values="E", axis=0)
+            ]
+
+    def test_multilevel_columns_missing_level(self):
+        with self.assertRaises(ArgumentValueError):
+            idxslice(self.multiindex_df, level="nonexistent", values="X", axis=1)
 
 
 if __name__ == "__main__":
