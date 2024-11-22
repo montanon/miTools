@@ -337,33 +337,63 @@ def get_entities_data(
     return combined_data
 
 
-def melt_hierarchical_data(
+def long_to_wide_dataframe(
     dataframe: DataFrame,
-    data_column: str,
-    entities: Iterable,
-    group_column: str,
-    subgroup_column: str,
-    time_column: str,
+    index: Union[str, List[str]],
+    columns: Union[str, List[str]],
+    values: Union[str, List[str]] = None,
+    filter_index: Dict = None,
+    filter_columns: Dict = None,
+    agg_func: str = "first",
+    fill_value: Any = None,
 ) -> DataFrame:
-    data_columns = [col for col in dataframe.columns if col[-1] == data_column]
-    sub_dataframe = dataframe.loc[pd.IndexSlice[:, data_columns]]
-    sub_dataframe = sub_dataframe.copy(deep=True).T
-    reshaped_data = []
-    for entity in entities:
-        entity_data = sub_dataframe.loc[entity].copy(deep=True)
-        entity_data[group_column] = entity
-        reshaped_data.append(entity_data)
-    combined_data = pd.concat(reshaped_data)
-    melted_data = pd.melt(
-        combined_data.reset_index(),
-        id_vars=[subgroup_column, group_column],
-        var_name=time_column,
-        value_name=data_column,
+    index = [index] if isinstance(index, str) else index
+    columns = [columns] if isinstance(columns, str) else columns
+    values = [values] if isinstance(values, str) else values
+    required_columns = (
+        {*index, *columns, *values} if values is not None else {*index, *columns}
     )
-    return melted_data
+    missing_columns = required_columns - set(dataframe.columns)
+    if missing_columns:
+        raise ArgumentValueError(
+            f"Columns {missing_columns} not found in the DataFrame."
+        )
+    if filter_index is not None and any(
+        key not in dataframe.columns for key in filter_index.keys()
+    ):
+        raise ArgumentValueError(
+            f"Columns to filter {[key for key in filter_index.keys() if key not in dataframe.columns]} not found in the DataFrame."
+        )
+    if filter_columns is not None and any(
+        key not in dataframe.columns for key in filter_columns.keys()
+    ):
+        raise ArgumentValueError(
+            f"Columns to filter {[key for key in filter_columns.keys() if key not in dataframe.columns]} not found in the DataFrame."
+        )
+    if filter_index:
+        for key, value in filter_index.items():
+            if key in dataframe.columns:
+                filter_values = value if isinstance(value, list) else [value]
+                dataframe = dataframe[dataframe[key].isin(filter_values)]
+    if filter_columns:
+        for key, value in filter_columns.items():
+            if key in dataframe.columns:
+                filter_values = value if isinstance(value, list) else [value]
+                dataframe = dataframe[dataframe[key].isin(filter_values)]
+    try:
+        wide_dataframe = dataframe.pivot_table(
+            index=index,
+            columns=columns,
+            values=values,
+            aggfunc=agg_func,
+            fill_value=fill_value,
+        )
+    except ValueError as e:
+        raise ArgumentValueError(f"Error pivoting DataFrame: {str(e)}")
+    return wide_dataframe
 
 
-def store_dataframe_by_level(
+def storedataframe_by_level(
     df: DataFrame, base_path: Union[str, PathLike], level: Union[str, int]
 ) -> None:
     if not isinstance(df, DataFrame):
@@ -391,7 +421,7 @@ def store_dataframe_by_level(
         sub_df.to_parquet(sub_path)
 
 
-def load_level_destructured_dataframe(
+def load_level_destructureddataframe(
     base_path: Union[str, PathLike], level: Union[str, int]
 ) -> DataFrame:
     if not isinstance(base_path, (str, PathLike)):
