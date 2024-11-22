@@ -262,14 +262,37 @@ def reshape_groups_subgroups(
     return combined_groups
 
 
-def build_group(
-    df: DataFrame, value_cols: List[str], entity: str, group_col: str, time_col: str
+def get_entity_data(
+    dataframe: DataFrame,
+    data_columns: List[str],
+    entity: str,
+    entity_column: str,
+    time_column: str,
+    agg_func: str = "first",
 ) -> DataFrame:
-    group_df = df.query(f'{group_col} == "{entity}"')
-    group = group_df.groupby(by=[time_col])[[*value_cols]].first().reset_index()
-    group.set_index(time_col, inplace=True)
-    group.index.name = entity
-    return group
+    required_columns = {*data_columns, entity_column, time_column}
+    missing_columns = required_columns - set(dataframe.columns)
+    if missing_columns:
+        raise ArgumentValueError(
+            f"Columns {missing_columns} not found in the DataFrame."
+        )
+    filtered_data = dataframe.query(f"{entity_column} == @entity")
+    if filtered_data.empty:
+        raise ArgumentValueError(
+            f"No data found for entity '{entity}' in column '{entity_column}'."
+        )
+    grouped_data = (
+        filtered_data.groupby(by=[time_column])[data_columns]
+        .agg(agg_func)
+        .reset_index()
+    )
+    grouped_data = grouped_data.set_index(time_column)
+    all_times = dataframe[time_column].unique()
+    grouped_data = grouped_data.reindex(all_times, fill_value=None)
+    grouped_data = grouped_data.sort_index()
+    grouped_data = grouped_data.sort_index(axis=1)
+    grouped_data.index.name = entity
+    return grouped_data
 
 
 def build_groups(
