@@ -3,7 +3,6 @@ from .functions import (
     get_entity_data,
     idxslice,
     load_level_destructured_dataframe,
-    long_to_wide_dataframe,
     prepare_bool_cols,
     prepare_date_cols,
     prepare_int_cols,
@@ -14,4 +13,5 @@ from .functions import (
     reshape_group_data,
     reshape_groups_subgroups,
     storedataframe_by_level,
+    wide_to_long_dataframe,
 )

@@ -12,7 +12,6 @@ from mitools.pandas.functions import (
     get_entity_data,
     idxslice,
     load_level_destructured_dataframe,
-    melt_hierarchical_data,
     prepare_bool_cols,
     prepare_date_cols,
     prepare_int_cols,
@@ -20,6 +19,7 @@ from mitools.pandas.functions import (
     reshape_group_data,
     reshape_groups_subgroups,
     store_dataframe_by_level,
+    wide_to_long_dataframe,
 )
 
 
@@ -1000,132 +1000,149 @@ class TestGetEntitiesData(TestCase):
         )
 
 
-class TestMeltHierarchicalData(TestCase):
+class TestLongToWideDataFrame(TestCase):
     def setUp(self):
-        self.hierarchical_df = DataFrame(
+        self.data = DataFrame(
             {
-                ("USA", "indicator1"): [100, 200, 300],
-                ("USA", "indicator2"): [10, 20, 30],
-                ("CAN", "indicator1"): [400, 500, None],
-                ("CAN", "indicator2"): [40, 50, None],
-            },
-            index=["2021-Q1", "2021-Q2", "2021-Q3"],
+                "id": [1, 1, 2, 2, 3, 3, 2],
+                "category": ["A", "B", "A", "B", "A", "B", "C"],
+                "category2": ["A", "B", "A", "B", "A", "B", "C"],
+                "year": [2020, 2020, 2021, 2021, 2022, 2022, 2021],
+                "value": [10, 20, 30, 40, 50, 60, 5],
+                "value2": [10, 20, 30, 40, 50, 60, 3],
+            }
         )
-        self.hierarchical_df.index.name = "time"
 
-    def test_valid_input(self):
-        result = melt_hierarchical_data(
-            dataframe=self.hierarchical_df,
-            data_column="indicator1",
-            entities=["USA", "CAN"],
-            group_column="country",
-            subgroup_column="indicator",
-            time_column="time",
+    def test_basic_transformation(self):
+        result = wide_to_long_dataframe(
+            dataframe=self.data, index="id", columns="category", values="value"
         )
         expected = DataFrame(
             {
-                "indicator": ["USA", "USA", "USA", "CAN", "CAN", "CAN"],
-                "country": ["USA", "USA", "USA", "CAN", "CAN", "CAN"],
-                "time": [
-                    "2021-Q1",
-                    "2021-Q2",
-                    "2021-Q3",
-                    "2021-Q1",
-                    "2021-Q2",
-                    "2021-Q3",
-                ],
-                "indicator1": [100.0, 200.0, 300.0, 400.0, 500.0, None],
+                "id": [1, 2, 3],
+                "A": [10, 30, 50],
+                "B": [20, 40, 60],
+                "C": [None, 5, None],
             }
-        )
-        pd.testing.assert_frame_equal(result, expected)
+        ).set_index("id")
+        expected.columns = pd.MultiIndex.from_product([["value"], expected.columns])
+        expected.columns.names = [None, "category"]
+        pd.testing.assert_frame_equal(result, expected, check_dtype=False)
 
-    def test_single_entity(self):
-        result = melt_hierarchical_data(
-            dataframe=self.hierarchical_df,
-            data_column="indicator2",
-            entities=["USA"],
-            group_column="country",
-            subgroup_column="indicator",
-            time_column="time",
+    def test_multi_column_transformation(self):
+        result = wide_to_long_dataframe(
+            dataframe=self.data,
+            index=["id", "year"],
+            columns="category",
+            values="value",
         )
         expected = DataFrame(
             {
-                "indicator": ["USA", "USA", "USA"],
-                "country": ["USA", "USA", "USA"],
-                "time": ["2021-Q1", "2021-Q2", "2021-Q3"],
-                "indicator2": [10.0, 20.0, 30.0],
+                "id": [1, 2, 3],
+                "year": [2020, 2021, 2022],
+                "A": [10, 30, 50],
+                "B": [20, 40, 60],
+                "C": [None, 5, None],
             }
+        ).set_index(["id", "year"])
+        expected.columns = pd.MultiIndex.from_product([["value"], expected.columns])
+        expected.columns.names = [None, "category"]
+        pd.testing.assert_frame_equal(result, expected, check_dtype=False)
+
+    def test_filter_index(self):
+        result = wide_to_long_dataframe(
+            dataframe=self.data,
+            index="id",
+            columns="category",
+            values="value",
+            filter_index={"id": [1, 2]},
         )
+        expected = DataFrame(
+            {"id": [1, 2], "A": [10, 30], "B": [20, 40], "C": [None, 5]}
+        ).set_index("id")
+        expected.columns = pd.MultiIndex.from_product([["value"], expected.columns])
+        expected.columns.names = [None, "category"]
+        pd.testing.assert_frame_equal(result, expected, check_dtype=False)
+
+    def test_filter_columns(self):
+        result = wide_to_long_dataframe(
+            dataframe=self.data,
+            index="id",
+            columns="category",
+            values="value",
+            filter_columns={"category": ["A"]},
+        )
+        expected = DataFrame({"id": [1, 2, 3], "A": [10, 30, 50]}).set_index("id")
+        expected.columns = pd.MultiIndex.from_product([["value"], expected.columns])
+        expected.columns.names = [None, "category"]
         pd.testing.assert_frame_equal(result, expected)
 
-    def test_no_matching_entities(self):
-        with self.assertRaises(KeyError):
-            melt_hierarchical_data(
-                dataframe=self.hierarchical_df,
-                data_column="indicator1",
-                entities=["MEX"],
-                group_column="country",
-                subgroup_column="indicator",
-                time_column="time",
+    def test_aggfunc_sum(self):
+        result = wide_to_long_dataframe(
+            dataframe=self.data,
+            index="id",
+            columns="category",
+            values="value",
+            agg_func="sum",
+        )
+        expected = DataFrame(
+            {
+                "id": [1, 2, 3],
+                "A": [10, 30, 50],
+                "B": [20, 40, 60],
+                "C": [None, 5, None],
+            }
+        ).set_index("id")
+        expected.columns = pd.MultiIndex.from_product([["value"], expected.columns])
+        expected.columns.names = [None, "category"]
+        pd.testing.assert_frame_equal(result, expected, check_dtype=False)
+
+    def test_fill_value(self):
+        result = wide_to_long_dataframe(
+            dataframe=self.data,
+            index="id",
+            columns="category",
+            values="value",
+            fill_value=0,
+        )
+        from IPython.display import display
+
+        display(result)
+        expected = DataFrame(
+            {"id": [1, 2, 3], "A": [10, 30, 50], "B": [20, 40, 60], "C": [0, 5, 0]}
+        ).set_index("id")
+        expected.columns = pd.MultiIndex.from_product([["value"], expected.columns])
+        expected.columns.names = [None, "category"]
+        pd.testing.assert_frame_equal(result, expected)
+
+    def test_missing_columns_error(self):
+        with self.assertRaises(ArgumentValueError):
+            wide_to_long_dataframe(
+                dataframe=self.data,
+                index="nonexistent",
+                columns="category",
+                values="value",
             )
 
-    def test_invalid_data_column(self):
-        with self.assertRaises(KeyError):
-            melt_hierarchical_data(
-                dataframe=self.hierarchical_df,
-                data_column="nonexistent_indicator",
-                entities=["USA", "CAN"],
-                group_column="country",
-                subgroup_column="indicator",
-                time_column="time",
+    def test_invalid_filter_index_error(self):
+        with self.assertRaises(ArgumentValueError):
+            wide_to_long_dataframe(
+                dataframe=self.data,
+                index="id",
+                columns="category",
+                values="value",
+                filter_index={"nonexistent": [1]},
             )
 
-    def test_empty_dataframe(self):
-        empty_df = DataFrame(columns=self.hierarchical_df.columns)
-        with self.assertRaises(KeyError):
-            melt_hierarchical_data(
-                dataframe=empty_df,
-                data_column="indicator1",
-                entities=["USA", "CAN"],
-                group_column="country",
-                subgroup_column="indicator",
-                time_column="time",
+    def test_invalid_filter_columns_error(self):
+        with self.assertRaises(ArgumentValueError):
+            wide_to_long_dataframe(
+                dataframe=self.data,
+                index="id",
+                columns="category",
+                values="value",
+                filter_columns={"nonexistent": ["A"]},
             )
-
-    def test_large_dataframe(self):
-        large_df = pd.concat([self.hierarchical_df] * 1000, ignore_index=False)
-        result = melt_hierarchical_data(
-            dataframe=large_df,
-            data_column="indicator1",
-            entities=["USA", "CAN"],
-            group_column="country",
-            subgroup_column="indicator",
-            time_column="time",
-        )
-        self.assertTrue(len(result) > 0)  # Ensure output has rows
-
-    def test_preserves_column_order(self):
-        result = melt_hierarchical_data(
-            dataframe=self.hierarchical_df,
-            data_column="indicator2",
-            entities=["USA", "CAN"],
-            group_column="country",
-            subgroup_column="indicator",
-            time_column="time",
-        )
-        expected_columns = ["indicator", "country", "time", "indicator2"]
-        self.assertEqual(list(result.columns), expected_columns)
-
-    def test_handles_nan_values(self):
-        result = melt_hierarchical_data(
-            dataframe=self.hierarchical_df,
-            data_column="indicator1",
-            entities=["CAN"],
-            group_column="country",
-            subgroup_column="indicator",
-            time_column="time",
-        )
-        self.assertTrue(result["indicator1"].isna().sum() > 0)
 
 
 class TestStoreDataframeByLevel(unittest.TestCase):
