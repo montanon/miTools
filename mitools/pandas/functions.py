@@ -256,8 +256,6 @@ def reshape_groups_subgroups(
         combined_groups = pd.concat(groups_subgroups.values(), axis=1)
     except ValueError as e:
         raise ArgumentValueError(f"Error concatenating groups: {str(e)}")
-    # all_times = dataframe[time_column].unique()
-    # combined_groups = combined_groups.reindex(all_times, fill_value=None)
     combined_groups = combined_groups.sort_index()
     combined_groups = combined_groups.sort_index(axis=1)
     combined_groups.columns.names = [group_column, subgroup_column]
