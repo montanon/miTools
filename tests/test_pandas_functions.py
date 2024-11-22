@@ -1115,9 +1115,6 @@ class TestWideToLongDataFrame(TestCase):
             values="value",
             fill_value=0,
         )
-        from IPython.display import display
-
-        display(result)
         expected = DataFrame(
             {"id": [1, 2, 3], "A": [10, 30, 50], "B": [20, 40, 60], "C": [0, 5, 0]}
         ).set_index("id")
