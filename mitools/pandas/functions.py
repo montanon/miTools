@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Literal, Optional, Union
 
 import pandas as pd
-from pandas import DataFrame
+from pandas import DataFrame, IndexSlice
 from pandas._libs.tslibs.parsing import DateParseError
 from tqdm import tqdm
 
@@ -399,6 +399,47 @@ def wide_to_long_dataframe(
     return wide_dataframe
 
 
+def long_to_wide_dataframe(
+    dataframe: DataFrame,
+    id_vars: Union[str, List[str]],
+    value_vars: Union[str, List[str]] = None,
+    var_name: str = "variable",
+    value_name: str = "value",
+    filter_id_vars: Dict = None,
+    filter_value_vars: Dict = None,
+) -> DataFrame:
+    id_vars = [id_vars] if isinstance(id_vars, str) else id_vars
+    if value_vars is not None:
+        value_vars = [value_vars] if isinstance(value_vars, str) else value_vars
+    required_columns = {
+        *id_vars,
+        *(value_vars or dataframe.columns.difference(id_vars)),
+    }
+    missing_columns = required_columns - set(dataframe.columns)
+    if missing_columns:
+        raise ArgumentValueError(
+            f"Columns {missing_columns} not found in the DataFrame."
+        )
+    if filter_id_vars:
+        for key, value in filter_id_vars.items():
+            if key in dataframe.columns:
+                filter_values = value if isinstance(value, list) else [value]
+                dataframe = dataframe[dataframe[key].isin(filter_values)]
+    if filter_value_vars and value_vars:
+        for key, value in filter_value_vars.items():
+            if key in value_vars:
+                filter_values = value if isinstance(value, list) else [value]
+                dataframe = dataframe[dataframe[key].isin(filter_values)]
+    long_dataframe = pd.melt(
+        dataframe,
+        id_vars=id_vars,
+        value_vars=value_vars,
+        var_name=var_name,
+        value_name=value_name,
+    )
+    return long_dataframe
+
+
 def store_dataframe_by_level(
     df: DataFrame, base_path: Union[str, PathLike], level: Union[str, int]
 ) -> None:
@@ -449,7 +490,7 @@ def load_level_destructured_dataframe(
 
 def idxslice(
     df: DataFrame, level: Union[int, str], value: Union[List[Any], Any], axis: int
-) -> pd.IndexSlice:
+) -> IndexSlice:
     if axis not in [0, 1]:
         raise ValueError("axis must be 0 for index or 1 for columns")
     value = [value] if not isinstance(value, list) else value
@@ -460,7 +501,7 @@ def idxslice(
         level = multiidx.names.index(level)
     slices = [slice(None)] * multiidx.nlevels
     slices[level] = value
-    return pd.IndexSlice[tuple(slices)]
+    return IndexSlice[tuple(slices)]
 
 
 def quantize_group(group, column, N):
