@@ -1,6 +1,6 @@
 from os import PathLike
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Literal, Optional, Union
+from typing import Any, Dict, Iterable, List, Literal, Optional, Tuple, Union
 
 import pandas as pd
 from pandas import DataFrame, IndexSlice, MultiIndex
@@ -494,19 +494,34 @@ def load_dataframe_parquet(
 
 
 def idxslice(
-    df: DataFrame, level: Union[int, str], value: Union[List[Any], Any], axis: int
-) -> IndexSlice:
-    if axis not in [0, 1]:
-        raise ValueError("axis must be 0 for index or 1 for columns")
-    value = [value] if not isinstance(value, list) else value
-    multiidx = df.index if axis == 0 else df.columns
-    if isinstance(level, str):
-        if level not in multiidx.names:
-            raise ValueError("level is not in the axis index provided")
-        level = multiidx.names.index(level)
-    slices = [slice(None)] * multiidx.nlevels
-    slices[level] = value
-    return IndexSlice[tuple(slices)]
+    df: DataFrame, level: Union[int, str], values: Union[List[Any], Any], axis: int
+) -> slice:
+    if axis not in {0, 1}:
+        raise ArgumentValueError(
+            f"Invalid 'axis'={axis}, must be 0 for index or 1 for columns"
+        )
+    values = [values] if not isinstance(values, list) else values
+    idx = df.index if axis == 0 else df.columns
+    if isinstance(idx, MultiIndex):
+        if isinstance(level, str):
+            if level not in idx.names:
+                raise ArgumentValueError(
+                    f"'level'={level} is not in the MultiIndex names: {idx.names}"
+                )
+            level = idx.names.index(level)
+        slices = [slice(None)] * idx.nlevels
+        slices[level] = values
+        return IndexSlice[tuple(slices)]
+    if not isinstance(idx, MultiIndex):
+        if isinstance(level, int) and level != 0:
+            raise ArgumentValueError(
+                "For single-level Index or Columns, level must be 0."
+            )
+        if isinstance(level, str) and level != idx.name:
+            raise ArgumentValueError(
+                f"Level '{level}' does not match the Index or Columns name."
+            )
+        return IndexSlice[values]
 
 
 def quantize_group(group, column, N):
