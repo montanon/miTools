@@ -16,7 +16,9 @@ NON_DATE_COL_ERROR = (
 )
 
 
-def validate_columns(dataframe: DataFrame, columns: Union[Iterable[str], str]) -> None:
+def validate_columns(
+    dataframe: DataFrame, columns: Union[Iterable[str], str]
+) -> Iterable[str]:
     columns = [columns] if isinstance(columns, str) else columns
     if not isinstance(columns, Iterable) or not all(
         isinstance(c, str) for c in columns
@@ -73,7 +75,7 @@ def prepare_rank_columns(
     columns: Union[str, List[str]],
     method: str = "average",
     ascending: bool = True,
-):
+) -> DataFrame:
     columns = validate_columns(dataframe, columns)
     for col in columns:
         dataframe[col] = dataframe[col].rank(method=method, ascending=ascending)
@@ -94,10 +96,30 @@ def prepare_bin_columns(
     columns: Union[str, List[str]],
     bins: Union[int, List[float]] = 10,
     labels: List[Any] = None,
-):
+) -> DataFrame:
     columns = validate_columns(dataframe, columns)
     for col in columns:
         dataframe[col] = pd.cut(dataframe[col], bins=bins, labels=labels)
+    return dataframe
+
+
+def prepare_quantile_columns(
+    dataframe: DataFrame,
+    columns: Union[str, List[str]],
+    quantiles: int = 10,
+    labels: List[Any] = None,
+) -> DataFrame:
+    columns = validate_columns(dataframe, columns)
+    if not isinstance(quantiles, int) or quantiles < 2:
+        raise ArgumentValueError(
+            f"Argument 'quantiles'={quantiles} must be an int greater than 1."
+        )
+    if labels is not None and len(labels) != quantiles:
+        raise ArgumentValueError(
+            f"Length of 'labels': {len(labels)} must be equal to 'quantiles'={quantiles}."
+        )
+    for col in columns:
+        dataframe[col] = pd.qcut(dataframe[col], q=quantiles, labels=labels)
     return dataframe
 
 
