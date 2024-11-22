@@ -337,7 +337,7 @@ def get_entities_data(
     return combined_data
 
 
-def long_to_wide_dataframe(
+def wide_to_long_dataframe(
     dataframe: DataFrame,
     index: Union[str, List[str]],
     columns: Union[str, List[str]],
@@ -361,14 +361,20 @@ def long_to_wide_dataframe(
     if filter_index is not None and any(
         key not in dataframe.columns for key in filter_index.keys()
     ):
+        missing_columns = [
+            key for key in filter_index.keys() if key not in dataframe.columns
+        ]
         raise ArgumentValueError(
-            f"Columns to filter {[key for key in filter_index.keys() if key not in dataframe.columns]} not found in the DataFrame."
+            f"Columns to filter {missing_columns} not found in the DataFrame."
         )
     if filter_columns is not None and any(
         key not in dataframe.columns for key in filter_columns.keys()
     ):
+        missing_columns = [
+            key for key in filter_columns.keys() if key not in dataframe.columns
+        ]
         raise ArgumentValueError(
-            f"Columns to filter {[key for key in filter_columns.keys() if key not in dataframe.columns]} not found in the DataFrame."
+            f"Columns to filter {missing_columns} not found in the DataFrame."
         )
     if filter_index:
         for key, value in filter_index.items():
@@ -393,7 +399,7 @@ def long_to_wide_dataframe(
     return wide_dataframe
 
 
-def storedataframe_by_level(
+def store_dataframe_by_level(
     df: DataFrame, base_path: Union[str, PathLike], level: Union[str, int]
 ) -> None:
     if not isinstance(df, DataFrame):
@@ -421,7 +427,7 @@ def storedataframe_by_level(
         sub_df.to_parquet(sub_path)
 
 
-def load_level_destructureddataframe(
+def load_level_destructured_dataframe(
     base_path: Union[str, PathLike], level: Union[str, int]
 ) -> DataFrame:
     if not isinstance(base_path, (str, PathLike)):
