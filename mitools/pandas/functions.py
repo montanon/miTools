@@ -326,10 +326,14 @@ def get_entities_data(
             )
         except ArgumentValueError as e:
             raise ArgumentValueError(f"Error processing entity '{entity}': {str(e)}")
-    combined_data = pd.concat(entities_data.values(), axis=1)
+    try:
+        combined_data = pd.concat(entities_data.values(), axis=1)
+    except ValueError as e:
+        raise ArgumentValueError(f"Error concatenating entities: {str(e)}")
     combined_data = combined_data.sort_index()
     combined_data = combined_data.sort_index(axis=1)
     combined_data.columns.names = [entity_column, "indicator"]
+    combined_data.index.names = [time_column]
     return combined_data
 
 
