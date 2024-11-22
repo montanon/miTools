@@ -1,9 +1,9 @@
 from os import PathLike
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Literal, Optional, Union
+from typing import Any, Dict, Iterable, List, Literal, Optional, Tuple, Union
 
 import pandas as pd
-from pandas import DataFrame
+from pandas import DataFrame, IndexSlice, MultiIndex
 from pandas._libs.tslibs.parsing import DateParseError
 from tqdm import tqdm
 
@@ -16,9 +16,25 @@ NON_DATE_COL_ERROR = (
 )
 
 
-def prepare_int_cols(
+def validate_columns(
+    dataframe: DataFrame, columns: Union[Iterable[str], str]
+) -> Iterable[str]:
+    columns = [columns] if isinstance(columns, str) else columns
+    if not isinstance(columns, Iterable) or not all(
+        isinstance(c, str) for c in columns
+    ):
+        raise ArgumentTypeError(
+            "Argument 'cols' must be a string or an iterable of strings."
+        )
+    missing_cols = [col for col in columns if col not in dataframe.columns]
+    if missing_cols:
+        raise ArgumentValueError(f"Columns {missing_cols} not found in DataFrame.")
+    return columns
+
+
+def prepare_int_columns(
     dataframe: DataFrame,
-    cols: Union[Iterable[str], str],
+    columns: Union[Iterable[str], str],
     nan_placeholder: int,
     errors: Literal["raise", "coerce", "ignore"] = "coerce",
 ) -> DataFrame:
@@ -26,16 +42,9 @@ def prepare_int_cols(
         raise ArgumentValueError(
             "Argument 'errors' must be one of ['raise', 'coerce', 'ignore']."
         )
-    cols = [cols] if isinstance(cols, str) else cols
-    if not isinstance(cols, Iterable) or not all(isinstance(c, str) for c in cols):
-        raise ArgumentTypeError(
-            "Argument 'cols' must be a string or an iterable of strings."
-        )
-    missing_cols = [col for col in cols if col not in dataframe.columns]
-    if missing_cols:
-        raise ArgumentValueError(f"Columns {missing_cols} not found in DataFrame.")
+    columns = validate_columns(dataframe, columns)
     try:
-        for col in cols:
+        for col in columns:
             dataframe[col] = pd.to_numeric(
                 dataframe[col], errors=errors, downcast="integer"
             )
@@ -47,24 +56,114 @@ def prepare_int_cols(
     return dataframe
 
 
-def prepare_str_cols(
-    dataframe: DataFrame, cols: Union[Iterable[str], str]
+def prepare_categorical_columns(
+    dataframe: DataFrame,
+    columns: Union[Iterable[str], str],
+    categories: List[str] = None,
+    ordered: bool = False,
 ) -> DataFrame:
-    cols = [cols] if isinstance(cols, str) else cols
-    if not isinstance(cols, Iterable) or not all(isinstance(c, str) for c in cols):
-        raise ArgumentTypeError(
-            "Argument 'cols' must be a string or an iterable of strings."
+    columns = validate_columns(dataframe, columns)
+    for col in columns:
+        dataframe[col] = pd.Categorical(
+            dataframe[col], categories=categories, ordered=ordered
         )
-    missing_cols = [col for col in cols if col not in dataframe.columns]
-    if missing_cols:
-        raise ArgumentValueError(f"Columns {missing_cols} not found in DataFrame.")
-    dataframe[cols] = dataframe[cols].astype(str)
     return dataframe
 
 
-def prepare_date_cols(
+def prepare_rank_columns(
     dataframe: DataFrame,
-    cols: Union[Iterable[str], str],
+    columns: Union[str, List[str]],
+    method: Literal["average", "min", "max", "first", "dense"] = "average",
+    ascending: bool = True,
+) -> DataFrame:
+    if method not in ["average", "min", "max", "first", "dense"]:
+        raise ArgumentValueError(
+            f"Argument 'method'={method} must be one of ['average', 'min', 'max', 'first', 'dense']."
+        )
+    columns = validate_columns(dataframe, columns)
+    for col in columns:
+        dataframe[col] = dataframe[col].rank(method=method, ascending=ascending)
+    return dataframe
+
+
+def prepare_standardized_columns(
+    dataframe: DataFrame, columns: Union[str, List[str]]
+) -> DataFrame:
+    columns = validate_columns(dataframe, columns)
+    for col in columns:
+        dataframe[col] = (dataframe[col] - dataframe[col].mean()) / dataframe[col].std()
+    return dataframe
+
+
+def prepare_normalized_columns(
+    dataframe: DataFrame,
+    columns: Union[str, List[str]],
+    range_min: float = 0.0,
+    range_max: float = 1.0,
+) -> DataFrame:
+    columns = validate_columns(dataframe, columns)
+    for col in columns:
+        min_val = dataframe[col].min()
+        max_val = dataframe[col].max()
+        values_range = max_val - min_val if max_val != min_val else 1
+        dataframe[col] = (dataframe[col] - min_val) / values_range * (
+            range_max - range_min
+        ) + range_min
+    return dataframe
+
+
+def prepare_bin_columns(
+    dataframe: DataFrame,
+    columns: Union[str, List[str]],
+    bins: Union[int, List[float]] = 10,
+    labels: List[Any] = None,
+) -> DataFrame:
+    columns = validate_columns(dataframe, columns)
+    if labels is not None:
+        n_bins = bins if isinstance(bins, int) else len(bins) - 1
+        if len(labels) != n_bins:
+            raise ArgumentValueError(
+                f"Length of 'labels': {len(labels)} must be equal to amount of 'bins': {n_bins}."
+            )
+    try:
+        for col in columns:
+            dataframe[col] = pd.cut(dataframe[col], bins=bins, labels=labels)
+    except TypeError:
+        raise ArgumentTypeError(f"'column'={col} must be of numeric type.")
+    return dataframe
+
+
+def prepare_quantile_columns(
+    dataframe: DataFrame,
+    columns: Union[str, List[str]],
+    quantiles: int = 10,
+    labels: List[Any] = None,
+) -> DataFrame:
+    columns = validate_columns(dataframe, columns)
+    if not isinstance(quantiles, int) or quantiles < 2:
+        raise ArgumentValueError(
+            f"Argument 'quantiles'={quantiles} must be an int greater than 1."
+        )
+    if labels is not None and len(labels) != quantiles:
+        raise ArgumentValueError(
+            f"Length of 'labels': {len(labels)} must be equal to 'quantiles'={quantiles}."
+        )
+    for col in columns:
+        dataframe[col] = pd.qcut(dataframe[col], q=quantiles, labels=labels)
+    return dataframe
+
+
+def prepare_str_columns(
+    dataframe: DataFrame, columns: Union[Iterable[str], str]
+) -> DataFrame:
+    columns = validate_columns(dataframe, columns)
+    dataframe[columns] = dataframe[columns].astype(str)
+    return dataframe
+
+
+def prepare_date_columns(
+    dataframe: DataFrame,
+    columns: Union[Iterable[str], str],
     nan_placeholder: Union[str, pd.Timestamp],
     errors: Literal["raise", "coerce", "ignore"] = "coerce",
     date_format: str = None,
@@ -73,16 +172,9 @@ def prepare_date_cols(
         raise ArgumentValueError(
             "Argument 'errors' must be one of ['raise', 'coerce', 'ignore']."
         )
-    cols = [cols] if isinstance(cols, str) else cols
-    if not isinstance(cols, Iterable) or not all(isinstance(c, str) for c in cols):
-        raise ArgumentTypeError(
-            "Argument 'cols' must be a string or an iterable of strings."
-        )
-    missing_cols = [col for col in cols if col not in dataframe.columns]
-    if missing_cols:
-        raise ArgumentValueError(f"Columns {missing_cols} not found in DataFrame.")
+    columns = validate_columns(dataframe, columns)
     try:
-        for col in cols:
+        for col in columns:
             dataframe[col] = pd.to_datetime(
                 dataframe[col], errors=errors, format=date_format
             )
@@ -93,24 +185,19 @@ def prepare_date_cols(
     return dataframe
 
 
-def prepare_bool_cols(
-    dataframe: DataFrame, cols: Union[Iterable[str], str], nan_placeholder: bool = False
+def prepare_bool_columns(
+    dataframe: DataFrame,
+    columns: Union[Iterable[str], str],
+    nan_placeholder: bool = False,
 ) -> DataFrame:
-    cols = [cols] if isinstance(cols, str) else cols
-    if not isinstance(cols, Iterable) or not all(isinstance(c, str) for c in cols):
-        raise ArgumentTypeError(
-            "Argument 'cols' must be a string or an iterable of strings."
-        )
-    missing_cols = [col for col in cols if col not in dataframe.columns]
-    if missing_cols:
-        raise ArgumentValueError(f"Columns {missing_cols} not found in DataFrame.")
+    columns = validate_columns(dataframe, columns)
     try:
-        for col in cols:
+        for col in columns:
             dataframe[col] = dataframe[col].fillna(nan_placeholder)
             dataframe[col] = dataframe[col].astype(bool)
     except Exception as e:
         raise ArgumentTypeError(
-            f"{BOOL_COL_ERROR.format(col)}: {cols}. Details: {str(e)}"
+            f"{BOOL_COL_ERROR.format(col)}: {columns}. Details: {str(e)}"
         )
     return dataframe
 
@@ -337,98 +424,192 @@ def get_entities_data(
     return combined_data
 
 
-def melt_hierarchical_data(
+def wide_to_long_dataframe(
     dataframe: DataFrame,
-    data_column: str,
-    entities: Iterable,
-    group_column: str,
-    subgroup_column: str,
-    time_column: str,
+    index: Union[str, List[str]],
+    columns: Union[str, List[str]],
+    values: Union[str, List[str]] = None,
+    filter_index: Dict = None,
+    filter_columns: Dict = None,
+    agg_func: str = "first",
+    fill_value: Any = None,
 ) -> DataFrame:
-    data_columns = [col for col in dataframe.columns if col[-1] == data_column]
-    sub_dataframe = dataframe.loc[pd.IndexSlice[:, data_columns]]
-    sub_dataframe = sub_dataframe.copy(deep=True).T
-    reshaped_data = []
-    for entity in entities:
-        entity_data = sub_dataframe.loc[entity].copy(deep=True)
-        entity_data[group_column] = entity
-        reshaped_data.append(entity_data)
-    combined_data = pd.concat(reshaped_data)
-    melted_data = pd.melt(
-        combined_data.reset_index(),
-        id_vars=[subgroup_column, group_column],
-        var_name=time_column,
-        value_name=data_column,
+    index = [index] if isinstance(index, str) else index
+    columns = [columns] if isinstance(columns, str) else columns
+    values = [values] if isinstance(values, str) else values
+    required_columns = (
+        {*index, *columns, *values} if values is not None else {*index, *columns}
     )
-    return melted_data
-
-
-def store_dataframe_by_level(
-    df: DataFrame, base_path: Union[str, PathLike], level: Union[str, int]
-) -> None:
-    if not isinstance(df, DataFrame):
-        raise Exception("Error: df is not a pandas DataFrame.")
-    if not isinstance(base_path, (str, PathLike)):
-        raise ValueError("Error: base_path is not a string or a PathLike object.")
-    if not isinstance(level, (int, str)):
-        raise ValueError("Error: level is not an integer.")
-    if isinstance(level, int) and (level < 0 or level >= df.columns.nlevels):
-        raise ValueError(
-            f"Error: level {level} is not a valid level for the DataFrame."
+    missing_columns = required_columns - set(dataframe.columns)
+    if missing_columns:
+        raise ArgumentValueError(
+            f"Columns {missing_columns} not found in the DataFrame."
         )
-    if isinstance(level, str) and level not in df.columns.names:
-        raise ValueError(
-            f"Error: level {level} is not a valid level for the DataFrame."
+    if filter_index is not None and any(
+        key not in dataframe.columns for key in filter_index.keys()
+    ):
+        missing_columns = [
+            key for key in filter_index.keys() if key not in dataframe.columns
+        ]
+        raise ArgumentValueError(
+            f"Columns to filter {missing_columns} not found in the DataFrame."
         )
-    level_values = df.columns.get_level_values(level).unique()
-    for n, value in enumerate(level_values):
-        if value not in df.columns.get_level_values(level):
-            raise ValueError(
-                f"Error: value {value} is not in level {level} of the DataFrame."
-            )
-        sub_df = df.xs(value, axis=1, level=level, drop_level=False)
-        sub_path = Path(str(base_path).replace(".parquet", f"{n}_sub.parquet"))
-        sub_df.to_parquet(sub_path)
+    if filter_columns is not None and any(
+        key not in dataframe.columns for key in filter_columns.keys()
+    ):
+        missing_columns = [
+            key for key in filter_columns.keys() if key not in dataframe.columns
+        ]
+        raise ArgumentValueError(
+            f"Columns to filter {missing_columns} not found in the DataFrame."
+        )
+    if filter_index:
+        for key, value in filter_index.items():
+            if key in dataframe.columns:
+                filter_values = value if isinstance(value, list) else [value]
+                dataframe = dataframe[dataframe[key].isin(filter_values)]
+    if filter_columns:
+        for key, value in filter_columns.items():
+            if key in dataframe.columns:
+                filter_values = value if isinstance(value, list) else [value]
+                dataframe = dataframe[dataframe[key].isin(filter_values)]
+    try:
+        wide_dataframe = dataframe.pivot_table(
+            index=index,
+            columns=columns,
+            values=values,
+            aggfunc=agg_func,
+            fill_value=fill_value,
+        )
+    except ValueError as e:
+        raise ArgumentValueError(f"Error pivoting DataFrame: {str(e)}")
+    return wide_dataframe
 
 
-def load_level_destructured_dataframe(
-    base_path: Union[str, PathLike], level: Union[str, int]
+def long_to_wide_dataframe(
+    dataframe: DataFrame,
+    id_vars: Union[str, List[str]],
+    value_vars: Union[str, List[str]] = None,
+    var_name: str = "variable",
+    value_name: str = "value",
+    filter_id_vars: Dict = None,
+    filter_value_vars: Dict = None,
 ) -> DataFrame:
-    if not isinstance(base_path, (str, PathLike)):
-        raise ValueError("base_path must be a string or a PathLike object.")
-    if not isinstance(level, int):
-        raise ValueError("level must be an integer.")
-    if isinstance(base_path, str):
-        base_path = Path(base_path)
-    base_dir, base_filename = base_path.parent, base_path.stem
-    parquet_files = list(base_dir.glob(f"{base_filename}*_sub.parquet"))
-    if not parquet_files:
-        raise FileNotFoundError(
-            f"No parquet files found in {base_dir} with prefix {base_filename}."
+    id_vars = [id_vars] if isinstance(id_vars, str) else id_vars
+    if value_vars is not None:
+        value_vars = [value_vars] if isinstance(value_vars, str) else value_vars
+    required_columns = {
+        *id_vars,
+        *(value_vars or dataframe.columns.difference(id_vars)),
+    }
+    missing_columns = required_columns - set(dataframe.columns)
+    if missing_columns:
+        raise ArgumentValueError(
+            f"Columns {missing_columns} not found in the DataFrame."
         )
-    df = [pd.read_parquet(file) for file in parquet_files]
-    df = pd.concat(df, axis=1)
-    return df
+    if filter_id_vars:
+        for key, value in filter_id_vars.items():
+            if key in dataframe.columns:
+                filter_values = value if isinstance(value, list) else [value]
+                dataframe = dataframe[dataframe[key].isin(filter_values)]
+    if filter_value_vars and value_vars:
+        for key, value in filter_value_vars.items():
+            if key in value_vars:
+                filter_values = value if isinstance(value, list) else [value]
+                dataframe = dataframe[dataframe[key].isin(filter_values)]
+    long_dataframe = pd.melt(
+        dataframe,
+        id_vars=id_vars,
+        value_vars=value_vars,
+        var_name=var_name,
+        value_name=value_name,
+    )
+    return long_dataframe
+
+
+def store_dataframe_parquet(
+    dataframe: DataFrame,
+    base_path: Union[str, PathLike],
+    dataframe_name: str,
+    overwrite: bool = False,
+) -> None:
+    base_path = Path(base_path).absolute()
+    if not base_path.is_dir():
+        raise ArgumentValueError(
+            f"'base_path'={base_path} directory not found. It must be a directory."
+        )
+    index_path = base_path / f"{dataframe_name}_index.parquet"
+    columns_path = base_path / f"{dataframe_name}_columns.parquet"
+    data_path = base_path / f"{dataframe_name}.parquet"
+    if data_path.exists() and not overwrite:
+        raise ArgumentValueError(
+            f"File {data_path} already exists. Set 'overwrite=True' to overwrite."
+        )
+    if not data_path.exists() or overwrite:
+        if isinstance(dataframe.index, MultiIndex):
+            indexes = dataframe.index.to_frame()
+            indexes.to_parquet(index_path)
+            dataframe = dataframe.reset_index(drop=True)
+        if isinstance(dataframe.columns, MultiIndex):
+            columns = dataframe.columns.to_frame(index=False)
+            columns.to_parquet(columns_path)
+            dataframe.columns = range(len(dataframe.columns))
+        dataframe.to_parquet(data_path)
+
+
+def load_dataframe_parquet(
+    dataframe: DataFrame, base_path: Union[str, PathLike], dataframe_name: str
+) -> DataFrame:
+    base_path = Path(base_path).absolute()
+    if not base_path.is_dir():
+        raise ArgumentValueError(
+            f"'base_path'={base_path} directory not found. It must be a directory."
+        )
+    index_path = base_path / f"{dataframe_name}_index.parquet"
+    columns_path = base_path / f"{dataframe_name}_columns.parquet"
+    data_path = base_path / f"{dataframe_name}.parquet"
+    if not data_path.exists():
+        raise ArgumentValueError(f"File {data_path} not found.")
+    dataframe = pd.read_parquet(data_path)
+    if index_path.exists():
+        indexes = pd.read_parquet(index_path)
+        dataframe.index = pd.MultiIndex.from_frame(indexes)
+    if columns_path.exists():
+        columns = pd.read_parquet(columns_path)
+        dataframe.columns = pd.MultiIndex.from_frame(columns)
+    return dataframe
 
 
 def idxslice(
-    df: DataFrame, level: Union[int, str], value: Union[List[Any], Any], axis: int
-) -> pd.IndexSlice:
-    if axis not in [0, 1]:
-        raise ValueError("axis must be 0 for index or 1 for columns")
-    value = [value] if not isinstance(value, list) else value
-    multiidx = df.index if axis == 0 else df.columns
-    if isinstance(level, str):
-        if level not in multiidx.names:
-            raise ValueError("level is not in the axis index provided")
-        level = multiidx.names.index(level)
-    slices = [slice(None)] * multiidx.nlevels
-    slices[level] = value
-    return pd.IndexSlice[tuple(slices)]
-
-
-def quantize_group(group, column, N):
-    quantiles = pd.qcut(group[column], N, labels=False)
-    quantiles = quantiles / (N - 1)
-    group[column] = quantiles + 0.1
-    return group
+    df: DataFrame, level: Union[int, str], values: Union[List[Any], Any], axis: int
+) -> slice:
+    if axis not in {0, 1}:
+        raise ArgumentValueError(
+            f"Invalid 'axis'={axis}, must be 0 for index or 1 for columns"
+        )
+    values = [values] if not isinstance(values, list) else values
+    idx = df.index if axis == 0 else df.columns
+    if isinstance(idx, MultiIndex):
+        if isinstance(level, str):
+            if level not in idx.names:
+                raise ArgumentValueError(
+                    f"'level'={level} is not in the MultiIndex names: {idx.names}"
+                )
+            level = idx.names.index(level)
+        elif not isinstance(level, int) or level < 0 or level >= idx.nlevels:
+            raise ArgumentValueError(
+                f"Provided 'level'={level} is out of bounds for the MultiIndex with {idx.nlevels} levels."
+            )
+        slices = [slice(None)] * idx.nlevels
+        slices[level] = values
+        return IndexSlice[tuple(slices)]
+    if not isinstance(idx, MultiIndex):
+        if isinstance(level, int) and level != 0:
+            raise ArgumentValueError(
+                "For single-level Index or Columns, level must be 0."
+            )
+        if isinstance(level, str) and level != idx.name:
+            raise ArgumentValueError(
+                f"Level '{level}' does not match the Index or Columns name."
+            )
+        return IndexSlice[values]

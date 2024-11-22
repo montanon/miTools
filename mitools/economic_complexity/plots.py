@@ -726,7 +726,7 @@ def plot_country_eci_indicator_scatter(
         if level in country_data.loc[steps_index, :].index.get_level_values(groups_col)
     ]
     for group in groups:
-        group_idxslice = idxslice(country_data, level=groups_col, value=group, axis=0)
+        group_idxslice = idxslice(country_data, level=groups_col, values=group, axis=0)
         ax.plot(
             country_data.loc[steps_index, :].loc[group_idxslice, x_var_col].values,
             country_data.loc[steps_index, :].loc[group_idxslice, y_var_col].values,
@@ -806,7 +806,7 @@ def plot_income_levels_ecis_indicator_scatter(
     for n, group in enumerate(groups):
         if group != all_groups:
             group_data = data.loc[
-                idxslice(data, level=groups_col, value=group, axis=0), :
+                idxslice(data, level=groups_col, values=group, axis=0), :
             ].copy(deep=True)
             groups = [group]
         else:
