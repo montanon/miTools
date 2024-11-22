@@ -5,6 +5,7 @@ from unittest import TestCase
 
 import pandas as pd
 from pandas import DataFrame, Series, testing
+from pandas.testing import assert_frame_equal
 
 from mitools.exceptions.custom_exceptions import ArgumentTypeError, ArgumentValueError
 from mitools.pandas.functions import (
@@ -12,6 +13,7 @@ from mitools.pandas.functions import (
     get_entity_data,
     idxslice,
     load_level_destructured_dataframe,
+    long_to_wide_dataframe,
     prepare_bool_cols,
     prepare_date_cols,
     prepare_int_cols,
@@ -42,7 +44,7 @@ class TestPrepareIntCols(TestCase):
                 "col3": [None, None, None, None],
             }
         )
-        pd.testing.assert_frame_equal(result, expected)
+        assert_frame_equal(result, expected)
 
     def test_multiple_columns_conversion(self):
         result = prepare_int_cols(
@@ -55,7 +57,7 @@ class TestPrepareIntCols(TestCase):
                 "col3": [None, None, None, None],
             }
         )
-        pd.testing.assert_frame_equal(result, expected)
+        assert_frame_equal(result, expected)
 
     def test_column_with_only_nans(self):
         result = prepare_int_cols(self.df.copy(), cols="col3", nan_placeholder=99)
@@ -66,7 +68,7 @@ class TestPrepareIntCols(TestCase):
                 "col3": [99, 99, 99, 99],
             }
         )
-        pd.testing.assert_frame_equal(result, expected)
+        assert_frame_equal(result, expected)
 
     def test_column_not_in_dataframe(self):
         with self.assertRaises(ArgumentValueError):
@@ -91,7 +93,7 @@ class TestPrepareIntCols(TestCase):
                 "col3": [None, None, None, None],
             }
         )
-        pd.testing.assert_frame_equal(result, expected)
+        assert_frame_equal(result, expected)
 
     def test_invalid_error_handling(self):
         with self.assertRaises(ArgumentValueError):
@@ -102,27 +104,27 @@ class TestPrepareIntCols(TestCase):
     def test_empty_dataframe(self):
         empty_df = DataFrame()
         result = prepare_int_cols(empty_df, cols=[], nan_placeholder=0)
-        pd.testing.assert_frame_equal(result, empty_df)
+        assert_frame_equal(result, empty_df)
 
     def test_empty_columns(self):
         result = prepare_int_cols(self.df, cols=[], nan_placeholder=0)
-        pd.testing.assert_frame_equal(result, self.df)
+        assert_frame_equal(result, self.df)
 
     def test_no_conversion_needed(self):
         df = DataFrame({"col1": [1, 2, 3], "col2": [4, 5, 6]})
         result = prepare_int_cols(df.copy(), cols="col1", nan_placeholder=0)
         expected = DataFrame({"col1": [1, 2, 3], "col2": [4, 5, 6]})
-        pd.testing.assert_frame_equal(result, expected, check_dtype=False)
+        assert_frame_equal(result, expected, check_dtype=False)
         result = prepare_int_cols(
             df.copy(), cols="col1", nan_placeholder=0, errors="ignore"
         )
         expected = DataFrame({"col1": [1, 2, 3], "col2": [4, 5, 6]})
-        pd.testing.assert_frame_equal(result, expected, check_dtype=False)
+        assert_frame_equal(result, expected, check_dtype=False)
         result = prepare_int_cols(
             df.copy(), cols="col1", nan_placeholder=0, errors="raise"
         )
         expected = DataFrame({"col1": [1, 2, 3], "col2": [4, 5, 6]})
-        pd.testing.assert_frame_equal(result, expected, check_dtype=False)
+        assert_frame_equal(result, expected, check_dtype=False)
 
     def test_custom_nan_placeholder(self):
         result = prepare_int_cols(self.df.copy(), cols="col1", nan_placeholder=999)
@@ -133,7 +135,7 @@ class TestPrepareIntCols(TestCase):
                 "col3": [None, None, None, None],
             }
         )
-        pd.testing.assert_frame_equal(result, expected)
+        assert_frame_equal(result, expected)
 
 
 class TestPrepareStrCols(TestCase):
@@ -187,7 +189,7 @@ class TestPrepareStrCols(TestCase):
 
     def test_empty_cols_list(self):
         result = prepare_str_cols(self.df.copy(), cols=[])
-        pd.testing.assert_frame_equal(result, self.df)
+        assert_frame_equal(result, self.df)
 
     def test_empty_dataframe(self):
         empty_df = DataFrame()
@@ -197,9 +199,7 @@ class TestPrepareStrCols(TestCase):
 
     def test_preserves_other_columns(self):
         result = prepare_str_cols(self.df.copy(), cols="col1")
-        pd.testing.assert_frame_equal(
-            result[["col2", "col3"]], self.df[["col2", "col3"]]
-        )
+        assert_frame_equal(result[["col2", "col3"]], self.df[["col2", "col3"]])
 
     def test_large_dataframe(self):
         large_df = DataFrame(
@@ -302,9 +302,7 @@ class TestPrepareDateCols(TestCase):
         result = prepare_date_cols(
             self.df.copy(), cols="valid_dates", nan_placeholder="2000-01-01"
         )
-        pd.testing.assert_frame_equal(
-            result[["invalid_dates"]], self.df[["invalid_dates"]]
-        )
+        assert_frame_equal(result[["invalid_dates"]], self.df[["invalid_dates"]])
 
     def test_large_dataframe(self):
         large_df = DataFrame({"dates": ["2021-01-01"] * 100000 + [None] * 100000})
@@ -344,9 +342,7 @@ class TestPrepareBoolCols(TestCase):
 
     def test_preserves_other_columns(self):
         result = prepare_bool_cols(self.df.copy(), cols=["col1"])
-        pd.testing.assert_frame_equal(
-            result[["col2", "col3"]], self.df[["col2", "col3"]]
-        )
+        assert_frame_equal(result[["col2", "col3"]], self.df[["col2", "col3"]])
 
     def test_invalid_cols_type(self):
         with self.assertRaises(ArgumentTypeError) as context:
@@ -381,7 +377,7 @@ class TestPrepareBoolCols(TestCase):
 
     def test_empty_cols_list(self):
         result = prepare_bool_cols(self.df.copy(), cols=[])
-        pd.testing.assert_frame_equal(result, self.df)
+        assert_frame_equal(result, self.df)
 
     def test_large_dataframe(self):
         large_df = DataFrame({"col1": [1, 0, None] * 100000})
@@ -447,7 +443,7 @@ class TestReshapeGroupData(TestCase):
         )
         expected.columns.name = "subgroup"
         expected.index.name = "A"
-        pd.testing.assert_frame_equal(result, expected)
+        assert_frame_equal(result, expected)
 
     def test_custom_aggregation_function(self):
         df = self.df.copy()
@@ -467,7 +463,7 @@ class TestReshapeGroupData(TestCase):
         )
         expected.columns.name = "subgroup"
         expected.index.name = "A"
-        pd.testing.assert_frame_equal(result, expected)
+        assert_frame_equal(result, expected)
 
     def test_missing_required_columns(self):
         df = self.df.drop(columns=["subgroup"])
@@ -551,7 +547,7 @@ class TestReshapeGroupData(TestCase):
         )
         expected.columns.name = "subgroup"
         expected.index.name = "A"
-        pd.testing.assert_frame_equal(result, expected, check_dtype=False)
+        assert_frame_equal(result, expected, check_dtype=False)
 
 
 class TestReshapeGroupsSubgroups(TestCase):
@@ -591,7 +587,7 @@ class TestReshapeGroupsSubgroups(TestCase):
             index=["2021-01", "2021-02", "2021-03"],
         )
         expected.columns.names = ["group", "subgroup"]
-        pd.testing.assert_frame_equal(result, expected)
+        assert_frame_equal(result, expected)
 
     def test_custom_aggregation_function(self):
         df = self.df.copy()
@@ -615,7 +611,7 @@ class TestReshapeGroupsSubgroups(TestCase):
             index=["2021-01", "2021-02", "2021-03"],
         )
         expected.columns.names = ["group", "subgroup"]
-        pd.testing.assert_frame_equal(result, expected)
+        assert_frame_equal(result, expected)
 
     def test_missing_required_columns(self):
         df = self.df.drop(columns=["subgroup"])
@@ -686,7 +682,7 @@ class TestReshapeGroupsSubgroups(TestCase):
         )
         expected.index.name = "A"
         expected.columns.names = ["group", "subgroup"]
-        pd.testing.assert_frame_equal(result, expected)
+        assert_frame_equal(result, expected)
 
     def test_column_type_mismatch(self):
         df = self.df.copy()
@@ -747,7 +743,7 @@ class TestGetEntityData(TestCase):
             index=["2021-Q1", "2021-Q2", "2021-Q3", "2021-Q4"],
         )
         expected.index.name = "USA"
-        pd.testing.assert_frame_equal(result, expected)
+        assert_frame_equal(result, expected)
 
     def test_custom_aggregation_function(self):
         df = self.df.copy()
@@ -768,7 +764,7 @@ class TestGetEntityData(TestCase):
             index=["2021-Q1", "2021-Q2", "2021-Q3", "2021-Q4"],
         )
         expected.index.name = "USA"
-        pd.testing.assert_frame_equal(result, expected)
+        assert_frame_equal(result, expected)
 
     def test_missing_required_columns(self):
         df = self.df.drop(columns=["indicator1"])
@@ -838,7 +834,7 @@ class TestGetEntityData(TestCase):
             index=["2021-Q1", "2021-Q2", "2021-Q3", "2021-Q4"],
         )
         expected.index.name = "CAN"
-        pd.testing.assert_frame_equal(result, expected)
+        assert_frame_equal(result, expected)
 
     def test_large_dataframe(self):
         large_df = pd.concat([self.df] * 10000, ignore_index=True)
@@ -899,7 +895,7 @@ class TestGetEntitiesData(TestCase):
         )
         expected.index.name = "time"
         expected.columns.names = ["country", "indicator"]
-        pd.testing.assert_frame_equal(result, expected)
+        assert_frame_equal(result, expected)
 
     def test_custom_aggregation_function(self):
         df = self.df.copy()
@@ -922,7 +918,7 @@ class TestGetEntitiesData(TestCase):
         )
         expected.index.name = "time"
         expected.columns.names = ["country", "indicator"]
-        pd.testing.assert_frame_equal(result, expected)
+        assert_frame_equal(result, expected)
 
     def test_missing_required_columns(self):
         df = self.df.drop(columns=["indicator1"])
@@ -954,7 +950,7 @@ class TestGetEntitiesData(TestCase):
         )
         expected.index.name = "time"
         expected.columns.names = ["country", "indicator"]
-        pd.testing.assert_frame_equal(result, expected)
+        assert_frame_equal(result, expected)
 
     def test_no_matching_entities(self):
         with self.assertRaises(ArgumentValueError) as context:
@@ -1000,7 +996,7 @@ class TestGetEntitiesData(TestCase):
         )
 
 
-class TestLongToWideDataFrame(TestCase):
+class TestWideToLongDataFrame(TestCase):
     def setUp(self):
         self.data = DataFrame(
             {
@@ -1027,7 +1023,7 @@ class TestLongToWideDataFrame(TestCase):
         ).set_index("id")
         expected.columns = pd.MultiIndex.from_product([["value"], expected.columns])
         expected.columns.names = [None, "category"]
-        pd.testing.assert_frame_equal(result, expected, check_dtype=False)
+        assert_frame_equal(result, expected, check_dtype=False)
 
     def test_multiple_transformation(self):
         result = wide_to_long_dataframe(
@@ -1059,7 +1055,7 @@ class TestLongToWideDataFrame(TestCase):
         ).set_index(["id", "year"])
         expected.columns = pd.MultiIndex.from_product([["value"], expected.columns])
         expected.columns.names = [None, "category"]
-        pd.testing.assert_frame_equal(result, expected, check_dtype=False)
+        assert_frame_equal(result, expected, check_dtype=False)
 
     def test_filter_index(self):
         result = wide_to_long_dataframe(
@@ -1074,7 +1070,7 @@ class TestLongToWideDataFrame(TestCase):
         ).set_index("id")
         expected.columns = pd.MultiIndex.from_product([["value"], expected.columns])
         expected.columns.names = [None, "category"]
-        pd.testing.assert_frame_equal(result, expected, check_dtype=False)
+        assert_frame_equal(result, expected, check_dtype=False)
 
     def test_filter_columns(self):
         result = wide_to_long_dataframe(
@@ -1087,7 +1083,7 @@ class TestLongToWideDataFrame(TestCase):
         expected = DataFrame({"id": [1, 2, 3], "A": [10, 30, 50]}).set_index("id")
         expected.columns = pd.MultiIndex.from_product([["value"], expected.columns])
         expected.columns.names = [None, "category"]
-        pd.testing.assert_frame_equal(result, expected)
+        assert_frame_equal(result, expected)
 
     def test_aggfunc_sum(self):
         result = wide_to_long_dataframe(
@@ -1107,7 +1103,7 @@ class TestLongToWideDataFrame(TestCase):
         ).set_index("id")
         expected.columns = pd.MultiIndex.from_product([["value"], expected.columns])
         expected.columns.names = [None, "category"]
-        pd.testing.assert_frame_equal(result, expected, check_dtype=False)
+        assert_frame_equal(result, expected, check_dtype=False)
 
     def test_fill_value(self):
         result = wide_to_long_dataframe(
@@ -1125,7 +1121,7 @@ class TestLongToWideDataFrame(TestCase):
         ).set_index("id")
         expected.columns = pd.MultiIndex.from_product([["value"], expected.columns])
         expected.columns.names = [None, "category"]
-        pd.testing.assert_frame_equal(result, expected)
+        assert_frame_equal(result, expected)
 
     def test_missing_columns_error(self):
         with self.assertRaises(ArgumentValueError):
@@ -1155,6 +1151,173 @@ class TestLongToWideDataFrame(TestCase):
                 values="value",
                 filter_columns={"nonexistent": ["A"]},
             )
+
+
+class TestLongToWideDataFrame(TestCase):
+    def setUp(self):
+        self.data = DataFrame(
+            {
+                "id": [1, 2, 3],
+                "2020_A": [10, 20, 30],
+                "2020_B": [40, 50, 60],
+                "2021_A": [70, 80, 90],
+                "2021_B": [100, 110, 120],
+            }
+        )
+
+    def test_basic_transformation(self):
+        result = long_to_wide_dataframe(
+            dataframe=self.data,
+            id_vars="id",
+            value_vars=["2020_A", "2020_B", "2021_A", "2021_B"],
+            var_name="year_category",
+            value_name="value",
+        )
+        expected = (
+            DataFrame(
+                {
+                    "id": [1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3],
+                    "year_category": ["2020_A", "2020_B", "2021_A", "2021_B"] * 3,
+                    "value": [10, 40, 70, 100, 20, 50, 80, 110, 30, 60, 90, 120],
+                }
+            )
+            .sort_values(by=["year_category", "id"])
+            .reset_index(drop=True)
+        )
+        assert_frame_equal(result, expected)
+
+    def test_default_parameters(self):
+        result = long_to_wide_dataframe(
+            dataframe=self.data,
+            id_vars="id",
+            value_vars=["2020_A", "2020_B", "2021_A", "2021_B"],
+        )
+        expected = (
+            DataFrame(
+                {
+                    "id": [1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3],
+                    "variable": ["2020_A", "2020_B", "2021_A", "2021_B"] * 3,
+                    "value": [10, 40, 70, 100, 20, 50, 80, 110, 30, 60, 90, 120],
+                }
+            )
+            .sort_values(by=["variable", "id"])
+            .reset_index(drop=True)
+        )
+        assert_frame_equal(result, expected)
+
+    def test_no_value_vars(self):
+        data = DataFrame(
+            {"id": [1, 2, 3], "2020_A": [10, 20, 30], "2020_B": [40, 50, 60]}
+        )
+        result = long_to_wide_dataframe(dataframe=data, id_vars="id")
+        expected = (
+            DataFrame(
+                {
+                    "id": [1, 1, 2, 2, 3, 3],
+                    "variable": ["2020_A", "2020_B"] * 3,
+                    "value": [10, 40, 20, 50, 30, 60],
+                }
+            )
+            .sort_values(by=["variable", "id"])
+            .reset_index(drop=True)
+        )
+        assert_frame_equal(result, expected)
+
+    def test_filter_id_vars(self):
+        result = long_to_wide_dataframe(
+            dataframe=self.data,
+            id_vars="id",
+            value_vars=["2020_A", "2020_B", "2021_A", "2021_B"],
+            filter_id_vars={"id": [1]},
+        )
+        expected = (
+            DataFrame(
+                {
+                    "id": [1, 1, 1, 1],
+                    "variable": ["2020_A", "2020_B", "2021_A", "2021_B"],
+                    "value": [10, 40, 70, 100],
+                }
+            )
+            .sort_values(by=["variable", "id"])
+            .reset_index(drop=True)
+        )
+        assert_frame_equal(result, expected)
+
+    def test_filter_value_vars(self):
+        result = long_to_wide_dataframe(
+            dataframe=self.data, id_vars="id", value_vars=["2020_A", "2021_A"]
+        )
+        expected = (
+            DataFrame(
+                {
+                    "id": [1, 1, 2, 2, 3, 3],
+                    "variable": ["2020_A", "2021_A"] * 3,
+                    "value": [10, 70, 20, 80, 30, 90],
+                }
+            )
+            .sort_values(by=["variable", "id"])
+            .reset_index(drop=True)
+        )
+        assert_frame_equal(result, expected)
+
+    def test_missing_columns(self):
+        with self.assertRaises(ArgumentValueError):
+            long_to_wide_dataframe(
+                dataframe=self.data,
+                id_vars="id",
+                value_vars=["2020_A", "missing_column"],
+            )
+
+    def test_empty_dataframe(self):
+        empty_data = DataFrame(columns=["id", "2020_A", "2020_B"])
+        expected = DataFrame(columns=["id", "variable", "value"])
+        result = long_to_wide_dataframe(dataframe=empty_data, id_vars="id")
+        assert_frame_equal(result, expected)
+
+    def test_custom_var_value_names(self):
+        result = long_to_wide_dataframe(
+            dataframe=self.data,
+            id_vars="id",
+            value_vars=["2020_A", "2020_B", "2021_A", "2021_B"],
+            var_name="attribute",
+            value_name="measurement",
+        )
+        expected = (
+            DataFrame(
+                {
+                    "id": [1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3],
+                    "attribute": ["2020_A", "2020_B", "2021_A", "2021_B"] * 3,
+                    "measurement": [10, 40, 70, 100, 20, 50, 80, 110, 30, 60, 90, 120],
+                }
+            )
+            .sort_values(by=["attribute", "id"])
+            .reset_index(drop=True)
+        )
+        assert_frame_equal(result, expected)
+
+    def test_invalid_id_vars(self):
+        with self.assertRaises(ArgumentValueError):
+            long_to_wide_dataframe(dataframe=self.data, id_vars="missing_id_var")
+
+    def test_filter_with_scalar(self):
+        result = long_to_wide_dataframe(
+            dataframe=self.data,
+            id_vars="id",
+            value_vars=["2020_A", "2020_B", "2021_A", "2021_B"],
+            filter_id_vars={"id": 1},
+        )
+        expected = (
+            DataFrame(
+                {
+                    "id": [1, 1, 1, 1],
+                    "variable": ["2020_A", "2020_B", "2021_A", "2021_B"],
+                    "value": [10, 40, 70, 100],
+                }
+            )
+            .sort_values(by=["variable", "id"])
+            .reset_index(drop=True)
+        )
+        assert_frame_equal(result, expected)
 
 
 class TestStoreDataframeByLevel(unittest.TestCase):
