@@ -73,9 +73,13 @@ def prepare_categorical_columns(
 def prepare_rank_columns(
     dataframe: DataFrame,
     columns: Union[str, List[str]],
-    method: str = "average",
+    method: Literal["average", "min", "max", "first", "dense"] = "average",
     ascending: bool = True,
 ) -> DataFrame:
+    if method not in ["average", "min", "max", "first", "dense"]:
+        raise ArgumentValueError(
+            f"Argument 'method'={method} must be one of ['average', 'min', 'max', 'first', 'dense']."
+        )
     columns = validate_columns(dataframe, columns)
     for col in columns:
         dataframe[col] = dataframe[col].rank(method=method, ascending=ascending)
@@ -98,8 +102,17 @@ def prepare_bin_columns(
     labels: List[Any] = None,
 ) -> DataFrame:
     columns = validate_columns(dataframe, columns)
-    for col in columns:
-        dataframe[col] = pd.cut(dataframe[col], bins=bins, labels=labels)
+    if labels is not None:
+        n_bins = bins if isinstance(bins, int) else len(bins) - 1
+        if len(labels) != n_bins:
+            raise ArgumentValueError(
+                f"Length of 'labels': {len(labels)} must be equal to amount of 'bins': {n_bins}."
+            )
+    try:
+        for col in columns:
+            dataframe[col] = pd.cut(dataframe[col], bins=bins, labels=labels)
+    except TypeError:
+        raise ArgumentTypeError(f"'column'={col} must be of numeric type.")
     return dataframe
 
 

@@ -32,6 +32,82 @@ from mitools.pandas.functions import (
 )
 
 
+class TestPrepareBinColumns(TestCase):
+    def setUp(self):
+        self.df = pd.DataFrame(
+            {
+                "A": [1, 2, 3, 4, 5],
+                "B": [10, 20, 30, 40, 50],
+                "C": ["x", "y", "z", "w", "v"],  # Non-numeric column
+            }
+        )
+
+    def test_single_column_equal_bins(self):
+        result = prepare_bin_columns(self.df.copy(), columns="A", bins=2)
+        expected = self.df.copy()
+        expected["A"] = pd.cut(self.df["A"], bins=2)
+        assert_frame_equal(result, expected)
+
+    def test_multiple_columns_equal_bins(self):
+        result = prepare_bin_columns(self.df.copy(), columns=["A", "B"], bins=3)
+        expected = self.df.copy()
+        expected["A"] = pd.cut(self.df["A"], bins=3)
+        expected["B"] = pd.cut(self.df["B"], bins=3)
+        assert_frame_equal(result, expected)
+
+    def test_single_column_custom_bins(self):
+        custom_bins = [0, 2, 4, 6]
+        result = prepare_bin_columns(self.df.copy(), columns="A", bins=custom_bins)
+        expected = self.df.copy()
+        expected["A"] = pd.cut(self.df["A"], bins=custom_bins)
+        assert_frame_equal(result, expected)
+
+    def test_multiple_columns_custom_bins(self):
+        custom_bins = [0, 20, 40, 60]
+        result = prepare_bin_columns(
+            self.df.copy(), columns=["A", "B"], bins=custom_bins
+        )
+        expected = self.df.copy()
+        expected["A"] = pd.cut(self.df["A"], bins=custom_bins)
+        expected["B"] = pd.cut(self.df["B"], bins=custom_bins)
+        assert_frame_equal(result, expected)
+
+    def test_single_column_custom_labels(self):
+        labels = ["Low", "High"]
+        result = prepare_bin_columns(self.df.copy(), columns="A", bins=2, labels=labels)
+        expected = self.df.copy()
+        expected["A"] = pd.cut(self.df["A"], bins=2, labels=labels)
+        assert_frame_equal(result, expected)
+
+    def test_multiple_columns_custom_labels(self):
+        labels = ["Low", "Medium", "High"]
+        result = prepare_bin_columns(
+            self.df.copy(), columns=["A", "B"], bins=3, labels=labels
+        )
+        expected = self.df.copy()
+        expected["A"] = pd.cut(self.df["A"], bins=3, labels=labels)
+        expected["B"] = pd.cut(self.df["B"], bins=3, labels=labels)
+        assert_frame_equal(result, expected)
+
+    def test_missing_column(self):
+        with self.assertRaises(ArgumentValueError):
+            prepare_bin_columns(self.df.copy(), columns="D", bins=3)
+
+    def test_non_numeric_column(self):
+        with self.assertRaises(ArgumentTypeError):
+            prepare_bin_columns(self.df.copy(), columns="C", bins=3)
+
+    def test_bins_mismatch_with_labels(self):
+        with self.assertRaises(ArgumentValueError):
+            prepare_bin_columns(
+                self.df.copy(), columns="A", bins=3, labels=["Low", "High"]
+            )
+
+    def test_no_modification_to_untouched_columns(self):
+        result = prepare_bin_columns(self.df.copy(), columns="A", bins=3)
+        self.assertTrue(result["B"].equals(self.df["B"]))
+
+
 class TestPrepareRankColumns(TestCase):
     def setUp(self):
         self.df = pd.DataFrame(
