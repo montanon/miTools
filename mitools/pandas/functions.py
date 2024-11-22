@@ -95,6 +95,22 @@ def prepare_standardized_columns(
     return dataframe
 
 
+def prepare_normalized_columns(
+    dataframe: DataFrame,
+    columns: Union[str, List[str]],
+    range_min: float = 0.0,
+    range_max: float = 1.0,
+) -> DataFrame:
+    columns = validate_columns(dataframe, columns)
+    for col in columns:
+        min_val = dataframe[col].min()
+        max_val = dataframe[col].max()
+        dataframe[col] = (dataframe[col] - min_val) / (max_val - min_val) * (
+            range_max - range_min
+        ) + range_min
+    return dataframe
+
+
 def prepare_bin_columns(
     dataframe: DataFrame,
     columns: Union[str, List[str]],
