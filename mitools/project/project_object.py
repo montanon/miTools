@@ -21,7 +21,7 @@ from ..utils import build_dir_tree
 
 PROJECT_FILENAME = Path("project.pkl")
 PROJECT_FOLDER = Path(".project")
-PROJECT_NOTEBOOK = PROJECT_FOLDER / "Project.ipynb"
+PROJECT_NOTEBOOK = "Project.ipynb"
 PROJECT_ARCHIVE = PROJECT_FOLDER / ".archive"
 PROJECT_BACKUP = PROJECT_FOLDER / ".backup"
 
@@ -42,8 +42,8 @@ class VersionInfo:
 class Project:
     def __init__(
         self,
-        root: PathLike,
         project_name: str,
+        root: PathLike = ".",
         version: str = "v0",
         logger: Logger = None,
     ):
@@ -56,6 +56,7 @@ class Project:
         self.name = project_name
         self.folder = self.root / self.name
         self.project_folder = self.folder / PROJECT_FOLDER
+        self.project_file = self.folder / PROJECT_FILENAME
         self.project_notebook = self.folder / PROJECT_NOTEBOOK
         self.create_main_folder()
         self.version = version
@@ -67,6 +68,7 @@ class Project:
         self.paths: Dict[str, Path] = {}
         self.tree = build_dir_tree(self.folder)
         self.update_info()
+        self.store_project()
         if not self._is_running_in_required_notebook():
             raise ProjectError(
                 "Project object can only be initialized inside the respective Project Jupyter notebook."
@@ -154,9 +156,7 @@ class Project:
             created_at=datetime.now(),
             description=description,
         )
-
-        if self.auto_save:
-            self.store_project()
+        self.store_project()
 
     def create_version_subfolder(self, subfolder_name: str) -> None:
         subfolder_path = self.version_folder / subfolder_name
@@ -292,7 +292,7 @@ class Project:
 
     def store_project(self) -> None:
         self.update_info()
-        with open(self.folder / PROJECT_FILENAME, "wb") as file:
+        with open(self.project_file, "wb") as file:
             pickle.dump(self, file)
 
     @classmethod
