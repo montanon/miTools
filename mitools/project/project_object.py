@@ -9,14 +9,19 @@ from os import PathLike
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import ipykernel
+import requests
+from notebook.notebookapp import list_running_servers
+
 from mitools.exceptions import ProjectError, ProjectFolderError, ProjectVersionError
+from mitools.notebooks import recreate_notebook_structure, save_notebook_as_ipynb
 
 from ..files import folder_in_subtree, folder_is_subfolder
 from ..utils import build_dir_tree
 
-PROJECT_FILENAME = "project.pkl"
-PROJECT_FOLDER = ".project"
-PROJECT_NOTEBOOK = "Project.ipynb"
+PROJECT_FILENAME = Path("project.pkl")
+PROJECT_FOLDER = Path(".project")
+PROJECT_NOTEBOOK = PROJECT_FOLDER / "Project.ipynb"
 PROJECT_ARCHIVE = PROJECT_FOLDER / ".archive"
 PROJECT_BACKUP = PROJECT_FOLDER / ".backup"
 
@@ -51,6 +56,7 @@ class Project:
         self.name = project_name
         self.folder = self.root / self.name
         self.project_folder = self.folder / PROJECT_FOLDER
+        self.project_notebook = self.folder / PROJECT_NOTEBOOK
         self.create_main_folder()
         self.version = version
         self.version_folder = self.folder / self.version
@@ -61,6 +67,41 @@ class Project:
         self.paths: Dict[str, Path] = {}
         self.tree = build_dir_tree(self.folder)
         self.update_info()
+        if not self._is_running_in_required_notebook():
+            raise ProjectError(
+                "Project object can only be initialized inside the respective Project Jupyter notebook."
+            )
+
+    def _is_running_in_required_notebook(self) -> bool:
+        try:
+            notebook_path = self._get_current_notebook_name()
+            if notebook_path.name != self.project_notebook:
+                return False
+        except Exception as e:
+            raise ProjectError(
+                f"Failed to validate notebook from whcih Project is running: {e}"
+            )
+        return True
+
+    def _get_current_notebook_name(self) -> Path:
+        try:
+            connection_file = Path(ipykernel.get_connection_file()).resolve()
+            kernel_id = connection_file.stem.split("-", 1)[1]
+            for server in list_running_servers():
+                try:
+                    response = requests.get(
+                        f"{server['url']}api/sessions",
+                        params={"token": server.get("token", "")},
+                    )
+                    response.raise_for_status()
+                    for session in response.json():
+                        if session["kernel"]["id"] == kernel_id:
+                            return Path(session["notebook"]["path"]).name
+                except Exception:
+                    continue
+        except Exception as e:
+            raise ProjectError(f"Unable to retrieve notebook name: {e}")
+        raise ProjectError("Could not match current kernel to any running notebook.")
 
     def create_main_folder(self) -> None:
         self.folder.mkdir(parents=True, exist_ok=True)
@@ -407,4 +448,5 @@ class Project:
         print(f"Updated '{key}' of project paths and stored the project.")
 
     def create_project_notebook(self) -> None:
-        pass
+        notebook = recreate_notebook_structure()
+        save_notebook_as_ipynb(notebook, self.project_notebook)
