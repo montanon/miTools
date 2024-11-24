@@ -1,5 +1,10 @@
 import pickle
 import shutil
+from contextlib import contextmanager
+from dataclasses import dataclass
+from datetime import datetime
+from enum import Enum
+from logging import Logger
 from os import PathLike
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -12,15 +17,37 @@ from ..utils import build_dir_tree
 PROJECT_FILENAME = "project.pkl"
 PROJECT_FOLDER = ".project"
 PROJECT_NOTEBOOK = "Project.ipynb"
+PROJECT_ARCHIVE = PROJECT_FOLDER / ".archive"
+PROJECT_BACKUP = PROJECT_FOLDER / ".backup"
+
+
+class VersionState(Enum):
+    ACTIVE = "active"
+    ARCHIVED = "archived"
+
+
+@dataclass
+class VersionInfo:
+    version: str
+    creation: float
+    state: VersionState = VersionState.ACTIVE
+    description: str = ""
 
 
 class Project:
-    def __init__(self, root: PathLike, project_name: str, version: str = "v0"):
+    def __init__(
+        self,
+        root: PathLike,
+        project_name: str,
+        version: str = "v0",
+        logger: Logger = None,
+    ):
         self.root = Path(root).absolute()
         if self.root.exists() and not self.root.is_dir():
             raise ProjectFolderError(f"{self.root} is not a directory")
         elif not self.root.exists():
             raise ProjectFolderError(f"{self.root} does not exist")
+        self.logger = logger
         self.name = project_name
         self.folder = self.root / self.name
         self.project_folder = self.folder / PROJECT_FOLDER
@@ -29,8 +56,9 @@ class Project:
         self.version_folder = self.folder / self.version
         self.create_version_folder()
         self.versions = self.get_all_versions()
-        self.vars = {}
-        self.paths = {}
+        self.versions_metadata: Dict[str, VersionInfo] = {}
+        self.vars: Dict[str, Any] = {}
+        self.paths: Dict[str, Path] = {}
         self.tree = build_dir_tree(self.folder)
         self.update_info()
 
@@ -58,10 +86,11 @@ class Project:
         self.subfolders = self.list_version_subfolders()
         self.paths.update(self.folder_path_dict())
 
-    def create_version(self, version: str) -> None:
+    def create_version(self, version: str, description: str = "") -> None:
         version_path = self.folder / version
         if not version_path.exists():
             version_path.mkdir(parents=True, exist_ok=True)
+            self.add_version_metadata(version, description)
             self.update_info()
         else:
             raise ProjectVersionError(
@@ -74,6 +103,20 @@ class Project:
         self.create_version_folder()
         self.update_info()
 
+    def add_version_metadata(self, version: str, description: str = "") -> None:
+        if version not in self.versions:
+            raise ProjectError(
+                f"Version {version} does not exist in Project {self.name} with version {self.versions}"
+            )
+        self.version_metadata[version] = VersionInfo(
+            name=version,
+            created_at=datetime.now(),
+            description=description,
+        )
+
+        if self.auto_save:
+            self.store_project()
+
     def create_version_subfolder(self, subfolder_name: str) -> None:
         subfolder_path = self.version_folder / subfolder_name
         subfolder_path.mkdir(parents=True, exist_ok=True)
@@ -81,6 +124,15 @@ class Project:
 
     def list_version_subfolders(self) -> List[str]:
         return [d.name for d in self.version_folder.iterdir() if d.is_dir()]
+
+    @contextmanager
+    def version_context(self, version: str):
+        original_version = self.version
+        try:
+            self.update_version(version)
+            yield
+        finally:
+            self.update_version(original_version)
 
     def delete_subfolder(self, subfolder_name: str) -> None:
         subfolder_path = self.version_folder / subfolder_name
@@ -119,9 +171,48 @@ class Project:
             )
             self.update_version(self.versions[0])
 
+    def archive_version(self, version: str) -> None:
+        if version not in self.versions_metadata:
+            raise ProjectError(
+                f"Version {version} not found int Project {self.name} with versions {self.versions}"
+            )
+        self.versions_metadata[version].state = VersionState.ARCHIVED
+        archive_path = self.folder / PROJECT_ARCHIVE / version
+        version_path = self.folder / version
+        archive_path.parent.mkdir(exist_ok=True)
+        shutil.move(str(version_path), str(archive_path))
+        if self.auto_save:
+            self.store_project()
+
+    def restore_version(self, version: str) -> None:
+        archive_path = self.folder / "_archived" / version
+        if not archive_path.exists():
+            raise ProjectError(
+                f"Archived version {version} not found in Archive: {PROJECT_ARCHIVE}"
+            )
+        version_path = self.folder / version
+        shutil.move(str(archive_path), str(version_path))
+        self.version_metadata[version].state = VersionState.ACTIVE
+        if self.auto_save:
+            self.store_project()
+
     def reset_version(self, version: str) -> None:
         self.delete_version(version)
         self.update_version(version)
+
+    def get_version_data(self, version: str) -> Dict[str, Any]:
+        if version not in self.versions_metadata:
+            raise ProjectVersionError(
+                f"Version {version} not found in Porject {self.name} with versions {self.versions}"
+            )
+        metadata = self.versions_metadata[version]
+        return {
+            "name": version,
+            "created_at": metadata.created_at,
+            "state": metadata.state.value,
+            "description": metadata.description,
+            "subfolders": self.list_version_subfolders(version),
+        }
 
     def clear_version(self) -> None:
         for path in self.version_folder.rglob("*"):
@@ -135,8 +226,15 @@ class Project:
                 and path.name != PROJECT_FILENAME
                 and path.name != PROJECT_NOTEBOOK
                 and path.parent != PROJECT_FOLDER
+                and path.parent != PROJECT_ARCHIVE
+                and path.parent != PROJECT_BACKUP
             ):
                 path.unlink()
+
+    def create_backup(self):
+        backup_name = f"{self.name}_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        backup_path = PROJECT_BACKUP / backup_name
+        shutil.copytree(self.folder, backup_path)
 
     def delete_file(self, file_name: str, subfolder: str = None) -> None:
         subfolder_path = self.version_folder / subfolder
@@ -157,12 +255,15 @@ class Project:
             pickle.dump(self, file)
 
     @classmethod
-    def load_project(
-        cls, project_folder: Optional[Path] = None, auto_load: bool = False, n: int = 3
-    ) -> "Project":
+    def find_project(
+        cls,
+        project_folder: PathLike = None,
+        max_depth: int = 3,
+        auto_load: bool = False,
+    ):
         if project_folder is None and auto_load:
             current_path = Path.cwd().resolve()
-            for _ in range(n):
+            for _ in range(max_depth):
                 project_path = current_path / PROJECT_FILENAME
                 if project_path.exists():
                     break
@@ -171,7 +272,7 @@ class Project:
                 current_path = current_path.parent
             else:
                 raise ProjectError(
-                    f"No {PROJECT_FILENAME} found in the current or {n} parent directories."
+                    f"No {PROJECT_FILENAME} found in the current or {max_depth} parent directories."
                 )
         else:
             project_path = Path(project_folder) / PROJECT_FILENAME
@@ -179,13 +280,29 @@ class Project:
                 raise ProjectError(
                     f"{PROJECT_FILENAME} does not exist in the specified directory {project_folder}"
                 )
+        return project_path
 
+    @classmethod
+    def load_project(
+        cls,
+        project_folder: Optional[Path] = None,
+        auto_load: bool = False,
+        max_depth: int = 3,
+    ) -> "Project":
+        project_path = cls.find_project(
+            project_folder=project_folder, max_depth=max_depth, auto_load=auto_load
+        )
         with project_path.open("rb") as file:
             obj = pickle.load(file)
         obj.update_info()
+        # Retro-compatibility
         obj.vars = obj.vars if hasattr(obj, "vars") else {}
         obj.paths = obj.paths if hasattr(obj, "paths") else {}
-
+        obj.versions_metadata = (
+            obj.versions_metadata
+            if hasattr(obj, "versions_metadata")
+            else {v: obj.add_version_metadata(v) for v in obj.versions}
+        )
         current_path = Path.cwd().resolve()
         if folder_is_subfolder(obj.root, current_path):
             version_folder = folder_in_subtree(
@@ -194,7 +311,6 @@ class Project:
             if version_folder:
                 obj.update_version(version_folder.stem)
                 print(f"Updated Project version to current {obj.version} version.")
-
         return obj
 
     def __repr__(self) -> str:
@@ -264,21 +380,29 @@ class Project:
         self.store_project()
         print(f"Updated '{key}' of project variables and stored the project.")
 
-    def add_path(self, key: str, value: PathLike, overwrite: bool = False) -> None:
+    def add_path(self, key: str, path: Path, overwrite: bool = False) -> None:
+        if not isinstance(path, Path):
+            raise ProjectError(
+                f"Provided 'path'={path} of type {type(path)} must be of type pathlib.Path"
+            )
         if key in self.paths and not overwrite:
             raise ProjectError(
                 f"Key '{key}' already exists in self.paths. Use update_path() to modify existing variables."
             )
-        self.paths[key] = value
+        self.paths[key] = path
         self.store_project()
         print(f"Added '{key}' to project paths and stored the project.")
 
-    def update_path(self, key: str, value: PathLike) -> None:
+    def update_path(self, key: str, path: Path) -> None:
+        if not isinstance(path, Path):
+            raise ProjectError(
+                f"Provided 'path'={path} of type {type(path)} must be of type pathlib.Path"
+            )
         if key not in self.paths:
             raise ProjectError(
                 f"Key {key} does not exist in self.paths. Cannot update non-existing path."
             )
-        self.paths[key] = value
+        self.paths[key] = path
         self.store_project()
         print(f"Updated '{key}' of project paths and stored the project.")
 
