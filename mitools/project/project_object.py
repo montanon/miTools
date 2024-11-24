@@ -4,35 +4,59 @@ from os import PathLike
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from mitools.exceptions import ProjectError, ProjectFolderError, ProjectVersionError
+
 from ..files import folder_in_subtree, folder_is_subfolder
 from ..utils import build_dir_tree
 
 PROJECT_FILENAME = "project.pkl"
+PROJECT_FOLDER = ".project"
+PROJECT_NOTEBOOK = "Project.ipynb"
 
 
 class Project:
-    def __init__(
-        self, root: PathLike, project_name: str, version: Optional[str] = "v0"
-    ):
+    def __init__(self, root: PathLike, project_name: str, version: str = "v0"):
         self.root = Path(root).absolute()
         if self.root.exists() and not self.root.is_dir():
-            raise ValueError(f"{self.root} is not a directory")
+            raise ProjectFolderError(f"{self.root} is not a directory")
         elif not self.root.exists():
-            raise ValueError(f"{self.root} does not exist")
+            raise ProjectFolderError(f"{self.root} does not exist")
         self.name = project_name
         self.folder = self.root / self.name
+        self.project_folder = self.folder / PROJECT_FOLDER
         self.create_main_folder()
         self.version = version
         self.version_folder = self.folder / self.version
         self.create_version_folder()
+        self.versions = self.get_all_versions()
         self.vars = {}
+        self.paths = {}
+        self.tree = build_dir_tree(self.folder)
         self.update_info()
 
     def create_main_folder(self) -> None:
         self.folder.mkdir(parents=True, exist_ok=True)
+        self.project_folder.mkdir(parents=True, exist_ok=True)
+        self.create_project_notebook()  # TODO
 
     def create_version_folder(self) -> None:
         self.version_folder.mkdir(parents=True, exist_ok=True)
+
+    def get_all_versions(self) -> List[str]:
+        return [d.name for d in self.folder.iterdir() if d.is_dir()]
+
+    def folder_path_dict(self) -> List[str]:
+        return {
+            subfolder: self.version_folder / subfolder for subfolder in self.subfolders
+        }
+
+    def update_info(self) -> None:
+        self.versions = self.get_all_versions()
+        self.version_folders = [
+            Path(self.folder) / version for version in self.versions
+        ]
+        self.subfolders = self.list_version_subfolders()
+        self.paths.update(self.folder_path_dict())
 
     def create_version(self, version: str) -> None:
         version_path = self.folder / version
@@ -40,7 +64,9 @@ class Project:
             version_path.mkdir(parents=True, exist_ok=True)
             self.update_info()
         else:
-            raise ValueError(f"Version {version} already exists in Project {self.name}")
+            raise ProjectVersionError(
+                f"Version {version} already exists in Project {self.name}. Existing versions: [{self.versions}]"
+            )
 
     def update_version(self, version: str) -> None:
         self.version = version
@@ -48,21 +74,18 @@ class Project:
         self.create_version_folder()
         self.update_info()
 
-    def get_all_versions(self) -> List[str]:
-        return [d.name for d in self.folder.iterdir() if d.is_dir()]
-
-    def create_subfolder(self, subfolder_name: str) -> None:
+    def create_version_subfolder(self, subfolder_name: str) -> None:
         subfolder_path = self.version_folder / subfolder_name
         subfolder_path.mkdir(parents=True, exist_ok=True)
         self.update_info()
 
-    def list_subfolders(self) -> List[str]:
+    def list_version_subfolders(self) -> List[str]:
         return [d.name for d in self.version_folder.iterdir() if d.is_dir()]
 
     def delete_subfolder(self, subfolder_name: str) -> None:
         subfolder_path = self.version_folder / subfolder_name
         if not subfolder_path.exists():
-            raise ValueError(
+            raise ProjectFolderError(
                 f"Subfolder {subfolder_name} does not exist in Project {self.name} version {self.version}"
             )
         for child in subfolder_path.iterdir():
@@ -71,17 +94,15 @@ class Project:
         subfolder_path.rmdir()
         self.update_info()
 
-    def reset_version(self, version: str) -> None:
-        self.delete_version(version)
-        self.update_version(version)
-
     def delete_version(self, version: str) -> None:
         if version in self.versions and len(self.versions) == 1:
-            raise ValueError(
+            raise ProjectError(
                 f"Cannot delete, {version} is the only version of Project {self.name}"
             )
         elif version not in self.versions:
-            raise ValueError(f"Version {version} does not exist in Project {self.name}")
+            raise ProjectVersionError(
+                f"Version {version} does not exist in Project {self.name}, with versions: {self.versions}"
+            )
         version_path: Path = self.folder / version
         print(f"About to remove version {version} of Project {self.name}...")
         if version_path.exists() and version_path.is_dir():
@@ -98,6 +119,10 @@ class Project:
             )
             self.update_version(self.versions[0])
 
+    def reset_version(self, version: str) -> None:
+        self.delete_version(version)
+        self.update_version(version)
+
     def clear_version(self) -> None:
         for path in self.version_folder.rglob("*"):
             if path.is_file():
@@ -105,18 +130,23 @@ class Project:
 
     def clear_project(self) -> None:
         for path in self.folder.rglob("*"):
-            if path.is_file() and path.name != PROJECT_FILENAME:
+            if (
+                path.is_file()
+                and path.name != PROJECT_FILENAME
+                and path.name != PROJECT_NOTEBOOK
+                and path.parent != PROJECT_FOLDER
+            ):
                 path.unlink()
 
     def delete_file(self, file_name: str, subfolder: str = None) -> None:
         subfolder_path = self.version_folder / subfolder
         if not subfolder_path.exists():
-            raise ValueError(
+            raise ProjectFolderError(
                 f"Subfolder {subfolder} does not exist in Project {self.name} version {self.version}"
             )
         file_path = subfolder_path / file_name
         if not file_path.exists():
-            raise FileNotFoundError(
+            raise ProjectError(
                 f"File {file_name} does not exist in subfolder {subfolder} of Project {self.name}"
             )
         file_path.unlink()
@@ -140,13 +170,13 @@ class Project:
                     break
                 current_path = current_path.parent
             else:
-                raise FileNotFoundError(
+                raise ProjectError(
                     f"No {PROJECT_FILENAME} found in the current or {n} parent directories."
                 )
         else:
             project_path = Path(project_folder) / PROJECT_FILENAME
             if not project_path.exists():
-                raise FileNotFoundError(
+                raise ProjectError(
                     f"{PROJECT_FILENAME} does not exist in the specified directory {project_folder}"
                 )
 
@@ -154,6 +184,7 @@ class Project:
             obj = pickle.load(file)
         obj.update_info()
         obj.vars = obj.vars if hasattr(obj, "vars") else {}
+        obj.paths = obj.paths if hasattr(obj, "paths") else {}
 
         current_path = Path.cwd().resolve()
         if folder_is_subfolder(obj.root, current_path):
@@ -175,19 +206,6 @@ class Project:
             + f"Folder: {self.folder},\nVersions: {self.versions}\n"
         )
 
-    def update_info(self) -> None:
-        self.versions = self.get_all_versions()
-        self.version_folders = [
-            Path(self.folder) / version for version in self.versions
-        ]
-        self.subfolders = self.list_subfolders()
-        self.vars.update(self.folder_path_dict())
-
-    def folder_path_dict(self) -> List[str]:
-        return {
-            subfolder: self.version_folder / subfolder for subfolder in self.subfolders
-        }
-
     def get_info(self) -> Dict:
         self.update_info()
         return {
@@ -206,39 +224,63 @@ class Project:
         self.directory_tree(self.folder)
 
     def directory_tree(self, directory: PathLike) -> None:
-        tree = build_dir_tree(directory)
-        tree.show()
+        self.tree = build_dir_tree(directory)
+        self.tree.show()
 
     def clone_version(self, source_version: str, new_version: str) -> None:
         source_version_folder = self.folder / source_version
         new_version_folder = self.folder / new_version
 
         if not source_version_folder.exists():
-            raise ValueError(f"Source version {source_version} does not exist.")
+            raise ProjectVersionError(
+                f"Version {source_version} does not exists in Project {self.name}. Existing versions: [{self.versions}]"
+            )
 
         if new_version_folder.exists():
-            raise ValueError(f"New version {new_version} already exists.")
+            raise ProjectVersionError(
+                f"Version {new_version} already exists in Project {self.name}. Existing versions: [{self.versions}]"
+            )
 
         shutil.copytree(source_version_folder, new_version_folder)
         self.update_version(new_version)
         self.update_info()
         self.store_project()
 
-    def add_var(self, key: str, value: Any, overwrite: Optional[bool] = False) -> None:
+    def add_var(self, key: str, value: Any, overwrite: bool = False) -> None:
         if key in self.vars and not overwrite:
-            raise ValueError(
+            raise ProjectError(
                 f"Key '{key}' already exists in self.vars. Use update_var() to modify existing variables."
             )
         self.vars[key] = value
         self.store_project()
         print(f"Added '{key}' to project variables and stored the project.")
 
-    def try_add_var(
-        self, key: str, value: Any, overwrite: Optional[bool] = False
-    ) -> None:
-        if key in self.vars and not overwrite:
-            print(
-                f"Key '{key}' already exists in self.vars. Use update_var() to modify existing variables."
+    def update_var(self, key: str, value: Any) -> None:
+        if key not in self.vars:
+            raise ProjectError(
+                f"Key {key} does not exist in self.vars. Cannot update non-existing variable."
             )
-        else:
-            self.add_var(key, value, overwrite)
+        self.vars[key] = value
+        self.store_project()
+        print(f"Updated '{key}' of project variables and stored the project.")
+
+    def add_path(self, key: str, value: PathLike, overwrite: bool = False) -> None:
+        if key in self.paths and not overwrite:
+            raise ProjectError(
+                f"Key '{key}' already exists in self.paths. Use update_path() to modify existing variables."
+            )
+        self.paths[key] = value
+        self.store_project()
+        print(f"Added '{key}' to project paths and stored the project.")
+
+    def update_path(self, key: str, value: PathLike) -> None:
+        if key not in self.paths:
+            raise ProjectError(
+                f"Key {key} does not exist in self.paths. Cannot update non-existing path."
+            )
+        self.paths[key] = value
+        self.store_project()
+        print(f"Updated '{key}' of project paths and stored the project.")
+
+    def create_project_notebook(self) -> None:
+        pass

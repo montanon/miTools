@@ -22,6 +22,18 @@ class ArgumentStructureError(Exception):
         super().__init__(self.message)
 
 
+class ProjectError(ArgumentValueError):
+    pass
+
+
+class ProjectVersionError(ArgumentValueError):
+    pass
+
+
+class ProjectFolderError(ArgumentValueError):
+    pass
+
+
 class ColumnValidationError(ArgumentValueError):
     pass
 
