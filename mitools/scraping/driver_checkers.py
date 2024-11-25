@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Dict, List, Type
 
+from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.support import expected_conditions as EC
@@ -25,8 +26,10 @@ class AbstractElementsPresenceChecker(ABC):
                 EC.presence_of_element_located((self.by_type, identifier))
             )
             return True
-        except Exception:
+        except TimeoutException:
             return False
+        except Exception as e:
+            raise e
 
 
 class IDPresenceChecker(AbstractElementsPresenceChecker):
