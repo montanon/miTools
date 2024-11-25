@@ -31,6 +31,15 @@ from mitools.scraping.driver_finders import (
     NameFinder,
     XPathFinder,
 )
+from mitools.scraping.driver_waiters import (
+    AbstractElementsWaiter,
+    ClassNameWaiter,
+    CSSSelectorWaiter,
+    IDWaiter,
+    NameWaiter,
+    WaiterFactory,
+    XPathWaiter,
+)
 
 
 class TestPresenceCheckers(TestCase):
@@ -130,6 +139,20 @@ class TestFinders(unittest.TestCase):
         result = finder.find_element(self.driver, "test-id")
         self.assertEqual(result, self.mock_element)
         self.driver.find_element.assert_called_with(By.ID, "test-id")
+
+    def test_find_name_element_success(self):
+        self.driver.find_element.return_value = self.mock_element
+        finder = NameFinder()
+        result = finder.find_element(self.driver, "test-id")
+        self.assertEqual(result, self.mock_element)
+        self.driver.find_element.assert_called_with(By.NAME, "test-id")
+
+    def test_find_xpath_element_success(self):
+        self.driver.find_element.return_value = self.mock_element
+        finder = XPathFinder()
+        result = finder.find_element(self.driver, "test-id")
+        self.assertEqual(result, self.mock_element)
+        self.driver.find_element.assert_called_with(By.XPATH, "test-id")
 
     def test_find_element_not_found(self):
         self.driver.find_element.side_effect = NoSuchElementException()
