@@ -1,9 +1,9 @@
-from typing import Callable, Optional, Tuple
+from typing import Callable, Iterable, List, Optional, Tuple, Union
 
 import numpy as np
 from matplotlib.axes import Axes
 
-from mitools.exceptions import ArgumentTypeError
+from mitools.exceptions import ArgumentStructureError, ArgumentTypeError
 
 
 def adjust_axes_lims(
@@ -104,10 +104,23 @@ def adjust_text_axes_limits(ax: Axes, text: str) -> None:
 def adjust_ax_fontsize(ax: Axes, fontsize: int) -> None:
     if not isinstance(ax, Axes):
         raise ArgumentTypeError("ax must be an instance of matplotlib.axes.Axes")
-    if not isinstance(fontsize, int):
-        raise ArgumentTypeError(f"'fontsize'={fontsize} must be an integer")
+    if not isinstance(fontsize, (int, str)):
+        raise ArgumentTypeError(f"'fontsize'={fontsize} must be an integer or str")
     ax.xaxis.label.set_fontsize(fontsize)
     ax.yaxis.label.set_fontsize(fontsize)
+
+
+def adjust_axes_fontsize(
+    axes: Iterable[Axes], fontsizes: Union[List[int], int]
+) -> Iterable[Axes]:
+    fontsizes = [fontsizes] * len(axes) if isinstance(fontsizes, int) else fontsizes
+    if len(fontsizes) != len(axes):
+        raise ArgumentStructureError(
+            f"Length of 'fontsizes'={len(fontsizes)} must be equal to the number of axes={len(axes)}"
+        )
+    for ax, fontsize in zip(axes, fontsizes):
+        adjust_ax_fontsize(ax, fontsize)
+    return axes
 
 
 def is_ax_empty(ax: Axes) -> bool:
