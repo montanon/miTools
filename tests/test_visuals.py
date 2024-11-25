@@ -1,6 +1,10 @@
 import unittest
 from unittest import TestCase
 
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot
 import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.collections import PathCollection
@@ -9,7 +13,11 @@ from matplotlib.image import AxesImage
 from matplotlib.patches import Rectangle
 from matplotlib.text import Text
 
-from mitools.exceptions import ArgumentStructureError, ArgumentTypeError
+from mitools.exceptions import (
+    ArgumentStructureError,
+    ArgumentTypeError,
+    ArgumentValueError,
+)
 from mitools.visuals.axes_functions import (
     adjust_ax_labels_fontsize,
     adjust_ax_text_limits,
@@ -324,6 +332,125 @@ class TestAreAxesEmpty(TestCase):
     def test_single_non_empty_axes(self):
         self.ax1.plot([0, 1], [0, 1], label="Test Line")
         self.assertFalse(are_axes_empty(self.ax1))
+
+
+class TestAdjustAxTextLimits(TestCase):
+    def setUp(self):
+        fig, axes = matplotlib.pyplot.subplots(nrows=2, ncols=2)
+        self.figure = fig
+        self.ax: Axes = axes.flat[0]
+
+    def test_adjust_x_axis_with_text(self):
+        text = self.ax.text(1, 1, "Sample Text")
+        adjust_ax_text_limits(self.ax, text, axis="x")
+        xlim = self.ax.get_xlim()
+        self.assertTrue(xlim[1] >= 1, "X-axis limit should encompass the text")
+
+    def test_adjust_y_axis_with_text(self):
+        text = self.ax.text(1, 1, "Sample Text")
+        adjust_ax_text_limits(self.ax, text, axis="y")
+        ylim = self.ax.get_ylim()
+        self.assertTrue(ylim[1] >= 1, "Y-axis limit should encompass the text")
+
+    def test_adjust_both_axes_with_text(self):
+        text = self.ax.text(2, 3, "Sample Text")
+        adjust_ax_text_limits(self.ax, text, axis="both")
+        xlim = self.ax.get_xlim()
+        ylim = self.ax.get_ylim()
+        self.assertTrue(xlim[1] >= 2, "X-axis limit should encompass the text")
+        self.assertTrue(ylim[1] >= 3, "Y-axis limit should encompass the text")
+
+    def test_adjust_with_large_text(self):
+        text = self.ax.text(5, 5, "A" * 100)  # Long text
+        adjust_ax_text_limits(self.ax, text, axis="both")
+        xlim = self.ax.get_xlim()
+        ylim = self.ax.get_ylim()
+        self.assertTrue(xlim[1] >= 5, "X-axis limit should adjust for long text")
+        self.assertTrue(ylim[1] >= 5, "Y-axis limit should adjust for long text")
+
+    def test_no_change_when_text_is_within_limits(self):
+        self.ax.set_xlim(0, 10)
+        self.ax.set_ylim(0, 10)
+        text = self.ax.text(5, 5, "Centered Text")
+        adjust_ax_text_limits(self.ax, text, axis="both")
+        xlim = self.ax.get_xlim()
+        ylim = self.ax.get_ylim()
+        self.assertEqual(xlim, (0, 10), "X-axis limits should remain unchanged")
+        self.assertEqual(ylim, (0, 10), "Y-axis limits should remain unchanged")
+
+    def test_invalid_axes_argument(self):
+        with self.assertRaises(ArgumentTypeError):
+            adjust_ax_text_limits("Not an Axes object", Text(x=0, y=0, text="Invalid"))
+
+    def test_invalid_text_argument(self):
+        with self.assertRaises(ArgumentTypeError):
+            adjust_ax_text_limits(self.ax, "Not a Text object", axis="x")
+
+    def test_invalid_axis_argument(self):
+        text = self.ax.text(x=1, y=1, s="Sample Text")
+        with self.assertRaises(ArgumentValueError):
+            adjust_ax_text_limits(self.ax, text, axis="invalid")
+
+    def test_text_outside_current_limits(self):
+        self.ax.set_xlim(0, 1)
+        self.ax.set_ylim(0, 1)
+        text = self.ax.text(2, 2, "Out of bounds")
+        adjust_ax_text_limits(self.ax, text, axis="both")
+        xlim = self.ax.get_xlim()
+        ylim = self.ax.get_ylim()
+        self.assertTrue(
+            xlim[1] >= 2, "X-axis limit should adjust to encompass the text"
+        )
+        self.assertTrue(
+            ylim[1] >= 2, "Y-axis limit should adjust to encompass the text"
+        )
+
+    def test_text_at_edge_of_limits(self):
+        self.ax.set_xlim(0, 5)
+        self.ax.set_ylim(0, 5)
+        text = self.ax.text(5, 5, "Edge Text")
+        adjust_ax_text_limits(self.ax, text, axis="both")
+        xlim = self.ax.get_xlim()
+        ylim = self.ax.get_ylim()
+        self.assertTrue(
+            xlim[1] >= 5, "X-axis limit should remain or expand to encompass the text"
+        )
+        self.assertTrue(
+            ylim[1] >= 5, "Y-axis limit should remain or expand to encompass the text"
+        )
+
+    def test_adjust_axis_with_multiple_texts(self):
+        self.ax.text(2, 2, "Text 1")
+        text2 = self.ax.text(6, 6, "Text 2")
+        adjust_ax_text_limits(self.ax, text2, axis="both")
+        xlim = self.ax.get_xlim()
+        ylim = self.ax.get_ylim()
+        self.assertTrue(xlim[1] >= 6, "X-axis limit should adjust to the farthest text")
+        self.assertTrue(ylim[1] >= 6, "Y-axis limit should adjust to the farthest text")
+
+    def test_adjust_after_canvas_clear(self):
+        text = self.ax.text(1, 1, "Sample Text")
+        self.figure.canvas.draw()
+        adjust_ax_text_limits(self.ax, text, axis="x")
+        xlim = self.ax.get_xlim()
+        self.assertTrue(
+            xlim[1] >= 1, "X-axis limit should adjust even after canvas draw"
+        )
+
+    def test_adjust_with_subplots(self):
+        fig, (ax1, ax2) = matplotlib.pyplot.subplots(nrows=1, ncols=2)
+        text1 = ax1.text(3, 3, "Subplot 1 Text")
+        text2 = ax2.text(5, 5, "Subplot 2 Text")
+        adjust_ax_text_limits(ax1, text1, axis="both")
+        adjust_ax_text_limits(ax2, text2, axis="both")
+        xlim1 = ax1.get_xlim()
+        ylim1 = ax1.get_ylim()
+        xlim2 = ax2.get_xlim()
+        ylim2 = ax2.get_ylim()
+        self.assertTrue(xlim1[1] >= 3, "Ax1 X-axis should adjust for text")
+        self.assertTrue(ylim1[1] >= 3, "Ax1 Y-axis should adjust for text")
+        self.assertTrue(xlim2[1] >= 5, "Ax2 X-axis should adjust for text")
+        self.assertTrue(ylim2[1] >= 5, "Ax2 Y-axis should adjust for text")
 
 
 if __name__ == "__main__":

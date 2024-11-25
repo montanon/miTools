@@ -4,7 +4,11 @@ import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.text import Text
 
-from mitools.exceptions import ArgumentStructureError, ArgumentTypeError
+from mitools.exceptions import (
+    ArgumentStructureError,
+    ArgumentTypeError,
+    ArgumentValueError,
+)
 
 FONTSIZES = ["xx-small", "x-small", "small", "medium", "large", "x-large", "xx-large"]
 
@@ -103,19 +107,55 @@ def adjust_ax_text_limits(
             "The 'ax' parameter must be an instance of matplotlib.axes.Axes."
         )
     if not isinstance(text, Text):
-        raise TypeError(
+        raise ArgumentTypeError(
             "The 'text' parameter must be an instance of matplotlib.text.Text."
         )
+    if axis not in ("x", "y", "both"):
+        raise ArgumentValueError(
+            "The 'axis' parameter must be one of 'x', 'y', or 'both'."
+        )
     ax.figure.canvas.draw()
-    bbox = text.get_window_extent(renderer=ax.figure.canvas.get_renderer())
+    renderer = ax.figure.canvas.get_renderer()
+    bbox = text.get_window_extent(renderer=renderer)
     bbox_transformed = bbox.transformed(ax.transData.inverted())
     if axis in ("x", "both"):
-        right_x = bbox_transformed.x1
-        ax.set_xlim(ax.get_xlim()[0], right_x)
+        current_xlim = ax.get_xlim()
+        if (
+            bbox_transformed.x1 > current_xlim[1]
+            or bbox_transformed.x0 < current_xlim[0]
+        ):
+            ax.set_xlim(
+                min(bbox_transformed.x0, current_xlim[0]),
+                max(bbox_transformed.x1, current_xlim[1]),
+            )
     if axis in ("y", "both"):
-        top_y = bbox_transformed.y1
-        ax.set_ylim(ax.get_ylim()[0], top_y)
+        current_ylim = ax.get_ylim()
+        if (
+            bbox_transformed.y1 > current_ylim[1]
+            or bbox_transformed.y0 < current_ylim[0]
+        ):
+            ax.set_ylim(
+                min(bbox_transformed.y0, current_ylim[0]),
+                max(bbox_transformed.y1, current_ylim[1]),
+            )
+
     return ax
+
+
+def adjust_axes_text_limits(
+    axes: Union[Iterable[Axes], Axes],
+    texts: Union[Iterable[Text], Text],
+    axis: Literal["x", "y", "both"] = "both",
+) -> Iterable[Axes]:
+    axes = [axes] if isinstance(axes, Axes) else axes
+    texts = [texts] if isinstance(texts, Text) else texts
+    if len(axes) != len(texts):
+        raise ArgumentStructureError(
+            f"The number of axes={len(axes)} must be equal to the number of texts={len(texts)}"
+        )
+    for ax, text in zip(axes, texts):
+        adjust_ax_text_limits(ax, text, axis)
+    return axes
 
 
 def adjust_ax_labels_fontsize(
