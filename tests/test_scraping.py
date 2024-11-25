@@ -14,6 +14,7 @@ from mitools.exceptions import (
     WebScraperError,
     WebScraperTimeoutError,
 )
+from mitools.scraping.driver import DriverHandler
 from mitools.scraping.driver_checkers import (
     AbstractElementsPresenceChecker,
     ClassNamePresenceChecker,
@@ -314,6 +315,84 @@ class TestWaiters(TestCase):
     def test_default_convert_identifier(self):
         waiter = IDWaiter()
         self.assertEqual(waiter.convert_identifier("test-id"), "test-id")
+
+
+class MockWebDriver2:
+    def __init__(self):
+        self.current_url = ""
+        self._window_handles = ["tab1"]
+        self.active_window = "tab1"
+        self.elements = {}
+        self.requests = []
+
+    def get(self, url: str):
+        self.current_url = url
+
+    def find_element(self, by: str, value: str):
+        if (by, value) in self.elements:
+            return self.elements[(by, value)]
+        raise TimeoutException(f"Element not found: {value}")
+
+    def find_elements(self, by: str, value: str):
+        return [
+            element
+            for (b, v), element in self.elements.items()
+            if b == by and v == value
+        ]
+
+    def switch_to(self):
+        return self
+
+    def window(self, handle: str):
+        if handle in self.window_handles:
+            self.active_window = handle
+        else:
+            raise ValueError(f"No such window: {handle}")
+
+    def close(self):
+        if self.active_window in self.window_handles:
+            self.window_handles.remove(self.active_window)
+            if self.window_handles:
+                self.active_window = self.window_handles[0]
+        else:
+            raise ValueError(f"Cannot close non-existent window: {self.active_window}")
+
+    @property
+    def window_handles(self):
+        return self._window_handles
+
+
+class MockWebElement:
+    def __init__(self, text: str = "", tag_name: str = "div"):
+        self.text = text
+        self.tag_name = tag_name
+        self.selected_options = []
+        self.all_options = []
+        self.input_value = ""
+
+    def click(self):
+        pass
+
+    def send_keys(self, text: str):
+        self.input_value = text
+
+    def find_element(self, by: str, value: str):
+        return MockWebElement()
+
+    def find_elements(self, by: str, value: str):
+        return [MockWebElement() for _ in range(3)]
+
+
+class TestDriverHandler(TestCase):
+    def setUp(self):
+        self.driver = MockWebDriver2()
+        self.handler = DriverHandler(use_options=True)
+        self.handler.driver = self.driver
+
+    def test_load_link_and_wait(self):
+        self.driver.elements[(By.ID, "test-id")] = MockWebElement()
+        self.handler.load_link_and_wait("http://example.com", id_to_wait_for="test-id")
+        self.assertEqual(self.driver.current_url, "http://example.com")
 
 
 if __name__ == "__main__":
