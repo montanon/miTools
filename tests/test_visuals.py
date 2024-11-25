@@ -11,7 +11,7 @@ from matplotlib.text import Text
 
 from mitools.exceptions import ArgumentTypeError
 from mitools.visuals.axes_functions import (
-    adjust_ax_fontsize,
+    adjust_ax_labels_fontsize,
     adjust_axes_lims,
     adjust_text_axes_limits,
     get_axes_limits,
@@ -100,34 +100,34 @@ class TestAdjustAxFontsize(TestCase):
     def test_valid_input(self):
         self.ax.set_xlabel("Test X")
         self.ax.set_ylabel("Test Y")
-        adjust_ax_fontsize(self.ax, fontsize=20)
+        adjust_ax_labels_fontsize(self.ax, fontsize=20)
 
         self.assertEqual(self.ax.xaxis.label.get_fontsize(), 20)
         self.assertEqual(self.ax.yaxis.label.get_fontsize(), 20)
 
     def test_no_labels_set(self):
-        adjust_ax_fontsize(self.ax, fontsize=15)
+        adjust_ax_labels_fontsize(self.ax, fontsize=15)
         self.assertEqual(self.ax.xaxis.label.get_fontsize(), 15)
         self.assertEqual(self.ax.yaxis.label.get_fontsize(), 15)
         self.assertEqual(self.ax.get_xlabel(), "")
         self.assertEqual(self.ax.get_ylabel(), "")
 
     def test_empty_axes(self):
-        adjust_ax_fontsize(self.ax, fontsize=10)
+        adjust_ax_labels_fontsize(self.ax, fontsize=10)
         self.assertEqual(self.ax.xaxis.label.get_fontsize(), 10)
         self.assertEqual(self.ax.yaxis.label.get_fontsize(), 10)
 
     def test_none_axes(self):
         with self.assertRaises(ArgumentTypeError):
-            adjust_ax_fontsize(None, fontsize=12)
+            adjust_ax_labels_fontsize(None, fontsize=12)
 
     def test_boundary_font_sizes(self):
         self.ax.set_xlabel("Boundary Test")
         self.ax.set_ylabel("Boundary Test")
-        adjust_ax_fontsize(self.ax, fontsize=1)
+        adjust_ax_labels_fontsize(self.ax, fontsize=1)
         self.assertEqual(self.ax.xaxis.label.get_fontsize(), 1)
         self.assertEqual(self.ax.yaxis.label.get_fontsize(), 1)
-        adjust_ax_fontsize(self.ax, fontsize=100)
+        adjust_ax_labels_fontsize(self.ax, fontsize=100)
         self.assertEqual(self.ax.xaxis.label.get_fontsize(), 100)
         self.assertEqual(self.ax.yaxis.label.get_fontsize(), 100)
 
@@ -135,9 +135,9 @@ class TestAdjustAxFontsize(TestCase):
         self.ax.set_xlabel("Invalid Fontsize Test")
         self.ax.set_ylabel("Invalid Fontsize Test")
         with self.assertRaises(ArgumentTypeError):
-            adjust_ax_fontsize(self.ax, fontsize="large")  # Invalid type
+            adjust_ax_labels_fontsize(self.ax, fontsize="large")  # Invalid type
         with self.assertRaises(ArgumentTypeError):
-            adjust_ax_fontsize(self.ax, fontsize=None)  # Invalid type
+            adjust_ax_labels_fontsize(self.ax, fontsize=None)  # Invalid type
 
 
 if __name__ == "__main__":

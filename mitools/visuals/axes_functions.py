@@ -101,7 +101,7 @@ def adjust_text_axes_limits(ax: Axes, text: str) -> None:
     ax.autoscale(enable=True, axis="both", tight=False)
 
 
-def adjust_ax_fontsize(ax: Axes, fontsize: int) -> None:
+def adjust_ax_labels_fontsize(ax: Axes, fontsize: int) -> None:
     if not isinstance(ax, Axes):
         raise ArgumentTypeError("ax must be an instance of matplotlib.axes.Axes")
     if not isinstance(fontsize, (int, str)):
@@ -110,7 +110,7 @@ def adjust_ax_fontsize(ax: Axes, fontsize: int) -> None:
     ax.yaxis.label.set_fontsize(fontsize)
 
 
-def adjust_axes_fontsize(
+def adjust_axes_labels_fontsize(
     axes: Iterable[Axes], fontsizes: Union[List[int], int]
 ) -> Iterable[Axes]:
     fontsizes = [fontsizes] * len(axes) if isinstance(fontsizes, int) else fontsizes
@@ -119,7 +119,7 @@ def adjust_axes_fontsize(
             f"Length of 'fontsizes'={len(fontsizes)} must be equal to the number of axes={len(axes)}"
         )
     for ax, fontsize in zip(axes, fontsizes):
-        adjust_ax_fontsize(ax, fontsize)
+        adjust_ax_labels_fontsize(ax, fontsize)
     return axes
 
 
