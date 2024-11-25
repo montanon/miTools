@@ -2,13 +2,17 @@ import unittest
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
-from selenium.common.exceptions import TimeoutException
+from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from selenium.webdriver.common.by import By
-from selenium.webdriver.remote.webdriver import WebDriver
+from selenium.webdriver.remote.webdriver import WebDriver, WebElement
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
-from mitools.exceptions import WebScraperError, WebScraperTimeoutError
+from mitools.exceptions import (
+    WebElementNotFoundError,
+    WebScraperError,
+    WebScraperTimeoutError,
+)
 from mitools.scraping.driver_checkers import (
     AbstractElementsPresenceChecker,
     ClassNamePresenceChecker,
@@ -18,9 +22,18 @@ from mitools.scraping.driver_checkers import (
     PresenceCheckerFactory,
     XPathPresenceChecker,
 )
+from mitools.scraping.driver_finders import (
+    AbstractElementsFinder,
+    ClassNameFinder,
+    CSSSelectorFinder,
+    FinderFactory,
+    IDFinder,
+    NameFinder,
+    XPathFinder,
+)
 
 
-class TestPresenceCheckers(unittest.TestCase):
+class TestPresenceCheckers(TestCase):
     def setUp(self):
         self.driver = MagicMock(spec=WebDriver)
         self.mock_elements = [MagicMock(), MagicMock()]  # Simulate multiple elements
@@ -96,6 +109,83 @@ class TestPresenceCheckers(unittest.TestCase):
         self.driver.find_elements.return_value = self.mock_elements
         self.assertTrue(checker.is_element_present(self.driver, "test class"))
         self.driver.find_elements.assert_called_with(By.CSS_SELECTOR, ".test.class")
+
+
+class TestFinders(unittest.TestCase):
+    def setUp(self):
+        self.driver = MagicMock(spec=WebDriver)
+        self.mock_element = MagicMock(spec=WebElement)
+        self.mock_elements = [
+            self.mock_element,
+            self.mock_element,
+        ]  # Simulate multiple elements
+        self.wait_patch = patch("selenium.webdriver.support.ui.WebDriverWait").start()
+        self.mock_wait = self.wait_patch.return_value
+        self.addCleanup(patch.stopall)
+        self.factory = FinderFactory()
+
+    def test_find_element_success(self):
+        self.driver.find_element.return_value = self.mock_element
+        finder = IDFinder()
+        result = finder.find_element(self.driver, "test-id")
+        self.assertEqual(result, self.mock_element)
+        self.driver.find_element.assert_called_with(By.ID, "test-id")
+
+    def test_find_element_not_found(self):
+        self.driver.find_element.side_effect = NoSuchElementException()
+        finder = IDFinder()
+        with self.assertRaises(WebElementNotFoundError):
+            finder.try_find_element(self.driver, "nonexistent-id")
+
+    def test_find_elements_success(self):
+        self.driver.find_elements.return_value = self.mock_elements
+        finder = ClassNameFinder()
+        results = finder.find_elements(self.driver, "test-class")
+        self.assertEqual(results, self.mock_elements)
+        self.driver.find_elements.assert_called_with(By.CLASS_NAME, "test-class")
+
+    def test_css_selector_conversion(self):
+        self.driver.find_element.return_value = self.mock_element
+        finder = CSSSelectorFinder()
+        result = finder.find_element(self.driver, "test class")
+        self.assertEqual(result, self.mock_element)
+        self.driver.find_element.assert_called_with(By.CSS_SELECTOR, ".test.class")
+
+    def test_factory_create_valid_finder(self):
+        finder = self.factory.create("id")
+        self.assertIsInstance(finder, IDFinder)
+
+        finder = self.factory.create("css")
+        self.assertIsInstance(finder, CSSSelectorFinder)
+
+    def test_factory_create_invalid_finder(self):
+        with self.assertRaises(ValueError):
+            self.factory.create("invalid")
+
+    def test_factory_register_custom_finder(self):
+        class TagNameFinder(AbstractElementsFinder):
+            @property
+            def by_type(self):
+                return By.TAG_NAME
+
+        self.factory.register_finder("tag", TagNameFinder)
+        finder = self.factory.create("tag")
+        self.assertIsInstance(finder, TagNameFinder)
+
+    def test_factory_creators_list(self):
+        creators = self.factory.creators
+        self.assertIn("id", creators)
+        self.assertIn("css", creators)
+        self.assertIn("xpath", creators)
+
+    def test_convert_identifier_override(self):
+        finder = CSSSelectorFinder()
+        converted = finder.convert_identifier("test class")
+        self.assertEqual(converted, ".test.class")
+
+    def test_default_convert_identifier(self):
+        finder = IDFinder()
+        self.assertEqual(finder.convert_identifier("test-id"), "test-id")
 
 
 if __name__ == "__main__":
