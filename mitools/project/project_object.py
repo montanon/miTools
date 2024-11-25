@@ -17,8 +17,8 @@ from mitools.utils import build_dir_tree
 PROJECT_FILENAME = Path("project.pkl")
 PROJECT_FOLDER = Path(".project")
 PROJECT_NOTEBOOK = "Project.ipynb"
-PROJECT_ARCHIVE = PROJECT_FOLDER / ".archive"
-PROJECT_BACKUP = PROJECT_FOLDER / ".backup"
+PROJECT_ARCHIVE = ".archive"
+PROJECT_BACKUP = ".backup"
 NOT_IN_NOTEBOOK = (
     "Project object can only be initialized inside the respective Project Notebook={}."
 )
@@ -45,6 +45,8 @@ class Project:
         version: str = "v0",
         logger: Logger = None,
     ):
+        if not isinstance(project_name, str) or not project_name:
+            raise ProjectError(f"Project 'root'={root} must be a non-empty string.")
         self.root = Path(root).absolute()
         if self.root.exists() and not self.root.is_dir():
             raise ProjectFolderError(f"{self.root} is not a directory")
@@ -56,6 +58,7 @@ class Project:
         self.project_folder = self.folder / PROJECT_FOLDER
         self.project_file = self.folder / PROJECT_FILENAME
         self.project_notebook = self.folder / PROJECT_NOTEBOOK
+        self.backup_folder = self.folder / PROJECT_BACKUP
         self.create_main_folder()
         self.version = version
         self.version_folder = self.folder / self.version
@@ -77,7 +80,11 @@ class Project:
         self.version_folder.mkdir(parents=True, exist_ok=True)
 
     def get_all_versions(self) -> List[str]:
-        return [d.name for d in self.folder.iterdir() if d.is_dir()]
+        return [
+            d.name
+            for d in self.folder.iterdir()
+            if d.is_dir() and not d.name.startswith(".")
+        ]
 
     def folder_path_dict(self) -> List[str]:
         return {
@@ -96,8 +103,8 @@ class Project:
         version_path = self.folder / version
         if not version_path.exists():
             version_path.mkdir(parents=True, exist_ok=True)
-            self.add_version_metadata(version, description)
             self.update_info()
+            self.add_version_metadata(version, description)
         else:
             raise ProjectVersionError(
                 f"Version {version} already exists in Project {self.name}. Existing versions: [{self.versions}]"
@@ -114,9 +121,9 @@ class Project:
             raise ProjectError(
                 f"Version {version} does not exist in Project {self.name} with version {self.versions}"
             )
-        self.version_metadata[version] = VersionInfo(
-            name=version,
-            created_at=datetime.now(),
+        self.versions_metadata[version] = VersionInfo(
+            version=version,
+            creation=datetime.now(),
             description=description,
         )
         self.store_project()
@@ -185,20 +192,18 @@ class Project:
         version_path = self.folder / version
         archive_path.parent.mkdir(exist_ok=True)
         shutil.move(str(version_path), str(archive_path))
-        if self.auto_save:
-            self.store_project()
+        self.store_project()
 
     def restore_version(self, version: str) -> None:
-        archive_path = self.folder / "_archived" / version
+        archive_path = self.folder / PROJECT_ARCHIVE / version
         if not archive_path.exists():
             raise ProjectError(
-                f"Archived version {version} not found in Archive: {PROJECT_ARCHIVE}"
+                f"Archived version {version} not found in Archive: {self.folder / PROJECT_ARCHIVE}"
             )
         version_path = self.folder / version
         shutil.move(str(archive_path), str(version_path))
-        self.version_metadata[version].state = VersionState.ACTIVE
-        if self.auto_save:
-            self.store_project()
+        self.versions_metadata[version].state = VersionState.ACTIVE
+        self.store_project()
 
     def reset_version(self, version: str) -> None:
         self.delete_version(version)
@@ -234,11 +239,6 @@ class Project:
                 and path.parent != PROJECT_BACKUP
             ):
                 path.unlink()
-
-    def create_backup(self):
-        backup_name = f"{self.name}_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        backup_path = PROJECT_BACKUP / backup_name
-        shutil.copytree(self.folder, backup_path)
 
     def delete_file(self, file_name: str, subfolder: str = None) -> None:
         subfolder_path = self.version_folder / subfolder

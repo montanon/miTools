@@ -1,1 +1,1 @@
-from .project_object import Project
+from .project_object import Project, VersionInfo, VersionState
