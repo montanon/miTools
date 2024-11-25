@@ -1,12 +1,15 @@
 import os
 
 from selenium import webdriver
+from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.support.ui import Select
 from seleniumrequests import Chrome
 
-from .driver_checkers import *
-from .driver_finders import *
-from .driver_waiters import *
+from mitools.exceptions import WebScraperTimeoutError
+
+from .driver_checkers import PresenceCheckerFactory
+from .driver_finders import FinderFactory
+from .driver_waiters import WaiterFactory
 
 CHROME_DRIVER = "~/WebBrowser_Drivers/chromedriver"
 DOWNLOADS_DIRECTORY = os.path.expanduser("~/Downloads")
@@ -59,7 +62,7 @@ class DriverHandler:
 
     def _set_creator_attribute(self, creator, factory, factory_name):
         attribute_name = f"{creator}_{factory_name}"
-        setattr(self, attribute_name, factory.get_object(creator))
+        setattr(self, attribute_name, factory.create(creator))
         return getattr(self, attribute_name)
 
     def _set_creator_methods(self, creator, attribute):
@@ -83,7 +86,7 @@ class DriverHandler:
         try:
             self.load_link_and_wait(link, id_to_wait_for)
         except TimeoutException as e:
-            raise TimeoutException(e)
+            raise WebScraperTimeoutError(e)
 
     def load_link_and_wait(self, link, id_to_wait_for=None):
         self.link = link

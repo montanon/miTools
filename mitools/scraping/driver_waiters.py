@@ -82,7 +82,7 @@ class WaiterFactory:
             "xpath": XPathWaiter,
         }
 
-    def create_waiter(self, selector: str) -> AbstractElementsWaiter:
+    def create(self, selector: str) -> AbstractElementsWaiter:
         creator = self._creators.get(selector)
         if not creator:
             raise WebScraperError("Invalid selector")

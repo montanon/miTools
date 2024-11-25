@@ -80,7 +80,7 @@ class PresenceCheckerFactory:
             "xpath": XPathPresenceChecker,
         }
 
-    def create_checker(self, selector: str) -> AbstractElementsPresenceChecker:
+    def create(self, selector: str) -> AbstractElementsPresenceChecker:
         creator = self._creators.get(selector)
         if not creator:
             raise ArgumentValueError(f"Invalid selector type: {selector}")
