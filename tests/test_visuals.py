@@ -15,6 +15,7 @@ from mitools.visuals.axes_functions import (
     adjust_axes_labels_fontsize,
     adjust_axes_lims,
     adjust_text_axes_limits,
+    are_axes_empty,
     get_axes_limits,
     is_ax_empty,
     set_axes_limits,
@@ -160,8 +161,8 @@ class TestAdjustAxesLabelsFontsize(TestCase):
             self.assertEqual(ax.yaxis.label.get_fontsize(), 15)
 
     def test_single_ax_fontsize(self):
-        adjust_axes_labels_fontsize(self.axes.flat[0], fontsizes=15)
-        for ax in self.axes.flat[:1]:
+        adjust_axes_labels_fontsize(self.axes[0], fontsizes=15)
+        for ax in self.axes[:1]:
             self.assertEqual(ax.xaxis.label.get_fontsize(), 15)
             self.assertEqual(ax.yaxis.label.get_fontsize(), 15)
 
@@ -225,6 +226,104 @@ class TestAdjustAxesLabelsFontsize(TestCase):
         self.assertEqual(self.ax1.yaxis.label.get_fontsize(), 16)
         self.assertEqual(self.ax2.xaxis.label.get_fontsize(), 18)
         self.assertEqual(self.ax2.yaxis.label.get_fontsize(), 18)
+
+
+class TestAreAxesEmpty(TestCase):
+    def setUp(self):
+        self.figure = Figure()
+        self.ax1 = self.figure.add_subplot(211)
+        self.ax2 = self.figure.add_subplot(212)
+        self.axes = [self.ax1, self.ax2]
+
+    def test_all_empty_axes(self):
+        self.assertTrue(are_axes_empty(self.axes))
+
+    def test_one_non_empty_axes(self):
+        self.ax1.plot([0, 1], [0, 1], label="Test Line")
+        self.assertFalse(are_axes_empty(self.axes))
+
+    def test_all_non_empty_axes(self):
+        self.ax1.plot([0, 1], [0, 1], label="Test Line")
+        self.ax2.set_xlabel("Test Label")
+        self.assertFalse(are_axes_empty(self.axes))
+
+    def test_empty_single_ax(self):
+        self.assertTrue(are_axes_empty(self.ax1))
+
+    def test_non_empty_single_ax(self):
+        self.ax1.plot([0, 1], [0, 1], label="Test Line")
+        self.assertFalse(are_axes_empty(self.ax1))
+
+    def test_axes_with_lines(self):
+        self.ax1.plot([0, 1], [0, 1], label="Test Line")
+        self.assertFalse(are_axes_empty(self.axes))
+
+    def test_axes_with_patches(self):
+        rect = Rectangle((0, 0), 1, 1)
+        self.ax1.add_patch(rect)
+        self.assertFalse(are_axes_empty(self.axes))
+
+    def test_axes_with_collections(self):
+        x = np.random.rand(10)
+        y = np.random.rand(10)
+        self.ax2.scatter(x, y)
+        self.assertFalse(are_axes_empty(self.axes))
+
+    def test_axes_with_texts(self):
+        self.ax1.text(0.5, 0.5, "Test Text")
+        self.assertFalse(are_axes_empty(self.axes))
+
+    def test_axes_with_images(self):
+        data = np.random.rand(10, 10)
+        self.ax2.imshow(data)
+        self.assertFalse(are_axes_empty(self.axes))
+
+    def test_axes_with_labels(self):
+        self.ax1.set_xlabel("X-axis Label")
+        self.ax2.set_ylabel("Y-axis Label")
+        self.assertFalse(are_axes_empty(self.axes))
+
+    def test_axes_with_titles(self):
+        self.ax1.set_title("Test Title")
+        self.assertFalse(are_axes_empty(self.axes))
+
+    def test_axes_with_legend(self):
+        self.ax1.plot([0, 1], [0, 1], label="Test Line")
+        self.ax1.legend()
+        self.assertFalse(are_axes_empty(self.axes))
+
+    def test_axes_mixed_content(self):
+        self.ax1.plot([0, 1], [0, 1], label="Test Line")
+        self.assertFalse(are_axes_empty(self.axes))
+
+    def test_all_cleared_axes(self):
+        self.ax1.plot([0, 1], [0, 1], label="Test Line")
+        self.ax2.set_xlabel("X-axis Label")
+        self.ax1.cla()
+        self.ax2.cla()
+        self.assertTrue(are_axes_empty(self.axes))
+
+    def test_invalid_input(self):
+        with self.assertRaises(ArgumentTypeError):
+            are_axes_empty("Not an Axes object")
+        with self.assertRaises(ArgumentTypeError):
+            are_axes_empty(None)
+        with self.assertRaises(ArgumentTypeError):
+            are_axes_empty([self.ax1, "Invalid Type"])
+
+    def test_empty_axes_iterable(self):
+        self.assertTrue(are_axes_empty([]))
+
+    def test_mixed_empty_and_non_empty_axes(self):
+        self.ax1.plot([0, 1], [0, 1], label="Test Line")
+        self.assertFalse(are_axes_empty(self.axes))
+
+    def test_single_empty_axes(self):
+        self.assertTrue(are_axes_empty(self.ax1))
+
+    def test_single_non_empty_axes(self):
+        self.ax1.plot([0, 1], [0, 1], label="Test Line")
+        self.assertFalse(are_axes_empty(self.ax1))
 
 
 if __name__ == "__main__":

@@ -106,7 +106,7 @@ def adjust_text_axes_limits(ax: Axes, text: str) -> None:
 def adjust_ax_labels_fontsize(
     ax: Axes,
     fontsize: Union[int, str],
-) -> None:
+) -> Axes:
     if not isinstance(ax, Axes):
         raise ArgumentTypeError("ax must be an instance of matplotlib.axes.Axes")
     if not isinstance(fontsize, int) and fontsize not in FONTSIZES:
@@ -147,9 +147,18 @@ def is_ax_empty(ax: Axes) -> bool:
         or ax.get_xlabel()
         or ax.get_ylabel()
         or ax.get_legend()
+        or ax.get_title()
     )
 
 
 def are_axes_empty(axes: Union[Iterable[Axes], Axes]) -> bool:
-    axes = [axes] if isinstance(axes, Axes) else axes
+    axes = [axes] if axes is not None and isinstance(axes, Axes) else axes
+    if (
+        axes is None
+        or not isinstance(axes, list)
+        and not all(isinstance(ax, Axes) for ax in axes)
+    ):
+        raise ArgumentTypeError(
+            "axes must be an instance of matplotlib.axes.Axes or an iterable of such instances"
+        )
     return all(is_ax_empty(ax) for ax in axes)
