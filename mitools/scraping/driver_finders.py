@@ -124,7 +124,7 @@ class FinderFactory:
             "xpath": XPathFinder,
         }
 
-    def get_object(self, selector: str) -> AbstractElementsFinder:
+    def create_finder(self, selector: str) -> AbstractElementsFinder:
         creator = self._creators.get(selector)
         if not creator:
             raise ValueError("Invalid selector")

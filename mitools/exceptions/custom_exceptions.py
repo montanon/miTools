@@ -22,6 +22,24 @@ class ArgumentStructureError(Exception):
         super().__init__(self.message)
 
 
+class ArgumentTimeoutError(Exception):
+    def __init__(self, message):
+        self.message = message
+        super().__init__(self.message)
+
+
+class WebScraperError(ArgumentValueError):
+    pass
+
+
+class WebScraperTimeoutError(ArgumentTimeoutError):
+    pass
+
+
+class ElementNotFoundError(WebScraperError):
+    pass
+
+
 class ProjectError(ArgumentValueError):
     pass
 
