@@ -111,15 +111,13 @@ def adjust_axes_labels(ax: Axes, fontsize: int) -> None:
 def is_ax_empty(ax: Axes) -> bool:
     if not isinstance(ax, Axes):
         raise ArgumentTypeError("ax must be an instance of matplotlib.axes.Axes")
-    return not (ax.lines or ax.patches or ax.collections or ax.texts or ax.images)
-
-
-def is_axes_empty(ax: Axes) -> bool:
-    return (
-        len(ax.get_lines()) == 0
-        and len(ax.patches) == 0
-        and len(ax.texts) == 0
-        and ax.get_legend() is None
-        and not ax.get_xlabel()
-        and not ax.get_ylabel()
+    return not (
+        ax.lines
+        or ax.patches
+        or ax.collections
+        or ax.texts
+        or ax.images
+        or ax.get_xlabel()
+        or ax.get_ylabel()
+        or ax.get_legend()
     )
