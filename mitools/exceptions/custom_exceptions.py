@@ -36,7 +36,7 @@ class WebScraperTimeoutError(ArgumentTimeoutError):
     pass
 
 
-class ElementNotFoundError(WebScraperError):
+class WebElementNotFoundError(WebScraperError):
     pass
 
 

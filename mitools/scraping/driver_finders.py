@@ -7,7 +7,7 @@ from selenium.webdriver.remote.webdriver import WebDriver, WebElement
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
-from mitools.exceptions import ElementNotFoundError, WebScraperTimeoutError
+from mitools.exceptions import WebElementNotFoundError, WebScraperTimeoutError
 
 
 class AbstractElementsFinder(ABC):
@@ -20,7 +20,7 @@ class AbstractElementsFinder(ABC):
         try:
             self.find_element(driver, identifier)
         except NoSuchElementException as e:
-            raise ElementNotFoundError(
+            raise WebElementNotFoundError(
                 f"""No element found with {self.by_type} = {identifier}\n\n
                 Exception: {e}"""
             )
@@ -54,7 +54,7 @@ class AbstractElementsFinder(ABC):
         try:
             self.find_elements(driver, identifier)
         except NoSuchElementException as e:
-            raise ElementNotFoundError(
+            raise WebElementNotFoundError(
                 f"""No elements found with {self.by_type} = {identifier}\n\n
                 Exception: {e}"""
             )
