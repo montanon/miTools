@@ -88,7 +88,7 @@ class DriverHandler:
         for method_name, method in self._get_callable_methods(attribute):
             setattr(self, f"{method_name}_{creator}", self.method_wrapper(method))
 
-    def _get_callable_methods(self, attribute: str) -> Generator[str, Callable]:
+    def _get_callable_methods(self, attribute: str) -> Generator:
         for method_name in dir(attribute):
             if not method_name.startswith("__"):
                 method = getattr(attribute, method_name)
