@@ -33,7 +33,6 @@ from mitools.scraping.driver_finders import (
     XPathFinder,
 )
 from mitools.scraping.driver_waiters import (
-    AbstractElementsWaiter,
     ClassNameWaiter,
     CSSSelectorWaiter,
     IDWaiter,
@@ -268,6 +267,11 @@ class TestWaiters(TestCase):
     def test_css_selector_conversion(self):
         waiter = CSSSelectorWaiter()
         self.assertEqual(waiter.convert_identifier("test class"), ".test.class")
+
+    def test_wait_for_element_class_name_success(self):
+        waiter = ClassNameWaiter()
+        result = waiter.wait_for_element(self.driver, "test-class", wait_time=1)
+        self.assertEqual(result, "Element with class name")
 
     def test_wait_for_element_css_success(self):
         waiter = CSSSelectorWaiter()
