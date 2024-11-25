@@ -16,12 +16,11 @@ from mitools.visuals.axes_functions import (
     adjust_text_axes_limits,
     get_axes_limits,
     is_ax_empty,
-    is_axes_empty,
     set_axes_limits,
 )
 
 
-class TestIsAxEmpty(unittest.TestCase):
+class TestIsAxEmpty(TestCase):
     def setUp(self):
         self.figure = Figure()
         self.ax = self.figure.add_subplot(111)
@@ -53,6 +52,19 @@ class TestIsAxEmpty(unittest.TestCase):
         self.ax.imshow(data)
         self.assertFalse(is_ax_empty(self.ax))
 
+    def test_axes_with_xlabel(self):
+        self.ax.set_xlabel("X-axis Label")
+        self.assertFalse(is_ax_empty(self.ax))
+
+    def test_axes_with_ylabel(self):
+        self.ax.set_ylabel("Y-axis Label")
+        self.assertFalse(is_ax_empty(self.ax))
+
+    def test_axes_with_legend(self):
+        self.ax.plot([0, 1], [0, 1], label="Test Line")
+        self.ax.legend()
+        self.assertFalse(is_ax_empty(self.ax))
+
     def test_axes_with_multiple_elements(self):
         self.ax.plot([0, 1], [0, 1], label="Test Line")
         self.ax.text(0.5, 0.5, "Test Text")
@@ -74,7 +86,7 @@ class TestIsAxEmpty(unittest.TestCase):
         self.ax.set_title("Test Title")
         self.ax.set_xlabel("X-axis Label")
         self.ax.set_ylabel("Y-axis Label")
-        self.assertTrue(is_ax_empty(self.ax))
+        self.assertFalse(is_ax_empty(self.ax))
 
     def test_axes_with_spines_and_ticks(self):
         self.assertTrue(is_ax_empty(self.ax))
