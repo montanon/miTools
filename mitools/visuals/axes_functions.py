@@ -3,6 +3,8 @@ from typing import Callable, Optional, Tuple
 import numpy as np
 from matplotlib.axes import Axes
 
+from mitools.exceptions import ArgumentTypeError
+
 
 def adjust_axes_lims(
     axes: Axes,
@@ -107,7 +109,9 @@ def adjust_axes_labels(ax: Axes, fontsize: int) -> None:
 
 
 def is_ax_empty(ax: Axes) -> bool:
-    return not (ax.lines or ax.patches or ax.collections)
+    if not isinstance(ax, Axes):
+        raise ArgumentTypeError("ax must be an instance of matplotlib.axes.Axes")
+    return not (ax.lines or ax.patches or ax.collections or ax.texts or ax.images)
 
 
 def is_axes_empty(ax: Axes) -> bool:
