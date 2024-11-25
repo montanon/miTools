@@ -2,6 +2,7 @@ from typing import Callable, Iterable, List, Literal, Optional, Tuple, Type, Uni
 
 import numpy as np
 from matplotlib.axes import Axes
+from matplotlib.text import Text
 
 from mitools.exceptions import ArgumentStructureError, ArgumentTypeError
 
@@ -94,13 +95,27 @@ def set_axes_limits(
         set_lim_func(ax, (lim_min, lim_max))
 
 
-def adjust_text_axes_limits(ax: Axes, text: str) -> None:
+def adjust_ax_text_limits(
+    ax: Axes, text: Text, axis: Literal["x", "y", "both"] = "both"
+) -> Axes:
+    if not isinstance(ax, Axes):
+        raise ArgumentTypeError(
+            "The 'ax' parameter must be an instance of matplotlib.axes.Axes."
+        )
+    if not isinstance(text, Text):
+        raise TypeError(
+            "The 'text' parameter must be an instance of matplotlib.text.Text."
+        )
     ax.figure.canvas.draw()
     bbox = text.get_window_extent(renderer=ax.figure.canvas.get_renderer())
     bbox_transformed = bbox.transformed(ax.transData.inverted())
-    right_x = bbox_transformed.x1
-    ax.set_xlim(ax.get_xlim()[0], right_x)
-    ax.autoscale(enable=True, axis="both", tight=False)
+    if axis in ("x", "both"):
+        right_x = bbox_transformed.x1
+        ax.set_xlim(ax.get_xlim()[0], right_x)
+    if axis in ("y", "both"):
+        top_y = bbox_transformed.y1
+        ax.set_ylim(ax.get_ylim()[0], top_y)
+    return ax
 
 
 def adjust_ax_labels_fontsize(
