@@ -102,10 +102,12 @@ def adjust_text_axes_limits(ax: Axes, text: str) -> None:
 
 
 def adjust_axes_labels(ax: Axes, fontsize: int) -> None:
-    xlabel = ax.get_xlabel()
-    ylabel = ax.get_ylabel()
-    ax.set_xlabel(xlabel, fontsize=fontsize)
-    ax.set_ylabel(ylabel, fontsize=fontsize)
+    if not isinstance(ax, Axes):
+        raise ArgumentTypeError("ax must be an instance of matplotlib.axes.Axes")
+    if not isinstance(fontsize, int):
+        raise ArgumentTypeError(f"'fontsize'={fontsize} must be an integer")
+    ax.xaxis.label.set_fontsize(fontsize)
+    ax.yaxis.label.set_fontsize(fontsize)
 
 
 def is_ax_empty(ax: Axes) -> bool:
