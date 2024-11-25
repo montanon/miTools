@@ -7,6 +7,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver, WebElement
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
+from seleniumrequests import Chrome
 
 from mitools.exceptions import (
     WebElementNotFoundError,
@@ -120,7 +121,7 @@ class TestPresenceCheckers(TestCase):
         self.driver.find_elements.assert_called_with(By.CSS_SELECTOR, ".test.class")
 
 
-class TestFinders(unittest.TestCase):
+class TestFinders(TestCase):
     def setUp(self):
         self.driver = MagicMock(spec=WebDriver)
         self.mock_element = MagicMock(spec=WebElement)
@@ -209,6 +210,106 @@ class TestFinders(unittest.TestCase):
     def test_default_convert_identifier(self):
         finder = IDFinder()
         self.assertEqual(finder.convert_identifier("test-id"), "test-id")
+
+
+class MockWebDriver(WebDriver):
+    def __init__(self, elements=None):
+        self.elements = elements or {}
+
+    def find_element(self, by, value):
+        print(by, value)
+        if (by, value) in self.elements:
+            return self.elements[(by, value)]
+        raise TimeoutException("Element not found")
+
+    def find_elements(self, by, value):
+        return [
+            element
+            for (b, v), element in self.elements.items()
+            if b == by and v == value
+        ]
+
+
+class TestWaiters(TestCase):
+    def setUp(self):
+        self.mock_elements = {
+            (By.ID, "test-id"): "Element with ID",
+            (By.CLASS_NAME, "test-class"): "Element with class name",
+            (By.NAME, "test-name"): "Element with name",
+            (By.XPATH, "//div[@class='test']"): "Element with XPath",
+            (By.CSS_SELECTOR, "test class"): "Element with CSS",
+        }
+        self.driver = MockWebDriver(elements=self.mock_elements)
+
+    def test_wait_for_element_success(self):
+        waiter = IDWaiter()
+        result = waiter.wait_for_element(self.driver, "test-id", wait_time=1)
+        self.assertEqual(result, "Element with ID")
+
+    def test_wait_for_element_not_found(self):
+        waiter = IDWaiter()
+        with self.assertRaises(TimeoutException):
+            waiter.wait_for_element(self.driver, "nonexistent-id", wait_time=1)
+
+    def test_try_wait_for_element_success(self):
+        waiter = NameWaiter()
+        try:
+            waiter.try_wait_for_element(self.driver, "test-name", wait_time=1)
+        except WebScraperTimeoutError:
+            self.fail("try_wait_for_element raised WebScraperTimeoutError unexpectedly")
+
+    def test_try_wait_for_element_timeout(self):
+        waiter = XPathWaiter()
+        with self.assertRaises(WebScraperTimeoutError):
+            waiter.try_wait_for_element(
+                self.driver, "//div[@class='nonexistent']", wait_time=1
+            )
+
+    def test_css_selector_conversion(self):
+        waiter = CSSSelectorWaiter()
+        self.assertEqual(waiter.convert_identifier("test class"), ".test.class")
+
+    def test_wait_for_element_css_success(self):
+        waiter = CSSSelectorWaiter()
+        result = waiter.wait_for_element(self.driver, "test class", wait_time=1)
+        self.assertEqual(result, "Element with CSS")
+
+    def test_wait_for_element_css_not_found(self):
+        waiter = CSSSelectorWaiter()
+        with self.assertRaises(TimeoutException):
+            waiter.wait_for_element(self.driver, "nonexistent class", wait_time=1)
+
+    def test_factory_create_valid_waiter(self):
+        factory = WaiterFactory()
+        waiter = factory.create("id")
+        self.assertIsInstance(waiter, IDWaiter)
+
+        waiter = factory.create("css")
+        self.assertIsInstance(waiter, CSSSelectorWaiter)
+
+    def test_factory_create_invalid_waiter(self):
+        factory = WaiterFactory()
+        with self.assertRaises(WebScraperError):
+            factory.create("invalid")
+
+    def test_factory_creators_list(self):
+        factory = WaiterFactory()
+        creators = factory.creators
+        self.assertIn("id", creators)
+        self.assertIn("class", creators)
+        self.assertIn("xpath", creators)
+
+    def test_factory_create_and_use_waiter(self):
+        factory = WaiterFactory()
+        waiter = factory.create("xpath")
+        result = waiter.wait_for_element(
+            self.driver, "//div[@class='test']", wait_time=1
+        )
+        self.assertEqual(result, "Element with XPath")
+
+    def test_default_convert_identifier(self):
+        waiter = IDWaiter()
+        self.assertEqual(waiter.convert_identifier("test-id"), "test-id")
 
 
 if __name__ == "__main__":
