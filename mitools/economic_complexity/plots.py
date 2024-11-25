@@ -28,7 +28,7 @@ from ..pandas import idxslice, prepare_quantile_columns
 from ..utils import stretch_string
 from ..visuals import (
     adjust_axes_lims,
-    is_axes_empty,
+    is_ax_empty,
 )
 from .objects import Product, ProductsBasket
 
@@ -662,7 +662,7 @@ def plot_country_ecis_indicator_scatter(
         horizontalalignment="center",
     )
     last_ax = axes.flat[-1]
-    if is_axes_empty(last_ax) and groups_colors is not None:
+    if is_ax_empty(last_ax) and groups_colors is not None:
         last_ax.cla()
         last_ax.set_xticks([])
         last_ax.set_yticks([])
