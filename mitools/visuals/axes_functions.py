@@ -101,7 +101,7 @@ def adjust_text_axes_limits(ax: Axes, text: str) -> None:
     ax.autoscale(enable=True, axis="both", tight=False)
 
 
-def adjust_axes_labels(ax: Axes, fontsize: int) -> None:
+def adjust_ax_fontsize(ax: Axes, fontsize: int) -> None:
     if not isinstance(ax, Axes):
         raise ArgumentTypeError("ax must be an instance of matplotlib.axes.Axes")
     if not isinstance(fontsize, int):
