@@ -1,9 +1,11 @@
-from typing import Callable, Iterable, List, Optional, Tuple, Union
+from typing import Callable, Iterable, List, Literal, Optional, Tuple, Type, Union
 
 import numpy as np
 from matplotlib.axes import Axes
 
 from mitools.exceptions import ArgumentStructureError, ArgumentTypeError
+
+FONTSIZES = ["xx-small", "x-small", "small", "medium", "large", "x-large", "xx-large"]
 
 
 def adjust_axes_lims(
@@ -101,19 +103,29 @@ def adjust_text_axes_limits(ax: Axes, text: str) -> None:
     ax.autoscale(enable=True, axis="both", tight=False)
 
 
-def adjust_ax_labels_fontsize(ax: Axes, fontsize: int) -> None:
+def adjust_ax_labels_fontsize(
+    ax: Axes,
+    fontsize: Union[int, str],
+) -> None:
     if not isinstance(ax, Axes):
         raise ArgumentTypeError("ax must be an instance of matplotlib.axes.Axes")
-    if not isinstance(fontsize, (int, str)):
-        raise ArgumentTypeError(f"'fontsize'={fontsize} must be an integer or str")
+    if not isinstance(fontsize, int) and fontsize not in FONTSIZES:
+        raise ArgumentTypeError(
+            f"'fontsize'={fontsize} must be an integer or be one of {FONTSIZES}"
+        )
     ax.xaxis.label.set_fontsize(fontsize)
     ax.yaxis.label.set_fontsize(fontsize)
+    return ax
 
 
 def adjust_axes_labels_fontsize(
-    axes: Iterable[Axes], fontsizes: Union[List[int], int]
+    axes: Union[Iterable[Axes], Axes],
+    fontsizes: Union[List[int], int, List[str], str],
 ) -> Iterable[Axes]:
-    fontsizes = [fontsizes] * len(axes) if isinstance(fontsizes, int) else fontsizes
+    axes = [axes] if isinstance(axes, Axes) else axes
+    if isinstance(fontsizes, int) or isinstance(fontsizes, str):
+        fontsizes = [fontsizes] * len(axes)
+    print(fontsizes)
     if len(fontsizes) != len(axes):
         raise ArgumentStructureError(
             f"Length of 'fontsizes'={len(fontsizes)} must be equal to the number of axes={len(axes)}"
@@ -136,3 +148,8 @@ def is_ax_empty(ax: Axes) -> bool:
         or ax.get_ylabel()
         or ax.get_legend()
     )
+
+
+def are_axes_empty(axes: Union[Iterable[Axes], Axes]) -> bool:
+    axes = [axes] if isinstance(axes, Axes) else axes
+    return all(is_ax_empty(ax) for ax in axes)
