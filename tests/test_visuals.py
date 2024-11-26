@@ -1,6 +1,7 @@
 import unittest
 from typing import Tuple
 from unittest import TestCase
+from unittest.mock import MagicMock
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -633,6 +634,75 @@ class TestGetAxesLimits(TestCase):
         with self.assertRaises(ArgumentValueError):
             get_axes_limits(empty_ax, axis="x")
         plt.close(empty_fig)
+
+
+class TestSetAxesLimits(TestCase):
+    def setUp(self):
+        self.fig, self.ax1 = plt.subplots()
+        self.ax2 = self.fig.add_subplot(121)
+        self.ax3 = self.fig.add_subplot(122)
+
+        self.ax1.plot([1, 2, 3], [4, 5, 6])
+        self.ax2.plot([10, 20, 30], [40, 50, 60])
+
+    def tearDown(self):
+        plt.close(self.fig)
+
+    def test_set_x_limits_single_axis(self):
+        axes = set_axes_limits(self.ax1, lim_min=0, lim_max=10, axis="x")
+        self.assertEqual(self.ax1.get_xlim(), (0, 10))
+        self.assertIn(self.ax1, axes)
+
+    def test_set_y_limits_single_axis(self):
+        axes = set_axes_limits(self.ax1, lim_min=-5, lim_max=5, axis="y")
+        self.assertEqual(self.ax1.get_ylim(), (-5, 5))
+        self.assertIn(self.ax1, axes)
+
+    def test_set_x_limits_multiple_axes(self):
+        axes = set_axes_limits([self.ax1, self.ax2], lim_min=0, lim_max=10, axis="x")
+        self.assertEqual(self.ax1.get_xlim(), (0, 10))
+        self.assertEqual(self.ax2.get_xlim(), (0, 10))
+        self.assertIn(self.ax1, axes)
+        self.assertIn(self.ax2, axes)
+
+    def test_set_y_limits_multiple_axes(self):
+        axes = set_axes_limits([self.ax1, self.ax2], lim_min=-5, lim_max=5, axis="y")
+        self.assertEqual(self.ax1.get_ylim(), (-5, 5))
+        self.assertEqual(self.ax2.get_ylim(), (-5, 5))
+        self.assertIn(self.ax1, axes)
+        self.assertIn(self.ax2, axes)
+
+    def test_empty_axes(self):
+        set_axes_limits([], lim_min=0, lim_max=10, axis="x")
+
+    def test_invalid_axis_parameter(self):
+        with self.assertRaises(ArgumentValueError) as context:
+            set_axes_limits([self.ax1, self.ax2], lim_min=0, lim_max=10, axis="z")
+        self.assertEqual(
+            str(context.exception),
+            "The 'axis'=z parameter must be one of 'x' or 'y'.",
+        )
+
+    def test_invalid_axes_object(self):
+        with self.assertRaises(TypeError):
+            set_axes_limits(None, lim_min=0, lim_max=10, axis="x")
+
+    def test_custom_set_lim_func(self):
+        custom_func = MagicMock()
+        set_axes_limits(
+            [self.ax1, self.ax2], lim_min=0, lim_max=10, set_lim_func=custom_func
+        )
+        custom_func.assert_any_call(self.ax1, (0, 10))
+        custom_func.assert_any_call(self.ax2, (0, 10))
+
+    def test_callable_check(self):
+        axes = set_axes_limits(
+            [self.ax1, self.ax2], lim_min=0, lim_max=10, axis="y", set_lim_func=None
+        )
+        self.assertEqual(self.ax1.get_ylim(), (0, 10))
+        self.assertEqual(self.ax2.get_ylim(), (0, 10))
+        self.assertIn(self.ax1, axes)
+        self.assertIn(self.ax2, axes)
 
 
 if __name__ == "__main__":
