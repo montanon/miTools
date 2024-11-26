@@ -102,7 +102,6 @@ def get_axes_limits(
     for ax in axes:
         if not is_ax_empty(ax):
             lim1, lim2 = get_lim_func(ax)
-            print(lim1, lim2)
             lim_min, lim_max = min(lim1, lim_min), max(lim2, lim_max)
     if lim_min == float("inf") or lim_max == float("-inf"):
         raise ArgumentValueError("No valid limits found across the provided axes.")
@@ -110,10 +109,25 @@ def get_axes_limits(
 
 
 def set_axes_limits(
-    axes: Axes, set_lim_func: Callable, lim_min: float, lim_max: float
-) -> None:
+    axes: Union[Iterable[Axes], Axes],
+    lim_min: float,
+    lim_max: float,
+    axis: Literal["x", "y"] = "x",
+    set_lim_func: Callable = None,
+) -> Iterable[Axes]:
+    axes = validate_axes(axes)
+    if axis not in {"x", "y"}:
+        raise ArgumentValueError(
+            f"The 'axis'={axis} parameter must be one of 'x' or 'y'."
+        )
+    if not isinstance(set_lim_func, Callable):
+
+        def set_lim_func(ax: Axes, limits: Tuple[float, float]) -> Axes:
+            return ax.set_xlim(limits) if axis == "x" else ax.set_ylim(limits)
+
     for ax in axes:
         set_lim_func(ax, (lim_min, lim_max))
+    return axes
 
 
 def adjust_ax_text_limits(
