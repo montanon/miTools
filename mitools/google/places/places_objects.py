@@ -231,16 +231,16 @@ class DummyResponse:
 
 @dataclass(frozen=True)
 class NearbySearchRequest:
-    location: Point
+    location: CircleType
     distance_in_meters: float
     type: str
     language_code: str = "en"
     key: str = field(default=GOOGLE_PLACES_API_KEY, init=False)
 
     def __post_init__(self):
-        if not isinstance(self.location, Point):
+        if not isinstance(self.location, Polygon):
             raise ArgumentTypeError(
-                f"'location' must be a Point, got {type(self.location)}"
+                f"'location' must be a Polygon, got {type(self.location)}"
             )
         if self.distance_in_meters <= 0:
             raise ArgumentValueError("Distance in meters must be a positive number.")
@@ -265,16 +265,16 @@ class NearbySearchRequest:
 
 @dataclass(frozen=True)
 class NewNearbySearchRequest:
-    location: Point
+    location: CircleType
     distance_in_meters: float
     max_result_count: int = 20
     included_types: List[str] = field(default_factory=list)
     language_code: str = "en"
 
     def __post_init__(self):
-        if not isinstance(self.location, Point):
+        if not isinstance(self.location, Polygon):
             raise ArgumentTypeError(
-                f"Invalid location type: {type(self.location)}. Expected a 'Point'."
+                f"Invalid location type: {type(self.location)}. Expected a 'Polygon'."
             )
         if self.distance_in_meters <= 0:
             raise ArgumentValueError(

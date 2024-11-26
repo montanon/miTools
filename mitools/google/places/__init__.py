@@ -2,6 +2,7 @@ from .places import (
     GOOGLE_PLACES_API_KEY,
     NEW_NEARBY_SEARCH_URL,
     QUERY_HEADERS,
+    _generate_file_path,
     calculate_degree_steps,
     create_dummy_place,
     create_dummy_response,

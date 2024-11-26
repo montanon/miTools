@@ -13,6 +13,7 @@ from .places import (
     Place,
     Viewport,
     ViewportCoordinate,
+    _generate_file_path,
     calculate_degree_steps,
     create_dummy_place,
     create_dummy_response,
