@@ -1,4 +1,5 @@
 import unittest
+from typing import Tuple
 from unittest import TestCase
 
 import matplotlib
@@ -454,7 +455,7 @@ class TestAdjustAxTextLimits(TestCase):
         self.assertTrue(ylim2[1] >= 5, "Ax2 Y-axis should adjust for text")
 
 
-class TestAdjustAxesTextLimits(unittest.TestCase):
+class TestAdjustAxesTextLimits(TestCase):
     def setUp(self):
         self.figure, self.axes = plt.subplots(nrows=2, ncols=2)
         self.texts = [
@@ -563,6 +564,75 @@ class TestAdjustAxesTextLimits(unittest.TestCase):
             self.assertTrue(
                 ylim[1] >= 0.5, "Y-axis limit should adjust to fit the text"
             )
+
+
+class TestGetAxesLimits(TestCase):
+    def setUp(self):
+        self.fig, self.ax1 = plt.subplots()
+        self.ax2 = self.fig.add_subplot(121)
+        self.ax3 = self.fig.add_subplot(122)
+
+        self.ax1.plot([1, 2, 3], [4, 5, 6])
+        self.ax2.plot([10, 20, 30], [40, 50, 60])
+
+    def tearDown(self):
+        plt.close(self.fig)
+
+    def test_get_x_limits_multiple_axes(self):
+        limits = get_axes_limits([self.ax1, self.ax2], axis="x")
+        self.assertEqual(limits, (0.9, 31.0))  # Expected x-axis range
+
+    def test_get_y_limits_multiple_axes(self):
+        limits = get_axes_limits([self.ax1, self.ax2], axis="y")
+        self.assertEqual(limits, (3.9, 61.0))  # Expected y-axis range
+
+    def test_get_x_limits_single_axis(self):
+        limits = get_axes_limits(self.ax1, axis="x")
+        self.assertEqual(limits, (0.9, 3.1))  # Expected x-axis range for ax1
+
+    def test_get_y_limits_single_axis(self):
+        limits = get_axes_limits(self.ax1, axis="y")
+        self.assertEqual(limits, (3.9, 6.1))  # Expected y-axis range for ax1
+
+    def test_no_valid_axes(self):
+        with self.assertRaises(ArgumentValueError) as context:
+            get_axes_limits([], axis="x")
+        self.assertEqual(
+            str(context.exception), "No valid limits found across the provided axes."
+        )
+
+    def test_empty_axis_ignored(self):
+        limits = get_axes_limits([self.ax1, self.ax2, self.ax3], axis="x")
+        self.assertEqual(limits, (0.9, 31.0))  # Empty ax3 ignored
+
+    def test_invalid_axis_parameter(self):
+        with self.assertRaises(ArgumentValueError) as context:
+            get_axes_limits([self.ax1, self.ax2], axis="z")
+        self.assertEqual(
+            str(context.exception),
+            "The 'axis'=z parameter must be one of 'x' or 'y'.",
+        )
+
+    def test_custom_get_lim_func(self):
+        def custom_get_lim_func(ax: Axes) -> Tuple[float, float]:
+            return ax.get_xlim()
+
+        limits = get_axes_limits([self.ax1, self.ax2], get_lim_func=custom_get_lim_func)
+        self.assertEqual(limits, (0.9, 31.0))  # Expected x-axis range
+
+    def test_callable_check(self):
+        limits = get_axes_limits([self.ax1, self.ax2], axis="y", get_lim_func=None)
+        self.assertEqual(limits, (3.9, 61.0))  # Expected y-axis range
+
+    def test_invalid_axes_object(self):
+        with self.assertRaises(TypeError):
+            get_axes_limits(None, axis="x")
+
+    def test_no_limits_found(self):
+        empty_fig, empty_ax = plt.subplots()
+        with self.assertRaises(ArgumentValueError):
+            get_axes_limits(empty_ax, axis="x")
+        plt.close(empty_fig)
 
 
 if __name__ == "__main__":
