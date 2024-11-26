@@ -23,8 +23,8 @@ from mitools.exceptions import (
 from mitools.visuals.axes_functions import (
     adjust_ax_labels_fontsize,
     adjust_ax_text_limits,
+    adjust_axes_array_limits,
     adjust_axes_labels_fontsize,
-    adjust_axes_lims,
     adjust_axes_text_limits,
     are_axes_empty,
     get_axes_limits,

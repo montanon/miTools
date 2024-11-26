@@ -14,7 +14,7 @@ from mitools.utils.helper_functions import stretch_string
 from ..visuals import (
     adjust_ax_labels_fontsize,
     adjust_ax_text_limits,
-    adjust_axes_lims,
+    adjust_axes_array_limits,
 )
 from .quantiles import QuantileRegStrs, get_regression_predictions
 
