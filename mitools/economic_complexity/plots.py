@@ -27,8 +27,8 @@ from ..country_converter import country_converter
 from ..pandas import idxslice, prepare_quantile_columns
 from ..utils import stretch_string
 from ..visuals import (
-    adjust_axes_lims,
-    is_axes_empty,
+    adjust_axes_array_limits,
+    is_ax_empty,
 )
 from .objects import Product, ProductsBasket
 
@@ -89,7 +89,7 @@ def plot_country_sector_distributions_evolution(
                     ax=ax,
                     kde=kde,
                 )
-    axes = adjust_axes_lims(axes, y=False)
+    axes = adjust_axes_array_limits(axes, y=False)
     return axes
 
 
@@ -145,7 +145,7 @@ def plot_country_sector_distributions_by_year(
                     ax=ax,
                     kde=kde,
                 )
-    axes = adjust_axes_lims(axes, y=False)
+    axes = adjust_axes_array_limits(axes, y=False)
     return axes
 
 
@@ -662,7 +662,7 @@ def plot_country_ecis_indicator_scatter(
         horizontalalignment="center",
     )
     last_ax = axes.flat[-1]
-    if is_axes_empty(last_ax) and groups_colors is not None:
+    if is_ax_empty(last_ax) and groups_colors is not None:
         last_ax.cla()
         last_ax.set_xticks([])
         last_ax.set_yticks([])
@@ -836,7 +836,7 @@ def plot_income_levels_ecis_indicator_scatter(
             marker_kwargs=marker_kwargs,
             axes=axes.flat[n::ncols],
         )
-    axes = adjust_axes_lims(axes, **adjust_axes_lims_kwargs)
+    axes = adjust_axes_array_limits(axes, **adjust_axes_lims_kwargs)
     return axes
 
 

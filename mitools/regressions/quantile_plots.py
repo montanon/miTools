@@ -11,7 +11,11 @@ from tqdm import tqdm
 from mitools.economic_complexity.plots import plot_income_levels_ecis_indicator_scatter
 from mitools.utils.helper_functions import stretch_string
 
-from ..visuals import adjust_axes_labels, adjust_axes_lims, adjust_text_axes_limits
+from ..visuals import (
+    adjust_ax_labels_fontsize,
+    adjust_ax_text_limits,
+    adjust_axes_array_limits,
+)
 from .quantiles import QuantileRegStrs, get_regression_predictions
 
 Color = Union[Tuple[int, int, int], str]
@@ -357,8 +361,8 @@ def plot_regression_predictions_by_group(
                     f"{quantile}{QuantileRegStrs.ANNOTATION}",
                     **annotation_kwargs,
                 )
-            adjust_text_axes_limits(ax, text)
-            adjust_axes_labels(ax, labels_fontsize)
+            adjust_ax_text_limits(ax, text)
+            adjust_ax_labels_fontsize(ax, labels_fontsize)
     if quadratic:
         independent_variables = [
             var
