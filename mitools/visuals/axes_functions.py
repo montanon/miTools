@@ -147,14 +147,7 @@ def adjust_axes_text_limits(
     texts: Union[Iterable[Text], Text],
     axis: Literal["x", "y", "both"] = "both",
 ) -> Iterable[Axes]:
-    axes = [axes] if isinstance(axes, Axes) else axes
-    if axes is None or not (
-        isinstance(axes, Axes)
-        or (isinstance(axes, Iterable) and all(isinstance(ax, Axes) for ax in axes))
-    ):
-        raise ArgumentTypeError(
-            "axes must be an instance of matplotlib.axes.Axes or an iterable of such instances"
-        )
+    axes = validate_axes(axes)
     texts = [texts] if isinstance(texts, Text) else texts
     if texts is None or not isinstance(texts, list):
         raise ArgumentTypeError(
@@ -188,14 +181,7 @@ def adjust_axes_labels_fontsize(
     axes: Union[Iterable[Axes], Axes],
     fontsizes: Union[List[int], int, List[str], str],
 ) -> Iterable[Axes]:
-    axes = [axes] if isinstance(axes, Axes) else axes
-    if axes is None or not (
-        isinstance(axes, Axes)
-        or (isinstance(axes, Iterable) and all(isinstance(ax, Axes) for ax in axes))
-    ):
-        raise ArgumentTypeError(
-            "axes must be an instance of matplotlib.axes.Axes or an iterable of such instances"
-        )
+    axes = validate_axes(axes)
     if isinstance(fontsizes, int) or isinstance(fontsizes, str):
         fontsizes = [fontsizes] * len(axes)
     if fontsizes is None or not isinstance(fontsizes, list):
@@ -228,12 +214,16 @@ def is_ax_empty(ax: Axes) -> bool:
 
 
 def are_axes_empty(axes: Union[Iterable[Axes], Axes]) -> bool:
-    axes = [axes] if axes is not None and isinstance(axes, Axes) else axes
+    axes = validate_axes(axes)
+    return all(is_ax_empty(ax) for ax in axes)
+
+
+def validate_axes(axes: Union[Iterable[Axes], Axes]) -> Iterable[Axes]:
+    axes = [axes] if isinstance(axes, Axes) else axes
     if axes is None or not (
-        isinstance(axes, Axes)
-        or (isinstance(axes, Iterable) and all(isinstance(ax, Axes) for ax in axes))
+        isinstance(axes, Iterable) and all(isinstance(ax, Axes) for ax in axes)
     ):
         raise ArgumentTypeError(
             "axes must be an instance of matplotlib.axes.Axes or an iterable of such instances"
         )
-    return all(is_ax_empty(ax) for ax in axes)
+    return axes
