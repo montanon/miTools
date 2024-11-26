@@ -2,9 +2,9 @@ import unittest
 from unittest import TestCase
 
 import matplotlib
+import matplotlib.pyplot as plt
 
 matplotlib.use("Agg")
-import matplotlib.pyplot
 import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.collections import PathCollection
@@ -23,6 +23,7 @@ from mitools.visuals.axes_functions import (
     adjust_ax_text_limits,
     adjust_axes_labels_fontsize,
     adjust_axes_lims,
+    adjust_axes_text_limits,
     are_axes_empty,
     get_axes_limits,
     is_ax_empty,
@@ -336,7 +337,7 @@ class TestAreAxesEmpty(TestCase):
 
 class TestAdjustAxTextLimits(TestCase):
     def setUp(self):
-        fig, axes = matplotlib.pyplot.subplots(nrows=2, ncols=2)
+        fig, axes = plt.subplots(nrows=2, ncols=2)
         self.figure = fig
         self.ax: Axes = axes.flat[0]
 
@@ -438,7 +439,7 @@ class TestAdjustAxTextLimits(TestCase):
         )
 
     def test_adjust_with_subplots(self):
-        fig, (ax1, ax2) = matplotlib.pyplot.subplots(nrows=1, ncols=2)
+        fig, (ax1, ax2) = plt.subplots(nrows=1, ncols=2)
         text1 = ax1.text(3, 3, "Subplot 1 Text")
         text2 = ax2.text(5, 5, "Subplot 2 Text")
         adjust_ax_text_limits(ax1, text1, axis="both")
@@ -451,6 +452,117 @@ class TestAdjustAxTextLimits(TestCase):
         self.assertTrue(ylim1[1] >= 3, "Ax1 Y-axis should adjust for text")
         self.assertTrue(xlim2[1] >= 5, "Ax2 X-axis should adjust for text")
         self.assertTrue(ylim2[1] >= 5, "Ax2 Y-axis should adjust for text")
+
+
+class TestAdjustAxesTextLimits(unittest.TestCase):
+    def setUp(self):
+        self.figure, self.axes = plt.subplots(nrows=2, ncols=2)
+        self.texts = [
+            ax.text(0.5, 0.5, f"Text {i}") for i, ax in enumerate(self.axes.flat)
+        ]
+
+    def test_adjust_single_axis_with_text(self):
+        single_ax = self.axes[0, 0]
+        single_text = self.texts[0]
+        adjust_axes_text_limits(single_ax, single_text, axis="x")
+        xlim = single_ax.get_xlim()
+        self.assertTrue(xlim[1] >= 0.5, "X-axis limit should adjust to fit the text")
+
+    def test_adjust_multiple_axes_with_texts(self):
+        adjust_axes_text_limits(self.axes.flat, self.texts, axis="both")
+        for ax, text in zip(self.axes.flat, self.texts):
+            xlim = ax.get_xlim()
+            ylim = ax.get_ylim()
+            self.assertTrue(
+                xlim[1] >= 0.5, "X-axis limit should adjust to fit the text"
+            )
+            self.assertTrue(
+                ylim[1] >= 0.5, "Y-axis limit should adjust to fit the text"
+            )
+
+    def test_adjust_x_axis_only(self):
+        adjust_axes_text_limits(self.axes.flat, self.texts, axis="x")
+        for ax, text in zip(self.axes.flat, self.texts):
+            xlim = ax.get_xlim()
+            self.assertTrue(
+                xlim[1] >= 0.5, "X-axis limit should adjust to fit the text"
+            )
+            ylim = ax.get_ylim()
+            self.assertEqual(ylim, (0.0, 1.0), "Y-axis limits should remain unchanged")
+
+    def test_adjust_y_axis_only(self):
+        adjust_axes_text_limits(self.axes.flat, self.texts, axis="y")
+        for ax, text in zip(self.axes.flat, self.texts):
+            ylim = ax.get_ylim()
+            self.assertTrue(
+                ylim[1] >= 0.5, "Y-axis limit should adjust to fit the text"
+            )
+            xlim = ax.get_xlim()
+            self.assertEqual(xlim, (0.0, 1.0), "X-axis limits should remain unchanged")
+
+    def test_no_adjustment_needed(self):
+        for ax in self.axes.flat:
+            ax.set_xlim(0, 2)
+            ax.set_ylim(0, 2)
+        adjust_axes_text_limits(self.axes.flat, self.texts, axis="both")
+        for ax in self.axes.flat:
+            self.assertEqual(
+                ax.get_xlim(), (0, 2), "X-axis limits should remain unchanged"
+            )
+            self.assertEqual(
+                ax.get_ylim(), (0, 2), "Y-axis limits should remain unchanged"
+            )
+
+    def test_mismatched_axes_and_texts(self):
+        additional_text = self.axes[0, 0].text(1, 1, "Extra Text")
+        mismatched_texts = self.texts + [additional_text]
+        with self.assertRaises(ArgumentStructureError):
+            adjust_axes_text_limits(self.axes.flat, mismatched_texts, axis="both")
+
+    def test_invalid_axes_argument(self):
+        with self.assertRaises(ArgumentTypeError):
+            adjust_axes_text_limits("Invalid Axes", self.texts, axis="x")
+
+    def test_invalid_texts_argument(self):
+        with self.assertRaises(ArgumentTypeError):
+            adjust_axes_text_limits(self.axes.flat, "Invalid Texts", axis="x")
+
+    def test_invalid_axis_argument(self):
+        # with self.assertRaises(ArgumentValueError):
+        adjust_axes_text_limits(self.axes.flat, self.texts, axis="invalid")
+
+    def test_empty_axes_and_texts(self):
+        result = adjust_axes_text_limits([], [], axis="both")
+        self.assertEqual(result, [], "Empty input should return an empty list")
+
+    def test_mixed_axes_and_texts(self):
+        subset_axes = self.axes.flat[:2]
+        subset_texts = self.texts[:2]
+        adjust_axes_text_limits(subset_axes, subset_texts, axis="both")
+        for ax, text in zip(subset_axes, subset_texts):
+            xlim = ax.get_xlim()
+            ylim = ax.get_ylim()
+            self.assertTrue(
+                xlim[1] >= 0.5, "X-axis limit should adjust to fit the text"
+            )
+            self.assertTrue(
+                ylim[1] >= 0.5, "Y-axis limit should adjust to fit the text"
+            )
+
+    def test_adjust_with_preexisting_limits(self):
+        for i, ax in enumerate(self.axes.flat):
+            ax.set_xlim(0, 1 + i)
+            ax.set_ylim(0, 1 + i)
+        adjust_axes_text_limits(self.axes.flat, self.texts, axis="both")
+        for ax, text in zip(self.axes.flat, self.texts):
+            xlim = ax.get_xlim()
+            ylim = ax.get_ylim()
+            self.assertTrue(
+                xlim[1] >= 0.5, "X-axis limit should adjust to fit the text"
+            )
+            self.assertTrue(
+                ylim[1] >= 0.5, "Y-axis limit should adjust to fit the text"
+            )
 
 
 if __name__ == "__main__":

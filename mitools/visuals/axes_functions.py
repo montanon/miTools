@@ -148,7 +148,18 @@ def adjust_axes_text_limits(
     axis: Literal["x", "y", "both"] = "both",
 ) -> Iterable[Axes]:
     axes = [axes] if isinstance(axes, Axes) else axes
+    if axes is None or not (
+        isinstance(axes, Axes)
+        or (isinstance(axes, Iterable) and all(isinstance(ax, Axes) for ax in axes))
+    ):
+        raise ArgumentTypeError(
+            "axes must be an instance of matplotlib.axes.Axes or an iterable of such instances"
+        )
     texts = [texts] if isinstance(texts, Text) else texts
+    if texts is None or not isinstance(texts, list):
+        raise ArgumentTypeError(
+            "fontsizes must be an integer or a string or an iterable of such values"
+        )
     if len(axes) != len(texts):
         raise ArgumentStructureError(
             f"The number of axes={len(axes)} must be equal to the number of texts={len(texts)}"
@@ -178,9 +189,19 @@ def adjust_axes_labels_fontsize(
     fontsizes: Union[List[int], int, List[str], str],
 ) -> Iterable[Axes]:
     axes = [axes] if isinstance(axes, Axes) else axes
+    if axes is None or not (
+        isinstance(axes, Axes)
+        or (isinstance(axes, Iterable) and all(isinstance(ax, Axes) for ax in axes))
+    ):
+        raise ArgumentTypeError(
+            "axes must be an instance of matplotlib.axes.Axes or an iterable of such instances"
+        )
     if isinstance(fontsizes, int) or isinstance(fontsizes, str):
         fontsizes = [fontsizes] * len(axes)
-    print(fontsizes)
+    if fontsizes is None or not isinstance(fontsizes, list):
+        raise ArgumentTypeError(
+            "fontsizes must be an integer or a string or an iterable of such values"
+        )
     if len(fontsizes) != len(axes):
         raise ArgumentStructureError(
             f"Length of 'fontsizes'={len(fontsizes)} must be equal to the number of axes={len(axes)}"
@@ -208,10 +229,9 @@ def is_ax_empty(ax: Axes) -> bool:
 
 def are_axes_empty(axes: Union[Iterable[Axes], Axes]) -> bool:
     axes = [axes] if axes is not None and isinstance(axes, Axes) else axes
-    if (
-        axes is None
-        or not isinstance(axes, list)
-        and not all(isinstance(ax, Axes) for ax in axes)
+    if axes is None or not (
+        isinstance(axes, Axes)
+        or (isinstance(axes, Iterable) and all(isinstance(ax, Axes) for ax in axes))
     ):
         raise ArgumentTypeError(
             "axes must be an instance of matplotlib.axes.Axes or an iterable of such instances"
