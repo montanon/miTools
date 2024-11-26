@@ -3,6 +3,7 @@ from typing import Callable, Iterable, List, Literal, Optional, Tuple, Type, Uni
 import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.text import Text
+from numpy import ndarray
 
 from mitools.exceptions import (
     ArgumentStructureError,
@@ -13,71 +14,67 @@ from mitools.exceptions import (
 FONTSIZES = ["xx-small", "x-small", "small", "medium", "large", "x-large", "xx-large"]
 
 
-def adjust_axes_lims(
-    axes: Axes,
-    mode: Optional[str] = "all",
-    x: Optional[bool] = True,
-    y: Optional[bool] = True,
+def adjust_axes_array_limits(
+    axes: Union[ndarray, Iterable[Axes], Axes],
+    mode: Literal["all", "rows", "columns"] = "all",
+    x: bool = True,
+    y: bool = True,
 ) -> Axes:
     if not (x or y):
         return axes
-
-    # Check if axes are 1D or a single axis
-    if isinstance(axes, np.ndarray) and len(axes.shape) == 1:
-        nrows, ncols = axes.shape[0], 1
-        axes = axes[:, np.newaxis]
-    elif isinstance(axes, np.ndarray) and len(axes.shape) == 2:
+    if mode not in {"all", "rows", "columns"}:
+        raise ArgumentValueError(
+            f'Unknown mode: {mode}, must be one of "all", "rows", "columns"'
+        )
+    axes = [axes] if isinstance(axes, Axes) else axes
+    if isinstance(axes, list) and all(isinstance(ax, Axes) for ax in axes):
+        axes = np.array(axes, dtype=object)
+    if isinstance(axes, ndarray):
+        if axes.ndim == 1:
+            axes = axes[:, np.newaxis]
         nrows, ncols = axes.shape
     else:
-        nrows, ncols = 1, 1
         axes = np.array([[axes]])
+        nrows, ncols = 1, 1
+
+    def adjust_limits(axis_items, get_lim_func, set_lim_func):
+        lim_min, lim_max = get_axes_limits(axis_items, get_lim_func)
+        set_axes_limits(axis_items, lim_min, lim_max, set_lim_func=set_lim_func)
 
     if mode == "all":
         if x:
-            xlim_min, xlim_max = get_axes_limits(axes.flat, lambda ax: ax.get_xlim())
-            set_axes_limits(
-                axes.flat, lambda ax, lim: ax.set_xlim(*lim), xlim_min, xlim_max
-            )
+            lim_min, lim_max = get_axes_limits(axes=axes.flat, axis="x")
+            set_axes_limits(axes=axes.flat, lim_min=lim_min, lim_max=lim_max, axis="x")
         if y:
-            ylim_min, ylim_max = get_axes_limits(axes.flat, lambda ax: ax.get_ylim())
-            set_axes_limits(
-                axes.flat, lambda ax, lim: ax.set_ylim(*lim), ylim_min, ylim_max
-            )
+            lim_min, lim_max = get_axes_limits(axes=axes.flat, axis="y")
+            set_axes_limits(axes=axes.flat, lim_min=lim_min, lim_max=lim_max, axis="y")
     elif mode == "rows":
         for i in range(nrows):
             if x:
-                xlim_min, xlim_max = get_axes_limits(
-                    axes[i, :], lambda ax: ax.get_xlim()
-                )
+                lim_min, lim_max = get_axes_limits(axes[i, :], axis="x")
                 set_axes_limits(
-                    axes[i, :], lambda ax, lim: ax.set_xlim(*lim), xlim_min, xlim_max
+                    axes=axes[i, :], lim_min=lim_min, lim_max=lim_max, axis="x"
                 )
             if y:
-                ylim_min, ylim_max = get_axes_limits(
-                    axes[i, :], lambda ax: ax.get_ylim()
-                )
+                lim_min, lim_max = get_axes_limits(axes[i, :], axis="y")
                 set_axes_limits(
-                    axes[i, :], lambda ax, lim: ax.set_ylim(*lim), ylim_min, ylim_max
+                    axes=axes[i, :], lim_min=lim_min, lim_max=lim_max, axis="y"
                 )
     elif mode == "columns":
         for j in range(ncols):
             if x:
-                xlim_min, xlim_max = get_axes_limits(
-                    axes[:, j], lambda ax: ax.get_xlim()
-                )
+                lim_min, lim_max = get_axes_limits(axes=axes[:, j], axis="x")
                 set_axes_limits(
-                    axes[:, j], lambda ax, lim: ax.set_xlim(*lim), xlim_min, xlim_max
+                    axes=axes[:, j], lim_min=lim_min, lim_max=lim_max, axis="x"
                 )
             if y:
-                ylim_min, ylim_max = get_axes_limits(
-                    axes[:, j], lambda ax: ax.get_ylim()
-                )
+                lim_min, lim_max = get_axes_limits(axes=axes[:, j], axis="y")
                 set_axes_limits(
-                    axes[:, j], lambda ax, lim: ax.set_ylim(*lim), ylim_min, ylim_max
+                    axes=axes[:, j], lim_min=lim_min, lim_max=lim_max, axis="y"
                 )
     else:
-        raise ValueError(
-            f'Unknown mode: {mode}, must be one of "all", "rows", "columns"'
+        raise ArgumentValueError(
+            f"Unknown mode: {mode}, must be one of {'all', 'rows', 'columns'}"
         )
 
     return axes
