@@ -733,6 +733,28 @@ class TestAdjustAxesArrayLimits(TestCase):
         )
         self.assertEqual(self.ax1.get_xlim(), (0.9, 31))
         self.assertEqual(self.ax2.get_xlim(), (0.9, 31))
+        self.assertEqual(self.ax1.get_ylim(), (3.9, 61))
+        self.assertEqual(self.ax2.get_ylim(), (3.9, 61))
+        self.assertIsInstance(axes, np.ndarray)
+
+    def test_list_of_axes_adjust_all_no_x(self):
+        axes = adjust_axes_array_limits(
+            [self.ax1, self.ax2], mode="all", x=False, y=True
+        )
+        self.assertEqual(self.ax1.get_xlim(), (0.9, 3.1))
+        self.assertEqual(self.ax2.get_xlim(), (9.0, 31))
+        self.assertEqual(self.ax1.get_ylim(), (3.9, 61))
+        self.assertEqual(self.ax2.get_ylim(), (3.9, 61))
+        self.assertIsInstance(axes, np.ndarray)
+
+    def test_list_of_axes_adjust_all_no_y(self):
+        axes = adjust_axes_array_limits(
+            [self.ax1, self.ax2], mode="all", x=True, y=False
+        )
+        self.assertEqual(self.ax1.get_xlim(), (0.9, 31))
+        self.assertEqual(self.ax2.get_xlim(), (0.9, 31))
+        self.assertEqual(self.ax1.get_ylim(), (3.9, 6.1))
+        self.assertEqual(self.ax2.get_ylim(), (39.0, 61))
         self.assertIsInstance(axes, np.ndarray)
 
     def test_array_of_axes_adjust_rows(self):
