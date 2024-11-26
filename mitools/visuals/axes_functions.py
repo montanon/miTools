@@ -38,41 +38,28 @@ def adjust_axes_array_limits(
         raise ArgumentValueError("The provided axes array is empty.")
     if not (x or y):
         return axes
+
+    def adjust_axes_limits(axes: Iterable[Axes], axis: Literal["x", "y"]) -> None:
+        lim_min, lim_max = get_axes_limits(axes, axis)
+        set_axes_limits(axes, lim_min, lim_max, axis)
+
     if mode == "all":
         if x:
-            lim_min, lim_max = get_axes_limits(axes=list(axes.flat), axis="x")
-            set_axes_limits(
-                axes=list(axes.flat), lim_min=lim_min, lim_max=lim_max, axis="x"
-            )
+            adjust_axes_limits(list(axes.flat), "x")
         if y:
-            lim_min, lim_max = get_axes_limits(axes=list(axes.flat), axis="y")
-            set_axes_limits(
-                axes=list(axes.flat), lim_min=lim_min, lim_max=lim_max, axis="y"
-            )
+            adjust_axes_limits(list(axes.flat), "y")
     elif mode == "rows":
         for i in range(nrows):
             if x:
-                lim_min, lim_max = get_axes_limits(axes[i, :], axis="x")
-                set_axes_limits(
-                    axes=axes[i, :], lim_min=lim_min, lim_max=lim_max, axis="x"
-                )
+                adjust_axes_limits(axes[i, :], "x")
             if y:
-                lim_min, lim_max = get_axes_limits(axes[i, :], axis="y")
-                set_axes_limits(
-                    axes=axes[i, :], lim_min=lim_min, lim_max=lim_max, axis="y"
-                )
+                adjust_axes_limits(axes[i, :], "y")
     elif mode == "columns":
         for j in range(ncols):
             if x:
-                lim_min, lim_max = get_axes_limits(axes=axes[:, j], axis="x")
-                set_axes_limits(
-                    axes=axes[:, j], lim_min=lim_min, lim_max=lim_max, axis="x"
-                )
+                adjust_axes_limits(axes[:, j], "x")
             if y:
-                lim_min, lim_max = get_axes_limits(axes=axes[:, j], axis="y")
-                set_axes_limits(
-                    axes=axes[:, j], lim_min=lim_min, lim_max=lim_max, axis="y"
-                )
+                adjust_axes_limits(axes[:, j], "y")
     else:
         raise ArgumentValueError(
             f"Unknown mode: {mode}, must be one of {'all', 'rows', 'columns'}"
