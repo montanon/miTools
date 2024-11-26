@@ -20,8 +20,6 @@ def adjust_axes_array_limits(
     x: bool = True,
     y: bool = True,
 ) -> Axes:
-    if not (x or y):
-        return axes
     if mode not in {"all", "rows", "columns"}:
         raise ArgumentValueError(
             f'Unknown mode: {mode}, must be one of "all", "rows", "columns"'
@@ -36,18 +34,21 @@ def adjust_axes_array_limits(
     else:
         axes = np.array([[axes]])
         nrows, ncols = 1, 1
-
-    def adjust_limits(axis_items, get_lim_func, set_lim_func):
-        lim_min, lim_max = get_axes_limits(axis_items, get_lim_func)
-        set_axes_limits(axis_items, lim_min, lim_max, set_lim_func=set_lim_func)
-
+    if axes.size == 0:
+        raise ArgumentValueError("The provided axes array is empty.")
+    if not (x or y):
+        return axes
     if mode == "all":
         if x:
-            lim_min, lim_max = get_axes_limits(axes=axes.flat, axis="x")
-            set_axes_limits(axes=axes.flat, lim_min=lim_min, lim_max=lim_max, axis="x")
+            lim_min, lim_max = get_axes_limits(axes=list(axes.flat), axis="x")
+            set_axes_limits(
+                axes=list(axes.flat), lim_min=lim_min, lim_max=lim_max, axis="x"
+            )
         if y:
-            lim_min, lim_max = get_axes_limits(axes=axes.flat, axis="y")
-            set_axes_limits(axes=axes.flat, lim_min=lim_min, lim_max=lim_max, axis="y")
+            lim_min, lim_max = get_axes_limits(axes=list(axes.flat), axis="y")
+            set_axes_limits(
+                axes=list(axes.flat), lim_min=lim_min, lim_max=lim_max, axis="y"
+            )
     elif mode == "rows":
         for i in range(nrows):
             if x:

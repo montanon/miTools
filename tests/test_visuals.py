@@ -705,5 +705,79 @@ class TestSetAxesLimits(TestCase):
         self.assertIn(self.ax2, axes)
 
 
+class TestAdjustAxesArrayLimits(TestCase):
+    def setUp(self):
+        self.fig, self.axes = plt.subplots(2, 2)
+        self.ax1 = self.axes[0, 0]
+        self.ax2 = self.axes[0, 1]
+        self.ax3 = self.axes[1, 0]
+        self.ax4 = self.axes[1, 1]
+
+        self.ax1.plot([1, 2, 3], [4, 5, 6])
+        self.ax2.plot([10, 20, 30], [40, 50, 60])
+        self.ax3.plot([0.1, 0.2, 0.3], [0.4, 0.5, 0.6])
+        self.ax4.plot([-1, -2, -3], [-4, -5, -6])
+
+    def tearDown(self):
+        plt.close(self.fig)
+
+    def test_single_axis_adjust_all(self):
+        axes = adjust_axes_array_limits(self.ax1, mode="all", x=True, y=True)
+        self.assertEqual(self.ax1.get_xlim(), (0.9, 3.1))
+        self.assertEqual(self.ax1.get_ylim(), (3.9, 6.1))
+        self.assertIsInstance(axes, np.ndarray)
+
+    def test_list_of_axes_adjust_all(self):
+        axes = adjust_axes_array_limits(
+            [self.ax1, self.ax2], mode="all", x=True, y=True
+        )
+        self.assertEqual(self.ax1.get_xlim(), (0.9, 31))
+        self.assertEqual(self.ax2.get_xlim(), (0.9, 31))
+        self.assertIsInstance(axes, np.ndarray)
+
+    def test_array_of_axes_adjust_rows(self):
+        axes = np.array([[self.ax1, self.ax2], [self.ax3, self.ax4]], dtype=object)
+        adjust_axes_array_limits(axes, mode="rows", x=True, y=False)
+        self.assertEqual(self.ax1.get_xlim(), (0.9, 31))
+        self.assertEqual(self.ax2.get_xlim(), (0.9, 31))
+        self.assertEqual(self.ax3.get_xlim(), (-3.1, 0.31))
+        self.assertEqual(self.ax4.get_xlim(), (-3.1, 0.31))
+
+    def test_array_of_axes_adjust_columns(self):
+        axes = np.array([[self.ax1, self.ax2], [self.ax3, self.ax4]], dtype=object)
+        adjust_axes_array_limits(axes, mode="columns", x=False, y=True)
+        self.assertEqual(self.ax1.get_ylim(), (0.39, 6.1))
+        self.assertEqual(self.ax3.get_ylim(), (0.39, 6.1))
+        self.assertEqual(self.ax2.get_ylim(), (-6.1, 61))
+        self.assertEqual(self.ax4.get_ylim(), (-6.1, 61))
+
+    def test_invalid_mode(self):
+        with self.assertRaises(ArgumentValueError):
+            adjust_axes_array_limits(self.ax1, mode="invalid", x=True, y=True)
+
+    def test_no_adjustment(self):
+        axes = adjust_axes_array_limits(self.ax1, mode="all", x=False, y=False)
+        self.assertEqual(self.ax1.get_xlim(), (0.9, 3.1))  # Original xlim
+        self.assertEqual(self.ax1.get_ylim(), (3.9, 6.1))  # Original ylim
+        self.assertIsInstance(axes, np.ndarray)
+
+    def test_empty_axes(self):
+        axes = np.array([], dtype=object)
+        with self.assertRaises(ArgumentValueError):
+            adjust_axes_array_limits(axes, mode="all", x=True, y=True)
+
+    def test_edge_case_single_row(self):
+        axes = np.array([self.ax1, self.ax2], dtype=object)
+        adjust_axes_array_limits(axes, mode="rows", x=True, y=True)
+        self.assertEqual(self.ax1.get_xlim(), (0.9, 3.1))
+        self.assertEqual(self.ax2.get_xlim(), (9.0, 31.0))
+
+    def test_edge_case_single_column(self):
+        axes = np.array([[self.ax1], [self.ax3]], dtype=object)
+        adjust_axes_array_limits(axes, mode="columns", x=True, y=True)
+        self.assertEqual(self.ax1.get_xlim(), (0.09000000000000001, 3.1))
+        self.assertEqual(self.ax3.get_xlim(), (0.09000000000000001, 3.1))
+
+
 if __name__ == "__main__":
     unittest.main()
