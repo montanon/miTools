@@ -58,13 +58,24 @@ class ScatterPlotter(ABC):
     def _validate_data(self, data, name):
         pass
 
-    def set_title(self, title):
-        self.title = title
+    def set_title(self, title: str, **kwargs):
+        """https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.set_title.html"""
+        self.title = Text(text=title, **kwargs)
         return self
 
-    def set_axes_labels(self, xlabel, ylabel):
-        self.xlabel = xlabel
-        self.ylabel = ylabel
+    def set_xlabel(self, xlabel: str, **kwargs):
+        """https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.set_xlabel"""
+        self.xlabel = Text(text=xlabel, **kwargs)
+        return self
+
+    def set_ylabel(self, ylabel: str, **kwargs):
+        """https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.set_ylabel"""
+        self.ylabel = Text(text=ylabel, **kwargs)
+        return self
+
+    def set_axes_labels(self, xlabel: str, ylabel: str, **kwargs):
+        self.set_xlabel(xlabel, **kwargs)
+        self.set_ylabel(ylabel, **kwargs)
         return self
 
     def set_style(self, style):
