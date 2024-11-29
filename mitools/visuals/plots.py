@@ -49,13 +49,13 @@ class ScatterPlotter(ABC):
         self.title: Text = ""
         self.xlabel: Text = ""
         self.ylabel: Text = ""
-        self.style: str = "default"
+        self.style: str = "dark_background"
         self.hover: bool = False
         self.figure: Figure = None
         self.ax: Axes = None
 
     @abstractmethod
-    def _validate_data(self, data, name):
+    def _validate_data(self, data: Any) -> Any:
         pass
 
     def set_title(self, title: str, **kwargs):
@@ -78,11 +78,11 @@ class ScatterPlotter(ABC):
         self.set_ylabel(ylabel, **kwargs)
         return self
 
-    def set_style(self, style):
+    def set_style(self, style: str):
         if style in plt.style.available:
             self.style = style
         else:
-            raise ValueError(f"Style '{style}' is not available in Matplotlib.")
+            raise ArgumentValueError(f"Style '{style}' is not available in Matplotlib.")
         return self
 
     def set_color(self, color):
