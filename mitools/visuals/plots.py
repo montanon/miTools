@@ -154,7 +154,7 @@ class ScatterPlotter:
         return self
 
     def set_style(self, style: str):
-        if style in plt.style.available:
+        if style in plt.style.available or style is None:
             self.style = style
         else:
             raise ArgumentValueError(
