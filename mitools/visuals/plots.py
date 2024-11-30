@@ -47,6 +47,7 @@ class ScatterPlotter(ABC):
             raise ArgumentStructureError(
                 f"'x_data' and 'y_data' must be of the same length, {len(x_data)} != {len(y_data)}."
             )
+        self.data_size = len(self.x_data)
         self.title: Text = ""
         if "title" in kwargs:
             self.set_title(kwargs["title"])
@@ -68,11 +69,15 @@ class ScatterPlotter(ABC):
         self.color_map: Cmap = None
         if "color_map" in kwargs:
             self.set_colormap(kwargs["color_map"])
-        self.normalize: Norm = None
-        if "normalize" in kwargs:
-            self.set_normalize(kwargs["normalize"])
+        self.normalization: Norm = None
+        if "normalization" in kwargs:
+            self.set_normalization(kwargs["normalization"])
         self.vmin: float = None
+        if "vmin" in kwargs:
+            self.set_vmin(kwargs["vmin"])
         self.vmax: float = None
+        if "vmax" in kwargs:
+            self.set_vmax("vmax")
         self.alpha: Union[Sequence[float], float] = 1.0
         self.linewidths: Union[Sequence[float], float] = None
         self.linestyles: Union[Sequence[LineStyle], LineStyle] = None
@@ -121,10 +126,10 @@ class ScatterPlotter(ABC):
     def set_size(self, size_data: Union[Sequence[float], float]):
         if isinstance(size_data, (list, tuple, ndarray, Series, float, int)):
             if not isinstance(size_data, (float, int)):
-                if len(size_data) != len(self.x_data):
+                if len(size_data) != self.data_size:
                     raise ArgumentStructureError(
                         "size_data must be of the same length as x_data and y_data,"
-                        + f"len(size_data)={len(size_data)} != len(x_data)={len(self.x_data)}."
+                        + f"len(size_data)={len(size_data)} != len(x_data)={self.data_size}."
                     )
                 if not all(isinstance(s, (float, int)) for s in size_data):
                     raise ArgumentTypeError(
@@ -140,10 +145,10 @@ class ScatterPlotter(ABC):
     def set_color(self, color: Union[Sequence[Color], Color]):
         if isinstance(color, (list, tuple, ndarray, Series, str)):
             if not isinstance(color, str):
-                if len(color) != len(self.x_data):
+                if len(color) != self.data_size:
                     raise ArgumentStructureError(
                         "color must be of the same length as x_data and y_data, "
-                        + f"len(color)={len(color)} != len(x_data)={len(self.x_data)}."
+                        + f"len(color)={len(color)} != len(x_data)={self.data_size}."
                     )
                 if not all(isinstance(c, (str, tuple, list, ndarray)) for c in color):
                     raise ArgumentTypeError(
@@ -179,10 +184,10 @@ class ScatterPlotter(ABC):
                 raise ArgumentTypeError(
                     "All elements in marker must be MarkerStyle objects or valid Matplotlib marker strings."
                 )
-            if len(marker) != len(self.x_data):
+            if len(marker) != self.data_size:
                 raise ArgumentStructureError(
                     "marker must be of the same length as x_data and y_data, "
-                    + f"len(marker)={len(marker)} != len(x_data)={len(self.x_data)}."
+                    + f"len(marker)={len(marker)} != len(x_data)={self.data_size}."
                 )
             self.marker = [
                 MarkerStyle(m.get_marker(), fillstyle=fillstyle)
@@ -215,7 +220,7 @@ class ScatterPlotter(ABC):
             )
         return self
 
-    def set_normalize(self, normalize: Norm):
+    def set_normalization(self, normalization: Norm):
         _normalizations = [
             "linear",
             "log",
@@ -226,16 +231,43 @@ class ScatterPlotter(ABC):
             "functionlog",
         ]
         if (
-            isinstance(normalize, Normalize)
-            or isinstance(normalize, str)
-            and normalize in _normalizations
+            isinstance(normalization, Normalize)
+            or isinstance(normalization, str)
+            and normalization in _normalizations
         ):
-            self.normalize = normalize
+            self.normalization = normalization
         else:
             raise ArgumentTypeError(
                 "normalize must be a valid Normalize object or a valid Matplotlib normalization string"
                 + f" of {_normalizations}."
             )
+        return self
+
+    def set_vmin(self, vmin: float):
+        if self.normalization is not None and not isinstance(self.normalization, str):
+            raise ArgumentValueError(
+                f"Normalization {self.normalization} has been set. vmin only work when 'self.normalization' is a str."
+            )
+        if isinstance(vmin, float):
+            self.vmin = vmin
+        else:
+            raise ArgumentTypeError(f"'vmin'={vmin} must be a float.")
+        return self
+
+    def set_vmax(self, vmax: float):
+        if self.normalization is not None and not isinstance(self.normalization, str):
+            raise ArgumentValueError(
+                f"Normalization {self.normalization} has been set. vmax only work when 'self.normalization' is a str."
+            )
+        if isinstance(vmax, float):
+            self.vmin = vmax
+        else:
+            raise ArgumentTypeError(f"'vmax'={vmax} must be a float.")
+        return self
+
+    def set_normalization_range(self, vmin: float, vmax: float):
+        self.set_vmin(vmin)
+        self.set_vmax(vmax)
         return self
 
     def set_alpha(self, alpha: Union[Sequence[float], float]):
