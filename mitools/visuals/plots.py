@@ -81,6 +81,8 @@ class ScatterPlotter:
         if "alpha" in kwargs:
             self.set_alpha(kwargs["alpha"])
         self.linewidth: Union[Sequence[float], float] = None
+        if "linewidth" in kwargs:
+            self.set_linewidth(kwargs["linewidth"])
         self.linestyle: Union[Sequence[LineStyle], LineStyle] = None
         self.edgecolor: EdgeColor = None
         self.facecolor: FaceColor = None
@@ -303,8 +305,39 @@ class ScatterPlotter:
             )
         return self
 
-    def set_edgecolor(self, edgecolor):
-        self.edgecolor = edgecolor
+    def set_edgecolor(self, edgecolor: EdgeColor):
+        if edgecolor in ["face", "none", None]:
+            self.edgecolor = edgecolor
+        elif isinstance(edgecolor, str) or (
+            isinstance(edgecolor, (list, tuple))
+            and len(edgecolor) in [3, 4]
+            and all(isinstance(x, (int, float)) for x in edgecolor)
+        ):
+            self.edgecolor = edgecolor
+        elif isinstance(edgecolor, (list, tuple, ndarray, Series)):
+            if len(edgecolor) != self.data_size:
+                raise ArgumentStructureError(
+                    "edgecolor must be of the same length as x_data and y_data, "
+                    + f"len(edgecolor)={len(edgecolor)} != len(x_data)={self.data_size}."
+                )
+            for ec in edgecolor:
+                if not (
+                    isinstance(ec, str)
+                    or (
+                        isinstance(ec, (list, tuple))
+                        and len(ec) in [3, 4]
+                        and all(isinstance(x, (int, float)) for x in ec)
+                    )
+                ):
+                    raise ArgumentTypeError(
+                        "Each edgecolor must be a string or RGB/RGBA values."
+                    )
+            self.edgecolor = edgecolor
+        else:
+            raise ArgumentTypeError(
+                "edgecolor must be 'face', 'none', None, a color string, RGB/RGBA values, "
+                + "or an array-like of color strings/RGB/RGBA values."
+            )
         return self
 
     def set_labels(self, labels):
