@@ -157,7 +157,9 @@ class ScatterPlotter:
         if style in plt.style.available:
             self.style = style
         else:
-            raise ArgumentValueError(f"Style '{style}' is not available in Matplotlib.")
+            raise ArgumentValueError(
+                f"Style '{style}' is not available in Matplotlib styles: {plt.style.available}."
+            )
         return self
 
     def set_size(self, size_data: Union[Sequence[float], float]):
@@ -323,7 +325,7 @@ class ScatterPlotter:
         return self
 
     def set_linewidth(self, linewidth: Union[Sequence[float], float]):
-        if isinstance(linewidth, float):
+        if isinstance(linewidth, (float, int)):
             self.linewidth = linewidth
         elif isinstance(linewidth, list, tuple, ndarray, Series) and all(
             isinstance(lw, float) for lw in linewidth
@@ -336,7 +338,7 @@ class ScatterPlotter:
             self.linewidth = linewidth
         else:
             raise ArgumentTypeError(
-                "linewidth must be a float or an array-like of floats."
+                "linewidth must be a float or an array-like of floats or ints."
             )
         return self
 
@@ -450,11 +452,11 @@ class ScatterPlotter:
 
     def set_figsize(self, figsize: Tuple[float, float]):
         if isinstance(figsize, tuple) and all(
-            isinstance(val, float) for val in figsize
+            isinstance(val, (float, int)) for val in figsize
         ):
             self.figsize = figsize
         else:
-            raise ArgumentTypeError("figsize must be a tuple of floats.")
+            raise ArgumentTypeError("figsize must be a tuple of floats or ints.")
         return self
 
     def set_scales(
@@ -477,8 +479,8 @@ class ScatterPlotter:
     def set_grid(
         self,
         visible: bool = None,
-        which: Literal["major", "minor", "both"] = None,
-        axis: Literal["both", "x", "y"] = None,
+        which: Literal["major", "minor", "both"] = "major",
+        axis: Literal["both", "x", "y"] = "both",
         **kwargs,
     ):
         self.grid = dict(visible=visible, which=which, axis=axis, **kwargs)
@@ -530,6 +532,9 @@ class ScatterPlotter:
         if not self.ax and not self.figure:
             self.figure, self.ax = plt.subplots(figsize=self.figsize)
 
+        if self.grid is not None:
+            self.ax.grid(**self.grid)
+
         scatter_kwargs = {
             "x": self.x_data,
             "y": self.y_data,
@@ -563,8 +568,6 @@ class ScatterPlotter:
             self.ax.set_xscale(self.xscale)
         if self.yscale:
             self.ax.set_yscale(self.yscale)
-        if self.grid is not None:
-            self.ax.grid(**self.grid)
         if self.texts is not None:
             for text in self.texts:
                 self.ax.text(**text)
