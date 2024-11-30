@@ -83,6 +83,8 @@ class ScatterPlotter:
             "suptitle": {"default": None, "type": Text},
             "xlim": {"default": None, "type": Union[Tuple[float, float], None]},
             "ylim": {"default": None, "type": Union[Tuple[float, float], None]},
+            "x_ticks": {"default": None, "type": Union[Sequence[float], None]},
+            "y_ticks": {"default": None, "type": Union[Sequence[float], None]},
         }
 
         for param, config in self._init_params.items():
@@ -96,6 +98,8 @@ class ScatterPlotter:
                         self.set_scales(**{param: kwargs[param]})
                     elif param in ["xlim", "ylim"]:
                         self.set_ax_limits(**{param: kwargs[param]})
+                    elif param in ["x_ticks", "y_ticks"]:
+                        self.set_ticks(**{param: kwargs[param]})
                     else:
                         raise ArgumentValueError(f"Parameter '{param}' is not valid.")
         self.figure: Figure = None
@@ -602,8 +606,26 @@ class ScatterPlotter:
             self.ylim = ylim
         return self
 
-    def set_ticks(self, x_ticks=None, y_ticks=None):
-        raise NotImplementedError
+    def set_ticks(
+        self,
+        x_ticks: Union[Sequence[float], None] = None,
+        y_ticks: Union[Sequence[float], None] = None,
+    ):
+        if x_ticks is not None:
+            if not isinstance(x_ticks, (list, tuple, ndarray)):
+                raise ArgumentTypeError("x_ticks must be array-like")
+            if not all(isinstance(x, (int, float)) for x in x_ticks):
+                raise ArgumentTypeError("x_ticks values must be numeric")
+            self.x_ticks = x_ticks
+
+        if y_ticks is not None:
+            if not isinstance(y_ticks, (list, tuple, ndarray)):
+                raise ArgumentTypeError("y_ticks must be array-like")
+            if not all(isinstance(y, (int, float)) for y in y_ticks):
+                raise ArgumentTypeError("y_ticks values must be numeric")
+            self.y_ticks = y_ticks
+
+        return self
 
     def set_tick_labels(self, x_tick_labels=None, y_tick_labels=None):
         raise NotImplementedError
@@ -673,10 +695,14 @@ class ScatterPlotter:
             self.figure.set_facecolor(self.figure_background)
         if self.suptitle:
             self.figure.suptitle(**self.suptitle)
-        if self.xlim:
+        if self.xlim is not None:
             self.ax.set_xlim(self.xlim)
-        if self.ylim:
+        if self.ylim is not None:
             self.ax.set_ylim(self.ylim)
+        if self.x_ticks is not None:
+            self.ax.set_xticks(self.x_ticks)
+        if self.y_ticks is not None:
+            self.ax.set_yticks(self.y_ticks)
         if self.hover and self.label is not None:
             pass
         if self.tight_layout:
