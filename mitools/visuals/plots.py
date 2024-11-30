@@ -181,7 +181,9 @@ class ScatterPlotter:
             )
         return self
 
-    def set_color(self, color: Union[Sequence[Color], Color]):
+    def set_color(
+        self, color: Union[Sequence[Color], Color, Sequence[float], Sequence[int]]
+    ):
         if isinstance(color, (list, tuple, ndarray, Series, str)):
             if not isinstance(color, str):
                 if len(color) != self.data_size:
@@ -189,7 +191,10 @@ class ScatterPlotter:
                         "color must be of the same length as x_data and y_data, "
                         + f"len(color)={len(color)} != len(x_data)={self.data_size}."
                     )
-                if not all(isinstance(c, (str, tuple, list, ndarray)) for c in color):
+                if not all(
+                    isinstance(c, (str, tuple, list, ndarray, float, int))
+                    for c in color
+                ):
                     raise ArgumentTypeError(
                         "All elements in color must be strings, tuples, lists, or ndarrays."
                     )
