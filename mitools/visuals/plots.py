@@ -80,6 +80,7 @@ class ScatterPlotter:
             "yscale": {"default": None, "type": Scale},
             "background": {"default": None, "type": Color},
             "figure_background": {"default": None, "type": Color},
+            "suptitle": {"default": None, "type": Text},
         }
 
         for param, config in self._init_params.items():
@@ -570,6 +571,10 @@ class ScatterPlotter:
         self.figure_background = figure_background
         return self
 
+    def set_suptitle(self, suptitle: str, **kwargs):
+        self.suptitle = dict(t=suptitle, **kwargs)
+        return self
+
     def set_limits(self, xlim=None, ylim=None):
         raise NotImplementedError
 
@@ -619,8 +624,16 @@ class ScatterPlotter:
             self.ax.set_title(**self.title)
         if self.xlabel:
             self.ax.set_xlabel(**self.xlabel)
+            if "color" in self.xlabel:
+                self.ax.tick_params(axis="x", colors=self.xlabel["color"])
+                self.ax.spines["bottom"].set_color(self.xlabel["color"])
+                self.ax.spines["top"].set_color(self.xlabel["color"])
         if self.ylabel:
             self.ax.set_ylabel(**self.ylabel)
+            if "color" in self.ylabel:
+                self.ax.tick_params(axis="y", colors=self.ylabel["color"])
+                self.ax.spines["left"].set_color(self.ylabel["color"])
+                self.ax.spines["right"].set_color(self.ylabel["color"])
         if self.xscale:
             self.ax.set_xscale(self.xscale)
         if self.yscale:
@@ -634,6 +647,8 @@ class ScatterPlotter:
             self.ax.set_facecolor(self.background)
         if self.figure_background:
             self.figure.set_facecolor(self.figure_background)
+        if self.suptitle:
+            self.figure.suptitle(**self.suptitle)
         if self.hover and self.label is not None:
             pass
         if self.tight_layout:
