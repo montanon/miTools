@@ -40,7 +40,7 @@ LineStyle = Literal["solid", "dashed", "dashdot", "dotted", "-", "--", "-.", ":"
 
 
 class ScatterPlotter(ABC):
-    def __init__(self, x_data: Any, y_data: Any):
+    def __init__(self, x_data: Any, y_data: Any, **kwargs):
         self.x_data = self._validate_data(x_data, "x_data")
         self.y_data = self._validate_data(y_data, "y_data")
         if len(self.x_data) != len(self.y_data):
@@ -48,13 +48,29 @@ class ScatterPlotter(ABC):
                 f"'x_data' and 'y_data' must be of the same length, {len(x_data)} != {len(y_data)}."
             )
         self.title: Text = ""
+        if "title" in kwargs:
+            self.set_title(kwargs["title"])
         self.xlabel: Text = ""
+        if "xlabel" in kwargs:
+            self.set_xlabel(kwargs["xlabel"])
         self.ylabel: Text = ""
+        if "ylabel" in kwargs:
+            self.set_ylabel(kwargs["ylabel"])
         self.size_data: Union[Sequence[float], float] = None
+        if "size_data" in kwargs:
+            self.set_size(kwargs["size_data"])
         self.color: Union[Sequence[Color], Color] = None
+        if "color" in kwargs:
+            self.set_color(kwargs["color"])
         self.marker: Markers = "o"
+        if "marker" in kwargs:
+            self.set_marker(kwargs["marker"])
         self.color_map: Cmap = None
+        if "color_map" in kwargs:
+            self.set_colormap(kwargs["color_map"])
         self.normalize: Norm = None
+        if "normalize" in kwargs:
+            self.set_normalize(kwargs["normalize"])
         self.vmin: float = None
         self.vmax: float = None
         self.alpha: Union[Sequence[float], float] = 1.0
@@ -72,8 +88,8 @@ class ScatterPlotter(ABC):
         self.ax: Axes = None
 
     @abstractmethod
-    def _validate_data(self, data: Any) -> Any:
-        pass
+    def _validate_data(self, data: Any, name: str) -> Any:
+        return data
 
     def set_title(self, title: str, **kwargs):
         """https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.set_title.html"""
