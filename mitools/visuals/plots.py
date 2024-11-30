@@ -575,8 +575,28 @@ class ScatterPlotter:
         self.suptitle = dict(t=suptitle, **kwargs)
         return self
 
-    def set_limits(self, xlim=None, ylim=None):
-        raise NotImplementedError
+    def set_limits(
+        self,
+        xlim: Union[Tuple[float, float], None] = None,
+        ylim: Union[Tuple[float, float], None] = None,
+    ):
+        if xlim is not None:
+            if not isinstance(xlim, (list, tuple)) or len(xlim) != 2:
+                raise ArgumentStructureError(
+                    "xlim must be a tuple or list of two ints or floats (min, max)."
+                )
+            if not all(isinstance(x, (int, float)) for x in xlim):
+                raise ArgumentTypeError("xlim values must be ints or floats.")
+            self.xlim = xlim
+        if ylim is not None:
+            if not isinstance(ylim, (list, tuple)) or len(ylim) != 2:
+                raise ArgumentStructureError(
+                    "ylim must be a tuple or list of two ints or floats (min, max)."
+                )
+            if not all(isinstance(y, (int, float)) for y in ylim):
+                raise ArgumentTypeError("ylim values must be ints or floats.")
+            self.ylim = ylim
+        return self
 
     def set_ticks(self, x_ticks=None, y_ticks=None):
         raise NotImplementedError
@@ -649,6 +669,10 @@ class ScatterPlotter:
             self.figure.set_facecolor(self.figure_background)
         if self.suptitle:
             self.figure.suptitle(**self.suptitle)
+        if self.xlim:
+            self.ax.set_xlim(self.xlim)
+        if self.ylim:
+            self.ax.set_ylim(self.ylim)
         if self.hover and self.label is not None:
             pass
         if self.tight_layout:
