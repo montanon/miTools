@@ -5,6 +5,7 @@ from typing import Any, Literal, Sequence, Tuple, Union
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib import colormaps
 from matplotlib.axes import Axes
 from matplotlib.colors import Colormap, Normalize
 from matplotlib.figure import Figure
@@ -129,8 +130,15 @@ class ScatterPlotter(ABC):
             )
         return self
 
-    def set_colormap(self, cmap):
-        self.color_map = cmap
+    def set_colormap(self, cmap: Cmap):
+        if (
+            isinstance(cmap, str)
+            and cmap in list(colormaps)
+            or isinstance(cmap, Colormap)
+        ):
+            self.color_map = cmap
+        else:
+            raise ArgumentTypeError("cmap must be a string or a Colormap object.")
         return self
 
     def set_alpha(self, alpha):
