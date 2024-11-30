@@ -129,6 +129,7 @@ class ScatterPlotter:
             self.set_scales(yscale=kwargs["yscale"])
         self.figure: Figure = None
         self.ax: Axes = None
+        self.legend: Union[Dict, None] = None
 
     def _validate_data(self, data: Any, name: str) -> Any:
         return data
@@ -328,8 +329,8 @@ class ScatterPlotter:
     def set_linewidth(self, linewidth: Union[Sequence[float], float]):
         if isinstance(linewidth, (float, int)):
             self.linewidth = linewidth
-        elif isinstance(linewidth, list, tuple, ndarray, Series) and all(
-            isinstance(lw, float) for lw in linewidth
+        elif isinstance(linewidth, (list, tuple, ndarray, Series)) and all(
+            isinstance(lw, (float, int)) for lw in linewidth
         ):
             if len(linewidth) != self.data_size:
                 raise ArgumentStructureError(
@@ -427,13 +428,99 @@ class ScatterPlotter:
             raise ArgumentTypeError("labels must be a str or a sequence of strs.")
         return self
 
+    def set_legend(
+        self,
+        show: bool = True,
+        labels: Union[Sequence[str], str, None] = None,
+        handles: Union[Sequence[Any], None] = None,
+        loc: Union[str, int] = "best",
+        bbox_to_anchor: Union[Tuple[float, float], None] = None,
+        ncol: int = 1,
+        fontsize: Union[int, str, None] = None,
+        title: Union[str, None] = None,
+        title_fontsize: Union[int, str, None] = None,
+        frameon: bool = True,
+        fancybox: bool = True,
+        framealpha: float = 0.8,
+        edgecolor: Union[str, None] = None,
+        facecolor: Union[str, None] = "inherit",
+        **kwargs,
+    ):
+        if show not in [True, False]:
+            raise ArgumentTypeError("'show' must be a boolean")
+
+        legend_kwargs = {
+            "loc": loc,
+            "ncol": ncol,
+            "frameon": frameon,
+            "fancybox": fancybox,
+            "framealpha": framealpha,
+        }
+        if labels is not None:
+            if isinstance(labels, str):
+                legend_kwargs["labels"] = [labels]
+            elif isinstance(labels, (list, tuple)) and all(
+                isinstance(l, str) for l in labels
+            ):
+                legend_kwargs["labels"] = labels
+            else:
+                raise ArgumentTypeError(
+                    "'labels' must be a string or sequence of strings"
+                )
+        if handles is not None:
+            if not isinstance(handles, (list, tuple)):
+                raise ArgumentTypeError(
+                    "'handles' must be a sequence of Artist objects"
+                )
+            legend_kwargs["handles"] = handles
+        if bbox_to_anchor is not None:
+            if not isinstance(bbox_to_anchor, tuple) or len(bbox_to_anchor) not in [
+                2,
+                4,
+            ]:
+                raise ArgumentTypeError(
+                    "'bbox_to_anchor' must be a tuple of 2 or 4 floats"
+                )
+            legend_kwargs["bbox_to_anchor"] = bbox_to_anchor
+
+        if fontsize is not None:
+            if not isinstance(fontsize, (int, str)):
+                raise ArgumentTypeError("'fontsize' must be an integer or string")
+            legend_kwargs["fontsize"] = fontsize
+
+        if title is not None:
+            if not isinstance(title, str):
+                raise ArgumentTypeError("'title' must be a string")
+            legend_kwargs["title"] = title
+
+        if title_fontsize is not None:
+            if not isinstance(title_fontsize, (int, str)):
+                raise ArgumentTypeError("'title_fontsize' must be an integer or string")
+            legend_kwargs["title_fontsize"] = title_fontsize
+
+        if edgecolor is not None:
+            if not isinstance(edgecolor, str):
+                raise ArgumentTypeError("'edgecolor' must be a string")
+            legend_kwargs["edgecolor"] = edgecolor
+
+        if facecolor is not None:
+            if not isinstance(facecolor, str):
+                raise ArgumentTypeError("'facecolor' must be a string")
+            legend_kwargs["facecolor"] = facecolor
+
+        # Add any additional kwargs
+        legend_kwargs.update(kwargs)
+
+        # Store the legend configuration
+        self.legend = {"show": show, "kwargs": legend_kwargs} if show else None
+
+        return self
+
     def set_zorder(self, zorder: Union[Sequence[float], float]):
         if isinstance(zorder, float):
             self.zorder = zorder
-        elif isinstance(
-            zorder,
-            (list, tuple, ndarray, Series)
-            and all(isinstance(zo, float) for zo in zorder),
+        elif isinstance(zorder, (list, tuple, ndarray, Series)) and all(
+            isinstance(zo, float) for zo in zorder
         ):
             if len(zorder) != self.data_size:
                 raise ArgumentStructureError(
@@ -521,9 +608,6 @@ class ScatterPlotter:
     def set_tick_labels(self, x_tick_labels=None, y_tick_labels=None):
         raise NotImplementedError
 
-    def set_legend(self, legend=True):
-        raise NotImplementedError
-
     def add_line(self, x_data, y_data, **kwargs):
         raise NotImplementedError
 
@@ -576,6 +660,8 @@ class ScatterPlotter:
             pass
         if self.tight_layout:
             plt.tight_layout()
+        if self.legend is not None and self.legend["show"]:
+            self.ax.legend(**self.legend["kwargs"])
         if show:
             plt.show()
         return self.ax
