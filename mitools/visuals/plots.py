@@ -85,6 +85,8 @@ class ScatterPlotter:
             "ylim": {"default": None, "type": Union[Tuple[float, float], None]},
             "x_ticks": {"default": None, "type": Union[Sequence[float], None]},
             "y_ticks": {"default": None, "type": Union[Sequence[float], None]},
+            "x_tick_labels": {"default": None, "type": Union[Sequence[str], None]},
+            "y_tick_labels": {"default": None, "type": Union[Sequence[str], None]},
         }
 
         for param, config in self._init_params.items():
@@ -100,6 +102,8 @@ class ScatterPlotter:
                         self.set_ax_limits(**{param: kwargs[param]})
                     elif param in ["x_ticks", "y_ticks"]:
                         self.set_ticks(**{param: kwargs[param]})
+                    elif param in ["x_tick_labels", "y_tick_labels"]:
+                        self.set_tick_labels(**{param: kwargs[param]})
                     else:
                         raise ArgumentValueError(f"Parameter '{param}' is not valid.")
         self.figure: Figure = None
@@ -617,18 +621,36 @@ class ScatterPlotter:
             if not all(isinstance(x, (int, float)) for x in x_ticks):
                 raise ArgumentTypeError("x_ticks values must be numeric")
             self.x_ticks = x_ticks
-
         if y_ticks is not None:
             if not isinstance(y_ticks, (list, tuple, ndarray)):
                 raise ArgumentTypeError("y_ticks must be array-like")
             if not all(isinstance(y, (int, float)) for y in y_ticks):
                 raise ArgumentTypeError("y_ticks values must be numeric")
             self.y_ticks = y_ticks
-
         return self
 
-    def set_tick_labels(self, x_tick_labels=None, y_tick_labels=None):
-        raise NotImplementedError
+    def set_tick_labels(
+        self,
+        x_tick_labels: Union[Sequence[Union[str, float, int]], None] = None,
+        y_tick_labels: Union[Sequence[Union[str, float, int]], None] = None,
+    ):
+        if x_tick_labels is not None:
+            if not isinstance(x_tick_labels, (list, tuple, ndarray)):
+                raise ArgumentTypeError("x_tick_labels must be array-like")
+            if not all(isinstance(x, (str, float, int)) for x in x_tick_labels):
+                raise ArgumentTypeError(
+                    "x_tick_labels values must be strings, floats, or ints"
+                )
+            self.x_tick_labels = x_tick_labels
+        if y_tick_labels is not None:
+            if not isinstance(y_tick_labels, (list, tuple, ndarray)):
+                raise ArgumentTypeError("y_tick_labels must be array-like")
+            if not all(isinstance(y, (str, float, int)) for y in y_tick_labels):
+                raise ArgumentTypeError(
+                    "y_tick_labels values must be strings, floats, or ints"
+                )
+            self.y_tick_labels = y_tick_labels
+        return self
 
     def add_line(self, x_data, y_data, **kwargs):
         raise NotImplementedError
@@ -703,6 +725,10 @@ class ScatterPlotter:
             self.ax.set_xticks(self.x_ticks)
         if self.y_ticks is not None:
             self.ax.set_yticks(self.y_ticks)
+        if self.x_tick_labels is not None:
+            self.ax.set_xticklabels(self.x_tick_labels)
+        if self.y_tick_labels is not None:
+            self.ax.set_yticklabels(self.y_tick_labels)
         if self.hover and self.label is not None:
             pass
         if self.tight_layout:
