@@ -39,6 +39,10 @@ LineStyle = Literal["solid", "dashed", "dashdot", "dotted", "-", "--", "-.", ":"
 Scale = Literal["linear", "log", "symlog", "logit"]
 
 
+class ScatterPlotterException(Exception):
+    pass
+
+
 class ScatterPlotter:
     def __init__(self, x_data: Any, y_data: Any, **kwargs):
         self.x_data = self._validate_data(x_data, "x_data")
@@ -57,9 +61,9 @@ class ScatterPlotter:
         self.ylabel: Text = ""
         if "ylabel" in kwargs:
             self.set_ylabel(kwargs["ylabel"])
-        self.size_data: Union[Sequence[float], float] = None
-        if "size_data" in kwargs:
-            self.set_size(kwargs["size_data"])
+        self.size: Union[Sequence[float], float] = None
+        if "size" in kwargs:
+            self.set_size(kwargs["size"])
         self.color: Union[Sequence[Color], Color] = None
         if "color" in kwargs:
             self.set_color(kwargs["color"])
@@ -111,6 +115,9 @@ class ScatterPlotter:
         self.hover: bool = False
         if "hover" in kwargs:
             self.set_hover(kwargs["hover"])
+        self.tight_layout: bool = False
+        if "tight_layout" in kwargs:
+            self.set_tight_layout(kwargs["tight_layout"])
         self.texts: Union[Sequence[Text], Text] = None
         if "texts" in kwargs:
             self.set_texts(kwargs["texts"])
@@ -128,17 +135,17 @@ class ScatterPlotter:
 
     def set_title(self, title: str, **kwargs):
         """https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.set_title.html"""
-        self.title = Text(text=title, **kwargs)
+        self.title = dict(label=title, **kwargs)
         return self
 
     def set_xlabel(self, xlabel: str, **kwargs):
         """https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.set_xlabel"""
-        self.xlabel = Text(text=xlabel, **kwargs)
+        self.xlabel = dict(xlabel=xlabel, **kwargs)
         return self
 
     def set_ylabel(self, ylabel: str, **kwargs):
         """https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.set_ylabel"""
-        self.ylabel = Text(text=ylabel, **kwargs)
+        self.ylabel = dict(ylabel=ylabel, **kwargs)
         return self
 
     def set_axes_labels(self, xlabel: str, ylabel: str, **kwargs):
@@ -165,7 +172,7 @@ class ScatterPlotter:
                     raise ArgumentTypeError(
                         "All elements in size_data must be numeric."
                     )
-            self.size_data = size_data
+            self.size = size_data
         else:
             raise ArgumentTypeError(
                 "size_data must be array-like or a single numeric value."
@@ -476,11 +483,11 @@ class ScatterPlotter:
     ):
         self.grid = dict(visible=visible, which=which, axis=axis, **kwargs)
 
-    def set_texts(self, texts: Union[Sequence[Text], Text]):
-        if isinstance(texts, Text):
+    def set_texts(self, texts: Union[Sequence[Dict], Dict]):
+        if isinstance(texts, dict):
             self.texts = [texts]
         elif isinstance(texts, (list, tuple, ndarray, Series)) and all(
-            isinstance(tx, Text) for tx in texts
+            isinstance(tx, dict) for tx in texts
         ):
             self.texts = texts
         else:
@@ -493,6 +500,13 @@ class ScatterPlotter:
         if hover not in [True, False]:
             raise ArgumentTypeError("hover must be a bool.")
         self.hover = hover
+        return self
+
+    def set_tight_layout(self, tight_layout: bool = False):
+        if tight_layout in [True, False]:
+            self.tight_layout = tight_layout
+        else:
+            raise ArgumentValueError(f"tight_layout must be a bool.")
         return self
 
     def set_limits(self, xlim=None, ylim=None):
@@ -510,110 +524,62 @@ class ScatterPlotter:
     def add_line(self, x_data, y_data, **kwargs):
         raise NotImplementedError
 
-    def set_log_scale(self, x_log=False, y_log=False):
-        if x_log:
-            self.ax.set_xscale("log")
-        if y_log:
-            self.ax.set_yscale("log")
-        return self
-
-    def invert_axes(self, x_invert=False, y_invert=False):
-        if x_invert:
-            self.ax.invert_xaxis()
-        if y_invert:
-            self.ax.invert_yaxis()
-        return self
-
-    def set_aspect_ratio(self, aspect="auto"):
-        self.ax.set_aspect(aspect)
-        return self
-
-    def apply_theme(self, theme):
-        if theme == "dark":
-            self.set_style("dark_background")
-            self.set_color("cyan")
-            self.set_edgecolor("white")
-        elif theme == "light":
-            self.set_style("default")
-            self.set_color("blue")
-            self.set_edgecolor("black")
-        else:
-            raise ValueError(f"Theme '{theme}' is not recognized.")
-        return self
-
-    def draw(self):
-        plt.style.use(self.style)
-        if not self.figure or not self.ax:
-            self.figure, self.ax = plt.subplots()
+    def draw(self, show: bool = False):
+        if self.style is not None:
+            plt.style.use(self.style)
+        if not self.ax:
+            self.figure, self.ax = plt.subplots(figsize=self.figsize)
 
         scatter_kwargs = {
             "x": self.x_data,
             "y": self.y_data,
-            "c": self.color_data if self.color_data is not None else self.color,
-            "cmap": self.color_map,
-            "alpha": self.alpha,
-            "edgecolor": self.edgecolor,
+            "s": self.size,
+            "c": self.color,
             "marker": self.marker,
+            "cmap": self.color_map,
+            "norm": self.normalization,
+            "vmin": self.vmin,
+            "vmax": self.vmax,
+            "alpha": self.alpha,
+            "linewidth": self.linewidth,
+            "edgecolor": self.edgecolor,
+            "facecolor": self.facecolor,
+            "label": self.label,
+            "zorder": self.zorder,
+            "plotnonfinite": self.plot_non_finite,
         }
 
-        if self.size_data is not None:
-            scatter_kwargs["s"] = self.size_data
-
         try:
-            sc = self.ax.scatter(**scatter_kwargs)
+            self.ax.scatter(**scatter_kwargs)
         except Exception as e:
-            self.logger.error(f"Error while creating scatter plot: {e}")
-            raise
-
-        self.ax.set_title(self.title)
-        self.ax.set_xlabel(self.xlabel)
-        self.ax.set_ylabel(self.ylabel)
-
-        if self.color_data is not None and self.color_map is not None:
-            cbar = self.figure.colorbar(sc, ax=self.ax)
-            cbar.set_label("Color Scale")
-
+            raise ScatterPlotterException(f"Error while creating scatter plot: {e}")
+        if self.title:
+            self.ax.set_title(**self.title)
+        if self.xlabel:
+            self.ax.set_xlabel(**self.xlabel)
+        if self.ylabel:
+            self.ax.set_ylabel(**self.ylabel)
+        if self.xscale:
+            self.ax.set_xscale(self.xscale)
+        if self.yscale:
+            self.ax.set_yscale(self.yscale)
+        if self.grid is not None:
+            self.ax.grid(**self.grid)
+        if self.texts is not None:
+            for text in self.texts:
+                self.ax.text(**text)
         if self.hover and self.label is not None:
-            # Implement hover functionality
-            annot = self.ax.annotate(
-                "",
-                xy=(0, 0),
-                xytext=(20, 20),
-                textcoords="offset points",
-                bbox=dict(boxstyle="round", fc="w"),
-                arrowprops=dict(arrowstyle="->"),
-            )
-            annot.set_visible(False)
+            pass
+        if self.tight_layout:
+            plt.tight_layout()
+        if show:
+            plt.show()
+        return self.ax
 
-            def update_annot(ind):
-                pos = sc.get_offsets()[ind["ind"][0]]
-                annot.xy = pos
-                text = "{}".format(" ".join([str(self.label[n]) for n in ind["ind"]]))
-                annot.set_text(text)
-                annot.get_bbox_patch().set_alpha(0.4)
-
-            def hover_event(event):
-                vis = annot.get_visible()
-                if event.inaxes == self.ax:
-                    cont, ind = sc.contains(event)
-                    if cont:
-                        update_annot(ind)
-                        annot.set_visible(True)
-                        self.figure.canvas.draw_idle()
-                    else:
-                        if vis:
-                            annot.set_visible(False)
-                            self.figure.canvas.draw_idle()
-
-            self.figure.canvas.mpl_connect("motion_notify_event", hover_event)
-
-        plt.show()
-        return self
-
-    def save(self, filename, dpi=300, bbox_inches="tight"):
+    def save(self, file_path: Path, dpi: int = 300, bbox_inches: str = "tight"):
         if self.figure:
             try:
-                self.figure.savefig(filename, dpi=dpi, bbox_inches=bbox_inches)
+                self.figure.savefig(file_path, dpi=dpi, bbox_inches=bbox_inches)
             except Exception as e:
                 self.logger.error(f"Error saving figure: {e}")
                 raise
