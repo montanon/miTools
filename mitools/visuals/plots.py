@@ -89,10 +89,12 @@ class ScatterPlotter:
         self.facecolor: FaceColor = None
         if "facecolor" in kwargs:
             self.set_facecolor(kwargs["facecolor"])
+        self.label: Union[Sequence[str], str] = None
+        if "label" in kwargs:
+            self.set_label(kwargs["label"])
+        self.zorder: Union[Sequence[float], float] = None
         self.linestyle: Union[Sequence[LineStyle], LineStyle] = None
         self.plot_non_finite: bool = False
-        self.label: Union[Sequence[str], str] = None
-        self.zorder: Union[Sequence[float], float] = None
         self.figsize: Tuple[float, float] = (21, 14)
         self.style: str = "dark_background"
         self.hover: bool = False
@@ -377,7 +379,7 @@ class ScatterPlotter:
             )
         return self
 
-    def set_labels(self, labels: Union[Sequence[str], str]):
+    def set_label(self, labels: Union[Sequence[str], str]):
         if isinstance(labels, str):
             self.labels = labels
         elif isinstance(labels, (list, tuple, ndarray, Series)) and all(
