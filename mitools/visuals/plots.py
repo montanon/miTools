@@ -3,12 +3,10 @@ from pathlib import Path
 from typing import Any, Literal, Sequence, Tuple, Union
 
 import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
-from matplotlib import colormaps
 from matplotlib.axes import Axes
 from matplotlib.colors import Colormap, Normalize
 from matplotlib.figure import Figure
+from matplotlib.markers import MarkerStyle
 from matplotlib.text import Text
 from numpy import ndarray
 from pandas import Series
@@ -20,7 +18,8 @@ from mitools.exceptions import (
 )
 
 Color = Union[str, Sequence[float]]
-Marker = Union[str, int, Path]
+Marker = Union[str, int, Path, MarkerStyle]
+Markers = Union[Marker, Sequence[Marker]]
 Cmap = Union[
     Literal[
         "magma",
@@ -44,7 +43,6 @@ class ScatterPlotter(ABC):
     def __init__(self, x_data: Any, y_data: Any):
         self.x_data = self._validate_data(x_data, "x_data")
         self.y_data = self._validate_data(y_data, "y_data")
-
         if len(self.x_data) != len(self.y_data):
             raise ArgumentStructureError(
                 f"'x_data' and 'y_data' must be of the same length, {len(x_data)} != {len(y_data)}."
@@ -54,7 +52,7 @@ class ScatterPlotter(ABC):
         self.ylabel: Text = ""
         self.size_data: Union[Sequence[float], float] = None
         self.color: Union[Sequence[Color], Color] = None
-        self.marker: Union[Sequence[Marker], Marker] = "o"
+        self.marker: Markers = "o"
         self.color_map: Cmap = None
         self.normalize: Norm = None
         self.vmin: float = None
@@ -142,6 +140,45 @@ class ScatterPlotter(ABC):
             )
         return self
 
+    def set_marker(
+        self,
+        marker: Markers,
+        fillstyle: Literal["full", "left", "right", "bottom", "top", "none"] = None,
+    ):
+        if fillstyle is not None and fillstyle not in MarkerStyle.fillstyles:
+            raise ArgumentValueError(
+                f"'fillstyle'={fillstyle} must be a valid Matplotlib fillstyle string {MarkerStyle.fillstyles}."
+            )
+        if isinstance(marker, str):
+            if marker not in MarkerStyle.markers:
+                raise ArgumentValueError(
+                    f"'marker'={marker} must be a valid Matplotlib marker string {MarkerStyle.markers} or a MarkerStyle object."
+                )
+            self.marker = MarkerStyle(marker, fillstyle=fillstyle)
+        elif isinstance(marker, MarkerStyle):
+            self.marker = MarkerStyle(marker.get_marker(), fillstyle=fillstyle)
+        elif isinstance(marker, Sequence):
+            if not all(isinstance(m, (MarkerStyle, str)) for m in marker):
+                raise ArgumentTypeError(
+                    "All elements in marker must be MarkerStyle objects or valid Matplotlib marker strings."
+                )
+            if len(marker) != len(self.x_data):
+                raise ArgumentStructureError(
+                    "marker must be of the same length as x_data and y_data, "
+                    + f"len(marker)={len(marker)} != len(x_data)={len(self.x_data)}."
+                )
+            self.marker = [
+                MarkerStyle(m.get_marker(), fillstyle=fillstyle)
+                if isinstance(m, MarkerStyle)
+                else MarkerStyle(m, fillstyle=fillstyle)
+                for m in marker
+            ]
+        else:
+            raise ArgumentTypeError(
+                "marker must be a string, a MarkerStyle object, or a sequence of MarkerStyle objects."
+            )
+        return self
+
     def set_colormap(self, cmap: Cmap):
         _cmaps = [
             "magma",
@@ -180,24 +217,17 @@ class ScatterPlotter(ABC):
         self.edgecolor = edgecolor
         return self
 
-    def set_marker(self, marker):
-        self.marker = marker
-        return self
-
     def set_labels(self, labels):
-        """Set labels for each point (for interactive plots)."""
         self.labels = self._validate_data(labels, "labels")
         if len(self.labels) != len(self.x_data):
             raise ValueError("labels must be of the same length as x_data and y_data.")
         return self
 
     def enable_hover(self, hover=True):
-        """Enable or disable hover interaction."""
         self.hover = hover
         return self
 
     def set_color_data(self, color_data):
-        """Set data for coloring the scatter points."""
         self.color_data = self._validate_data(color_data, "color_data")
         if len(self.color_data) != len(self.x_data):
             raise ValueError(
@@ -206,11 +236,9 @@ class ScatterPlotter(ABC):
         return self
 
     def set_size_data(self, size_data):
-        """Set data for sizing the scatter points."""
         return self.set_size(size_data)
 
     def set_figure_size(self, width, height):
-        """Set the size of the figure."""
         if self.figure:
             self.figure.set_size_inches(width, height)
         else:
@@ -218,7 +246,6 @@ class ScatterPlotter(ABC):
         return self
 
     def set_limits(self, xlim=None, ylim=None):
-        """Set the limits of the axes."""
         if xlim is not None:
             self.ax.set_xlim(xlim)
         if ylim is not None:
@@ -226,7 +253,6 @@ class ScatterPlotter(ABC):
         return self
 
     def set_ticks(self, x_ticks=None, y_ticks=None):
-        """Set custom ticks for the axes."""
         if x_ticks is not None:
             self.ax.set_xticks(x_ticks)
         if y_ticks is not None:
@@ -234,7 +260,6 @@ class ScatterPlotter(ABC):
         return self
 
     def set_tick_labels(self, x_tick_labels=None, y_tick_labels=None):
-        """Set custom tick labels for the axes."""
         if x_tick_labels is not None:
             self.ax.set_xticklabels(x_tick_labels)
         if y_tick_labels is not None:
@@ -242,7 +267,6 @@ class ScatterPlotter(ABC):
         return self
 
     def set_grid(self, grid=True):
-        """Enable or disable the grid."""
         self.ax.grid(grid)
         return self
 
