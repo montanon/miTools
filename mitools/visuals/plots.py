@@ -127,6 +127,12 @@ class ScatterPlotter:
         self.yscale: Scale = None
         if "yscale" in kwargs:
             self.set_scales(yscale=kwargs["yscale"])
+        self.background: Color = None
+        if "background" in kwargs:
+            self.set_background(kwargs["background"])
+        self.figure_background: Color = None
+        if "figure_background" in kwargs:
+            self.set_figure_background(kwargs["figure_background"])
         self.figure: Figure = None
         self.ax: Axes = None
         self.legend: Union[Dict, None] = None
@@ -507,20 +513,15 @@ class ScatterPlotter:
             if not isinstance(facecolor, str):
                 raise ArgumentTypeError("'facecolor' must be a string")
             legend_kwargs["facecolor"] = facecolor
-
-        # Add any additional kwargs
         legend_kwargs.update(kwargs)
-
-        # Store the legend configuration
         self.legend = {"show": show, "kwargs": legend_kwargs} if show else None
-
         return self
 
     def set_zorder(self, zorder: Union[Sequence[float], float]):
-        if isinstance(zorder, float):
+        if isinstance(zorder, (float, int)):
             self.zorder = zorder
         elif isinstance(zorder, (list, tuple, ndarray, Series)) and all(
-            isinstance(zo, float) for zo in zorder
+            isinstance(zo, (float, int)) for zo in zorder
         ):
             if len(zorder) != self.data_size:
                 raise ArgumentStructureError(
@@ -563,6 +564,7 @@ class ScatterPlotter:
                     f"'x=yscale'={yscale} must be one of {_scales}"
                 )
             self.yscale = yscale
+        return self
 
     def set_grid(
         self,
@@ -572,6 +574,7 @@ class ScatterPlotter:
         **kwargs,
     ):
         self.grid = dict(visible=visible, which=which, axis=axis, **kwargs)
+        return self
 
     def set_texts(self, texts: Union[Sequence[Dict], Dict]):
         if isinstance(texts, dict):
@@ -599,6 +602,14 @@ class ScatterPlotter:
             raise ArgumentValueError("tight_layout must be a bool.")
         return self
 
+    def set_background(self, background: Color):
+        self.background = background
+        return self
+
+    def set_figure_background(self, figure_background: Color):
+        self.figure_background = figure_background
+        return self
+
     def set_limits(self, xlim=None, ylim=None):
         raise NotImplementedError
 
@@ -613,6 +624,7 @@ class ScatterPlotter:
 
     def draw(self, show: bool = False):
         if self.style is not None:
+            default_style = plt.rcParams.copy()
             plt.style.use(self.style)
         if not self.ax and not self.figure:
             self.figure, self.ax = plt.subplots(figsize=self.figsize)
@@ -656,14 +668,20 @@ class ScatterPlotter:
         if self.texts is not None:
             for text in self.texts:
                 self.ax.text(**text)
+        if self.legend is not None and self.legend["show"]:
+            self.ax.legend(**self.legend["kwargs"])
+        if self.background:
+            self.ax.set_facecolor(self.background)
+        if self.figure_background:
+            self.figure.set_facecolor(self.figure_background)
         if self.hover and self.label is not None:
             pass
         if self.tight_layout:
             plt.tight_layout()
-        if self.legend is not None and self.legend["show"]:
-            self.ax.legend(**self.legend["kwargs"])
         if show:
             plt.show()
+        if self.style is not None:
+            plt.rcParams.update(default_style)
         return self.ax
 
     def save(self, file_path: Path, dpi: int = 300, bbox_inches: str = "tight"):
