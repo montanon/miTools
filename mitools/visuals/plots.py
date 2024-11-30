@@ -652,9 +652,6 @@ class ScatterPlotter:
             self.y_tick_labels = y_tick_labels
         return self
 
-    def add_line(self, x_data, y_data, **kwargs):
-        raise NotImplementedError
-
     def draw(self, show: bool = False):
         if self.style is not None:
             default_style = plt.rcParams.copy()
