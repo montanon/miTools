@@ -93,6 +93,8 @@ class ScatterPlotter:
         if "label" in kwargs:
             self.set_label(kwargs["label"])
         self.zorder: Union[Sequence[float], float] = None
+        if "zorder" in kwargs:
+            self.set_zorder(kwargs["zorder"])
         self.linestyle: Union[Sequence[LineStyle], LineStyle] = None
         self.plot_non_finite: bool = False
         self.figsize: Tuple[float, float] = (21, 14)
@@ -393,6 +395,24 @@ class ScatterPlotter:
             self.labels = labels
         else:
             raise ArgumentTypeError("labels must be a str or a sequence of strs.")
+        return self
+
+    def set_zorder(self, zorder: Union[Sequence[float], float]):
+        if isinstance(zorder, float):
+            self.zorder = zorder
+        elif isinstance(
+            zorder,
+            (list, tuple, ndarray, Series)
+            and all(isinstance(zo, float) for zo in zorder),
+        ):
+            if len(zorder) != self.data_size:
+                raise ArgumentStructureError(
+                    "zorder must be of the same length as x_data and y_data, "
+                    + f"len(zorder)={len(zorder)} != len(x_data)={self.data_size}."
+                )
+            self.zorder = zorder
+        else:
+            raise ArgumentTypeError(f"zorder must be a float or sequence of floats")
         return self
 
     def enable_hover(self, hover=True):
