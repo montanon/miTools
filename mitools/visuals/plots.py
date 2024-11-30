@@ -52,87 +52,47 @@ class ScatterPlotter:
                 f"'x_data' and 'y_data' must be of the same length, {len(x_data)} != {len(y_data)}."
             )
         self.data_size = len(self.x_data)
-        self.title: Text = ""
-        if "title" in kwargs:
-            self.set_title(kwargs["title"])
-        self.xlabel: Text = ""
-        if "xlabel" in kwargs:
-            self.set_xlabel(kwargs["xlabel"])
-        self.ylabel: Text = ""
-        if "ylabel" in kwargs:
-            self.set_ylabel(kwargs["ylabel"])
-        self.size: Union[Sequence[float], float] = None
-        if "size" in kwargs:
-            self.set_size(kwargs["size"])
-        self.color: Union[Sequence[Color], Color] = None
-        if "color" in kwargs:
-            self.set_color(kwargs["color"])
-        self.marker: Markers = "o"
-        if "marker" in kwargs:
-            self.set_marker(kwargs["marker"])
-        self.color_map: Cmap = None
-        if "color_map" in kwargs:
-            self.set_colormap(kwargs["color_map"])
-        self.normalization: Norm = None
-        if "normalization" in kwargs:
-            self.set_normalization(kwargs["normalization"])
-        self.vmin: float = None
-        if "vmin" in kwargs:
-            self.set_vmin(kwargs["vmin"])
-        self.vmax: float = None
-        if "vmax" in kwargs:
-            self.set_vmax("vmax")
-        self.alpha: Union[Sequence[float], float] = 1.0
-        if "alpha" in kwargs:
-            self.set_alpha(kwargs["alpha"])
-        self.linewidth: Union[Sequence[float], float] = None
-        if "linewidth" in kwargs:
-            self.set_linewidth(kwargs["linewidth"])
-        self.edgecolor: EdgeColor = None
-        if "edgecolor" in kwargs:
-            self.set_edgecolor(kwargs["edgecolor"])
-        self.facecolor: FaceColor = None
-        if "facecolor" in kwargs:
-            self.set_facecolor(kwargs["facecolor"])
-        self.label: Union[Sequence[str], str] = None
-        if "label" in kwargs:
-            self.set_label(kwargs["label"])
-        self.zorder: Union[Sequence[float], float] = None
-        if "zorder" in kwargs:
-            self.set_zorder(kwargs["zorder"])
-        self.plot_non_finite: bool = False
-        if "plot_non_finite" in kwargs:
-            self.set_plot_non_finite(kwargs["plot_non_finite"])
-        self.figsize: Tuple[float, float] = (21, 14)
-        if "figsize" in kwargs:
-            self.set_figsize(kwargs["figsize"])
-        self.style: str = "dark_background"
-        if "style" in kwargs:
-            self.set_style(kwargs["style"])
-        self.grid: Dict[str, Any] = None
-        if "grid" in kwargs:
-            self.set_grid(kwargs["grid"])
-        self.hover: bool = False
-        if "hover" in kwargs:
-            self.set_hover(kwargs["hover"])
-        self.tight_layout: bool = False
-        if "tight_layout" in kwargs:
-            self.set_tight_layout(kwargs["tight_layout"])
-        self.texts: Union[Sequence[Text], Text] = None
-        if "texts" in kwargs:
-            self.set_texts(kwargs["texts"])
-        self.xscale: Scale = None
-        if "xscale" in kwargs:
-            self.set_scales(xscale=kwargs["xscale"])
-        self.yscale: Scale = None
-        if "yscale" in kwargs:
-            self.set_scales(yscale=kwargs["yscale"])
-        self.background: Color = None
-        if "background" in kwargs:
-            self.set_background(kwargs["background"])
-        self.figure_background: Color = None
-        if "figure_background" in kwargs:
-            self.set_figure_background(kwargs["figure_background"])
+        self._init_params = {
+            "title": {"default": "", "type": Text},
+            "xlabel": {"default": "", "type": Text},
+            "ylabel": {"default": "", "type": Text},
+            "size": {"default": None, "type": Union[Sequence[float], float]},
+            "color": {"default": None, "type": Union[Sequence[Color], Color]},
+            "marker": {"default": "o", "type": Markers},
+            "color_map": {"default": None, "type": Cmap},
+            "normalization": {"default": None, "type": Norm},
+            "vmin": {"default": None, "type": float},
+            "vmax": {"default": None, "type": float},
+            "alpha": {"default": 1.0, "type": Union[Sequence[float], float]},
+            "linewidth": {"default": None, "type": Union[Sequence[float], float]},
+            "edgecolor": {"default": None, "type": EdgeColor},
+            "facecolor": {"default": None, "type": FaceColor},
+            "label": {"default": None, "type": Union[Sequence[str], str]},
+            "zorder": {"default": None, "type": Union[Sequence[float], float]},
+            "plot_non_finite": {"default": False, "type": bool},
+            "figsize": {"default": (21, 14), "type": Tuple[float, float]},
+            "style": {"default": "dark_background", "type": str},
+            "grid": {"default": None, "type": Dict[str, Any]},
+            "hover": {"default": False, "type": bool},
+            "tight_layout": {"default": False, "type": bool},
+            "texts": {"default": None, "type": Union[Sequence[Text], Text]},
+            "xscale": {"default": None, "type": Scale},
+            "yscale": {"default": None, "type": Scale},
+            "background": {"default": None, "type": Color},
+            "figure_background": {"default": None, "type": Color},
+        }
+
+        for param, config in self._init_params.items():
+            setattr(self, param, config["default"])
+            if param in kwargs:
+                setter_name = f"set_{param}"
+                if hasattr(self, setter_name):
+                    getattr(self, setter_name)(kwargs[param])
+                else:
+                    if param in ["xscale", "yscale"]:
+                        self.set_scales(**{param: kwargs[param]})
+                    else:
+                        raise ArgumentValueError(f"Parameter '{param}' is not valid.")
         self.figure: Figure = None
         self.ax: Axes = None
         self.legend: Union[Dict, None] = None
