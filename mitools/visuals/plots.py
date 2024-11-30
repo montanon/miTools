@@ -527,7 +527,7 @@ class ScatterPlotter:
     def draw(self, show: bool = False):
         if self.style is not None:
             plt.style.use(self.style)
-        if not self.ax:
+        if not self.ax and not self.figure:
             self.figure, self.ax = plt.subplots(figsize=self.figsize)
 
         scatter_kwargs = {
@@ -581,10 +581,11 @@ class ScatterPlotter:
             try:
                 self.figure.savefig(file_path, dpi=dpi, bbox_inches=bbox_inches)
             except Exception as e:
-                self.logger.error(f"Error saving figure: {e}")
-                raise
+                raise ScatterPlotterException(f"Error while saving scatter plot: {e}")
         else:
-            raise RuntimeError("Plot not drawn yet. Call draw() before saving.")
+            raise ScatterPlotterException(
+                "Plot not drawn yet. Call draw() before saving."
+            )
         return self
 
     def clear(self):
