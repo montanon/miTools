@@ -52,83 +52,50 @@ class ScatterPlotter:
                 f"'x_data' and 'y_data' must be of the same length, {len(x_data)} != {len(y_data)}."
             )
         self.data_size = len(self.x_data)
-        self.title: Text = ""
-        if "title" in kwargs:
-            self.set_title(kwargs["title"])
-        self.xlabel: Text = ""
-        if "xlabel" in kwargs:
-            self.set_xlabel(kwargs["xlabel"])
-        self.ylabel: Text = ""
-        if "ylabel" in kwargs:
-            self.set_ylabel(kwargs["ylabel"])
-        self.size: Union[Sequence[float], float] = None
-        if "size" in kwargs:
-            self.set_size(kwargs["size"])
-        self.color: Union[Sequence[Color], Color] = None
-        if "color" in kwargs:
-            self.set_color(kwargs["color"])
-        self.marker: Markers = "o"
-        if "marker" in kwargs:
-            self.set_marker(kwargs["marker"])
-        self.color_map: Cmap = None
-        if "color_map" in kwargs:
-            self.set_colormap(kwargs["color_map"])
-        self.normalization: Norm = None
-        if "normalization" in kwargs:
-            self.set_normalization(kwargs["normalization"])
-        self.vmin: float = None
-        if "vmin" in kwargs:
-            self.set_vmin(kwargs["vmin"])
-        self.vmax: float = None
-        if "vmax" in kwargs:
-            self.set_vmax("vmax")
-        self.alpha: Union[Sequence[float], float] = 1.0
-        if "alpha" in kwargs:
-            self.set_alpha(kwargs["alpha"])
-        self.linewidth: Union[Sequence[float], float] = None
-        if "linewidth" in kwargs:
-            self.set_linewidth(kwargs["linewidth"])
-        self.edgecolor: EdgeColor = None
-        if "edgecolor" in kwargs:
-            self.set_edgecolor(kwargs["edgecolor"])
-        self.facecolor: FaceColor = None
-        if "facecolor" in kwargs:
-            self.set_facecolor(kwargs["facecolor"])
-        self.label: Union[Sequence[str], str] = None
-        if "label" in kwargs:
-            self.set_label(kwargs["label"])
-        self.zorder: Union[Sequence[float], float] = None
-        if "zorder" in kwargs:
-            self.set_zorder(kwargs["zorder"])
-        self.plot_non_finite: bool = False
-        if "plot_non_finite" in kwargs:
-            self.set_plot_non_finite(kwargs["plot_non_finite"])
-        self.figsize: Tuple[float, float] = (21, 14)
-        if "figsize" in kwargs:
-            self.set_figsize(kwargs["figsize"])
-        self.style: str = "dark_background"
-        if "style" in kwargs:
-            self.set_style(kwargs["style"])
-        self.grid: Dict[str, Any] = None
-        if "grid" in kwargs:
-            self.set_grid(kwargs["grid"])
-        self.hover: bool = False
-        if "hover" in kwargs:
-            self.set_hover(kwargs["hover"])
-        self.tight_layout: bool = False
-        if "tight_layout" in kwargs:
-            self.set_tight_layout(kwargs["tight_layout"])
-        self.texts: Union[Sequence[Text], Text] = None
-        if "texts" in kwargs:
-            self.set_texts(kwargs["texts"])
-        self.xscale: Scale = None
-        if "xscale" in kwargs:
-            self.set_scales(xscale=kwargs["xscale"])
-        self.yscale: Scale = None
-        if "yscale" in kwargs:
-            self.set_scales(yscale=kwargs["yscale"])
+        self._init_params = {
+            "title": {"default": "", "type": Text},
+            "xlabel": {"default": "", "type": Text},
+            "ylabel": {"default": "", "type": Text},
+            "size": {"default": None, "type": Union[Sequence[float], float]},
+            "color": {"default": None, "type": Union[Sequence[Color], Color]},
+            "marker": {"default": "o", "type": Markers},
+            "color_map": {"default": None, "type": Cmap},
+            "normalization": {"default": None, "type": Norm},
+            "vmin": {"default": None, "type": float},
+            "vmax": {"default": None, "type": float},
+            "alpha": {"default": 1.0, "type": Union[Sequence[float], float]},
+            "linewidth": {"default": None, "type": Union[Sequence[float], float]},
+            "edgecolor": {"default": None, "type": EdgeColor},
+            "facecolor": {"default": None, "type": FaceColor},
+            "label": {"default": None, "type": Union[Sequence[str], str]},
+            "zorder": {"default": None, "type": Union[Sequence[float], float]},
+            "plot_non_finite": {"default": False, "type": bool},
+            "figsize": {"default": (21, 14), "type": Tuple[float, float]},
+            "style": {"default": "dark_background", "type": str},
+            "grid": {"default": None, "type": Dict[str, Any]},
+            "hover": {"default": False, "type": bool},
+            "tight_layout": {"default": False, "type": bool},
+            "texts": {"default": None, "type": Union[Sequence[Text], Text]},
+            "xscale": {"default": None, "type": Scale},
+            "yscale": {"default": None, "type": Scale},
+            "background": {"default": None, "type": Color},
+            "figure_background": {"default": None, "type": Color},
+        }
+
+        for param, config in self._init_params.items():
+            setattr(self, param, config["default"])
+            if param in kwargs:
+                setter_name = f"set_{param}"
+                if hasattr(self, setter_name):
+                    getattr(self, setter_name)(kwargs[param])
+                else:
+                    if param in ["xscale", "yscale"]:
+                        self.set_scales(**{param: kwargs[param]})
+                    else:
+                        raise ArgumentValueError(f"Parameter '{param}' is not valid.")
         self.figure: Figure = None
         self.ax: Axes = None
+        self.legend: Union[Dict, None] = None
 
     def _validate_data(self, data: Any, name: str) -> Any:
         return data
@@ -154,10 +121,12 @@ class ScatterPlotter:
         return self
 
     def set_style(self, style: str):
-        if style in plt.style.available:
+        if style in plt.style.available or style is None:
             self.style = style
         else:
-            raise ArgumentValueError(f"Style '{style}' is not available in Matplotlib.")
+            raise ArgumentValueError(
+                f"Style '{style}' is not available in Matplotlib styles: {plt.style.available}."
+            )
         return self
 
     def set_size(self, size_data: Union[Sequence[float], float]):
@@ -179,7 +148,9 @@ class ScatterPlotter:
             )
         return self
 
-    def set_color(self, color: Union[Sequence[Color], Color]):
+    def set_color(
+        self, color: Union[Sequence[Color], Color, Sequence[float], Sequence[int]]
+    ):
         if isinstance(color, (list, tuple, ndarray, Series, str)):
             if not isinstance(color, str):
                 if len(color) != self.data_size:
@@ -187,7 +158,10 @@ class ScatterPlotter:
                         "color must be of the same length as x_data and y_data, "
                         + f"len(color)={len(color)} != len(x_data)={self.data_size}."
                     )
-                if not all(isinstance(c, (str, tuple, list, ndarray)) for c in color):
+                if not all(
+                    isinstance(c, (str, tuple, list, ndarray, float, int))
+                    for c in color
+                ):
                     raise ArgumentTypeError(
                         "All elements in color must be strings, tuples, lists, or ndarrays."
                     )
@@ -280,26 +254,22 @@ class ScatterPlotter:
             )
         return self
 
-    def set_vmin(self, vmin: float):
+    def set_vmin(self, vmin: Union[float, int]):
         if self.normalization is not None and not isinstance(self.normalization, str):
             raise ArgumentValueError(
                 f"Normalization {self.normalization} has been set. vmin only work when 'self.normalization' is a str."
             )
-        if isinstance(vmin, float):
+        if isinstance(vmin, (float, int)):
             self.vmin = vmin
-        else:
-            raise ArgumentTypeError(f"'vmin'={vmin} must be a float.")
         return self
 
-    def set_vmax(self, vmax: float):
+    def set_vmax(self, vmax: Union[float, int]):
         if self.normalization is not None and not isinstance(self.normalization, str):
             raise ArgumentValueError(
                 f"Normalization {self.normalization} has been set. vmax only work when 'self.normalization' is a str."
             )
-        if isinstance(vmax, float):
+        if isinstance(vmax, (float, int)):
             self.vmax = vmax
-        else:
-            raise ArgumentTypeError(f"'vmax'={vmax} must be a float.")
         return self
 
     def set_normalization_range(self, vmin: float, vmax: float):
@@ -323,10 +293,10 @@ class ScatterPlotter:
         return self
 
     def set_linewidth(self, linewidth: Union[Sequence[float], float]):
-        if isinstance(linewidth, float):
+        if isinstance(linewidth, (float, int)):
             self.linewidth = linewidth
-        elif isinstance(linewidth, list, tuple, ndarray, Series) and all(
-            isinstance(lw, float) for lw in linewidth
+        elif isinstance(linewidth, (list, tuple, ndarray, Series)) and all(
+            isinstance(lw, (float, int)) for lw in linewidth
         ):
             if len(linewidth) != self.data_size:
                 raise ArgumentStructureError(
@@ -336,7 +306,7 @@ class ScatterPlotter:
             self.linewidth = linewidth
         else:
             raise ArgumentTypeError(
-                "linewidth must be a float or an array-like of floats."
+                "linewidth must be a float or an array-like of floats or ints."
             )
         return self
 
@@ -424,13 +394,94 @@ class ScatterPlotter:
             raise ArgumentTypeError("labels must be a str or a sequence of strs.")
         return self
 
+    def set_legend(
+        self,
+        show: bool = True,
+        labels: Union[Sequence[str], str, None] = None,
+        handles: Union[Sequence[Any], None] = None,
+        loc: Union[str, int] = "best",
+        bbox_to_anchor: Union[Tuple[float, float], None] = None,
+        ncol: int = 1,
+        fontsize: Union[int, str, None] = None,
+        title: Union[str, None] = None,
+        title_fontsize: Union[int, str, None] = None,
+        frameon: bool = True,
+        fancybox: bool = True,
+        framealpha: float = 0.8,
+        edgecolor: Union[str, None] = None,
+        facecolor: Union[str, None] = "inherit",
+        **kwargs,
+    ):
+        if show not in [True, False]:
+            raise ArgumentTypeError("'show' must be a boolean")
+
+        legend_kwargs = {
+            "loc": loc,
+            "ncol": ncol,
+            "frameon": frameon,
+            "fancybox": fancybox,
+            "framealpha": framealpha,
+        }
+        if labels is not None:
+            if isinstance(labels, str):
+                legend_kwargs["labels"] = [labels]
+            elif isinstance(labels, (list, tuple)) and all(
+                isinstance(l, str) for l in labels
+            ):
+                legend_kwargs["labels"] = labels
+            else:
+                raise ArgumentTypeError(
+                    "'labels' must be a string or sequence of strings"
+                )
+        if handles is not None:
+            if not isinstance(handles, (list, tuple)):
+                raise ArgumentTypeError(
+                    "'handles' must be a sequence of Artist objects"
+                )
+            legend_kwargs["handles"] = handles
+        if bbox_to_anchor is not None:
+            if not isinstance(bbox_to_anchor, tuple) or len(bbox_to_anchor) not in [
+                2,
+                4,
+            ]:
+                raise ArgumentTypeError(
+                    "'bbox_to_anchor' must be a tuple of 2 or 4 floats"
+                )
+            legend_kwargs["bbox_to_anchor"] = bbox_to_anchor
+
+        if fontsize is not None:
+            if not isinstance(fontsize, (int, str)):
+                raise ArgumentTypeError("'fontsize' must be an integer or string")
+            legend_kwargs["fontsize"] = fontsize
+
+        if title is not None:
+            if not isinstance(title, str):
+                raise ArgumentTypeError("'title' must be a string")
+            legend_kwargs["title"] = title
+
+        if title_fontsize is not None:
+            if not isinstance(title_fontsize, (int, str)):
+                raise ArgumentTypeError("'title_fontsize' must be an integer or string")
+            legend_kwargs["title_fontsize"] = title_fontsize
+
+        if edgecolor is not None:
+            if not isinstance(edgecolor, str):
+                raise ArgumentTypeError("'edgecolor' must be a string")
+            legend_kwargs["edgecolor"] = edgecolor
+
+        if facecolor is not None:
+            if not isinstance(facecolor, str):
+                raise ArgumentTypeError("'facecolor' must be a string")
+            legend_kwargs["facecolor"] = facecolor
+        legend_kwargs.update(kwargs)
+        self.legend = {"show": show, "kwargs": legend_kwargs} if show else None
+        return self
+
     def set_zorder(self, zorder: Union[Sequence[float], float]):
-        if isinstance(zorder, float):
+        if isinstance(zorder, (float, int)):
             self.zorder = zorder
-        elif isinstance(
-            zorder,
-            (list, tuple, ndarray, Series)
-            and all(isinstance(zo, float) for zo in zorder),
+        elif isinstance(zorder, (list, tuple, ndarray, Series)) and all(
+            isinstance(zo, (float, int)) for zo in zorder
         ):
             if len(zorder) != self.data_size:
                 raise ArgumentStructureError(
@@ -450,11 +501,11 @@ class ScatterPlotter:
 
     def set_figsize(self, figsize: Tuple[float, float]):
         if isinstance(figsize, tuple) and all(
-            isinstance(val, float) for val in figsize
+            isinstance(val, (float, int)) for val in figsize
         ):
             self.figsize = figsize
         else:
-            raise ArgumentTypeError("figsize must be a tuple of floats.")
+            raise ArgumentTypeError("figsize must be a tuple of floats or ints.")
         return self
 
     def set_scales(
@@ -473,15 +524,17 @@ class ScatterPlotter:
                     f"'x=yscale'={yscale} must be one of {_scales}"
                 )
             self.yscale = yscale
+        return self
 
     def set_grid(
         self,
         visible: bool = None,
-        which: Literal["major", "minor", "both"] = None,
-        axis: Literal["both", "x", "y"] = None,
+        which: Literal["major", "minor", "both"] = "major",
+        axis: Literal["both", "x", "y"] = "both",
         **kwargs,
     ):
         self.grid = dict(visible=visible, which=which, axis=axis, **kwargs)
+        return self
 
     def set_texts(self, texts: Union[Sequence[Dict], Dict]):
         if isinstance(texts, dict):
@@ -509,6 +562,14 @@ class ScatterPlotter:
             raise ArgumentValueError("tight_layout must be a bool.")
         return self
 
+    def set_background(self, background: Color):
+        self.background = background
+        return self
+
+    def set_figure_background(self, figure_background: Color):
+        self.figure_background = figure_background
+        return self
+
     def set_limits(self, xlim=None, ylim=None):
         raise NotImplementedError
 
@@ -518,17 +579,18 @@ class ScatterPlotter:
     def set_tick_labels(self, x_tick_labels=None, y_tick_labels=None):
         raise NotImplementedError
 
-    def set_legend(self, legend=True):
-        raise NotImplementedError
-
     def add_line(self, x_data, y_data, **kwargs):
         raise NotImplementedError
 
     def draw(self, show: bool = False):
         if self.style is not None:
+            default_style = plt.rcParams.copy()
             plt.style.use(self.style)
         if not self.ax and not self.figure:
             self.figure, self.ax = plt.subplots(figsize=self.figsize)
+
+        if self.grid is not None:
+            self.ax.grid(**self.grid)
 
         scatter_kwargs = {
             "x": self.x_data,
@@ -563,17 +625,23 @@ class ScatterPlotter:
             self.ax.set_xscale(self.xscale)
         if self.yscale:
             self.ax.set_yscale(self.yscale)
-        if self.grid is not None:
-            self.ax.grid(**self.grid)
         if self.texts is not None:
             for text in self.texts:
                 self.ax.text(**text)
+        if self.legend is not None and self.legend["show"]:
+            self.ax.legend(**self.legend["kwargs"])
+        if self.background:
+            self.ax.set_facecolor(self.background)
+        if self.figure_background:
+            self.figure.set_facecolor(self.figure_background)
         if self.hover and self.label is not None:
             pass
         if self.tight_layout:
             plt.tight_layout()
         if show:
             plt.show()
+        if self.style is not None:
+            plt.rcParams.update(default_style)
         return self.ax
 
     def save(self, file_path: Path, dpi: int = 300, bbox_inches: str = "tight"):

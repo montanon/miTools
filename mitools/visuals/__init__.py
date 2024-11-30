@@ -6,3 +6,4 @@ from .axes_functions import (
     is_ax_empty,
     set_axes_limits,
 )
+from .plots import ScatterPlotter
