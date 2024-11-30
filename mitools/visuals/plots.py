@@ -9,8 +9,13 @@ from matplotlib.axes import Axes
 from matplotlib.colors import Colormap, Normalize
 from matplotlib.figure import Figure
 from matplotlib.text import Text
+from pandas import Series
 
-from mitools.exceptions import ArgumentValueError
+from mitools.exceptions import (
+    ArgumentStructureError,
+    ArgumentTypeError,
+    ArgumentValueError,
+)
 
 Color = Union[str, Sequence[float]]
 Marker = Union[str, int, Path]
@@ -27,9 +32,12 @@ class ScatterPlotter(ABC):
         self.y_data = self._validate_data(y_data, "y_data")
 
         if len(self.x_data) != len(self.y_data):
-            raise ArgumentValueError(
+            raise ArgumentStructureError(
                 f"'x_data' and 'y_data' must be of the same length, {len(x_data)} != {len(y_data)}."
             )
+        self.title: Text = ""
+        self.xlabel: Text = ""
+        self.ylabel: Text = ""
         self.size_data: Union[Sequence[float], float] = None
         self.color: Union[Sequence[Color], Color] = None
         self.marker: Union[Sequence[Marker], Marker] = "o"
@@ -46,9 +54,6 @@ class ScatterPlotter(ABC):
         self.labels: Union[Sequence[str], str] = None
         self.zorders: Union[Sequence[float], float] = None
         self.figsize: Tuple[float, float] = (21, 14)
-        self.title: Text = ""
-        self.xlabel: Text = ""
-        self.ylabel: Text = ""
         self.style: str = "dark_background"
         self.hover: bool = False
         self.figure: Figure = None
@@ -85,6 +90,22 @@ class ScatterPlotter(ABC):
             raise ArgumentValueError(f"Style '{style}' is not available in Matplotlib.")
         return self
 
+    def set_size(self, size_data: Union[Sequence[float], float]):
+        if isinstance(size_data, (list, tuple, np.ndarray, Series, float, int)):
+            if not isinstance(size_data, (float, int)) and len(size_data) != len(
+                self.x_data
+            ):
+                raise ArgumentStructureError(
+                    "size_data must be of the same length as x_data and y_data,"
+                    + f"len(size_data)={len(size_data)} != len(x_data)={len(self.x_data)}."
+                )
+            self.size_data = size_data
+        else:
+            raise ArgumentTypeError(
+                "size_data must be array-like or a single numeric value."
+            )
+        return self
+
     def set_color(self, color):
         self.color = color
         return self
@@ -98,13 +119,6 @@ class ScatterPlotter(ABC):
             self.alpha = alpha
         else:
             raise ValueError("Alpha must be between 0.0 and 1.0.")
-        return self
-
-    def set_size(self, size_data):
-        if isinstance(size_data, (list, tuple, np.ndarray, pd.Series, float, int)):
-            self.size_data = size_data
-        else:
-            raise TypeError("size_data must be array-like or a single numeric value.")
         return self
 
     def set_edgecolor(self, edgecolor):
