@@ -36,6 +36,7 @@ Norm = Union[str, Normalize]
 EdgeColor = Union[Literal["face", "none", None], Color, Sequence[Color]]
 FaceColor = Union[Color, Sequence[Color]]
 LineStyle = Literal["solid", "dashed", "dashdot", "dotted", "-", "--", "-.", ":"]
+Scale = Literal["linear", "log", "symlog", "logit"]
 
 
 class ScatterPlotter:
@@ -110,6 +111,15 @@ class ScatterPlotter:
         self.hover: bool = False
         if "hover" in kwargs:
             self.set_hover(kwargs["hover"])
+        self.texts: Union[Sequence[Text], Text] = None
+        if "texts" in kwargs:
+            self.set_texts(kwargs["texts"])
+        self.xscale: Scale = None
+        if "xscale" in kwargs:
+            self.set_scales(xscale=kwargs["xscale"])
+        self.yscale: Scale = None
+        if "yscale" in kwargs:
+            self.set_scales(yscale=kwargs["yscale"])
         self.figure: Figure = None
         self.ax: Axes = None
 
@@ -440,6 +450,23 @@ class ScatterPlotter:
             raise ArgumentTypeError("figsize must be a tuple of floats.")
         return self
 
+    def set_scales(
+        self,
+        xscale: Scale = None,
+        yscale: Scale = None,
+    ):
+        _scales = ["linear", "log", "symlog", "logit"]
+        if xscale is not None:
+            if xscale not in _scales:
+                raise ArgumentValueError(f"'xscale'={xscale} must be one of {_scales}")
+            self.xscale = xscale
+        if yscale is not None:
+            if yscale not in _scales:
+                raise ArgumentValueError(
+                    f"'x=yscale'={yscale} must be one of {_scales}"
+                )
+            self.yscale = yscale
+
     def set_grid(
         self,
         visible: bool = None,
@@ -448,6 +475,19 @@ class ScatterPlotter:
         **kwargs,
     ):
         self.grid = dict(visible=visible, which=which, axis=axis, **kwargs)
+
+    def set_texts(self, texts: Union[Sequence[Text], Text]):
+        if isinstance(texts, Text):
+            self.texts = [texts]
+        elif isinstance(texts, (list, tuple, ndarray, Series)) and all(
+            isinstance(tx, Text) for tx in texts
+        ):
+            self.texts = texts
+        else:
+            raise ArgumentTypeError(
+                "texts must a matplotlib Text object or a sequence of Text objects"
+            )
+        return self
 
     def set_hover(self, hover: bool):
         if hover not in [True, False]:
@@ -464,22 +504,11 @@ class ScatterPlotter:
     def set_tick_labels(self, x_tick_labels=None, y_tick_labels=None):
         raise NotImplementedError
 
-    def set_grid(self, grid=True):
-        self.ax.grid(grid)
-        return self
-
     def set_legend(self, legend=True):
-        if legend:
-            self.ax.legend()
-        return self
-
-    def add_text(self, x, y, text, **kwargs):
-        self.ax.text(x, y, text, **kwargs)
-        return self
+        raise NotImplementedError
 
     def add_line(self, x_data, y_data, **kwargs):
-        self.ax.plot(x_data, y_data, **kwargs)
-        return self
+        raise NotImplementedError
 
     def set_log_scale(self, x_log=False, y_log=False):
         if x_log:
