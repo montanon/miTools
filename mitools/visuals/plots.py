@@ -95,10 +95,15 @@ class ScatterPlotter:
         self.zorder: Union[Sequence[float], float] = None
         if "zorder" in kwargs:
             self.set_zorder(kwargs["zorder"])
-        self.linestyle: Union[Sequence[LineStyle], LineStyle] = None
         self.plot_non_finite: bool = False
+        if "plot_non_finite" in kwargs:
+            self.set_plot_non_finite(kwargs["plot_non_finite"])
         self.figsize: Tuple[float, float] = (21, 14)
+        if "figsize" in kwargs:
+            self.set_figsize(kwargs["figsize"])
         self.style: str = "dark_background"
+        if "style" in kwargs:
+            self.set_style(kwargs["style"])
         self.hover: bool = False
         self.figure: Figure = None
         self.ax: Axes = None
@@ -412,29 +417,28 @@ class ScatterPlotter:
                 )
             self.zorder = zorder
         else:
-            raise ArgumentTypeError(f"zorder must be a float or sequence of floats")
+            raise ArgumentTypeError("zorder must be a float or sequence of floats")
         return self
 
-    def enable_hover(self, hover=True):
-        self.hover = hover
+    def set_plot_non_finite(self, plot_non_finite: bool):
+        if plot_non_finite not in [True, False]:
+            raise ArgumentTypeError("plot_non_finite must be a bool.")
+        self.plot_non_finite = plot_non_finite
         return self
 
-    def set_color_data(self, color_data):
-        self.color_data = self._validate_data(color_data, "color_data")
-        if len(self.color_data) != len(self.x_data):
-            raise ValueError(
-                "color_data must be of the same length as x_data and y_data."
-            )
-        return self
-
-    def set_size_data(self, size_data):
-        return self.set_size(size_data)
-
-    def set_figure_size(self, width, height):
-        if self.figure:
-            self.figure.set_size_inches(width, height)
+    def set_figsize(self, figsize: Tuple[float, float]):
+        if isinstance(figsize, tuple) and all(
+            isinstance(val, float) for val in figsize
+        ):
+            self.figsize = figsize
         else:
-            self.figure = plt.figure(figsize=(width, height))
+            raise ArgumentTypeError("figsize must be a tuple of floats.")
+        return self
+
+    def set_hover(self, hover: bool):
+        if hover not in [True, False]:
+            raise ArgumentTypeError("hover must be a bool.")
+        self.hover = hover
         return self
 
     def set_limits(self, xlim=None, ylim=None):
