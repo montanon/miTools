@@ -152,7 +152,8 @@ class ScatterPlotter(ABC):
         if isinstance(marker, str):
             if marker not in MarkerStyle.markers:
                 raise ArgumentValueError(
-                    f"'marker'={marker} must be a valid Matplotlib marker string {MarkerStyle.markers} or a MarkerStyle object."
+                    f"'marker'={marker} must be a valid Matplotlib marker string"
+                    + f" {MarkerStyle.markers} or a MarkerStyle object."
                 )
             self.marker = MarkerStyle(marker, fillstyle=fillstyle)
         elif isinstance(marker, MarkerStyle):
@@ -195,6 +196,29 @@ class ScatterPlotter(ABC):
         else:
             raise ArgumentTypeError(
                 f"cmap must be a Colormap object or a valid Colormap string from {_cmaps}."
+            )
+        return self
+
+    def set_normalize(self, normalize: Norm):
+        _normalizations = [
+            "linear",
+            "log",
+            "symlog",
+            "asinh",
+            "logit",
+            "function",
+            "functionlog",
+        ]
+        if (
+            isinstance(normalize, Normalize)
+            or isinstance(normalize, str)
+            and normalize in _normalizations
+        ):
+            self.normalize = normalize
+        else:
+            raise ArgumentTypeError(
+                "normalize must be a valid Normalize object or a valid Matplotlib normalization string"
+                + f" of {_normalizations}."
             )
         return self
 
