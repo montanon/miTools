@@ -1,4 +1,3 @@
-from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Literal, Sequence, Tuple, Union
 
@@ -39,7 +38,7 @@ FaceColor = Union[Color, Sequence[Color]]
 LineStyle = Literal["solid", "dashed", "dashdot", "dotted", "-", "--", "-.", ":"]
 
 
-class ScatterPlotter(ABC):
+class ScatterPlotter:
     def __init__(self, x_data: Any, y_data: Any, **kwargs):
         self.x_data = self._validate_data(x_data, "x_data")
         self.y_data = self._validate_data(y_data, "y_data")
@@ -79,20 +78,21 @@ class ScatterPlotter(ABC):
         if "vmax" in kwargs:
             self.set_vmax("vmax")
         self.alpha: Union[Sequence[float], float] = 1.0
-        self.linewidths: Union[Sequence[float], float] = None
-        self.linestyles: Union[Sequence[LineStyle], LineStyle] = None
-        self.edgecolors: EdgeColor = None
-        self.facecolors: FaceColor = None
+        if "alpha" in kwargs:
+            self.set_alpha(kwargs["alpha"])
+        self.linewidth: Union[Sequence[float], float] = None
+        self.linestyle: Union[Sequence[LineStyle], LineStyle] = None
+        self.edgecolor: EdgeColor = None
+        self.facecolor: FaceColor = None
         self.plot_non_finite: bool = False
-        self.labels: Union[Sequence[str], str] = None
-        self.zorders: Union[Sequence[float], float] = None
+        self.label: Union[Sequence[str], str] = None
+        self.zorder: Union[Sequence[float], float] = None
         self.figsize: Tuple[float, float] = (21, 14)
         self.style: str = "dark_background"
         self.hover: bool = False
         self.figure: Figure = None
         self.ax: Axes = None
 
-    @abstractmethod
     def _validate_data(self, data: Any, name: str) -> Any:
         return data
 
@@ -276,7 +276,7 @@ class ScatterPlotter(ABC):
                 if len(alpha) != len(self.x_data):
                     raise ArgumentStructureError(
                         "alpha must be of the same length as x_data and y_data, "
-                        + f"len(alpha)={len(alpha)} != len(x_data)={len(self.x_data)}."
+                        + f"len(alpha)={len(alpha)} != len(x_data)={self.data_size}."
                     )
             self.alpha = alpha
         else:
@@ -285,13 +285,31 @@ class ScatterPlotter(ABC):
             )
         return self
 
+    def set_linewidth(self, linewidth: Union[Sequence[float], float]):
+        if isinstance(linewidth, float):
+            self.linewidth = linewidth
+        elif isinstance(linewidth, list, tuple, ndarray, Series) and all(
+            isinstance(lw, float) for lw in linewidth
+        ):
+            if len(linewidth) != self.data_size:
+                raise ArgumentStructureError(
+                    "linewidth must be of the same length as x_data and y_data, "
+                    + f"len(linewdith)={len(linewidth)} != len(x_data)={self.data_size}."
+                )
+            self.linewidth = linewidth
+        else:
+            raise ArgumentTypeError(
+                "linewidth must be a float or an array-like of floats."
+            )
+        return self
+
     def set_edgecolor(self, edgecolor):
         self.edgecolor = edgecolor
         return self
 
     def set_labels(self, labels):
-        self.labels = self._validate_data(labels, "labels")
-        if len(self.labels) != len(self.x_data):
+        self.label = self._validate_data(labels, "labels")
+        if len(self.label) != len(self.x_data):
             raise ValueError("labels must be of the same length as x_data and y_data.")
         return self
 
@@ -418,7 +436,7 @@ class ScatterPlotter(ABC):
             cbar = self.figure.colorbar(sc, ax=self.ax)
             cbar.set_label("Color Scale")
 
-        if self.hover and self.labels is not None:
+        if self.hover and self.label is not None:
             # Implement hover functionality
             annot = self.ax.annotate(
                 "",
@@ -433,7 +451,7 @@ class ScatterPlotter(ABC):
             def update_annot(ind):
                 pos = sc.get_offsets()[ind["ind"][0]]
                 annot.xy = pos
-                text = "{}".format(" ".join([str(self.labels[n]) for n in ind["ind"]]))
+                text = "{}".format(" ".join([str(self.label[n]) for n in ind["ind"]]))
                 annot.set_text(text)
                 annot.get_bbox_patch().set_alpha(0.4)
 
