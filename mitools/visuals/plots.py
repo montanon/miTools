@@ -287,26 +287,22 @@ class ScatterPlotter:
             )
         return self
 
-    def set_vmin(self, vmin: float):
+    def set_vmin(self, vmin: Union[float, int]):
         if self.normalization is not None and not isinstance(self.normalization, str):
             raise ArgumentValueError(
                 f"Normalization {self.normalization} has been set. vmin only work when 'self.normalization' is a str."
             )
-        if isinstance(vmin, float):
+        if isinstance(vmin, (float, int)):
             self.vmin = vmin
-        else:
-            raise ArgumentTypeError(f"'vmin'={vmin} must be a float.")
         return self
 
-    def set_vmax(self, vmax: float):
+    def set_vmax(self, vmax: Union[float, int]):
         if self.normalization is not None and not isinstance(self.normalization, str):
             raise ArgumentValueError(
                 f"Normalization {self.normalization} has been set. vmax only work when 'self.normalization' is a str."
             )
-        if isinstance(vmax, float):
+        if isinstance(vmax, (float, int)):
             self.vmax = vmax
-        else:
-            raise ArgumentTypeError(f"'vmax'={vmax} must be a float.")
         return self
 
     def set_normalization_range(self, vmin: float, vmax: float):
