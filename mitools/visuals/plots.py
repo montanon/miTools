@@ -21,7 +21,19 @@ from mitools.exceptions import (
 
 Color = Union[str, Sequence[float]]
 Marker = Union[str, int, Path]
-Cmap = Union[str, Colormap]
+Cmap = Union[
+    Literal[
+        "magma",
+        "inferno",
+        "plasma",
+        "viridis",
+        "cividis",
+        "twilight",
+        "twilight_shifted",
+        "turbo",
+    ],
+    Colormap,
+]
 Norm = Union[str, Normalize]
 EdgeColor = Union[Literal["face", "none", None], Color, Sequence[Color]]
 FaceColor = Union[Color, Sequence[Color]]
@@ -47,7 +59,7 @@ class ScatterPlotter(ABC):
         self.normalize: Norm = None
         self.vmin: float = None
         self.vmax: float = None
-        self.alphas: Union[Sequence[float], float] = 1.0
+        self.alpha: Union[Sequence[float], float] = 1.0
         self.linewidths: Union[Sequence[float], float] = None
         self.linestyles: Union[Sequence[LineStyle], LineStyle] = None
         self.edgecolors: EdgeColor = None
@@ -131,21 +143,37 @@ class ScatterPlotter(ABC):
         return self
 
     def set_colormap(self, cmap: Cmap):
-        if (
-            isinstance(cmap, str)
-            and cmap in list(colormaps)
-            or isinstance(cmap, Colormap)
-        ):
+        _cmaps = [
+            "magma",
+            "inferno",
+            "plasma",
+            "viridis",
+            "cividis",
+            "twilight",
+            "twilight_shifted",
+            "turbo",
+        ]
+        if isinstance(cmap, str) and cmap in _cmaps or isinstance(cmap, Colormap):
             self.color_map = cmap
         else:
-            raise ArgumentTypeError("cmap must be a string or a Colormap object.")
+            raise ArgumentTypeError(
+                f"cmap must be a Colormap object or a valid Colormap string from {_cmaps}."
+            )
         return self
 
-    def set_alpha(self, alpha):
-        if 0.0 <= alpha <= 1.0:
+    def set_alpha(self, alpha: Union[Sequence[float], float]):
+        if isinstance(alpha, (list, tuple, ndarray, Series, float, int)):
+            if not isinstance(alpha, (float, int)):
+                if len(alpha) != len(self.x_data):
+                    raise ArgumentStructureError(
+                        "alpha must be of the same length as x_data and y_data, "
+                        + f"len(alpha)={len(alpha)} != len(x_data)={len(self.x_data)}."
+                    )
             self.alpha = alpha
         else:
-            raise ValueError("Alpha must be between 0.0 and 1.0.")
+            raise ArgumentTypeError(
+                "alpha must be a numeric value or an array-like of numeric values."
+            )
         return self
 
     def set_edgecolor(self, edgecolor):
