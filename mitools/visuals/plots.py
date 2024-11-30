@@ -9,6 +9,7 @@ from matplotlib.axes import Axes
 from matplotlib.colors import Colormap, Normalize
 from matplotlib.figure import Figure
 from matplotlib.text import Text
+from numpy import ndarray
 from pandas import Series
 
 from mitools.exceptions import (
@@ -91,14 +92,17 @@ class ScatterPlotter(ABC):
         return self
 
     def set_size(self, size_data: Union[Sequence[float], float]):
-        if isinstance(size_data, (list, tuple, np.ndarray, Series, float, int)):
-            if not isinstance(size_data, (float, int)) and len(size_data) != len(
-                self.x_data
-            ):
-                raise ArgumentStructureError(
-                    "size_data must be of the same length as x_data and y_data,"
-                    + f"len(size_data)={len(size_data)} != len(x_data)={len(self.x_data)}."
-                )
+        if isinstance(size_data, (list, tuple, ndarray, Series, float, int)):
+            if not isinstance(size_data, (float, int)):
+                if len(size_data) != len(self.x_data):
+                    raise ArgumentStructureError(
+                        "size_data must be of the same length as x_data and y_data,"
+                        + f"len(size_data)={len(size_data)} != len(x_data)={len(self.x_data)}."
+                    )
+                if not all(isinstance(s, (float, int)) for s in size_data):
+                    raise ArgumentTypeError(
+                        "All elements in size_data must be numeric."
+                    )
             self.size_data = size_data
         else:
             raise ArgumentTypeError(
@@ -106,8 +110,23 @@ class ScatterPlotter(ABC):
             )
         return self
 
-    def set_color(self, color):
-        self.color = color
+    def set_color(self, color: Union[Sequence[Color], Color]):
+        if isinstance(color, (list, tuple, ndarray, Series, str)):
+            if not isinstance(color, str):
+                if len(color) != len(self.x_data):
+                    raise ArgumentStructureError(
+                        "color must be of the same length as x_data and y_data, "
+                        + f"len(color)={len(color)} != len(x_data)={len(self.x_data)}."
+                    )
+                if not all(isinstance(c, (str, tuple, list, ndarray)) for c in color):
+                    raise ArgumentTypeError(
+                        "All elements in color must be strings, tuples, lists, or ndarrays."
+                    )
+            self.color = color
+        else:
+            raise ArgumentTypeError(
+                "color must be a string, array-like of strings, or array-like of RGB/RGBA values."
+            )
         return self
 
     def set_colormap(self, cmap):
