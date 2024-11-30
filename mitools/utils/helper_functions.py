@@ -97,9 +97,9 @@ def read_json_file(json_path: PathLike) -> Dict:
         return json.load(f)
 
 
-def write_json_file(data: Dict, json_path: PathLike) -> None:
+def write_json_file(data: Dict, json_path: PathLike, ensure_ascii: bool = True) -> None:
     with open(json_path, "w") as f:
-        json.dump(data, f, indent=4)
+        json.dump(data, f, indent=4, ensure_ascii=ensure_ascii)
 
 
 def dict_from_kwargs(**kwargs: Dict[str, Any]) -> Dict:
