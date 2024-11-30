@@ -83,9 +83,13 @@ class ScatterPlotter:
         self.linewidth: Union[Sequence[float], float] = None
         if "linewidth" in kwargs:
             self.set_linewidth(kwargs["linewidth"])
-        self.linestyle: Union[Sequence[LineStyle], LineStyle] = None
         self.edgecolor: EdgeColor = None
+        if "edgecolor" in kwargs:
+            self.set_edgecolor(kwargs["edgecolor"])
         self.facecolor: FaceColor = None
+        if "facecolor" in kwargs:
+            self.set_facecolor(kwargs["facecolor"])
+        self.linestyle: Union[Sequence[LineStyle], LineStyle] = None
         self.plot_non_finite: bool = False
         self.label: Union[Sequence[str], str] = None
         self.zorder: Union[Sequence[float], float] = None
@@ -340,10 +344,53 @@ class ScatterPlotter:
             )
         return self
 
-    def set_labels(self, labels):
-        self.label = self._validate_data(labels, "labels")
-        if len(self.label) != len(self.x_data):
-            raise ValueError("labels must be of the same length as x_data and y_data.")
+    def set_facecolor(self, facecolor: FaceColor):
+        if isinstance(facecolor, str) or (
+            isinstance(facecolor, (list, tuple))
+            and len(facecolor) in [3, 4]
+            and all(isinstance(x, (int, float)) for x in facecolor)
+        ):
+            self.facecolor = facecolor
+        elif isinstance(facecolor, (list, tuple, ndarray, Series)):
+            if len(facecolor) != self.data_size:
+                raise ArgumentStructureError(
+                    "facecolor must be of the same length as x_data and y_data, "
+                    + f"len(facecolor)={len(facecolor)} != len(x_data)={self.data_size}."
+                )
+            for fc in facecolor:
+                if not (
+                    isinstance(fc, str)
+                    or (
+                        isinstance(fc, (list, tuple))
+                        and len(fc) in [3, 4]
+                        and all(isinstance(x, (int, float)) for x in fc)
+                    )
+                ):
+                    raise ArgumentTypeError(
+                        "Each facecolor must be a string or RGB/RGBA values."
+                    )
+            self.facecolor = facecolor
+        else:
+            raise ArgumentTypeError(
+                f"'facecolor'={facecolor} must be a color string, RGB/RGBA values, "
+                + "or an array-like of color strings/RGB/RGBA values."
+            )
+        return self
+
+    def set_labels(self, labels: Union[Sequence[str], str]):
+        if isinstance(labels, str):
+            self.labels = labels
+        elif isinstance(labels, (list, tuple, ndarray, Series)) and all(
+            isinstance(label, str) for label in labels
+        ):
+            if len(labels) != len(self.data_size):
+                raise ArgumentStructureError(
+                    "labels must be of the same length as x_data and y_data, "
+                    + f"len(labels)={len(labels)} != len(x_data)={self.data_size}."
+                )
+            self.labels = labels
+        else:
+            raise ArgumentTypeError("labels must be a str or a sequence of strs.")
         return self
 
     def enable_hover(self, hover=True):
