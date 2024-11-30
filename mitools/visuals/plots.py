@@ -81,6 +81,8 @@ class ScatterPlotter:
             "background": {"default": None, "type": Color},
             "figure_background": {"default": None, "type": Color},
             "suptitle": {"default": None, "type": Text},
+            "xlim": {"default": None, "type": Union[Tuple[float, float], None]},
+            "ylim": {"default": None, "type": Union[Tuple[float, float], None]},
         }
 
         for param, config in self._init_params.items():
@@ -92,6 +94,8 @@ class ScatterPlotter:
                 else:
                     if param in ["xscale", "yscale"]:
                         self.set_scales(**{param: kwargs[param]})
+                    elif param in ["xlim", "ylim"]:
+                        self.set_ax_limits(**{param: kwargs[param]})
                     else:
                         raise ArgumentValueError(f"Parameter '{param}' is not valid.")
         self.figure: Figure = None
@@ -575,7 +579,7 @@ class ScatterPlotter:
         self.suptitle = dict(t=suptitle, **kwargs)
         return self
 
-    def set_limits(
+    def set_ax_limits(
         self,
         xlim: Union[Tuple[float, float], None] = None,
         ylim: Union[Tuple[float, float], None] = None,
