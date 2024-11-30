@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Literal, Sequence, Tuple, Union
+from typing import Any, Dict, Literal, Sequence, Tuple, Union
 
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
@@ -104,7 +104,12 @@ class ScatterPlotter:
         self.style: str = "dark_background"
         if "style" in kwargs:
             self.set_style(kwargs["style"])
+        self.grid: Dict[str, Any] = None
+        if "grid" in kwargs:
+            self.set_grid(kwargs["grid"])
         self.hover: bool = False
+        if "hover" in kwargs:
+            self.set_hover(kwargs["hover"])
         self.figure: Figure = None
         self.ax: Axes = None
 
@@ -435,6 +440,15 @@ class ScatterPlotter:
             raise ArgumentTypeError("figsize must be a tuple of floats.")
         return self
 
+    def set_grid(
+        self,
+        visible: bool = None,
+        which: Literal["major", "minor", "both"] = None,
+        axis: Literal["both", "x", "y"] = None,
+        **kwargs,
+    ):
+        self.grid = dict(visible=visible, which=which, axis=axis, **kwargs)
+
     def set_hover(self, hover: bool):
         if hover not in [True, False]:
             raise ArgumentTypeError("hover must be a bool.")
@@ -442,25 +456,13 @@ class ScatterPlotter:
         return self
 
     def set_limits(self, xlim=None, ylim=None):
-        if xlim is not None:
-            self.ax.set_xlim(xlim)
-        if ylim is not None:
-            self.ax.set_ylim(ylim)
-        return self
+        raise NotImplementedError
 
     def set_ticks(self, x_ticks=None, y_ticks=None):
-        if x_ticks is not None:
-            self.ax.set_xticks(x_ticks)
-        if y_ticks is not None:
-            self.ax.set_yticks(y_ticks)
-        return self
+        raise NotImplementedError
 
     def set_tick_labels(self, x_tick_labels=None, y_tick_labels=None):
-        if x_tick_labels is not None:
-            self.ax.set_xticklabels(x_tick_labels)
-        if y_tick_labels is not None:
-            self.ax.set_yticklabels(y_tick_labels)
-        return self
+        raise NotImplementedError
 
     def set_grid(self, grid=True):
         self.ax.grid(grid)
