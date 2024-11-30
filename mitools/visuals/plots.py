@@ -297,7 +297,7 @@ class ScatterPlotter:
                 f"Normalization {self.normalization} has been set. vmax only work when 'self.normalization' is a str."
             )
         if isinstance(vmax, float):
-            self.vmin = vmax
+            self.vmax = vmax
         else:
             raise ArgumentTypeError(f"'vmax'={vmax} must be a float.")
         return self
@@ -410,16 +410,16 @@ class ScatterPlotter:
 
     def set_label(self, labels: Union[Sequence[str], str]):
         if isinstance(labels, str):
-            self.labels = labels
+            self.label = labels
         elif isinstance(labels, (list, tuple, ndarray, Series)) and all(
             isinstance(label, str) for label in labels
         ):
-            if len(labels) != len(self.data_size):
+            if len(labels) != self.data_size:
                 raise ArgumentStructureError(
                     "labels must be of the same length as x_data and y_data, "
                     + f"len(labels)={len(labels)} != len(x_data)={self.data_size}."
                 )
-            self.labels = labels
+            self.label = labels
         else:
             raise ArgumentTypeError("labels must be a str or a sequence of strs.")
         return self
@@ -506,7 +506,7 @@ class ScatterPlotter:
         if tight_layout in [True, False]:
             self.tight_layout = tight_layout
         else:
-            raise ArgumentValueError(f"tight_layout must be a bool.")
+            raise ArgumentValueError("tight_layout must be a bool.")
         return self
 
     def set_limits(self, xlim=None, ylim=None):
