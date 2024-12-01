@@ -116,7 +116,17 @@ class ScatterPlotter:
         self.ax: Axes = None
         self.legend: Union[Dict, None] = None
 
-    def _validate_data(self, data: Any, name: str) -> Any:
+    def _validate_data(
+        self, data: Sequence[Union[float, int, integer]], name: str
+    ) -> Any:
+        if not isinstance(data, (list, tuple, ndarray, Series)):
+            raise ArgumentTypeError(
+                f"{name} must be a sequence of floats, ints, or integers."
+            )
+        if not all(isinstance(d, (float, int, integer)) for d in data):
+            raise ArgumentTypeError(
+                f"All elements in {name} must be floats, ints, or integers."
+            )
         return data
 
     def set_title(self, title: str, **kwargs):
