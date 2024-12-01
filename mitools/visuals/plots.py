@@ -727,6 +727,8 @@ class ScatterPlotter:
         return self
 
     def draw(self, show: bool = False):
+        if self.figure is not None or self.ax is not None:
+            self.clear()
         if self.style is not None:
             default_style = plt.rcParams.copy()
             plt.style.use(self.style)
