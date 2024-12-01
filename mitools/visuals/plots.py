@@ -1,3 +1,4 @@
+import json
 import re
 from pathlib import Path
 from typing import Any, Dict, Literal, Sequence, Tuple, Union
@@ -162,14 +163,14 @@ class ScatterPlotter:
         return self
 
     def set_size(self, size_data: Union[Sequence[float], float]):
-        if isinstance(size_data, (list, tuple, ndarray, Series, float, int)):
-            if not isinstance(size_data, (float, int)):
+        if isinstance(size_data, (list, tuple, ndarray, Series, float, int, integer)):
+            if not isinstance(size_data, (float, int, integer)):
                 if len(size_data) != self.data_size:
                     raise ArgumentStructureError(
                         "size_data must be of the same length as x_data and y_data,"
                         + f"len(size_data)={len(size_data)} != len(x_data)={self.data_size}."
                     )
-                if not all(isinstance(s, (float, int)) for s in size_data):
+                if not all(isinstance(s, (float, int, integer)) for s in size_data):
                     raise ArgumentTypeError(
                         "All elements in size_data must be numeric."
                     )
@@ -781,8 +782,16 @@ class ScatterPlotter:
             plt.rcParams.update(default_style)
         return self.ax
 
-    def save(self, file_path: Path, dpi: int = 300, bbox_inches: str = "tight"):
-        if self.figure:
+    def save_plot(
+        self,
+        file_path: Path,
+        dpi: int = 300,
+        bbox_inches: str = "tight",
+        draw: bool = False,
+    ):
+        if self.figure or draw:
+            if self.figure is None and draw:
+                self.draw()
             try:
                 self.figure.savefig(file_path, dpi=dpi, bbox_inches=bbox_inches)
             except Exception as e:
@@ -799,3 +808,45 @@ class ScatterPlotter:
             self.figure = None
             self.ax = None
         return self
+
+    def _to_serializable(self, value: Any) -> Any:
+        if value is None:
+            return None
+        elif isinstance(value, dict):
+            return {k: self._to_serializable(v) for k, v in value.items()}
+        elif isinstance(value, (list, tuple, ndarray, Series)):
+            return [self._to_serializable(v) for v in value]
+        elif isinstance(value, Colormap):
+            return value.name
+        elif isinstance(value, Normalize):
+            return value.__class__.__name__.lower()
+        elif isinstance(value, Path):
+            return str(value)
+        elif isinstance(value, MarkerStyle):
+            raise dict(
+                marker=value.get_marker(),
+                fillstyle=value.get_fillstyle(),
+                transform=value.get_transform(),
+                capstyle=value.get_capstyle(),
+                joinstyle=value.get_joinstyle(),
+            )
+        return value
+
+    def save_plotter(self, file_path: Union[str, Path], data: bool = False) -> None:
+        init_params = {}
+        for param, config in self._init_params.items():
+            value = getattr(self, param)
+            init_params[param] = self._to_serializable(value)
+        if data:
+            init_params["x_data"] = self._to_serializable(self.x_data)
+            init_params["y_data"] = self._to_serializable(self.y_data)
+        with open(file_path, "w") as f:
+            json.dump(init_params, f, indent=4)
+
+    @classmethod
+    def from_json(cls, file_path: Union[str, Path]) -> "ScatterPlotter":
+        with open(file_path, "r") as f:
+            params = json.load(f)
+        x_data = params.pop("x_data") if "x_data" in params else []
+        y_data = params.pop("y_data") if "y_data" in params else []
+        return cls(x_data=x_data, y_data=y_data, **params)
