@@ -212,6 +212,7 @@ class ScatterPlotter:
                     and len(c) in [3, 4]
                     and all(isinstance(x, (float, int, integer)) for x in c)
                 )
+                or isinstance(c, (int, float, integer))
                 for c in color
             ):
                 raise ArgumentTypeError(
@@ -793,7 +794,7 @@ class ScatterPlotter:
         return self
 
     def clear(self):
-        if self.figure:
+        if self.figure or self.ax:
             plt.close(self.figure)
             self.figure = None
             self.ax = None
