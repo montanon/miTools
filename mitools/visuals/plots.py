@@ -7,7 +7,7 @@ from matplotlib.colors import Colormap, Normalize
 from matplotlib.figure import Figure
 from matplotlib.markers import MarkerStyle
 from matplotlib.text import Text
-from numpy import ndarray
+from numpy import integer, ndarray
 from pandas import Series
 
 from mitools.exceptions import (
@@ -59,7 +59,7 @@ class ScatterPlotter:
             "size": {"default": None, "type": Union[Sequence[float], float]},
             "color": {"default": None, "type": Union[Sequence[Color], Color]},
             "marker": {"default": "o", "type": Markers},
-            "color_map": {"default": None, "type": Cmap},
+            "colormap": {"default": None, "type": Cmap},
             "normalization": {"default": None, "type": Norm},
             "vmin": {"default": None, "type": float},
             "vmax": {"default": None, "type": float},
@@ -83,8 +83,14 @@ class ScatterPlotter:
             "suptitle": {"default": None, "type": Text},
             "xlim": {"default": None, "type": Union[Tuple[float, float], None]},
             "ylim": {"default": None, "type": Union[Tuple[float, float], None]},
-            "x_ticks": {"default": None, "type": Union[Sequence[float], None]},
-            "y_ticks": {"default": None, "type": Union[Sequence[float], None]},
+            "x_ticks": {
+                "default": None,
+                "type": Union[Sequence[Union[float, int]], None],
+            },
+            "y_ticks": {
+                "default": None,
+                "type": Union[Sequence[Union[float, int]], None],
+            },
             "x_tick_labels": {"default": None, "type": Union[Sequence[str], None]},
             "y_tick_labels": {"default": None, "type": Union[Sequence[str], None]},
         }
@@ -101,6 +107,7 @@ class ScatterPlotter:
                     elif param in ["xlim", "ylim"]:
                         self.set_ax_limits(**{param: kwargs[param]})
                     elif param in ["x_ticks", "y_ticks"]:
+                        print("PARAM: ", param, kwargs[param])
                         self.set_ticks(**{param: kwargs[param]})
                     elif param in ["x_tick_labels", "y_tick_labels"]:
                         self.set_tick_labels(**{param: kwargs[param]})
@@ -329,7 +336,7 @@ class ScatterPlotter:
         elif isinstance(edgecolor, str) or (
             isinstance(edgecolor, (list, tuple))
             and len(edgecolor) in [3, 4]
-            and all(isinstance(x, (int, float)) for x in edgecolor)
+            and all(isinstance(x, (int, float, integer)) for x in edgecolor)
         ):
             self.edgecolor = edgecolor
         elif isinstance(edgecolor, (list, tuple, ndarray, Series)):
@@ -344,7 +351,7 @@ class ScatterPlotter:
                     or (
                         isinstance(ec, (list, tuple))
                         and len(ec) in [3, 4]
-                        and all(isinstance(x, (int, float)) for x in ec)
+                        and all(isinstance(x, (int, float, integer)) for x in ec)
                     )
                 ):
                     raise ArgumentTypeError(
@@ -362,7 +369,7 @@ class ScatterPlotter:
         if isinstance(facecolor, str) or (
             isinstance(facecolor, (list, tuple))
             and len(facecolor) in [3, 4]
-            and all(isinstance(x, (int, float)) for x in facecolor)
+            and all(isinstance(x, (int, float, integer)) for x in facecolor)
         ):
             self.facecolor = facecolor
         elif isinstance(facecolor, (list, tuple, ndarray, Series)):
@@ -377,7 +384,7 @@ class ScatterPlotter:
                     or (
                         isinstance(fc, (list, tuple))
                         and len(fc) in [3, 4]
-                        and all(isinstance(x, (int, float)) for x in fc)
+                        and all(isinstance(x, (int, float, integer)) for x in fc)
                     )
                 ):
                     raise ArgumentTypeError(
@@ -546,6 +553,12 @@ class ScatterPlotter:
         axis: Literal["both", "x", "y"] = "both",
         **kwargs,
     ):
+        if visible not in [True, False]:
+            raise ArgumentTypeError("visible must be a bool.")
+        if which not in ["major", "minor", "both"]:
+            raise ArgumentValueError("which must be one of 'major', 'minor', 'both'.")
+        if axis not in ["both", "x", "y"]:
+            raise ArgumentValueError("axis must be one of 'both', 'x', 'y'.")
         self.grid = dict(visible=visible, which=which, axis=axis, **kwargs)
         return self
 
@@ -597,7 +610,7 @@ class ScatterPlotter:
                 raise ArgumentStructureError(
                     "xlim must be a tuple or list of two ints or floats (min, max)."
                 )
-            if not all(isinstance(x, (int, float)) for x in xlim):
+            if not all(isinstance(x, (int, float, integer)) for x in xlim):
                 raise ArgumentTypeError("xlim values must be ints or floats.")
             self.xlim = xlim
         if ylim is not None:
@@ -605,27 +618,27 @@ class ScatterPlotter:
                 raise ArgumentStructureError(
                     "ylim must be a tuple or list of two ints or floats (min, max)."
                 )
-            if not all(isinstance(y, (int, float)) for y in ylim):
+            if not all(isinstance(y, (int, float, integer)) for y in ylim):
                 raise ArgumentTypeError("ylim values must be ints or floats.")
             self.ylim = ylim
         return self
 
     def set_ticks(
         self,
-        x_ticks: Union[Sequence[float], None] = None,
-        y_ticks: Union[Sequence[float], None] = None,
+        x_ticks: Union[Sequence[Union[float, int]], None] = None,
+        y_ticks: Union[Sequence[Union[float, int]], None] = None,
     ):
         if x_ticks is not None:
             if not isinstance(x_ticks, (list, tuple, ndarray)):
                 raise ArgumentTypeError("x_ticks must be array-like")
-            if not all(isinstance(x, (int, float)) for x in x_ticks):
-                raise ArgumentTypeError("x_ticks values must be numeric")
+            if not all(isinstance(x, (int, float, integer)) for x in x_ticks):
+                raise ArgumentTypeError("x_ticks values must be ints or floats.")
             self.x_ticks = x_ticks
         if y_ticks is not None:
             if not isinstance(y_ticks, (list, tuple, ndarray)):
                 raise ArgumentTypeError("y_ticks must be array-like")
-            if not all(isinstance(y, (int, float)) for y in y_ticks):
-                raise ArgumentTypeError("y_ticks values must be numeric")
+            if not all(isinstance(y, (int, float, integer)) for y in y_ticks):
+                raise ArgumentTypeError("y_ticks values must be ints or floats.")
             self.y_ticks = y_ticks
         return self
 
