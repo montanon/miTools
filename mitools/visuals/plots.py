@@ -72,6 +72,7 @@ class ScatterPlotter:
             "edgecolor": {"default": None, "type": EdgeColor},
             "facecolor": {"default": None, "type": FaceColor},
             "label": {"default": None, "type": Union[Sequence[str], str]},
+            "legend": {"default": None, "type": Union[Dict, None]},
             "zorder": {"default": None, "type": Union[Sequence[float], float]},
             "plot_non_finite": {"default": False, "type": bool},
             "figsize": {"default": (21, 14), "type": Tuple[float, float]},
@@ -118,7 +119,6 @@ class ScatterPlotter:
                         raise ArgumentValueError(f"Parameter '{param}' is not valid.")
         self.figure: Figure = None
         self.ax: Axes = None
-        self.legend: Union[Dict, None] = None
 
     def _validate_data(
         self, data: Sequence[Union[float, int, integer]], name: str
@@ -476,6 +476,9 @@ class ScatterPlotter:
         facecolor: Union[str, None] = "inherit",
         **kwargs,
     ):
+        if isinstance(show, dict):
+            self.legend = show
+            return self
         if show not in [True, False]:
             raise ArgumentTypeError("'show' must be a boolean")
 
@@ -882,5 +885,4 @@ class ScatterPlotter:
             params = json.load(f)
         x_data = params.pop("x_data") if "x_data" in params else []
         y_data = params.pop("y_data") if "y_data" in params else []
-        print(params["label"])
         return cls(x_data=x_data, y_data=y_data, **params)
