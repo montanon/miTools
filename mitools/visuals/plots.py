@@ -107,7 +107,6 @@ class ScatterPlotter:
                     elif param in ["xlim", "ylim"]:
                         self.set_ax_limits(**{param: kwargs[param]})
                     elif param in ["x_ticks", "y_ticks"]:
-                        print("PARAM: ", param, kwargs[param])
                         self.set_ticks(**{param: kwargs[param]})
                     elif param in ["x_tick_labels", "y_tick_labels"]:
                         self.set_tick_labels(**{param: kwargs[param]})
