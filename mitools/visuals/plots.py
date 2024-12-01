@@ -134,16 +134,25 @@ class ScatterPlotter:
         return data
 
     def set_title(self, title: str, **kwargs):
+        if isinstance(title, dict):
+            kwargs = {k: v for k, v in title.items() if k not in ["label"]}
+            title = title["label"]
         """https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.set_title.html"""
         self.title = dict(label=title, **kwargs)
         return self
 
     def set_xlabel(self, xlabel: str, **kwargs):
+        if isinstance(xlabel, dict):
+            kwargs = {k: v for k, v in xlabel.items() if k not in ["xlabel"]}
+            xlabel = xlabel["xlabel"]
         """https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.set_xlabel"""
         self.xlabel = dict(xlabel=xlabel, **kwargs)
         return self
 
     def set_ylabel(self, ylabel: str, **kwargs):
+        if isinstance(ylabel, dict):
+            kwargs = {k: v for k, v in ylabel.items() if k not in ["ylabel"]}
+            ylabel = ylabel["ylabel"]
         """https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.set_ylabel"""
         self.ylabel = dict(ylabel=ylabel, **kwargs)
         return self
@@ -227,13 +236,15 @@ class ScatterPlotter:
 
     def set_marker(
         self,
-        marker: Markers,
+        marker: Union[Markers, dict],
         fillstyle: Literal["full", "left", "right", "bottom", "top", "none"] = None,
     ):
         if fillstyle is not None and fillstyle not in MarkerStyle.fillstyles:
             raise ArgumentValueError(
                 f"'fillstyle'={fillstyle} must be a valid Matplotlib fillstyle string {MarkerStyle.fillstyles}."
             )
+        if isinstance(marker, dict):
+            marker = MarkerStyle(**marker)
         if isinstance(marker, str):
             if marker not in MarkerStyle.markers:
                 raise ArgumentValueError(
@@ -277,10 +288,10 @@ class ScatterPlotter:
             "turbo",
         ]
         if isinstance(cmap, str) and cmap in _cmaps or isinstance(cmap, Colormap):
-            self.color_map = cmap
+            self.colormap = cmap
         else:
             raise ArgumentTypeError(
-                f"cmap must be a Colormap object or a valid Colormap string from {_cmaps}."
+                f"'cmap'={cmap} must be a Colormap object or a valid Colormap string from {_cmaps}."
             )
         return self
 
@@ -553,6 +564,8 @@ class ScatterPlotter:
         return self
 
     def set_figsize(self, figsize: Tuple[float, float]):
+        if isinstance(figsize, list):
+            figsize = tuple(figsize)
         if isinstance(figsize, tuple) and all(
             isinstance(val, (float, int)) for val in figsize
         ):
@@ -581,11 +594,20 @@ class ScatterPlotter:
 
     def set_grid(
         self,
-        visible: bool = None,
+        visible: Union[bool, Dict] = None,
         which: Literal["major", "minor", "both"] = "major",
         axis: Literal["both", "x", "y"] = "both",
         **kwargs,
     ):
+        if isinstance(visible, dict):
+            kwargs = {
+                k: v
+                for k, v in visible.items()
+                if k not in ["visible", "which", "axis"]
+            }
+            which = visible.get("which", "major")
+            axis = visible.get("axis", "both")
+            visible = visible.get("visible", True)
         if visible not in [True, False]:
             raise ArgumentTypeError("visible must be a bool.")
         if which not in ["major", "minor", "both"]:
@@ -629,7 +651,10 @@ class ScatterPlotter:
         self.figure_background = figure_background
         return self
 
-    def set_suptitle(self, suptitle: str, **kwargs):
+    def set_suptitle(self, suptitle: Union[str, Dict], **kwargs):
+        if isinstance(suptitle, dict):
+            kwargs = {k: v for k, v in suptitle.items() if k not in ["t"]}
+            suptitle = suptitle["t"]
         self.suptitle = dict(t=suptitle, **kwargs)
         return self
 
@@ -714,7 +739,7 @@ class ScatterPlotter:
             "s": self.size,
             "c": self.color,
             "marker": self.marker,
-            "cmap": self.color_map,
+            "cmap": self.colormap,
             "norm": self.normalization,
             "vmin": self.vmin,
             "vmax": self.vmax,
@@ -817,19 +842,27 @@ class ScatterPlotter:
         elif isinstance(value, (list, tuple, ndarray, Series)):
             return [self._to_serializable(v) for v in value]
         elif isinstance(value, Colormap):
+            print(value)
             return value.name
         elif isinstance(value, Normalize):
             return value.__class__.__name__.lower()
         elif isinstance(value, Path):
             return str(value)
         elif isinstance(value, MarkerStyle):
-            raise dict(
+            marker = dict(
                 marker=value.get_marker(),
                 fillstyle=value.get_fillstyle(),
                 transform=value.get_transform(),
                 capstyle=value.get_capstyle(),
                 joinstyle=value.get_joinstyle(),
             )
+            marker["transform"] = (
+                marker["transform"].__class__.__name__.lower()
+                if marker["transform"]
+                else None
+            )
+            return marker
+
         return value
 
     def save_plotter(self, file_path: Union[str, Path], data: bool = False) -> None:
@@ -849,4 +882,5 @@ class ScatterPlotter:
             params = json.load(f)
         x_data = params.pop("x_data") if "x_data" in params else []
         y_data = params.pop("y_data") if "y_data" in params else []
+        print(params["label"])
         return cls(x_data=x_data, y_data=y_data, **params)
