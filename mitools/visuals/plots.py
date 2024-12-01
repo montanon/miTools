@@ -1,6 +1,8 @@
+import re
 from pathlib import Path
 from typing import Any, Dict, Literal, Sequence, Tuple, Union
 
+import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.colors import Colormap, Normalize
@@ -16,6 +18,7 @@ from mitools.exceptions import (
     ArgumentValueError,
 )
 
+_colors = list(mcolors.get_named_colors_mapping().keys())
 Color = Union[str, Sequence[float]]
 Marker = Union[str, int, Path, MarkerStyle]
 Markers = Union[Marker, Sequence[Marker]]
@@ -180,26 +183,45 @@ class ScatterPlotter:
     def set_color(
         self, color: Union[Sequence[Color], Color, Sequence[float], Sequence[int]]
     ):
-        if isinstance(color, (list, tuple, ndarray, Series, str)):
-            if not isinstance(color, str):
-                if len(color) != self.data_size:
-                    raise ArgumentStructureError(
-                        "color must be of the same length as x_data and y_data, "
-                        + f"len(color)={len(color)} != len(x_data)={self.data_size}."
-                    )
-                if not all(
-                    isinstance(c, (str, tuple, list, ndarray, float, int))
-                    for c in color
-                ):
-                    raise ArgumentTypeError(
-                        "All elements in color must be strings, tuples, lists, or ndarrays."
-                    )
+        if isinstance(color, str):
+            if color not in _colors and not re.match(
+                r"^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", color
+            ):
+                raise ArgumentTypeError(
+                    f"'color'='{color}' must be a valid Matplotlib color string or HEX code."
+                )
             self.color = color
-        else:
-            raise ArgumentTypeError(
-                "color must be a string, array-like of strings, or array-like of RGB/RGBA values."
-            )
-        return self
+            return self
+        if (
+            isinstance(color, (tuple, list, ndarray))
+            and len(color) in [3, 4]
+            and all(isinstance(c, (float, int, integer)) for c in color)
+        ):
+            self.color = color
+            return self
+        if isinstance(color, (list, tuple, ndarray, Series)):
+            if len(color) != self.data_size:
+                raise ArgumentStructureError(
+                    "color must be of the same length as x_data and y_data, "
+                    + f"len(color)={len(color)} != len(x_data)={self.data_size}."
+                )
+            if not all(
+                isinstance(c, str)
+                or (
+                    isinstance(c, (tuple, list, ndarray))
+                    and len(c) in [3, 4]
+                    and all(isinstance(x, (float, int, integer)) for x in c)
+                )
+                for c in color
+            ):
+                raise ArgumentTypeError(
+                    "All elements in color must be strings or RGB/RGBA values."
+                )
+            self.color = color
+            return self
+        raise ArgumentTypeError(
+            "color must be a string, RGB/RGBA values, or array-like of strings/RGB/RGBA values."
+        )
 
     def set_marker(
         self,
