@@ -3,7 +3,6 @@ import re
 from pathlib import Path
 from typing import Any, Dict, Literal, Sequence, Tuple, Union
 
-import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.colors import Colormap, Normalize
@@ -18,29 +17,16 @@ from mitools.exceptions import (
     ArgumentTypeError,
     ArgumentValueError,
 )
-
-_colors = list(mcolors.get_named_colors_mapping().keys())
-Color = Union[str, Sequence[float]]
-Marker = Union[str, int, Path, MarkerStyle]
-Markers = Union[Marker, Sequence[Marker]]
-Cmap = Union[
-    Literal[
-        "magma",
-        "inferno",
-        "plasma",
-        "viridis",
-        "cividis",
-        "twilight",
-        "twilight_shifted",
-        "turbo",
-    ],
-    Colormap,
-]
-Norm = Union[str, Normalize]
-EdgeColor = Union[Literal["face", "none", None], Color, Sequence[Color]]
-FaceColor = Union[Color, Sequence[Color]]
-LineStyle = Literal["solid", "dashed", "dashdot", "dotted", "-", "--", "-.", ":"]
-Scale = Literal["linear", "log", "symlog", "logit"]
+from mitools.visuals.plots.matplotlib_typing import (
+    Cmap,
+    Color,
+    EdgeColor,
+    FaceColor,
+    Markers,
+    Norm,
+    Scale,
+    _colors,
+)
 
 
 class ScatterPlotterException(Exception):
@@ -493,7 +479,7 @@ class ScatterPlotter:
             if isinstance(labels, str):
                 legend_kwargs["labels"] = [labels]
             elif isinstance(labels, (list, tuple)) and all(
-                isinstance(l, str) for l in labels
+                isinstance(lbl, str) for lbl in labels
             ):
                 legend_kwargs["labels"] = labels
             else:
