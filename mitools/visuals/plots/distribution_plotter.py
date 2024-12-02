@@ -1,5 +1,5 @@
 import re
-from typing import Any, Dict, Literal, Sequence, Tuple, Union
+from typing import Any, Literal, Sequence, Tuple, Union
 
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
@@ -71,27 +71,7 @@ class DistributionPlotter(Plotter):
             isinstance(color, (tuple, list, ndarray))
             and len(color) in [3, 4]
             and all(isinstance(c, (float, int, integer)) for c in color)
-        ):
-            self.color = color
-            return self
-        if isinstance(color, (list, tuple, ndarray, Series)):
-            if len(color) != self.data_size:
-                raise ArgumentStructureError(
-                    "color must be of the same length as x_data and y_data, "
-                    + f"len(color)={len(color)} != len(x_data)={self.data_size}."
-                )
-            if not all(
-                isinstance(c, str)
-                or (
-                    isinstance(c, (tuple, list, ndarray))
-                    and len(c) in [3, 4]
-                    and all(isinstance(x, (float, int, integer)) for x in c)
-                )
-                for c in color
-            ):
-                raise ArgumentTypeError(
-                    "All elements in color must be strings or RGB/RGBA values."
-                )
+        ) and len(color) == 1:
             self.color = color
             return self
         raise ArgumentTypeError(
