@@ -6,4 +6,9 @@ from mitools.visuals.axes_functions import (
     is_ax_empty,
     set_axes_limits,
 )
-from mitools.visuals.plots import BarPlotter, LinePlotter, ScatterPlotter
+from mitools.visuals.plots import (
+    BarPlotter,
+    HistogramPlotter,
+    LinePlotter,
+    ScatterPlotter,
+)

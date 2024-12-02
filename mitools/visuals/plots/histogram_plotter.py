@@ -15,11 +15,11 @@ from mitools.visuals.plots.matplotlib_typing import Color, EdgeColor, FaceColor,
 from mitools.visuals.plots.plotter import Plotter
 
 
-class DistributionPlotterException(Exception):
+class HistogramPlotterException(Exception):
     pass
 
 
-class DistributionPlotter(Plotter):
+class HistogramPlotter(Plotter):
     def __init__(self, x_data: Any, y_data: Any = None, **kwargs):
         super().__init__(
             x_data=x_data, y_data=x_data if y_data is None else y_data, **kwargs
@@ -270,4 +270,4 @@ class DistributionPlotter(Plotter):
         try:
             self.ax.hist(self.x_data, **hist_kwargs)
         except Exception as e:
-            raise DistributionPlotterException(f"Error while creating histogram: {e}")
+            raise HistogramPlotterException(f"Error while creating histogram: {e}")
