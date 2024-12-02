@@ -178,7 +178,6 @@ class LinePlotter:
                     and len(c) in [3, 4]
                     and all(isinstance(x, (float, int, integer)) for x in c)
                 )
-                or isinstance(c, (int, float, integer))
                 for c in color
             ):
                 raise ArgumentTypeError(
@@ -330,67 +329,72 @@ class LinePlotter:
     ):
         if show not in [True, False]:
             raise ArgumentTypeError("'show' must be a boolean")
+        if "kwargs" not in kwargs:
+            legend_kwargs = {
+                "loc": loc,
+                "ncol": ncol,
+                "frameon": frameon,
+                "fancybox": fancybox,
+                "framealpha": framealpha,
+            }
+            if labels is not None:
+                if isinstance(labels, str):
+                    legend_kwargs["labels"] = [labels]
+                elif isinstance(labels, (list, tuple)) and all(
+                    isinstance(lbl, str) for lbl in labels
+                ):
+                    legend_kwargs["labels"] = labels
+                else:
+                    raise ArgumentTypeError(
+                        "'labels' must be a string or sequence of strings"
+                    )
+            if handles is not None:
+                if not isinstance(handles, (list, tuple)):
+                    raise ArgumentTypeError(
+                        "'handles' must be a sequence of Artist objects"
+                    )
+                legend_kwargs["handles"] = handles
+            if bbox_to_anchor is not None:
+                if not isinstance(bbox_to_anchor, tuple) or len(bbox_to_anchor) not in [
+                    2,
+                    4,
+                ]:
+                    raise ArgumentTypeError(
+                        "'bbox_to_anchor' must be a tuple of 2 or 4 floats"
+                    )
+                legend_kwargs["bbox_to_anchor"] = bbox_to_anchor
 
-        legend_kwargs = {
-            "loc": loc,
-            "ncol": ncol,
-            "frameon": frameon,
-            "fancybox": fancybox,
-            "framealpha": framealpha,
-        }
-        if labels is not None:
-            if isinstance(labels, str):
-                legend_kwargs["labels"] = [labels]
-            elif isinstance(labels, (list, tuple)) and all(
-                isinstance(lbl, str) for lbl in labels
-            ):
-                legend_kwargs["labels"] = labels
-            else:
-                raise ArgumentTypeError(
-                    "'labels' must be a string or sequence of strings"
-                )
-        if handles is not None:
-            if not isinstance(handles, (list, tuple)):
-                raise ArgumentTypeError(
-                    "'handles' must be a sequence of Artist objects"
-                )
-            legend_kwargs["handles"] = handles
-        if bbox_to_anchor is not None:
-            if not isinstance(bbox_to_anchor, tuple) or len(bbox_to_anchor) not in [
-                2,
-                4,
-            ]:
-                raise ArgumentTypeError(
-                    "'bbox_to_anchor' must be a tuple of 2 or 4 floats"
-                )
-            legend_kwargs["bbox_to_anchor"] = bbox_to_anchor
+            if fontsize is not None:
+                if not isinstance(fontsize, (int, str)):
+                    raise ArgumentTypeError("'fontsize' must be an integer or string")
+                legend_kwargs["fontsize"] = fontsize
 
-        if fontsize is not None:
-            if not isinstance(fontsize, (int, str)):
-                raise ArgumentTypeError("'fontsize' must be an integer or string")
-            legend_kwargs["fontsize"] = fontsize
+            if title is not None:
+                if not isinstance(title, str):
+                    raise ArgumentTypeError("'title' must be a string")
+                legend_kwargs["title"] = title
 
-        if title is not None:
-            if not isinstance(title, str):
-                raise ArgumentTypeError("'title' must be a string")
-            legend_kwargs["title"] = title
+            if title_fontsize is not None:
+                if not isinstance(title_fontsize, (int, str)):
+                    raise ArgumentTypeError(
+                        "'title_fontsize' must be an integer or string"
+                    )
+                legend_kwargs["title_fontsize"] = title_fontsize
 
-        if title_fontsize is not None:
-            if not isinstance(title_fontsize, (int, str)):
-                raise ArgumentTypeError("'title_fontsize' must be an integer or string")
-            legend_kwargs["title_fontsize"] = title_fontsize
+            if edgecolor is not None:
+                if not isinstance(edgecolor, str):
+                    raise ArgumentTypeError("'edgecolor' must be a string")
+                legend_kwargs["edgecolor"] = edgecolor
 
-        if edgecolor is not None:
-            if not isinstance(edgecolor, str):
-                raise ArgumentTypeError("'edgecolor' must be a string")
-            legend_kwargs["edgecolor"] = edgecolor
-
-        if facecolor is not None:
-            if not isinstance(facecolor, str):
-                raise ArgumentTypeError("'facecolor' must be a string")
-            legend_kwargs["facecolor"] = facecolor
-        legend_kwargs.update(kwargs)
-        self.legend = {"show": show, "kwargs": legend_kwargs} if show else None
+            if facecolor is not None:
+                if not isinstance(facecolor, str):
+                    raise ArgumentTypeError("'facecolor' must be a string")
+                legend_kwargs["facecolor"] = facecolor
+            legend_kwargs.update(kwargs)
+            legend = {"show": show, "kwargs": legend_kwargs}
+        else:
+            legend = {"show": show, "kwargs": kwargs["kwargs"]}
+        self.legend = legend if show else None
         return self
 
     def set_zorder(self, zorder: Union[Sequence[float], float]):
@@ -465,12 +469,6 @@ class LinePlotter:
             raise ArgumentTypeError(
                 "texts must a matplotlib Text object or a sequence of Text objects"
             )
-        return self
-
-    def set_hover(self, hover: bool):
-        if hover not in [True, False]:
-            raise ArgumentTypeError("hover must be a bool.")
-        self.hover = hover
         return self
 
     def set_tight_layout(self, tight_layout: bool = False):
@@ -557,7 +555,7 @@ class LinePlotter:
             self.y_tick_labels = y_tick_labels
         return self
 
-    def draw(self, show: bool = False):
+    def draw(self, show: bool = True):
         if self.figure is not None or self.ax is not None:
             self.clear()
         if self.style is not None:
@@ -570,8 +568,6 @@ class LinePlotter:
             self.ax.grid(**self.grid)
 
         plot_kwargs = {
-            "x": self.x_data,
-            "y": self.y_data,
             "color": self.color,
             "marker": self.marker,
             "markersize": self.markersize,
@@ -588,7 +584,7 @@ class LinePlotter:
         plot_kwargs = {k: v for k, v in plot_kwargs.items() if v is not None}
 
         try:
-            self.ax.plot(**plot_kwargs)
+            self.ax.plot(self.x_data, self.y_data, **plot_kwargs)
         except Exception as e:
             raise LinePlotterException(f"Error while creating line plot: {e}")
         if self.title:
@@ -632,8 +628,6 @@ class LinePlotter:
             self.ax.set_xticklabels(self.x_tick_labels)
         if self.y_tick_labels is not None:
             self.ax.set_yticklabels(self.y_tick_labels)
-        if self.hover and self.label is not None:
-            pass
         if self.tight_layout:
             plt.tight_layout()
         if show:
