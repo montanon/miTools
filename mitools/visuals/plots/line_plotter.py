@@ -189,7 +189,7 @@ class LinePlotter(Plotter):
             )
         return self
 
-    def _create_plot(self, show: bool = True):
+    def _create_plot(self):
         plot_kwargs = {
             "color": self.color,
             "marker": self.marker,
