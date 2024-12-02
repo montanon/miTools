@@ -19,10 +19,7 @@ from mitools.exceptions import (
     ArgumentTypeError,
     ArgumentValueError,
 )
-from mitools.visuals.plots.matplotlib_typing import (
-    Color,
-    Scale,
-)
+from mitools.visuals.plots.matplotlib_typing import Color, Scale, _tickparams
 
 
 class PlotterException(Exception):
@@ -69,6 +66,8 @@ class Plotter(ABC):
             },
             "x_tick_labels": {"default": None, "type": Union[Sequence[str], None]},
             "y_tick_labels": {"default": None, "type": Union[Sequence[str], None]},
+            "x_tick_params": {"default": None, "type": Dict[str, Any]},
+            "y_tick_params": {"default": None, "type": Dict[str, Any]},
         }
 
         self._set_init_params(**kwargs)
@@ -95,6 +94,8 @@ class Plotter(ABC):
                         self.set_ticks(**{param: kwargs[param]})
                     elif param in ["x_tick_labels", "y_tick_labels"]:
                         self.set_tick_labels(**{param: kwargs[param]})
+                    elif param in ["x_tick_params", "y_tick_params"]:
+                        self.set_tick_params(**{param: kwargs[param]})
                     else:
                         raise ArgumentValueError(f"Parameter '{param}' is not valid.")
 
@@ -423,6 +424,31 @@ class Plotter(ABC):
             self.y_tick_labels = y_tick_labels
         return self
 
+    def set_tick_params(
+        self,
+        x_tick_params: Dict[str, Any] = None,
+        y_tick_params: Dict[str, Any] = None,
+    ):
+        if x_tick_params is not None:
+            if not isinstance(x_tick_params, dict) and not all(
+                param in _tickparams for param in x_tick_params
+            ):
+                raise ArgumentTypeError(
+                    "x_tick_params must be a dictionary with keys in "
+                    + f"{_tickparams}"
+                )
+            self.x_tick_params = x_tick_params
+        if y_tick_params is not None:
+            if not isinstance(y_tick_params, dict) and not all(
+                param in _tickparams for param in y_tick_params
+            ):
+                raise ArgumentTypeError(
+                    "y_tick_params must be a dictionary with keys in "
+                    + f"{_tickparams}"
+                )
+            self.y_tick_params = y_tick_params
+        return self
+
     def prepare_draw(self):
         if self.figure is not None or self.ax is not None:
             self.clear()
@@ -431,7 +457,7 @@ class Plotter(ABC):
             plt.style.use(self.style)
         if not self.ax and not self.figure:
             self.figure, self.ax = plt.subplots(figsize=self.figsize)
-        if self.grid is not None:
+        if self.grid is not None and self.grid["visible"]:
             self.ax.grid(**self.grid)
 
     def _apply_common_properties(self):
@@ -476,6 +502,10 @@ class Plotter(ABC):
             self.ax.set_xticklabels(self.x_tick_labels)
         if self.y_tick_labels is not None:
             self.ax.set_yticklabels(self.y_tick_labels)
+        if self.x_tick_params is not None:
+            self.ax.tick_params(axis="x", **self.x_tick_params)
+        if self.y_tick_params is not None:
+            self.ax.tick_params(axis="y", **self.y_tick_params)
 
     def _finalize_draw(self, show: bool = True):
         if self.tight_layout:
@@ -569,8 +599,8 @@ class Plotter(ABC):
             params = json.load(f)
         x_data = params.pop("x_data") if "x_data" in params else []
         y_data = params.pop("y_data") if "y_data" in params else []
-        if "xlim" in params:
+        if "xlim" in params and params["xlim"] is not None:
             params["xlim"] = tuple(params["xlim"])
-        if "ylim" in params:
+        if "ylim" in params and params["ylim"] is not None:
             params["ylim"] = tuple(params["ylim"])
         return cls(x_data=x_data, y_data=y_data, **params)
