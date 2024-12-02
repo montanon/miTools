@@ -1,3 +1,4 @@
+import re
 from typing import Any, Dict, Literal, Sequence, Union
 
 import numpy as np
@@ -40,6 +41,7 @@ class DistributionPlotter(Plotter):
                 "default": "vertical",
                 "type": Literal["vertical", "horizontal"],
             },
+            "hatch": {"default": None, "type": str},
         }
         super().__init__(
             x_data=x_data, y_data=x_data if y_data is None else y_data, **kwargs
@@ -84,6 +86,21 @@ class DistributionPlotter(Plotter):
         if kernel not in _kernels:
             raise ArgumentValueError(f"'kernel'={kernel} must be one of {_kernels}")
         self.kernel = kernel
+        return self
+
+    def set_hatch(self, hatch: Union[Sequence[str], str]):
+        if isinstance(hatch, str):
+            self.hatch = hatch
+        elif isinstance(hatch, (list, tuple, ndarray, Series)):
+            if len(hatch) != self.data_size:
+                raise ArgumentStructureError(
+                    "hatch must be of the same length as x_data and y_data"
+                )
+            if not all(isinstance(h, str) for h in hatch):
+                raise ArgumentTypeError("All hatch values must be strings")
+            self.hatch = hatch
+        else:
+            raise ArgumentTypeError("hatch must be a string or sequence of strings")
         return self
 
     def set_bandwidth(self, bandwidth: Union[str, float]):
@@ -210,6 +227,7 @@ class DistributionPlotter(Plotter):
                 fill_kwargs = {
                     "facecolor": self.facecolor.get("facecolor", self.color),
                     "alpha": self.facecolor.get("alpha", self.alpha),
+                    "hatch": self.hatch,
                 }
                 if self.orientation == "vertical":
                     self.ax.fill_between(grid, density, **fill_kwargs)
