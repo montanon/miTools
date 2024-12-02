@@ -33,7 +33,6 @@ class BarPlotter(Plotter):
             "align": {"default": "center", "type": Literal["center", "edge"]},
             "edgecolor": {"default": None, "type": EdgeColor},
             "linewidth": {"default": None, "type": Union[Sequence[float], float]},
-            "tick_label": {"default": None, "type": Union[Sequence[str], str]},
             "xerr": {"default": None, "type": Union[Sequence[float], float]},
             "yerr": {"default": None, "type": Union[Sequence[float], float]},
             "ecolor": {"default": None, "type": EdgeColor},
@@ -188,10 +187,6 @@ class BarPlotter(Plotter):
             raise ArgumentTypeError("linewidth must be a number or sequence of numbers")
         return self
 
-    def set_tick_label(self, tick_label: Union[Sequence[str], str]):
-        self.tick_label = tick_label
-        return self
-
     def set_xerr(self, xerr: Union[Sequence[float], float]):
         if isinstance(xerr, (float, int)):
             self.xerr = xerr
@@ -310,20 +305,25 @@ class BarPlotter(Plotter):
     def _create_plot(self):
         bar_kwargs = {
             "width": self.width,
+            "bottom": self.bottom,
             "align": self.align,
             "color": self.color,
             "edgecolor": self.edgecolor,
-            "facecolor": self.facecolor,
             "linewidth": self.linewidth,
+            "xerr": self.xerr,
+            "yerr": self.yerr,
+            "ecolor": self.ecolor,
+            "capsize": self.capsize,
+            "error_kw": self.error_kw,
+            "log": self.log,
+            "facecolor": self.facecolor,
+            "fill": self.fill,
+            "linestyle": self.linestyle,
             "hatch": self.hatch,
+            "colormap": self.colormap,
             "alpha": self.alpha,
             "label": self.label,
             "zorder": self.zorder,
-            "bottom": self.bottom,
-            "xerr": self.xerr,
-            "yerr": self.yerr,
-            "capsize": self.capsize,
-            "error_kw": self.error_kw,
         }
         bar_kwargs = {k: v for k, v in bar_kwargs.items() if v is not None}
 
@@ -331,6 +331,9 @@ class BarPlotter(Plotter):
             if self.orientation == "vertical":
                 self.ax.bar(self.x_data, self.y_data, **bar_kwargs)
             else:
-                self.ax.barh(self.x_data, self.y_data, **bar_kwargs)
+                bar_kwargs["height"] = self.y_data
+                y_data = bar_kwargs.pop("width")
+                bar_kwargs["left"] = bar_kwargs.pop("bottom")
+                self.ax.barh(self.x_data, y_data, **bar_kwargs)
         except Exception as e:
             raise BarPlotterException(f"Error while creating bar plot: {e}")
