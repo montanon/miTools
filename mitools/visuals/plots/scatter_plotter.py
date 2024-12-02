@@ -3,6 +3,7 @@ import re
 from pathlib import Path
 from typing import Any, Dict, Literal, Sequence, Tuple, Union
 
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.colors import Colormap, Normalize
@@ -461,67 +462,72 @@ class ScatterPlotter:
     ):
         if show not in [True, False]:
             raise ArgumentTypeError("'show' must be a boolean")
+        if "kwargs" not in kwargs:
+            legend_kwargs = {
+                "loc": loc,
+                "ncol": ncol,
+                "frameon": frameon,
+                "fancybox": fancybox,
+                "framealpha": framealpha,
+            }
+            if labels is not None:
+                if isinstance(labels, str):
+                    legend_kwargs["labels"] = [labels]
+                elif isinstance(labels, (list, tuple)) and all(
+                    isinstance(lbl, str) for lbl in labels
+                ):
+                    legend_kwargs["labels"] = labels
+                else:
+                    raise ArgumentTypeError(
+                        "'labels' must be a string or sequence of strings"
+                    )
+            if handles is not None:
+                if not isinstance(handles, (list, tuple)):
+                    raise ArgumentTypeError(
+                        "'handles' must be a sequence of Artist objects"
+                    )
+                legend_kwargs["handles"] = handles
+            if bbox_to_anchor is not None:
+                if not isinstance(bbox_to_anchor, tuple) or len(bbox_to_anchor) not in [
+                    2,
+                    4,
+                ]:
+                    raise ArgumentTypeError(
+                        "'bbox_to_anchor' must be a tuple of 2 or 4 floats"
+                    )
+                legend_kwargs["bbox_to_anchor"] = bbox_to_anchor
 
-        legend_kwargs = {
-            "loc": loc,
-            "ncol": ncol,
-            "frameon": frameon,
-            "fancybox": fancybox,
-            "framealpha": framealpha,
-        }
-        if labels is not None:
-            if isinstance(labels, str):
-                legend_kwargs["labels"] = [labels]
-            elif isinstance(labels, (list, tuple)) and all(
-                isinstance(lbl, str) for lbl in labels
-            ):
-                legend_kwargs["labels"] = labels
-            else:
-                raise ArgumentTypeError(
-                    "'labels' must be a string or sequence of strings"
-                )
-        if handles is not None:
-            if not isinstance(handles, (list, tuple)):
-                raise ArgumentTypeError(
-                    "'handles' must be a sequence of Artist objects"
-                )
-            legend_kwargs["handles"] = handles
-        if bbox_to_anchor is not None:
-            if not isinstance(bbox_to_anchor, tuple) or len(bbox_to_anchor) not in [
-                2,
-                4,
-            ]:
-                raise ArgumentTypeError(
-                    "'bbox_to_anchor' must be a tuple of 2 or 4 floats"
-                )
-            legend_kwargs["bbox_to_anchor"] = bbox_to_anchor
+            if fontsize is not None:
+                if not isinstance(fontsize, (int, str)):
+                    raise ArgumentTypeError("'fontsize' must be an integer or string")
+                legend_kwargs["fontsize"] = fontsize
 
-        if fontsize is not None:
-            if not isinstance(fontsize, (int, str)):
-                raise ArgumentTypeError("'fontsize' must be an integer or string")
-            legend_kwargs["fontsize"] = fontsize
+            if title is not None:
+                if not isinstance(title, str):
+                    raise ArgumentTypeError("'title' must be a string")
+                legend_kwargs["title"] = title
 
-        if title is not None:
-            if not isinstance(title, str):
-                raise ArgumentTypeError("'title' must be a string")
-            legend_kwargs["title"] = title
+            if title_fontsize is not None:
+                if not isinstance(title_fontsize, (int, str)):
+                    raise ArgumentTypeError(
+                        "'title_fontsize' must be an integer or string"
+                    )
+                legend_kwargs["title_fontsize"] = title_fontsize
 
-        if title_fontsize is not None:
-            if not isinstance(title_fontsize, (int, str)):
-                raise ArgumentTypeError("'title_fontsize' must be an integer or string")
-            legend_kwargs["title_fontsize"] = title_fontsize
+            if edgecolor is not None:
+                if not isinstance(edgecolor, str):
+                    raise ArgumentTypeError("'edgecolor' must be a string")
+                legend_kwargs["edgecolor"] = edgecolor
 
-        if edgecolor is not None:
-            if not isinstance(edgecolor, str):
-                raise ArgumentTypeError("'edgecolor' must be a string")
-            legend_kwargs["edgecolor"] = edgecolor
-
-        if facecolor is not None:
-            if not isinstance(facecolor, str):
-                raise ArgumentTypeError("'facecolor' must be a string")
-            legend_kwargs["facecolor"] = facecolor
-        legend_kwargs.update(kwargs)
-        self.legend = {"show": show, "kwargs": legend_kwargs} if show else None
+            if facecolor is not None:
+                if not isinstance(facecolor, str):
+                    raise ArgumentTypeError("'facecolor' must be a string")
+                legend_kwargs["facecolor"] = facecolor
+            legend_kwargs.update(kwargs)
+            legend = {"show": show, "kwargs": legend_kwargs}
+        else:
+            legend = {"show": show, "kwargs": kwargs["kwargs"]}
+        self.legend = legend if show else None
         return self
 
     def set_zorder(self, zorder: Union[Sequence[float], float]):
@@ -694,7 +700,7 @@ class ScatterPlotter:
             self.y_tick_labels = y_tick_labels
         return self
 
-    def draw(self, show: bool = False):
+    def draw(self, show: bool = True):
         if self.figure is not None or self.ax is not None:
             self.clear()
         if self.style is not None:
@@ -724,6 +730,8 @@ class ScatterPlotter:
             "zorder": self.zorder,
             "plotnonfinite": self.plot_non_finite,
         }
+
+        scatter_kwargs = {k: v for k, v in scatter_kwargs.items() if v is not None}
 
         try:
             self.ax.scatter(**scatter_kwargs)
@@ -828,14 +836,8 @@ class ScatterPlotter:
             marker = dict(
                 marker=value.get_marker(),
                 fillstyle=value.get_fillstyle(),
-                transform=value.get_transform(),
                 capstyle=value.get_capstyle(),
                 joinstyle=value.get_joinstyle(),
-            )
-            marker["transform"] = (
-                marker["transform"].__class__.__name__.lower()
-                if marker["transform"]
-                else None
             )
             return marker
 
