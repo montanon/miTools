@@ -25,5 +25,8 @@ Cmap = Union[
 Norm = Union[str, Normalize]
 EdgeColor = Union[Literal["face", "none", None], Color, Sequence[Color]]
 FaceColor = Union[Color, Sequence[Color]]
-LineStyle = Literal["solid", "dashed", "dashdot", "dotted", "-", "--", "-.", ":"]
+LineStyle = Union[
+    Literal["-", "--", "-.", ":", "None", "none", " ", ""],
+    Sequence[Literal["-", "--", "-.", ":", "None", "none", " ", ""]],
+]
 Scale = Literal["linear", "log", "symlog", "logit"]
