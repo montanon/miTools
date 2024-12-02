@@ -1,3 +1,4 @@
+import re
 from typing import Any, Dict, Literal, Sequence, Tuple, Union
 
 from matplotlib.axes import Axes
@@ -10,7 +11,7 @@ from mitools.exceptions import (
     ArgumentTypeError,
     ArgumentValueError,
 )
-from mitools.visuals.plots.matplotlib_typing import Color, EdgeColor, FaceColor
+from mitools.visuals.plots.matplotlib_typing import Color, EdgeColor, FaceColor, _colors
 from mitools.visuals.plots.plotter import Plotter
 
 
@@ -23,7 +24,7 @@ class DistributionPlotter(Plotter):
         super().__init__(
             x_data=x_data, y_data=x_data if y_data is None else y_data, **kwargs
         )
-        hist_params = {
+        self._hist_params = {
             "bins": {"default": "auto", "type": Union[int, str, Sequence[float]]},
             "range": {"default": None, "type": Union[Tuple[float, float], None]},
             "density": {"default": False, "type": bool},
@@ -49,10 +50,53 @@ class DistributionPlotter(Plotter):
             "linewidth": {"default": None, "type": Union[float, None]},
             "hatch": {"default": None, "type": Union[Sequence[str], str]},
         }
-        self._init_params.update(hist_params)
+        self._init_params.update(self._hist_params)
         self._set_init_params(**kwargs)
         self.figure: Figure = None
         self.ax: Axes = None
+
+    def set_color(
+        self, color: Union[Sequence[Color], Color, Sequence[float], Sequence[int]]
+    ):
+        if isinstance(color, str):
+            if color not in _colors and not re.match(
+                r"^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", color
+            ):
+                raise ArgumentTypeError(
+                    f"'color'='{color}' must be a valid Matplotlib color string or HEX code."
+                )
+            self.color = color
+            return self
+        if (
+            isinstance(color, (tuple, list, ndarray))
+            and len(color) in [3, 4]
+            and all(isinstance(c, (float, int, integer)) for c in color)
+        ):
+            self.color = color
+            return self
+        if isinstance(color, (list, tuple, ndarray, Series)):
+            if len(color) != self.data_size:
+                raise ArgumentStructureError(
+                    "color must be of the same length as x_data and y_data, "
+                    + f"len(color)={len(color)} != len(x_data)={self.data_size}."
+                )
+            if not all(
+                isinstance(c, str)
+                or (
+                    isinstance(c, (tuple, list, ndarray))
+                    and len(c) in [3, 4]
+                    and all(isinstance(x, (float, int, integer)) for x in c)
+                )
+                for c in color
+            ):
+                raise ArgumentTypeError(
+                    "All elements in color must be strings or RGB/RGBA values."
+                )
+            self.color = color
+            return self
+        raise ArgumentTypeError(
+            "color must be a string, RGB/RGBA values, or array-like of strings/RGB/RGBA values."
+        )
 
     def set_bins(self, bins: Union[int, str, Sequence[float]]):
         if isinstance(bins, (int, str)):
@@ -191,6 +235,29 @@ class DistributionPlotter(Plotter):
         if not isinstance(linewidth, (int, float)) or linewidth < 0:
             raise ArgumentValueError("linewidth must be a non-negative number")
         self.linewidth = float(linewidth)
+        return self
+
+    def set_fill(self, fill: Union[bool, Sequence[bool]]):
+        self.fill = fill
+        return self
+
+    def set_linestyle(self, linestyle: str):
+        self.linestyle = linestyle
+        return self
+
+    def set_hatch(self, hatch: Union[Sequence[str], str]):
+        if isinstance(hatch, str):
+            self.hatch = hatch
+        elif isinstance(hatch, (list, tuple, ndarray, Series)):
+            if len(hatch) != self.data_size:
+                raise ArgumentStructureError(
+                    "hatch must be of the same length as x_data and y_data"
+                )
+            if not all(isinstance(h, str) for h in hatch):
+                raise ArgumentTypeError("All hatch values must be strings")
+            self.hatch = hatch
+        else:
+            raise ArgumentTypeError("hatch must be a string or sequence of strings")
         return self
 
     def _create_plot(self):
