@@ -1,15 +1,10 @@
-import json
 import re
-from pathlib import Path
-from typing import Any, Dict, Literal, Sequence, Tuple, Union
+from typing import Any, Literal, Sequence, Union
 
-import matplotlib as mpl
-import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.colors import Colormap, Normalize
 from matplotlib.figure import Figure
 from matplotlib.markers import MarkerStyle
-from matplotlib.text import Text
 from numpy import integer, ndarray
 from pandas import Series
 
