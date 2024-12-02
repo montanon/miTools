@@ -146,25 +146,6 @@ class LinePlotter:
             )
         return self
 
-    def set_size(self, size_data: Union[Sequence[float], float]):
-        if isinstance(size_data, (list, tuple, ndarray, Series, float, int, integer)):
-            if not isinstance(size_data, (float, int, integer)):
-                if len(size_data) != self.data_size:
-                    raise ArgumentStructureError(
-                        "size_data must be of the same length as x_data and y_data,"
-                        + f"len(size_data)={len(size_data)} != len(x_data)={self.data_size}."
-                    )
-                if not all(isinstance(s, (float, int, integer)) for s in size_data):
-                    raise ArgumentTypeError(
-                        "All elements in size_data must be numeric."
-                    )
-            self.size = size_data
-        else:
-            raise ArgumentTypeError(
-                "size_data must be array-like or a single numeric value."
-            )
-        return self
-
     def set_color(
         self, color: Union[Sequence[Color], Color, Sequence[float], Sequence[int]]
     ):
@@ -209,41 +190,59 @@ class LinePlotter:
             "color must be a string, RGB/RGBA values, or array-like of strings/RGB/RGBA values."
         )
 
-    def set_marker(self, marker: Union[Markers, dict]):
-        if isinstance(marker, dict):
-            marker = MarkerStyle(**marker)
+    def set_marker(self, marker: Union[Markers, str]):
         if isinstance(marker, str):
             if marker not in MarkerStyle.markers:
                 raise ArgumentValueError(
                     f"'marker'={marker} must be a valid Matplotlib marker string"
-                    + f" {MarkerStyle.markers} or a MarkerStyle object."
+                    + f" {MarkerStyle.markers}."
                 )
-            self.marker = MarkerStyle(marker)
-        elif isinstance(marker, MarkerStyle):
-            self.marker = MarkerStyle(marker.get_marker())
+            self.marker = marker
         elif isinstance(marker, Sequence):
-            if not all(isinstance(m, (MarkerStyle, str)) for m in marker):
-                raise ArgumentTypeError(
-                    "All elements in marker must be MarkerStyle objects or valid Matplotlib marker strings."
-                )
             if len(marker) != self.data_size:
                 raise ArgumentStructureError(
-                    "marker must be of the same length as x_data and y_data, "
-                    + f"len(marker)={len(marker)} != len(x_data)={self.data_size}."
+                    "marker sequence must be same length as data"
                 )
-            self.marker = [MarkerStyle(m.get_marker()) for m in marker]
+            if not all(m in MarkerStyle.markers for m in marker):
+                raise ArgumentValueError("Invalid marker in sequence")
+            self.marker = marker
         else:
             raise ArgumentTypeError(
-                "marker must be a string, a MarkerStyle object, or a sequence of MarkerStyle objects."
+                "marker must be a string or sequence of valid Matplotlib marker strings"
             )
         return self
 
-    def set_linestyle(self, linestyle: LineStyle):
-        """Set the line style for the plot.
+    def set_markersize(self, markersize: Union[float, Sequence[float]]):
+        if isinstance(markersize, (int, float)):
+            self.markersize = markersize
+        elif isinstance(markersize, Sequence):
+            if len(markersize) != self.data_size:
+                raise ArgumentStructureError(
+                    "markersize sequence must be same length as data"
+                )
+            self.markersize = markersize
+        return self
 
-        Args:
-            linestyle: Line style string ('-', '--', '-.', ':') or sequence of such strings
-        """
+    def set_markerfacecolor(self, markerfacecolor: Union[Color, Sequence[Color]]):
+        self.markerfacecolor = markerfacecolor
+        return self
+
+    def set_markeredgecolor(self, markeredgecolor: Union[Color, Sequence[Color]]):
+        self.markeredgecolor = markeredgecolor
+        return self
+
+    def set_markeredgewidth(self, markeredgewidth: Union[float, Sequence[float]]):
+        if isinstance(markeredgewidth, (int, float)):
+            self.markeredgewidth = markeredgewidth
+        elif isinstance(markeredgewidth, Sequence):
+            if len(markeredgewidth) != self.data_size:
+                raise ArgumentStructureError(
+                    "markeredgewidth sequence must be same length as data"
+                )
+            self.markeredgewidth = markeredgewidth
+        return self
+
+    def set_linestyle(self, linestyle: LineStyle):
         _valid_styles = ["-", "--", "-.", ":", "None", "none", " ", ""]
         if isinstance(linestyle, str):
             if linestyle not in _valid_styles:
@@ -254,7 +253,8 @@ class LinePlotter:
         ):
             if len(linestyle) != self.data_size:
                 raise ArgumentStructureError(
-                    "linestyle sequence must match data length"
+                    "linestyle must be of the same length as x_data and y_data, "
+                    + f"len(linestyle)={len(linestyle)} != len(x_data)={self.data_size}."
                 )
             self.linestyle = linestyle
         else:
@@ -570,8 +570,14 @@ class LinePlotter:
             self.ax.grid(**self.grid)
 
         plot_kwargs = {
+            "x": self.x_data,
+            "y": self.y_data,
             "color": self.color,
             "marker": self.marker,
+            "markersize": self.markersize,
+            "markerfacecolor": self.markerfacecolor,
+            "markeredgecolor": self.markeredgecolor,
+            "markeredgewidth": self.markeredgewidth,
             "linestyle": self.linestyle,
             "linewidth": self.linewidth,
             "alpha": self.alpha,
@@ -579,8 +585,10 @@ class LinePlotter:
             "zorder": self.zorder,
         }
 
+        plot_kwargs = {k: v for k, v in plot_kwargs.items() if v is not None}
+
         try:
-            self.ax.plot(self.x_data, self.y_data, **plot_kwargs)
+            self.ax.plot(**plot_kwargs)
         except Exception as e:
             raise LinePlotterException(f"Error while creating line plot: {e}")
         if self.title:
