@@ -27,7 +27,6 @@ class HistogramPlotter(Plotter):
         self._hist_params = {
             "bins": {"default": "auto", "type": Union[int, str, Sequence[float]]},
             "range": {"default": None, "type": Union[Tuple[float, float], None]},
-            "density": {"default": False, "type": bool},
             "weights": {"default": None, "type": Union[Sequence[float], None]},
             "cumulative": {"default": False, "type": bool},
             "bottom": {"default": None, "type": Union[Sequence[float], float, None]},
@@ -112,12 +111,6 @@ class HistogramPlotter(Plotter):
         if range[0] >= range[1]:
             raise ArgumentValueError("range[0] must be less than range[1]")
         self.range = range
-        return self
-
-    def set_density(self, density: bool):
-        if not isinstance(density, bool):
-            raise ArgumentTypeError("density must be a boolean")
-        self.density = density
         return self
 
     def set_weights(self, weights: Sequence[float]):
@@ -244,7 +237,6 @@ class HistogramPlotter(Plotter):
         hist_kwargs = {
             "bins": self.bins,
             "range": self.range,
-            "density": self.density,
             "weights": self.weights,
             "cumulative": self.cumulative,
             "bottom": self.bottom,
