@@ -27,7 +27,7 @@ class BarPlotterException(Exception):
 
 class BarPlotter(Plotter):
     def __init__(self, x_data: Any, y_data: Any, **kwargs):
-        bar_params = {
+        self._bar_params = {
             "width": {"default": 0.8, "type": Union[Sequence[float], float]},
             "bottom": {"default": None, "type": Union[Sequence[float], float]},
             "align": {"default": "center", "type": Literal["center", "edge"]},
@@ -50,7 +50,7 @@ class BarPlotter(Plotter):
             "colormap": {"default": None, "type": Cmap},
         }
         super().__init__(x_data, y_data, **kwargs)
-        self._init_params.update(bar_params)
+        self._init_params.update(self._bar_params)
         self._set_init_params(**kwargs)
         self.figure: Figure = None
         self.ax: Axes = None

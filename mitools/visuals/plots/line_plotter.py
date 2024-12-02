@@ -29,7 +29,7 @@ class LinePlotterException(Exception):
 
 class LinePlotter(Plotter):
     def __init__(self, x_data: Any, y_data: Any, **kwargs):
-        line_params = {
+        self._line_params = {
             "marker": {"default": None, "type": Markers},
             "markersize": {"default": None, "type": Union[Sequence[float], float]},
             "markeredgewidth": {"default": None, "type": Union[Sequence[float], float]},
@@ -39,7 +39,7 @@ class LinePlotter(Plotter):
             "linewidth": {"default": None, "type": Union[Sequence[float], float]},
         }
         super().__init__(x_data, y_data, **kwargs)
-        self._init_params.update(line_params)
+        self._init_params.update(self._line_params)
         self._set_init_params(**kwargs)
         self.figure: Figure = None
         self.ax: Axes = None

@@ -31,7 +31,7 @@ class ScatterPlotterException(Exception):
 
 class ScatterPlotter(Plotter):
     def __init__(self, x_data: Any, y_data: Any, **kwargs):
-        scatter_params = {
+        self._scatter_params = {
             "size": {"default": None, "type": Union[Sequence[float], float]},
             "marker": {"default": "o", "type": Markers},
             "colormap": {"default": None, "type": Cmap},
@@ -45,7 +45,7 @@ class ScatterPlotter(Plotter):
             "hover": {"default": False, "type": bool},
         }
         super().__init__(x_data, y_data, **kwargs)
-        self._init_params.update(scatter_params)
+        self._init_params.update(self._scatter_params)
         self._set_init_params(**kwargs)
         self.figure: Figure = None
         self.ax: Axes = None
