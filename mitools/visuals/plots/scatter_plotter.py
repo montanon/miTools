@@ -88,10 +88,13 @@ class ScatterPlotter:
 
         for param, config in self._init_params.items():
             setattr(self, param, config["default"])
-            if param in kwargs:
+            if param in kwargs and kwargs[param] is not None:
                 setter_name = f"set_{param}"
                 if hasattr(self, setter_name):
-                    getattr(self, setter_name)(kwargs[param])
+                    if isinstance(kwargs[param], dict):
+                        getattr(self, setter_name)(**kwargs[param])
+                    else:
+                        getattr(self, setter_name)(kwargs[param])
                 else:
                     if param in ["xscale", "yscale"]:
                         self.set_scales(**{param: kwargs[param]})
@@ -119,26 +122,17 @@ class ScatterPlotter:
             )
         return data
 
-    def set_title(self, title: str, **kwargs):
-        if isinstance(title, dict):
-            kwargs = {k: v for k, v in title.items() if k not in ["label"]}
-            title = title["label"]
+    def set_title(self, label: str, **kwargs):
         """https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.set_title.html"""
-        self.title = dict(label=title, **kwargs)
+        self.title = dict(label=label, **kwargs)
         return self
 
     def set_xlabel(self, xlabel: str, **kwargs):
-        if isinstance(xlabel, dict):
-            kwargs = {k: v for k, v in xlabel.items() if k not in ["xlabel"]}
-            xlabel = xlabel["xlabel"]
         """https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.set_xlabel"""
         self.xlabel = dict(xlabel=xlabel, **kwargs)
         return self
 
     def set_ylabel(self, ylabel: str, **kwargs):
-        if isinstance(ylabel, dict):
-            kwargs = {k: v for k, v in ylabel.items() if k not in ["ylabel"]}
-            ylabel = ylabel["ylabel"]
         """https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.set_ylabel"""
         self.ylabel = dict(ylabel=ylabel, **kwargs)
         return self
@@ -224,6 +218,7 @@ class ScatterPlotter:
         self,
         marker: Union[Markers, dict],
         fillstyle: Literal["full", "left", "right", "bottom", "top", "none"] = None,
+        **kwargs,
     ):
         if fillstyle is not None and fillstyle not in MarkerStyle.fillstyles:
             raise ArgumentValueError(
@@ -237,9 +232,11 @@ class ScatterPlotter:
                     f"'marker'={marker} must be a valid Matplotlib marker string"
                     + f" {MarkerStyle.markers} or a MarkerStyle object."
                 )
-            self.marker = MarkerStyle(marker, fillstyle=fillstyle)
+            self.marker = MarkerStyle(marker, fillstyle=fillstyle, **kwargs)
         elif isinstance(marker, MarkerStyle):
-            self.marker = MarkerStyle(marker.get_marker(), fillstyle=fillstyle)
+            self.marker = MarkerStyle(
+                marker.get_marker(), fillstyle=fillstyle, **kwargs
+            )
         elif isinstance(marker, Sequence):
             if not all(isinstance(m, (MarkerStyle, str)) for m in marker):
                 raise ArgumentTypeError(
@@ -251,9 +248,9 @@ class ScatterPlotter:
                     + f"len(marker)={len(marker)} != len(x_data)={self.data_size}."
                 )
             self.marker = [
-                MarkerStyle(m.get_marker(), fillstyle=fillstyle)
+                MarkerStyle(m.get_marker(), fillstyle=fillstyle, **kwargs)
                 if isinstance(m, MarkerStyle)
-                else MarkerStyle(m, fillstyle=fillstyle)
+                else MarkerStyle(m, fillstyle=fillstyle, **kwargs)
                 for m in marker
             ]
         else:
@@ -462,9 +459,6 @@ class ScatterPlotter:
         facecolor: Union[str, None] = "inherit",
         **kwargs,
     ):
-        if isinstance(show, dict):
-            self.legend = show
-            return self
         if show not in [True, False]:
             raise ArgumentTypeError("'show' must be a boolean")
 
@@ -583,20 +577,11 @@ class ScatterPlotter:
 
     def set_grid(
         self,
-        visible: Union[bool, Dict] = None,
+        visible: bool = None,
         which: Literal["major", "minor", "both"] = "major",
         axis: Literal["both", "x", "y"] = "both",
         **kwargs,
     ):
-        if isinstance(visible, dict):
-            kwargs = {
-                k: v
-                for k, v in visible.items()
-                if k not in ["visible", "which", "axis"]
-            }
-            which = visible.get("which", "major")
-            axis = visible.get("axis", "both")
-            visible = visible.get("visible", True)
         if visible not in [True, False]:
             raise ArgumentTypeError("visible must be a bool.")
         if which not in ["major", "minor", "both"]:
@@ -640,11 +625,8 @@ class ScatterPlotter:
         self.figure_background = figure_background
         return self
 
-    def set_suptitle(self, suptitle: Union[str, Dict], **kwargs):
-        if isinstance(suptitle, dict):
-            kwargs = {k: v for k, v in suptitle.items() if k not in ["t"]}
-            suptitle = suptitle["t"]
-        self.suptitle = dict(t=suptitle, **kwargs)
+    def set_suptitle(self, t: str, **kwargs):
+        self.suptitle = dict(t=t, **kwargs)
         return self
 
     def set_ax_limits(
@@ -830,7 +812,11 @@ class ScatterPlotter:
             return None
         elif isinstance(value, dict):
             return {k: self._to_serializable(v) for k, v in value.items()}
-        elif isinstance(value, (list, tuple, ndarray, Series)):
+        elif isinstance(value, ndarray):
+            return value.tolist()
+        elif isinstance(value, Series):
+            return value.to_list()
+        elif isinstance(value, (list, tuple)):
             return [self._to_serializable(v) for v in value]
         elif isinstance(value, Colormap):
             print(value)
@@ -864,6 +850,7 @@ class ScatterPlotter:
         if data:
             init_params["x_data"] = self._to_serializable(self.x_data)
             init_params["y_data"] = self._to_serializable(self.y_data)
+        print(init_params["legend"])
         with open(file_path, "w") as f:
             json.dump(init_params, f, indent=4)
 
@@ -873,4 +860,8 @@ class ScatterPlotter:
             params = json.load(f)
         x_data = params.pop("x_data") if "x_data" in params else []
         y_data = params.pop("y_data") if "y_data" in params else []
+        if "xlim" in params:
+            params["xlim"] = tuple(params["xlim"])
+        if "ylim" in params:
+            params["ylim"] = tuple(params["ylim"])
         return cls(x_data=x_data, y_data=y_data, **params)
