@@ -68,6 +68,7 @@ class Plotter(ABC):
             "y_tick_labels": {"default": None, "type": Union[Sequence[str], None]},
             "x_tick_params": {"default": None, "type": Dict[str, Any]},
             "y_tick_params": {"default": None, "type": Dict[str, Any]},
+            "spines": {"default": {}, "type": Dict[str, Any]},
         }
 
         self._set_init_params(**kwargs)
@@ -449,6 +450,43 @@ class Plotter(ABC):
             self.y_tick_params = y_tick_params
         return self
 
+    def _spine_params(
+        self,
+        visible: Union[bool, Dict[str, bool]] = True,
+        position: Union[Dict[str, Union[Tuple[float, float], str]], None] = None,
+        color: Union[Color, Dict[str, Color]] = None,
+        linewidth: Union[float, Dict[str, float]] = None,
+        linestyle: Union[str, Dict[str, str]] = None,
+        alpha: Union[float, Dict[str, float]] = None,
+        bounds: Union[Tuple[float, float], Dict[str, Tuple[float, float]]] = None,
+        capstyle: Union[Literal["butt", "round", "projecting"], Dict[str, str]] = None,
+    ):
+        return {
+            "visible": visible,
+            "position": position,
+            "color": color,
+            "linewidth": linewidth,
+            "linestyle": linestyle,
+            "alpha": alpha,
+            "bounds": bounds,
+            "capstyle": capstyle,
+        }
+
+    def set_spines(
+        self,
+        left: Dict[str, Any] = None,
+        right: Dict[str, Any] = None,
+        bottom: Dict[str, Any] = None,
+        top: Dict[str, Any] = None,
+    ):
+        self.spines = {
+            "left": self._spine_params(**left) if left is not None else None,
+            "right": self._spine_params(**right) if right is not None else None,
+            "bottom": self._spine_params(**bottom) if bottom is not None else None,
+            "top": self._spine_params(**top) if top is not None else None,
+        }
+        return self
+
     def prepare_draw(self):
         if self.figure is not None or self.ax is not None:
             self.clear()
@@ -506,6 +544,30 @@ class Plotter(ABC):
             self.ax.tick_params(axis="x", **self.x_tick_params)
         if self.y_tick_params is not None:
             self.ax.tick_params(axis="y", **self.y_tick_params)
+        if self.spines:
+            for spine, spine_params in self.spines.items():
+                if spine_params is not None:
+                    for param, values in spine_params.items():
+                        if values is not None:
+                            if param == "visible":
+                                self.ax.spines[spine].set_visible(values)
+                            elif param == "position":
+                                if isinstance(values, str):
+                                    self.ax.spines[spine].set_position(values)
+                                else:
+                                    self.ax.spines[spine].set_position(("data", values))
+                            elif param == "color":
+                                self.ax.spines[spine].set_color(values)
+                            elif param == "linewidth":
+                                self.ax.spines[spine].set_linewidth(values)
+                            elif param == "linestyle":
+                                self.ax.spines[spine].set_linestyle(values)
+                            elif param == "alpha":
+                                self.ax.spines[spine].set_alpha(values)
+                            elif param == "bounds":
+                                self.ax.spines[spine].set_bounds(*values)
+                            elif param == "capstyle":
+                                self.ax.spines[spine].set_capstyle(values)
 
     def _finalize_draw(self, show: bool = True):
         if self.tight_layout:
