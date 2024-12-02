@@ -100,6 +100,11 @@ class Plotter(ABC):
                     else:
                         raise ArgumentValueError(f"Parameter '{param}' is not valid.")
 
+    def reset_params(self):
+        for param, config in self._init_params.items():
+            setattr(self, param, config["default"])
+        return self
+
     def _validate_data(
         self, data: Sequence[Union[float, int, integer]], name: str
     ) -> Any:
