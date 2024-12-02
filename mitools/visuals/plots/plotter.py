@@ -71,6 +71,12 @@ class Plotter(ABC):
             "y_tick_labels": {"default": None, "type": Union[Sequence[str], None]},
         }
 
+        self._set_init_params(**kwargs)
+
+        self.figure: Figure = None
+        self.ax: Axes = None
+
+    def _set_init_params(self, **kwargs):
         for param, config in self._init_params.items():
             setattr(self, param, config["default"])
             if param in kwargs and kwargs[param] is not None:
@@ -91,8 +97,6 @@ class Plotter(ABC):
                         self.set_tick_labels(**{param: kwargs[param]})
                     else:
                         raise ArgumentValueError(f"Parameter '{param}' is not valid.")
-        self.figure: Figure = None
-        self.ax: Axes = None
 
     def _validate_data(
         self, data: Sequence[Union[float, int, integer]], name: str
@@ -419,43 +423,18 @@ class Plotter(ABC):
             self.y_tick_labels = y_tick_labels
         return self
 
-    def draw(self, show: bool = True):
+    def prepare_draw(self):
         if self.figure is not None or self.ax is not None:
             self.clear()
         if self.style is not None:
-            default_style = plt.rcParams.copy()
+            self._default_style = plt.rcParams.copy()
             plt.style.use(self.style)
         if not self.ax and not self.figure:
             self.figure, self.ax = plt.subplots(figsize=self.figsize)
-
         if self.grid is not None:
             self.ax.grid(**self.grid)
 
-        scatter_kwargs = {
-            "x": self.x_data,
-            "y": self.y_data,
-            "s": self.size,
-            "c": self.color,
-            "marker": self.marker,
-            "cmap": self.colormap,
-            "norm": self.normalization,
-            "vmin": self.vmin,
-            "vmax": self.vmax,
-            "alpha": self.alpha,
-            "linewidth": self.linewidth,
-            "edgecolor": self.edgecolor,
-            "facecolor": self.facecolor,
-            "label": self.label,
-            "zorder": self.zorder,
-            "plotnonfinite": self.plot_non_finite,
-        }
-
-        scatter_kwargs = {k: v for k, v in scatter_kwargs.items() if v is not None}
-
-        try:
-            self.ax.scatter(**scatter_kwargs)
-        except Exception as e:
-            raise PlotterException(f"Error while creating scatter plot: {e}")
+    def _apply_common_properties(self):
         if self.title:
             self.ax.set_title(**self.title)
         if self.xlabel:
@@ -497,15 +476,28 @@ class Plotter(ABC):
             self.ax.set_xticklabels(self.x_tick_labels)
         if self.y_tick_labels is not None:
             self.ax.set_yticklabels(self.y_tick_labels)
-        if self.hover and self.label is not None:
-            pass
+
+    def _finalize_draw(self, show: bool = True):
         if self.tight_layout:
             plt.tight_layout()
         if show:
             plt.show()
         if self.style is not None:
-            plt.rcParams.update(default_style)
+            plt.rcParams.update(self._default_style)
         return self.ax
+
+    @abstractmethod
+    def _create_plot(self):
+        raise NotImplementedError
+
+    def draw(self, show: bool = True):
+        self.prepare_draw()
+        try:
+            self._create_plot()
+        except Exception as e:
+            raise PlotterException(f"Error while creating plot: {e}")
+        self._apply_common_properties()
+        return self._finalize_draw(show)
 
     def save_plot(
         self,
