@@ -819,7 +819,6 @@ class ScatterPlotter:
         elif isinstance(value, (list, tuple)):
             return [self._to_serializable(v) for v in value]
         elif isinstance(value, Colormap):
-            print(value)
             return value.name
         elif isinstance(value, Normalize):
             return value.__class__.__name__.lower()
@@ -850,7 +849,6 @@ class ScatterPlotter:
         if data:
             init_params["x_data"] = self._to_serializable(self.x_data)
             init_params["y_data"] = self._to_serializable(self.y_data)
-        print(init_params["legend"])
         with open(file_path, "w") as f:
             json.dump(init_params, f, indent=4)
 
