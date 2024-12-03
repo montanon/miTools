@@ -23,6 +23,17 @@ from mitools.visuals.plots.matplotlib_typing import (
     _colors,
 )
 from mitools.visuals.plots.plotter import Plotter
+from mitools.visuals.plots.validations import (
+    NUMERIC_TYPES,
+    SEQUENCE_TYPES,
+    is_sequence,
+    validate_length,
+    validate_same_length,
+    validate_sequence_length,
+    validate_sequence_type,
+    validate_type,
+    validate_value_in_options,
+)
 
 
 class ScatterPlotterException(Exception):
@@ -51,22 +62,11 @@ class ScatterPlotter(Plotter):
         self.ax: Axes = None
 
     def set_size(self, size_data: Union[Sequence[float], float]):
-        if isinstance(size_data, (list, tuple, ndarray, Series, float, int, integer)):
-            if not isinstance(size_data, (float, int, integer)):
-                if len(size_data) != self.data_size:
-                    raise ArgumentStructureError(
-                        "size_data must be of the same length as x_data and y_data,"
-                        + f"len(size_data)={len(size_data)} != len(x_data)={self.data_size}."
-                    )
-                if not all(isinstance(s, (float, int, integer)) for s in size_data):
-                    raise ArgumentTypeError(
-                        "All elements in size_data must be numeric."
-                    )
-            self.size = size_data
-        else:
-            raise ArgumentTypeError(
-                "size_data must be array-like or a single numeric value."
-            )
+        validate_type(size_data, (*SEQUENCE_TYPES, *NUMERIC_TYPES), "size_data")
+        if is_sequence(size_data):
+            validate_sequence_length(size_data, self.data_size, "size_data")
+            validate_sequence_type(size_data, NUMERIC_TYPES, "size_data")
+        self.size = size_data
         return self
 
     def set_color(
@@ -81,19 +81,13 @@ class ScatterPlotter(Plotter):
                 )
             self.color = color
             return self
-        if (
-            isinstance(color, (tuple, list, ndarray))
-            and len(color) in [3, 4]
-            and all(isinstance(c, (float, int, integer)) for c in color)
-        ):
-            self.color = color
-            return self
-        if isinstance(color, (list, tuple, ndarray, Series)):
-            if len(color) != self.data_size:
-                raise ArgumentStructureError(
-                    "color must be of the same length as x_data and y_data, "
-                    + f"len(color)={len(color)} != len(x_data)={self.data_size}."
-                )
+        if isinstance(color, (tuple, list, ndarray)):
+            if len(color) in [3, 4]:
+                validate_sequence_type(color, NUMERIC_TYPES, "color")
+                self.color = color
+                return self
+        if is_sequence(color):
+            validate_length(color, self.data_size, "color")
             if not all(
                 isinstance(c, str)
                 or (
@@ -107,6 +101,7 @@ class ScatterPlotter(Plotter):
                 raise ArgumentTypeError(
                     "All elements in color must be strings or RGB/RGBA values."
                 )
+
             self.color = color
             return self
         raise ArgumentTypeError(
@@ -119,33 +114,20 @@ class ScatterPlotter(Plotter):
         fillstyle: Literal["full", "left", "right", "bottom", "top", "none"] = None,
         **kwargs,
     ):
-        if fillstyle is not None and fillstyle not in MarkerStyle.fillstyles:
-            raise ArgumentValueError(
-                f"'fillstyle'={fillstyle} must be a valid Matplotlib fillstyle string {MarkerStyle.fillstyles}."
-            )
+        if fillstyle is not None:
+            validate_value_in_options(fillstyle, MarkerStyle.fillstyles, "fillstyle")
         if isinstance(marker, dict):
             marker = MarkerStyle(**marker)
         if isinstance(marker, str):
-            if marker not in MarkerStyle.markers:
-                raise ArgumentValueError(
-                    f"'marker'={marker} must be a valid Matplotlib marker string"
-                    + f" {MarkerStyle.markers} or a MarkerStyle object."
-                )
+            validate_value_in_options(marker, MarkerStyle.markers, "marker")
             self.marker = MarkerStyle(marker, fillstyle=fillstyle, **kwargs)
         elif isinstance(marker, MarkerStyle):
             self.marker = MarkerStyle(
                 marker.get_marker(), fillstyle=fillstyle, **kwargs
             )
-        elif isinstance(marker, Sequence):
-            if not all(isinstance(m, (MarkerStyle, str)) for m in marker):
-                raise ArgumentTypeError(
-                    "All elements in marker must be MarkerStyle objects or valid Matplotlib marker strings."
-                )
-            if len(marker) != self.data_size:
-                raise ArgumentStructureError(
-                    "marker must be of the same length as x_data and y_data, "
-                    + f"len(marker)={len(marker)} != len(x_data)={self.data_size}."
-                )
+        elif is_sequence(marker):
+            validate_sequence_type(marker, (MarkerStyle, str), "marker")
+            validate_length(marker, self.data_size, "marker")
             self.marker = [
                 MarkerStyle(m.get_marker(), fillstyle=fillstyle, **kwargs)
                 if isinstance(m, MarkerStyle)
@@ -169,12 +151,10 @@ class ScatterPlotter(Plotter):
             "twilight_shifted",
             "turbo",
         ]
-        if isinstance(cmap, str) and cmap in _cmaps or isinstance(cmap, Colormap):
-            self.colormap = cmap
-        else:
-            raise ArgumentTypeError(
-                f"'cmap'={cmap} must be a Colormap object or a valid Colormap string from {_cmaps}."
-            )
+        validate_type(cmap, (str, Colormap), "cmap")
+        if isinstance(cmap, str):
+            validate_value_in_options(cmap, _cmaps, "cmap")
+        self.colormap = cmap
         return self
 
     def set_normalization(self, normalization: Norm):
@@ -187,35 +167,24 @@ class ScatterPlotter(Plotter):
             "function",
             "functionlog",
         ]
-        if (
-            isinstance(normalization, Normalize)
-            or isinstance(normalization, str)
-            and normalization in _normalizations
-        ):
-            self.normalization = normalization
-        else:
-            raise ArgumentTypeError(
-                "normalize must be a valid Normalize object or a valid Matplotlib normalization string"
-                + f" of {_normalizations}."
-            )
+        validate_type(normalization, (str, Normalize), "normalization")
+        if isinstance(normalization, str):
+            validate_value_in_options(normalization, _normalizations, "normalization")
+        self.normalization = normalization
         return self
 
     def set_vmin(self, vmin: Union[float, int]):
-        if self.normalization is not None and not isinstance(self.normalization, str):
-            raise ArgumentValueError(
-                f"Normalization {self.normalization} has been set. vmin only work when 'self.normalization' is a str."
-            )
-        if isinstance(vmin, (float, int)):
-            self.vmin = vmin
+        if self.normalization is not None:
+            validate_type(self.normalization, str, "normalization")
+        validate_type(vmin, NUMERIC_TYPES, "vmin")
+        self.vmin = vmin
         return self
 
     def set_vmax(self, vmax: Union[float, int]):
-        if self.normalization is not None and not isinstance(self.normalization, str):
-            raise ArgumentValueError(
-                f"Normalization {self.normalization} has been set. vmax only work when 'self.normalization' is a str."
-            )
-        if isinstance(vmax, (float, int)):
-            self.vmax = vmax
+        if self.normalization is not None:
+            validate_type(self.normalization, str, "normalization")
+        validate_type(vmax, NUMERIC_TYPES, "vmax")
+        self.vmax = vmax
         return self
 
     def set_normalization_range(self, vmin: float, vmax: float):
@@ -224,100 +193,73 @@ class ScatterPlotter(Plotter):
         return self
 
     def set_linewidth(self, linewidth: Union[Sequence[float], float]):
-        if isinstance(linewidth, (float, int)):
-            self.linewidth = linewidth
-        elif isinstance(linewidth, (list, tuple, ndarray, Series)) and all(
-            isinstance(lw, (float, int)) for lw in linewidth
-        ):
-            if len(linewidth) != self.data_size:
-                raise ArgumentStructureError(
-                    "linewidth must be of the same length as x_data and y_data, "
-                    + f"len(linewdith)={len(linewidth)} != len(x_data)={self.data_size}."
-                )
-            self.linewidth = linewidth
+        if is_sequence(linewidth):
+            validate_type(linewidth, SEQUENCE_TYPES, "linewidth")
+            validate_sequence_type(linewidth, NUMERIC_TYPES, "linewidth")
+            validate_same_length(linewidth, self.x_data, "linewidth", "x_data")
         else:
-            raise ArgumentTypeError(
-                "linewidth must be a float or an array-like of floats or ints."
-            )
+            validate_type(linewidth, NUMERIC_TYPES, "linewidth")
+        self.linewidth = linewidth
         return self
 
     def set_edgecolor(self, edgecolor: EdgeColor):
         if edgecolor in ["face", "none", None]:
             self.edgecolor = edgecolor
-        elif isinstance(edgecolor, str) or (
-            isinstance(edgecolor, (list, tuple))
-            and len(edgecolor) in [3, 4]
-            and all(isinstance(x, (int, float, integer)) for x in edgecolor)
-        ):
+            return self
+        if isinstance(edgecolor, str):
             self.edgecolor = edgecolor
-        elif isinstance(edgecolor, (list, tuple, ndarray, Series)):
-            if len(edgecolor) != self.data_size:
-                raise ArgumentStructureError(
-                    "edgecolor must be of the same length as x_data and y_data, "
-                    + f"len(edgecolor)={len(edgecolor)} != len(x_data)={self.data_size}."
-                )
-            for ec in edgecolor:
-                if not (
-                    isinstance(ec, str)
-                    or (
-                        isinstance(ec, (list, tuple))
-                        and len(ec) in [3, 4]
-                        and all(isinstance(x, (int, float, integer)) for x in ec)
-                    )
-                ):
-                    raise ArgumentTypeError(
-                        "Each edgecolor must be a string or RGB/RGBA values."
-                    )
+            return self
+        if isinstance(edgecolor, (list, tuple)):
+            validate_sequence_length(edgecolor, (3, 4), "edgecolor")
+            validate_sequence_type(edgecolor, NUMERIC_TYPES, "edgecolor")
             self.edgecolor = edgecolor
-        else:
+            return self
+        validate_type(edgecolor, SEQUENCE_TYPES, "edgecolor")
+        validate_same_length(edgecolor, self.x_data, "edgecolor", "x_data")
+        for ec in edgecolor:
+            if isinstance(ec, str):
+                continue
+            if isinstance(ec, (list, tuple)):
+                validate_sequence_length(ec, (3, 4), "edgecolor values")
+                validate_sequence_type(ec, NUMERIC_TYPES, "edgecolor values")
+                continue
             raise ArgumentTypeError(
-                "edgecolor must be 'face', 'none', None, a color string, RGB/RGBA values, "
-                + "or an array-like of color strings/RGB/RGBA values."
+                "Each edgecolor must be a string or RGB/RGBA values."
             )
+        self.edgecolor = edgecolor
         return self
 
     def set_facecolor(self, facecolor: FaceColor):
-        if isinstance(facecolor, str) or (
-            isinstance(facecolor, (list, tuple))
-            and len(facecolor) in [3, 4]
-            and all(isinstance(x, (int, float, integer)) for x in facecolor)
-        ):
+        if isinstance(facecolor, str):
             self.facecolor = facecolor
-        elif isinstance(facecolor, (list, tuple, ndarray, Series)):
-            if len(facecolor) != self.data_size:
-                raise ArgumentStructureError(
-                    "facecolor must be of the same length as x_data and y_data, "
-                    + f"len(facecolor)={len(facecolor)} != len(x_data)={self.data_size}."
-                )
-            for fc in facecolor:
-                if not (
-                    isinstance(fc, str)
-                    or (
-                        isinstance(fc, (list, tuple))
-                        and len(fc) in [3, 4]
-                        and all(isinstance(x, (int, float, integer)) for x in fc)
-                    )
-                ):
-                    raise ArgumentTypeError(
-                        "Each facecolor must be a string or RGB/RGBA values."
-                    )
+            return self
+        if isinstance(facecolor, (list, tuple)):
+            validate_sequence_length(facecolor, (3, 4), "facecolor")
+            validate_sequence_type(facecolor, NUMERIC_TYPES, "facecolor")
             self.facecolor = facecolor
-        else:
+            return self
+        validate_type(facecolor, SEQUENCE_TYPES, "facecolor")
+        validate_same_length(facecolor, self.x_data, "facecolor", "x_data")
+        for fc in facecolor:
+            if isinstance(fc, str):
+                continue
+            if isinstance(fc, (list, tuple)):
+                validate_sequence_length(fc, (3, 4), "facecolor values")
+                validate_sequence_type(fc, NUMERIC_TYPES, "facecolor values")
+                continue
             raise ArgumentTypeError(
-                f"'facecolor'={facecolor} must be a color string, RGB/RGBA values, "
-                + "or an array-like of color strings/RGB/RGBA values."
+                "Each facecolor must be a string or RGB/RGBA values."
             )
+        self.facecolor = facecolor
         return self
 
     def set_plot_non_finite(self, plot_non_finite: bool):
-        if plot_non_finite not in [True, False]:
-            raise ArgumentTypeError("plot_non_finite must be a bool.")
+        validate_type(plot_non_finite, bool, "plot_non_finite")
         self.plot_non_finite = plot_non_finite
         return self
 
     def set_hover(self, hover: bool):
-        if hover not in [True, False]:
-            raise ArgumentTypeError("hover must be a bool.")
+        validate_type(hover, bool, "hover")
         self.hover = hover
         return self
 

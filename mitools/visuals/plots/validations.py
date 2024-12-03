@@ -1,6 +1,6 @@
 from typing import Any, Sequence, Tuple, Type, TypeVar, Union
 
-from numpy import ndarray
+from numpy import integer, ndarray
 from pandas import Series
 
 from mitools.exceptions import (
@@ -10,6 +10,9 @@ from mitools.exceptions import (
 )
 
 T = TypeVar("T")
+
+NUMERIC_TYPES = (float, int, integer)
+SEQUENCE_TYPES = (list, tuple, ndarray, Series)
 
 
 def validate_type(

@@ -1,9 +1,10 @@
 from pathlib import Path
 from typing import Any, Dict, Literal, Sequence, Union
 
-from matplotlib.colors import Colormap, Normalize
+from matplotlib.colors import Colormap, Normalize, get_named_colors_mapping
 from matplotlib.markers import MarkerStyle
 
+_colors = list(get_named_colors_mapping().keys())
 Color = Union[str, Sequence[float]]
 Marker = Union[str, int, Path, MarkerStyle]
 Markers = Union[Marker, Sequence[Marker]]

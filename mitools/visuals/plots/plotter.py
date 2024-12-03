@@ -15,7 +15,6 @@ from pandas import Series
 
 from mitools.exceptions import (
     ArgumentStructureError,
-    ArgumentTypeError,
     ArgumentValueError,
 )
 from mitools.visuals.plots.matplotlib_typing import Color, Scale, _tickparams
@@ -339,12 +338,12 @@ class Plotter(ABC):
         if xlim is not None:
             validate_type(xlim, (list, tuple), "xlim")
             validate_sequence_length(xlim, 2, "xlim")
-            validate_sequence_type(xlim, (*NUMERIC_TYPES, None), "xlim")
+            validate_sequence_type(xlim, (*NUMERIC_TYPES, type(None)), "xlim")
             self.xlim = xlim
         if ylim is not None:
             validate_type(ylim, (list, tuple), "ylim")
             validate_sequence_length(ylim, 2, "ylim")
-            validate_sequence_type(ylim, (*NUMERIC_TYPES, None), "ylim")
+            validate_sequence_type(ylim, (*NUMERIC_TYPES, type(None)), "ylim")
             self.ylim = ylim
         return self
 
