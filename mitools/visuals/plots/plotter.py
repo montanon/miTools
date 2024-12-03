@@ -19,6 +19,15 @@ from mitools.exceptions import (
     ArgumentValueError,
 )
 from mitools.visuals.plots.matplotlib_typing import Color, Scale, _tickparams
+from mitools.visuals.plots.validations import (
+    is_sequence,
+    validate_length,
+    validate_same_length,
+    validate_sequence_length,
+    validate_sequence_type,
+    validate_type,
+    validate_value_in_options,
+)
 
 
 class PlotterException(Exception):
@@ -29,10 +38,7 @@ class Plotter(ABC):
     def __init__(self, x_data: Any, y_data: Any, **kwargs):
         self.x_data = self._validate_data(x_data, "x_data")
         self.y_data = self._validate_data(y_data, "y_data")
-        if len(self.x_data) != len(self.y_data):
-            raise ArgumentStructureError(
-                f"'x_data' and 'y_data' must be of the same length, {len(x_data)} != {len(y_data)}."
-            )
+        validate_same_length(self.x_data, self.y_data, "x_data", "y_data")
         self.data_size = len(self.x_data)
         self._init_params = {
             "title": {"default": "", "type": Text},
@@ -107,14 +113,8 @@ class Plotter(ABC):
     def _validate_data(
         self, data: Sequence[Union[float, int, integer]], name: str
     ) -> Any:
-        if not isinstance(data, (list, tuple, ndarray, Series)):
-            raise ArgumentTypeError(
-                f"{name} must be a sequence of floats, ints, or integers."
-            )
-        if not all(isinstance(d, (float, int, integer)) for d in data):
-            raise ArgumentTypeError(
-                f"All elements in {name} must be floats, ints, or integers."
-            )
+        validate_type(data, (list, tuple, ndarray, Series), name)
+        validate_sequence_type(data, (float, int, integer), name)
         return data
 
     def set_title(self, label: str, **kwargs):
@@ -153,34 +153,20 @@ class Plotter(ABC):
         raise NotImplementedError
 
     def set_alpha(self, alpha: Union[Sequence[float], float]):
-        if isinstance(alpha, (list, tuple, ndarray, Series, float, int)):
-            if not isinstance(alpha, (float, int)):
-                if len(alpha) != len(self.x_data):
-                    raise ArgumentStructureError(
-                        "alpha must be of the same length as x_data and y_data, "
-                        + f"len(alpha)={len(alpha)} != len(x_data)={self.data_size}."
-                    )
-            self.alpha = alpha
-        else:
-            raise ArgumentTypeError(
-                "alpha must be a numeric value or an array-like of numeric values."
-            )
+        validate_type(alpha, (float, int, list, tuple, ndarray, Series), "alpha")
+        if is_sequence(alpha):
+            validate_length(alpha, self.data_size, "alpha")
+        self.alpha = alpha
         return self
 
     def set_label(self, labels: Union[Sequence[str], str]):
+        validate_type(labels, (str, list, tuple, ndarray, Series), "labels")
         if isinstance(labels, str):
             self.label = labels
-        elif isinstance(labels, (list, tuple, ndarray, Series)) and all(
-            isinstance(label, str) for label in labels
-        ):
-            if len(labels) != self.data_size:
-                raise ArgumentStructureError(
-                    "labels must be of the same length as x_data and y_data, "
-                    + f"len(labels)={len(labels)} != len(x_data)={self.data_size}."
-                )
-            self.label = labels
         else:
-            raise ArgumentTypeError("labels must be a str or a sequence of strs.")
+            validate_sequence_type(labels, str, "labels")
+            validate_length(labels, self.data_size, "labels")
+            self.label = labels
         return self
 
     def set_legend(
@@ -201,8 +187,36 @@ class Plotter(ABC):
         facecolor: Union[str, None] = "inherit",
         **kwargs,
     ):
-        if show not in [True, False]:
-            raise ArgumentTypeError("'show' must be a boolean")
+        validate_type(show, bool, "show")
+        validate_type(frameon, bool, "frameon")
+        validate_type(fancybox, bool, "fancybox")
+        validate_type(ncol, int, "ncol")
+        validate_type(framealpha, (int, float), "framealpha")
+        if labels is not None:
+            if isinstance(labels, str):
+                labels = [labels]
+            else:
+                validate_type(labels, (list, tuple, ndarray, Series), "labels")
+                validate_sequence_type(labels, str, "labels")
+        if handles is not None:
+            validate_type(handles, (list, tuple), "handles")
+        if bbox_to_anchor is not None:
+            validate_type(bbox_to_anchor, tuple, "bbox_to_anchor")
+            if len(bbox_to_anchor) not in [2, 4]:
+                raise ArgumentStructureError(
+                    "'bbox_to_anchor' must be a tuple of 2 or 4 floats"
+                )
+            validate_sequence_type(bbox_to_anchor, (int, float), "bbox_to_anchor")
+        if fontsize is not None:
+            validate_type(fontsize, (int, str), "fontsize")
+        if title is not None:
+            validate_type(title, str, "title")
+        if title_fontsize is not None:
+            validate_type(title_fontsize, (int, str), "title_fontsize")
+        if edgecolor is not None:
+            validate_type(edgecolor, str, "edgecolor")
+        if facecolor is not None:
+            validate_type(facecolor, str, "facecolor")
         if "kwargs" not in kwargs:
             legend_kwargs = {
                 "loc": loc,
@@ -212,57 +226,20 @@ class Plotter(ABC):
                 "framealpha": framealpha,
             }
             if labels is not None:
-                if isinstance(labels, str):
-                    legend_kwargs["labels"] = [labels]
-                elif isinstance(labels, (list, tuple)) and all(
-                    isinstance(lbl, str) for lbl in labels
-                ):
-                    legend_kwargs["labels"] = labels
-                else:
-                    raise ArgumentTypeError(
-                        "'labels' must be a string or sequence of strings"
-                    )
+                legend_kwargs["labels"] = labels
             if handles is not None:
-                if not isinstance(handles, (list, tuple)):
-                    raise ArgumentTypeError(
-                        "'handles' must be a sequence of Artist objects"
-                    )
                 legend_kwargs["handles"] = handles
             if bbox_to_anchor is not None:
-                if not isinstance(bbox_to_anchor, tuple) or len(bbox_to_anchor) not in [
-                    2,
-                    4,
-                ]:
-                    raise ArgumentTypeError(
-                        "'bbox_to_anchor' must be a tuple of 2 or 4 floats"
-                    )
                 legend_kwargs["bbox_to_anchor"] = bbox_to_anchor
-
             if fontsize is not None:
-                if not isinstance(fontsize, (int, str)):
-                    raise ArgumentTypeError("'fontsize' must be an integer or string")
                 legend_kwargs["fontsize"] = fontsize
-
             if title is not None:
-                if not isinstance(title, str):
-                    raise ArgumentTypeError("'title' must be a string")
                 legend_kwargs["title"] = title
-
             if title_fontsize is not None:
-                if not isinstance(title_fontsize, (int, str)):
-                    raise ArgumentTypeError(
-                        "'title_fontsize' must be an integer or string"
-                    )
                 legend_kwargs["title_fontsize"] = title_fontsize
-
             if edgecolor is not None:
-                if not isinstance(edgecolor, str):
-                    raise ArgumentTypeError("'edgecolor' must be a string")
                 legend_kwargs["edgecolor"] = edgecolor
-
             if facecolor is not None:
-                if not isinstance(facecolor, str):
-                    raise ArgumentTypeError("'facecolor' must be a string")
                 legend_kwargs["facecolor"] = facecolor
             legend_kwargs.update(kwargs)
             legend = {"show": show, "kwargs": legend_kwargs}
@@ -272,30 +249,22 @@ class Plotter(ABC):
         return self
 
     def set_zorder(self, zorder: Union[Sequence[float], float]):
-        if isinstance(zorder, (float, int)):
-            self.zorder = zorder
-        elif isinstance(zorder, (list, tuple, ndarray, Series)) and all(
-            isinstance(zo, (float, int)) for zo in zorder
-        ):
-            if len(zorder) != self.data_size:
-                raise ArgumentStructureError(
-                    "zorder must be of the same length as x_data and y_data, "
-                    + f"len(zorder)={len(zorder)} != len(x_data)={self.data_size}."
-                )
+        if is_sequence(zorder):
+            validate_sequence_type(zorder, (float, int, integer), "zorder")
+            validate_length(zorder, self.data_size, "zorder")
             self.zorder = zorder
         else:
-            raise ArgumentTypeError("zorder must be a float or sequence of floats")
+            validate_type(zorder, (float, int), "zorder")
+            self.zorder = zorder
         return self
 
     def set_figsize(self, figsize: Tuple[float, float]):
         if isinstance(figsize, list):
             figsize = tuple(figsize)
-        if isinstance(figsize, tuple) and all(
-            isinstance(val, (float, int)) for val in figsize
-        ):
-            self.figsize = figsize
-        else:
-            raise ArgumentTypeError("figsize must be a tuple of floats or ints.")
+        validate_type(figsize, tuple, "figsize")
+        validate_sequence_type(figsize, (float, int), "figsize")
+        validate_sequence_length(figsize, 2, "figsize")
+        self.figsize = figsize
         return self
 
     def set_scales(
@@ -305,14 +274,10 @@ class Plotter(ABC):
     ):
         _scales = ["linear", "log", "symlog", "logit"]
         if xscale is not None:
-            if xscale not in _scales:
-                raise ArgumentValueError(f"'xscale'={xscale} must be one of {_scales}")
+            validate_value_in_options(xscale, _scales, "xscale")
             self.xscale = xscale
         if yscale is not None:
-            if yscale not in _scales:
-                raise ArgumentValueError(
-                    f"'x=yscale'={yscale} must be one of {_scales}"
-                )
+            validate_value_in_options(yscale, _scales, "yscale")
             self.yscale = yscale
         return self
 
@@ -323,44 +288,44 @@ class Plotter(ABC):
         axis: Literal["both", "x", "y"] = "both",
         **kwargs,
     ):
-        if visible not in [True, False]:
-            raise ArgumentTypeError("visible must be a bool.")
-        if which not in ["major", "minor", "both"]:
-            raise ArgumentValueError("which must be one of 'major', 'minor', 'both'.")
-        if axis not in ["both", "x", "y"]:
-            raise ArgumentValueError("axis must be one of 'both', 'x', 'y'.")
+        validate_type(visible, bool, "visible")
+        validate_value_in_options(which, ["major", "minor", "both"], "which")
+        validate_value_in_options(axis, ["both", "x", "y"], "axis")
         self.grid = dict(visible=visible, which=which, axis=axis, **kwargs)
         return self
 
     def set_texts(self, texts: Union[Sequence[Dict], Dict]):
         if isinstance(texts, dict):
             self.texts = [texts]
-        elif isinstance(texts, (list, tuple, ndarray, Series)) and all(
-            isinstance(tx, dict) for tx in texts
-        ):
-            self.texts = texts
         else:
-            raise ArgumentTypeError(
-                "texts must a matplotlib Text object or a sequence of Text objects"
-            )
+            validate_type(texts, (list, tuple, ndarray, Series), "texts")
+            validate_sequence_type(texts, dict, "texts")
+            self.texts = texts
         return self
 
     def set_tight_layout(self, tight_layout: bool = False):
-        if tight_layout in [True, False]:
-            self.tight_layout = tight_layout
-        else:
-            raise ArgumentValueError("tight_layout must be a bool.")
+        validate_type(tight_layout, bool, "tight_layout")
+        self.tight_layout = tight_layout
         return self
 
     def set_background(self, background: Color):
+        validate_type(background, (str, tuple), "background")
+        if isinstance(background, tuple):
+            validate_sequence_type(background, (float, int), "background")
+            validate_sequence_length(background, (3, 4), "background")
         self.background = background
         return self
 
     def set_figure_background(self, figure_background: Color):
+        validate_type(figure_background, (str, tuple), "figure_background")
+        if isinstance(figure_background, tuple):
+            validate_sequence_type(figure_background, (float, int), "figure_background")
+            validate_sequence_length(figure_background, (3, 4), "figure_background")
         self.figure_background = figure_background
         return self
 
     def set_suptitle(self, t: str, **kwargs):
+        validate_type(t, str, "t")
         self.suptitle = dict(t=t, **kwargs)
         return self
 
@@ -370,20 +335,14 @@ class Plotter(ABC):
         ylim: Union[Tuple[float, float], None] = None,
     ):
         if xlim is not None:
-            if not isinstance(xlim, (list, tuple)) or len(xlim) != 2:
-                raise ArgumentStructureError(
-                    "xlim must be a tuple or list of two ints or floats (min, max)."
-                )
-            if not all(isinstance(x, (int, float, integer)) for x in xlim):
-                raise ArgumentTypeError("xlim values must be ints or floats.")
+            validate_type(xlim, (list, tuple), "xlim")
+            validate_sequence_length(xlim, 2, "xlim")
+            validate_sequence_type(xlim, (int, float, None), "xlim")
             self.xlim = xlim
         if ylim is not None:
-            if not isinstance(ylim, (list, tuple)) or len(ylim) != 2:
-                raise ArgumentStructureError(
-                    "ylim must be a tuple or list of two ints or floats (min, max)."
-                )
-            if not all(isinstance(y, (int, float, integer)) for y in ylim):
-                raise ArgumentTypeError("ylim values must be ints or floats.")
+            validate_type(ylim, (list, tuple), "ylim")
+            validate_sequence_length(ylim, 2, "ylim")
+            validate_sequence_type(ylim, (int, float, None), "ylim")
             self.ylim = ylim
         return self
 
@@ -393,16 +352,12 @@ class Plotter(ABC):
         y_ticks: Union[Sequence[Union[float, int]], None] = None,
     ):
         if x_ticks is not None:
-            if not isinstance(x_ticks, (list, tuple, ndarray)):
-                raise ArgumentTypeError("x_ticks must be array-like")
-            if not all(isinstance(x, (int, float, integer)) for x in x_ticks):
-                raise ArgumentTypeError("x_ticks values must be ints or floats.")
+            validate_type(x_ticks, (list, tuple, ndarray, Series), "x_ticks")
+            validate_sequence_type(x_ticks, (int, float, integer), "x_ticks")
             self.x_ticks = x_ticks
         if y_ticks is not None:
-            if not isinstance(y_ticks, (list, tuple, ndarray)):
-                raise ArgumentTypeError("y_ticks must be array-like")
-            if not all(isinstance(y, (int, float, integer)) for y in y_ticks):
-                raise ArgumentTypeError("y_ticks values must be ints or floats.")
+            validate_type(y_ticks, (list, tuple, ndarray, Series), "y_ticks")
+            validate_sequence_type(y_ticks, (int, float, integer), "y_ticks")
             self.y_ticks = y_ticks
         return self
 
@@ -412,20 +367,18 @@ class Plotter(ABC):
         y_tick_labels: Union[Sequence[Union[str, float, int]], None] = None,
     ):
         if x_tick_labels is not None:
-            if not isinstance(x_tick_labels, (list, tuple, ndarray)):
-                raise ArgumentTypeError("x_tick_labels must be array-like")
-            if not all(isinstance(x, (str, float, int)) for x in x_tick_labels):
-                raise ArgumentTypeError(
-                    "x_tick_labels values must be strings, floats, or ints"
-                )
+            validate_type(
+                x_tick_labels, (list, tuple, ndarray, Series), "x_tick_labels"
+            )
+            validate_sequence_type(
+                x_tick_labels, (str, float, int, integer), "x_tick_labels"
+            )
             self.x_tick_labels = x_tick_labels
         if y_tick_labels is not None:
-            if not isinstance(y_tick_labels, (list, tuple, ndarray)):
-                raise ArgumentTypeError("y_tick_labels must be array-like")
-            if not all(isinstance(y, (str, float, int)) for y in y_tick_labels):
-                raise ArgumentTypeError(
-                    "y_tick_labels values must be strings, floats, or ints"
-                )
+            validate_type(y_tick_labels, (list, tuple, ndarray), "y_tick_labels")
+            validate_sequence_type(
+                y_tick_labels, (str, float, int, integer), "y_tick_labels"
+            )
             self.y_tick_labels = y_tick_labels
         return self
 
@@ -435,22 +388,12 @@ class Plotter(ABC):
         y_tick_params: Dict[str, Any] = None,
     ):
         if x_tick_params is not None:
-            if not isinstance(x_tick_params, dict) and not all(
-                param in _tickparams for param in x_tick_params
-            ):
-                raise ArgumentTypeError(
-                    "x_tick_params must be a dictionary with keys in "
-                    + f"{_tickparams}"
-                )
+            validate_type(x_tick_params, dict, "x_tick_params")
+            validate_value_in_options(x_tick_params, _tickparams, "x_tick_params")
             self.x_tick_params = x_tick_params
         if y_tick_params is not None:
-            if not isinstance(y_tick_params, dict) and not all(
-                param in _tickparams for param in y_tick_params
-            ):
-                raise ArgumentTypeError(
-                    "y_tick_params must be a dictionary with keys in "
-                    + f"{_tickparams}"
-                )
+            validate_type(y_tick_params, dict, "y_tick_params")
+            validate_value_in_options(y_tick_params, _tickparams, "y_tick_params")
             self.y_tick_params = y_tick_params
         return self
 
