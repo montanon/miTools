@@ -68,11 +68,6 @@ class PiePlotter(Plotter):
                 )
             self.color = color
             return self
-        if isinstance(color, SEQUENCE_TYPES):
-            validate_sequence_type(color, NUMERIC_TYPES, "color")
-            validate_sequence_length(color, (3, 4), "color")
-            self.color = color
-            return self
         if is_sequence(color):
             validate_length(color, self.data_size, "color")
             for c in color:

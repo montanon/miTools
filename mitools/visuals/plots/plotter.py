@@ -51,7 +51,7 @@ class Plotter(ABC):
             "legend": {"default": None, "type": Union[Dict, None]},
             "zorder": {"default": None, "type": Union[Sequence[float], float]},
             "figsize": {"default": (21, 14), "type": Tuple[float, float]},
-            "style": {"default": "dark_background", "type": str},
+            "style": {"default": None, "type": str},
             "grid": {"default": None, "type": Dict[str, Any]},
             "tight_layout": {"default": False, "type": bool},
             "texts": {"default": None, "type": Union[Sequence[Text], Text]},
@@ -388,13 +388,9 @@ class Plotter(ABC):
     ):
         if x_tick_params is not None:
             validate_type(x_tick_params, dict, "x_tick_params")
-            for key in x_tick_params:
-                validate_value_in_options(key, _tickparams, "x_tick_params")
             self.x_tick_params = x_tick_params
         if y_tick_params is not None:
             validate_type(y_tick_params, dict, "y_tick_params")
-            for key in y_tick_params:
-                validate_value_in_options(key, _tickparams, "y_tick_params")
             self.y_tick_params = y_tick_params
         return self
 
