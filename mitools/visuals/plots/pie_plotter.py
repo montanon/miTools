@@ -208,11 +208,13 @@ class PiePlotter(Plotter):
         pie_kwargs = {
             "x": self.x_data,
             "explode": self.explode,
+            "hatch": self.hatch,
             "labels": self.label,
             "colors": self.color,
             "autopct": self.autopct,
             "pctdistance": self.pctdistance,
             "labeldistance": self.labeldistance,
+            "shadow": self.shadow,
             "startangle": self.startangle,
             "radius": self.radius,
             "counterclock": self.counterclock,

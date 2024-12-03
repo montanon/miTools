@@ -670,4 +670,6 @@ class Plotter(ABC):
             params["xlim"] = tuple(params["xlim"])
         if "ylim" in params and params["ylim"] is not None:
             params["ylim"] = tuple(params["ylim"])
+        if "center" in params and params["center"] is not None:
+            params["center"] = tuple(params["center"])
         return cls(x_data=x_data, y_data=y_data, **params)
