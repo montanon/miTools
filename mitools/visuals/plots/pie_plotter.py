@@ -13,7 +13,6 @@ from mitools.exceptions import (
 )
 from mitools.visuals.plots.matplotlib_typing import (
     Color,
-    EdgeColor,
     _colors,
 )
 from mitools.visuals.plots.plotter import Plotter

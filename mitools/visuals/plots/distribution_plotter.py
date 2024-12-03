@@ -15,7 +15,6 @@ from mitools.exceptions import (
 )
 from mitools.visuals.plots.matplotlib_typing import (
     Color,
-    EdgeColor,
     FaceColor,
     _colors,
 )

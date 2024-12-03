@@ -4,7 +4,6 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Dict, Literal, Sequence, Tuple, Union
 
-import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.colors import Colormap, Normalize
@@ -649,7 +648,7 @@ class Plotter(ABC):
 
         return value
 
-    def save_plotter(self, file_path: Union[str, Path], data: bool = False) -> None:
+    def save_plotter(self, file_path: Union[str, Path], data: bool = True) -> None:
         init_params = {}
         for param, config in self._init_params.items():
             value = getattr(self, param)
