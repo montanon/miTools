@@ -20,6 +20,8 @@ from mitools.exceptions import (
 )
 from mitools.visuals.plots.matplotlib_typing import Color, Scale, _tickparams
 from mitools.visuals.plots.validations import (
+    NUMERIC_TYPES,
+    SEQUENCE_TYPES,
     is_sequence,
     validate_length,
     validate_same_length,
@@ -75,9 +77,7 @@ class Plotter(ABC):
             "y_tick_params": {"default": None, "type": Dict[str, Any]},
             "spines": {"default": {}, "type": Dict[str, Any]},
         }
-
         self._set_init_params(**kwargs)
-
         self.figure: Figure = None
         self.ax: Axes = None
 
@@ -113,8 +113,8 @@ class Plotter(ABC):
     def _validate_data(
         self, data: Sequence[Union[float, int, integer]], name: str
     ) -> Any:
-        validate_type(data, (list, tuple, ndarray, Series), name)
-        validate_sequence_type(data, (float, int, integer), name)
+        validate_type(data, SEQUENCE_TYPES, name)
+        validate_sequence_type(data, NUMERIC_TYPES, name)
         return data
 
     def set_title(self, label: str, **kwargs):
@@ -153,14 +153,14 @@ class Plotter(ABC):
         raise NotImplementedError
 
     def set_alpha(self, alpha: Union[Sequence[float], float]):
-        validate_type(alpha, (float, int, list, tuple, ndarray, Series), "alpha")
+        validate_type(alpha, (*SEQUENCE_TYPES, *NUMERIC_TYPES), "alpha")
         if is_sequence(alpha):
             validate_length(alpha, self.data_size, "alpha")
         self.alpha = alpha
         return self
 
     def set_label(self, labels: Union[Sequence[str], str]):
-        validate_type(labels, (str, list, tuple, ndarray, Series), "labels")
+        validate_type(labels, (str, *SEQUENCE_TYPES), "labels")
         if isinstance(labels, str):
             self.label = labels
         else:
@@ -191,12 +191,12 @@ class Plotter(ABC):
         validate_type(frameon, bool, "frameon")
         validate_type(fancybox, bool, "fancybox")
         validate_type(ncol, int, "ncol")
-        validate_type(framealpha, (int, float), "framealpha")
+        validate_type(framealpha, NUMERIC_TYPES, "framealpha")
         if labels is not None:
             if isinstance(labels, str):
                 labels = [labels]
             else:
-                validate_type(labels, (list, tuple, ndarray, Series), "labels")
+                validate_type(labels, SEQUENCE_TYPES, "labels")
                 validate_sequence_type(labels, str, "labels")
         if handles is not None:
             validate_type(handles, (list, tuple), "handles")
@@ -206,7 +206,7 @@ class Plotter(ABC):
                 raise ArgumentStructureError(
                     "'bbox_to_anchor' must be a tuple of 2 or 4 floats"
                 )
-            validate_sequence_type(bbox_to_anchor, (int, float), "bbox_to_anchor")
+            validate_sequence_type(bbox_to_anchor, NUMERIC_TYPES, "bbox_to_anchor")
         if fontsize is not None:
             validate_type(fontsize, (int, str), "fontsize")
         if title is not None:
@@ -250,11 +250,11 @@ class Plotter(ABC):
 
     def set_zorder(self, zorder: Union[Sequence[float], float]):
         if is_sequence(zorder):
-            validate_sequence_type(zorder, (float, int, integer), "zorder")
+            validate_sequence_type(zorder, NUMERIC_TYPES, "zorder")
             validate_length(zorder, self.data_size, "zorder")
             self.zorder = zorder
         else:
-            validate_type(zorder, (float, int), "zorder")
+            validate_type(zorder, NUMERIC_TYPES, "zorder")
             self.zorder = zorder
         return self
 
@@ -262,7 +262,7 @@ class Plotter(ABC):
         if isinstance(figsize, list):
             figsize = tuple(figsize)
         validate_type(figsize, tuple, "figsize")
-        validate_sequence_type(figsize, (float, int), "figsize")
+        validate_sequence_type(figsize, NUMERIC_TYPES, "figsize")
         validate_sequence_length(figsize, 2, "figsize")
         self.figsize = figsize
         return self
@@ -298,7 +298,7 @@ class Plotter(ABC):
         if isinstance(texts, dict):
             self.texts = [texts]
         else:
-            validate_type(texts, (list, tuple, ndarray, Series), "texts")
+            validate_type(texts, SEQUENCE_TYPES, "texts")
             validate_sequence_type(texts, dict, "texts")
             self.texts = texts
         return self
@@ -311,7 +311,7 @@ class Plotter(ABC):
     def set_background(self, background: Color):
         validate_type(background, (str, tuple), "background")
         if isinstance(background, tuple):
-            validate_sequence_type(background, (float, int), "background")
+            validate_sequence_type(background, NUMERIC_TYPES, "background")
             validate_sequence_length(background, (3, 4), "background")
         self.background = background
         return self
@@ -319,7 +319,9 @@ class Plotter(ABC):
     def set_figure_background(self, figure_background: Color):
         validate_type(figure_background, (str, tuple), "figure_background")
         if isinstance(figure_background, tuple):
-            validate_sequence_type(figure_background, (float, int), "figure_background")
+            validate_sequence_type(
+                figure_background, NUMERIC_TYPES, "figure_background"
+            )
             validate_sequence_length(figure_background, (3, 4), "figure_background")
         self.figure_background = figure_background
         return self
@@ -337,12 +339,12 @@ class Plotter(ABC):
         if xlim is not None:
             validate_type(xlim, (list, tuple), "xlim")
             validate_sequence_length(xlim, 2, "xlim")
-            validate_sequence_type(xlim, (int, float, None), "xlim")
+            validate_sequence_type(xlim, (*NUMERIC_TYPES, None), "xlim")
             self.xlim = xlim
         if ylim is not None:
             validate_type(ylim, (list, tuple), "ylim")
             validate_sequence_length(ylim, 2, "ylim")
-            validate_sequence_type(ylim, (int, float, None), "ylim")
+            validate_sequence_type(ylim, (*NUMERIC_TYPES, None), "ylim")
             self.ylim = ylim
         return self
 
@@ -352,12 +354,12 @@ class Plotter(ABC):
         y_ticks: Union[Sequence[Union[float, int]], None] = None,
     ):
         if x_ticks is not None:
-            validate_type(x_ticks, (list, tuple, ndarray, Series), "x_ticks")
-            validate_sequence_type(x_ticks, (int, float, integer), "x_ticks")
+            validate_type(x_ticks, SEQUENCE_TYPES, "x_ticks")
+            validate_sequence_type(x_ticks, NUMERIC_TYPES, "x_ticks")
             self.x_ticks = x_ticks
         if y_ticks is not None:
-            validate_type(y_ticks, (list, tuple, ndarray, Series), "y_ticks")
-            validate_sequence_type(y_ticks, (int, float, integer), "y_ticks")
+            validate_type(y_ticks, SEQUENCE_TYPES, "y_ticks")
+            validate_sequence_type(y_ticks, NUMERIC_TYPES, "y_ticks")
             self.y_ticks = y_ticks
         return self
 
@@ -367,17 +369,15 @@ class Plotter(ABC):
         y_tick_labels: Union[Sequence[Union[str, float, int]], None] = None,
     ):
         if x_tick_labels is not None:
-            validate_type(
-                x_tick_labels, (list, tuple, ndarray, Series), "x_tick_labels"
-            )
+            validate_type(x_tick_labels, SEQUENCE_TYPES, "x_tick_labels")
             validate_sequence_type(
-                x_tick_labels, (str, float, int, integer), "x_tick_labels"
+                x_tick_labels, (str, *NUMERIC_TYPES), "x_tick_labels"
             )
             self.x_tick_labels = x_tick_labels
         if y_tick_labels is not None:
-            validate_type(y_tick_labels, (list, tuple, ndarray), "y_tick_labels")
+            validate_type(y_tick_labels, SEQUENCE_TYPES, "y_tick_labels")
             validate_sequence_type(
-                y_tick_labels, (str, float, int, integer), "y_tick_labels"
+                y_tick_labels, (str, *NUMERIC_TYPES), "y_tick_labels"
             )
             self.y_tick_labels = y_tick_labels
         return self
