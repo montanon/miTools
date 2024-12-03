@@ -1,3 +1,4 @@
+import re
 from typing import Any, Sequence, Tuple, Type, TypeVar, Union
 
 from numpy import integer, ndarray
@@ -8,11 +9,118 @@ from mitools.exceptions import (
     ArgumentTypeError,
     ArgumentValueError,
 )
+from mitools.visuals.plots.matplotlib_typing import NumericSequences, _colors
 
 T = TypeVar("T")
 
 NUMERIC_TYPES = (float, int, integer)
 SEQUENCE_TYPES = (list, tuple, ndarray, Series)
+
+
+def is_numeric(value: Any, name: str) -> bool:
+    try:
+        validate_numeric(value, name)
+        return True
+    except ArgumentTypeError:
+        return False
+
+
+def validate_numeric(value: Any, name: str) -> None:
+    validate_type(value, NUMERIC_TYPES, name)
+
+
+def is_numeric_sequence(sequence: Any, name: str) -> bool:
+    try:
+        validate_numeric_sequence(sequence, name)
+        return True
+    except ArgumentTypeError:
+        return False
+
+
+def validate_numeric_sequence(sequence: Sequence, name: str) -> None:
+    validate_sequence_type(sequence, NUMERIC_TYPES, name)
+
+
+def is_numeric_sequences(sequences: Any, name: str) -> bool:
+    try:
+        validate_numeric_sequences(sequences, name)
+        return True
+    except ArgumentTypeError:
+        return False
+
+
+def validate_numeric_sequences(sequences: Sequence[Sequence], name: str) -> None:
+    validate_sequence_type(sequences, SEQUENCE_TYPES, name)
+    for sequence in sequences:
+        validate_numeric_sequence(sequence, name)
+
+
+def is_consistent_len(sequences: NumericSequences, name: str) -> bool:
+    try:
+        validate_consistent_len(sequences, name)
+        return True
+    except ArgumentStructureError:
+        return False
+
+
+def validate_consistent_len(sequences: NumericSequences, name: str) -> None:
+    first_len = len(sequences[0])
+    for i, sequence in enumerate(sequences[1:], 1):
+        if len(sequence) != first_len:
+            raise ArgumentStructureError(
+                f"All sequences in '{name}' must have the same length. "
+                f"Sequence at index 0 has length {first_len}, but sequence at "
+                f"index {i} has length {len(sequence)}."
+            )
+
+
+def is_color_tuple(value: Any) -> bool:
+    return (
+        isinstance(value, SEQUENCE_TYPES)
+        and len(value) in [3, 4]
+        and all(isinstance(val, NUMERIC_TYPES) for val in value)
+    )
+
+
+def is_color_hex(value: Any) -> bool:
+    return isinstance(value, str) and re.match(
+        r"^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", value
+    )
+
+
+def is_color_str(value: Any) -> bool:
+    return isinstance(value, str) and value in _colors
+
+
+def is_color(value: Any) -> bool:
+    return is_color_tuple(value) or is_color_hex(value) or is_color_str(value)
+
+
+def validate_color(value: Any) -> None:
+    if not is_color(value):
+        raise ArgumentTypeError(f"Invalid color: {value}")
+
+
+def is_color_sequence(value: Any) -> bool:
+    return is_sequence(value) and all(is_color(item) for item in value)
+
+
+def validate_color_sequence(value: Any) -> None:
+    if not is_color_sequence(value):
+        raise ArgumentTypeError(f"Invalid color sequence: {value}")
+
+
+def is_color_sequences(sequences: Any) -> bool:
+    return is_sequence(sequences) and all(is_color_sequence(item) for item in sequences)
+
+
+def validate_color_sequences(sequences: Any) -> None:
+    if not is_color_sequences(sequences):
+        raise ArgumentTypeError(f"Invalid color sequences: {sequences}")
+
+
+def is_str_sequence(sequence: Any) -> bool:
+    return is_sequence(sequence) and all(isinstance(item, str) for item in sequence)
 
 
 def validate_type(

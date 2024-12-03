@@ -3,9 +3,16 @@ from typing import Any, Dict, Literal, Sequence, Union
 
 from matplotlib.colors import Colormap, Normalize, get_named_colors_mapping
 from matplotlib.markers import MarkerStyle
+from numpy import integer
 
-_colors = list(get_named_colors_mapping().keys())
+NumericType = Union[int, float, integer]
+NumericSequence = Sequence[NumericType]
+NumericSequences = Sequence[NumericSequence]
 Color = Union[str, Sequence[float]]
+ColorSequence = Sequence[Color]
+ColorSequences = Sequence[ColorSequence]
+StrSequence = Sequence[str]
+_colors = list(get_named_colors_mapping().keys())
 Marker = Union[str, int, Path, MarkerStyle]
 Markers = Union[Marker, Sequence[Marker]]
 Cmap = Union[
