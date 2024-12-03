@@ -9,9 +9,7 @@ from numpy import integer, ndarray
 from pandas import Series
 
 from mitools.exceptions import (
-    ArgumentStructureError,
     ArgumentTypeError,
-    ArgumentValueError,
 )
 from mitools.visuals.plots.matplotlib_typing import (
     Cmap,

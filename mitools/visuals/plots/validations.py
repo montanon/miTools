@@ -34,7 +34,7 @@ def validate_sequence_type(
 
 
 def is_sequence(value: Any) -> bool:
-    return isinstance(value, (list, tuple, ndarray, Series))
+    return isinstance(value, SEQUENCE_TYPES)
 
 
 def validate_sequence_length(

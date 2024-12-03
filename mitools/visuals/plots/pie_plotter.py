@@ -3,11 +3,8 @@ from typing import Any, Dict, Sequence, Union
 
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
-from numpy import integer, ndarray
-from pandas import Series
 
 from mitools.exceptions import (
-    ArgumentStructureError,
     ArgumentTypeError,
     ArgumentValueError,
 )
@@ -16,6 +13,16 @@ from mitools.visuals.plots.matplotlib_typing import (
     _colors,
 )
 from mitools.visuals.plots.plotter import Plotter
+from mitools.visuals.plots.validations import (
+    NUMERIC_TYPES,
+    SEQUENCE_TYPES,
+    is_sequence,
+    validate_length,
+    validate_sequence_length,
+    validate_sequence_type,
+    validate_type,
+    validate_value_in_options,
+)
 
 
 class PiePlotterException(Exception):
@@ -61,31 +68,20 @@ class PiePlotter(Plotter):
                 )
             self.color = color
             return self
-        if (
-            isinstance(color, (tuple, list, ndarray))
-            and len(color) in [3, 4]
-            and all(isinstance(c, (float, int, integer)) for c in color)
-        ):
+        if isinstance(color, SEQUENCE_TYPES):
+            validate_sequence_type(color, NUMERIC_TYPES, "color")
+            validate_sequence_length(color, (3, 4), "color")
             self.color = color
             return self
-        if isinstance(color, (list, tuple, ndarray, Series)):
-            if len(color) != self.data_size:
-                raise ArgumentStructureError(
-                    "color must be of the same length as data, "
-                    + f"len(color)={len(color)} != len(data)={self.data_size}."
-                )
-            if not all(
-                isinstance(c, str)
-                or (
-                    isinstance(c, (tuple, list, ndarray))
-                    and len(c) in [3, 4]
-                    and all(isinstance(x, (float, int, integer)) for x in c)
-                )
-                for c in color
-            ):
-                raise ArgumentTypeError(
-                    "All elements in color must be strings or RGB/RGBA values."
-                )
+        if is_sequence(color):
+            validate_length(color, self.data_size, "color")
+            for c in color:
+                if isinstance(c, str):
+                    validate_value_in_options(c, _colors, "color")
+                else:
+                    validate_type(c, SEQUENCE_TYPES, "color")
+                    validate_sequence_type(c, NUMERIC_TYPES, "color")
+                    validate_sequence_length(c, (3, 4), "color")
             self.color = color
             return self
         raise ArgumentTypeError(
@@ -93,79 +89,67 @@ class PiePlotter(Plotter):
         )
 
     def set_explode(self, explode: Union[Sequence[float], float]):
-        if isinstance(explode, (float, int, integer)):
+        if isinstance(explode, NUMERIC_TYPES):
             if explode < 0:
                 raise ArgumentValueError("explode must be non-negative")
             self.explode = explode
-        elif isinstance(explode, (list, tuple, ndarray, Series)):
-            if len(explode) != self.data_size:
-                raise ArgumentStructureError(
-                    "explode must be of the same length as data"
-                )
-            if not all(isinstance(e, (float, int)) and e >= 0 for e in explode):
-                raise ArgumentTypeError(
-                    "All explode values must be non-negative numbers"
-                )
-            self.explode = explode
         else:
-            raise ArgumentTypeError("explode must be a number or sequence of numbers")
+            validate_type(explode, SEQUENCE_TYPES, "explode")
+            validate_sequence_type(explode, NUMERIC_TYPES, "explode")
+            validate_length(explode, self.data_size, "explode")
+            if not all(e >= 0 for e in explode):
+                raise ArgumentValueError("All explode values must be non-negative")
+            self.explode = explode
         return self
 
     def set_hatch(self, hatch: Union[Sequence[str], str]):
         if isinstance(hatch, str):
             self.hatch = hatch
-        elif isinstance(hatch, (list, tuple, ndarray, Series)):
-            if len(hatch) != self.data_size:
-                raise ArgumentStructureError(
-                    "hatch must be of the same length as x_data and y_data"
-                )
-            if not all(isinstance(h, str) for h in hatch):
-                raise ArgumentTypeError("All hatch values must be strings")
-            self.hatch = hatch
         else:
-            raise ArgumentTypeError("hatch must be a string or sequence of strings")
+            validate_type(hatch, SEQUENCE_TYPES, "hatch")
+            validate_sequence_type(hatch, str, "hatch")
+            validate_length(hatch, self.data_size, "hatch")
+            self.hatch = hatch
         return self
 
     def set_autopct(self, autopct: Union[str, callable]):
-        if isinstance(autopct, str) or callable(autopct):
-            self.autopct = autopct
-        else:
-            raise ArgumentTypeError("autopct must be a string or callable")
+        validate_type(autopct, (str, callable), "autopct")
+        self.autopct = autopct
         return self
 
     def set_pctdistance(self, pctdistance: float):
-        if not isinstance(pctdistance, (float, int, integer)) or pctdistance < 0:
+        validate_type(pctdistance, NUMERIC_TYPES, "pctdistance")
+        if pctdistance < 0:
             raise ArgumentValueError("pctdistance must be a non-negative number")
         self.pctdistance = float(pctdistance)
         return self
 
     def set_labeldistance(self, labeldistance: float):
-        if not isinstance(labeldistance, (float, int, integer)) or labeldistance < 0:
+        validate_type(labeldistance, NUMERIC_TYPES, "labeldistance")
+        if labeldistance < 0:
             raise ArgumentValueError("labeldistance must be a non-negative number")
         self.labeldistance = float(labeldistance)
         return self
 
     def set_shadow(self, shadow: bool):
-        if not isinstance(shadow, bool):
-            raise ArgumentTypeError("shadow must be a boolean")
+        validate_type(shadow, bool, "shadow")
         self.shadow = shadow
         return self
 
     def set_startangle(self, startangle: float):
-        if not isinstance(startangle, (float, int, integer)):
-            raise ArgumentTypeError("startangle must be a number")
+        validate_type(startangle, NUMERIC_TYPES, "startangle")
         self.startangle = float(startangle)
         return self
 
     def set_radius(self, radius: float):
-        if not isinstance(radius, (float, int, integer)) or radius <= 0:
+        validate_type(radius, NUMERIC_TYPES, "radius")
+        if radius <= 0:
             raise ArgumentValueError("radius must be a positive number")
         self.radius = float(radius)
         return self
 
     def set_counterclock(self, counterclock: bool):
-        if not isinstance(counterclock, bool):
-            raise ArgumentTypeError("counterclock must be a boolean")
+        validate_type(counterclock, bool, "counterclock")
         self.counterclock = counterclock
         return self
 
@@ -178,28 +162,24 @@ class PiePlotter(Plotter):
         return self
 
     def set_center(self, center: tuple):
-        if not isinstance(center, tuple) or len(center) != 2:
-            raise ArgumentTypeError("center must be a tuple of (x, y) coordinates")
-        if not all(isinstance(c, (float, int)) for c in center):
-            raise ArgumentTypeError("center coordinates must be numbers")
+        validate_type(center, tuple, "center")
+        validate_sequence_length(center, 2, "center")
+        validate_sequence_type(center, NUMERIC_TYPES, "center")
         self.center = center
         return self
 
     def set_frame(self, frame: bool):
-        if not isinstance(frame, bool):
-            raise ArgumentTypeError("frame must be a boolean")
+        validate_type(frame, bool, "frame")
         self.frame = frame
         return self
 
     def set_rotatelabels(self, rotatelabels: bool):
-        if not isinstance(rotatelabels, bool):
-            raise ArgumentTypeError("rotatelabels must be a boolean")
+        validate_type(rotatelabels, bool, "rotatelabels")
         self.rotatelabels = rotatelabels
         return self
 
     def set_normalize(self, normalize: bool):
-        if not isinstance(normalize, bool):
-            raise ArgumentTypeError("normalize must be a boolean")
+        validate_type(normalize, bool, "normalize")
         self.normalize = normalize
         return self
 
