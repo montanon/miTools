@@ -2,7 +2,7 @@ import json
 import re
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Dict, Literal, Sequence, Tuple, Union
+from typing import Any, Dict, Literal, Sequence, Tuple, TypeVar, Union
 
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
@@ -15,9 +15,10 @@ from pandas import Series
 
 from mitools.exceptions import (
     ArgumentStructureError,
+    ArgumentTypeError,
     ArgumentValueError,
 )
-from mitools.visuals.plots.matplotlib_typing import Color, Scale, _tickparams
+from mitools.visuals.plots.matplotlib_typing import Color, Scale, _colors, _tickparams
 from mitools.visuals.plots.validations import (
     NUMERIC_TYPES,
     SEQUENCE_TYPES,
@@ -30,27 +31,145 @@ from mitools.visuals.plots.validations import (
     validate_value_in_options,
 )
 
+NumericType = Union[int, float, integer]
+NumericSequence = Sequence[NumericType]
+NumericSequences = Sequence[NumericSequence]
+ColorSequence = Sequence[Color]
+ColorSequences = Sequence[ColorSequence]
+StrSequence = Sequence[str]
+
+
+def is_numeric(value: Any, name: str) -> bool:
+    try:
+        validate_numeric(value, name)
+        return True
+    except ArgumentTypeError:
+        return False
+
+
+def validate_numeric(value: Any, name: str) -> None:
+    validate_type(value, NUMERIC_TYPES, name)
+
+
+def is_numeric_sequence(sequence: Any, name: str) -> bool:
+    try:
+        validate_numeric_sequence(sequence, name)
+        return True
+    except ArgumentTypeError:
+        return False
+
+
+def validate_numeric_sequence(sequence: Sequence, name: str) -> None:
+    validate_sequence_type(sequence, NUMERIC_TYPES, name)
+
+
+def is_numeric_sequences(sequences: Any, name: str) -> bool:
+    try:
+        validate_numeric_sequences(sequences, name)
+        return True
+    except ArgumentTypeError:
+        return False
+
+
+def validate_numeric_sequences(sequences: Sequence[Sequence], name: str) -> None:
+    validate_sequence_type(sequences, SEQUENCE_TYPES, name)
+    for sequence in sequences:
+        validate_numeric_sequence(sequence, name)
+
+
+def is_consistent_len(sequences: NumericSequences, name: str) -> bool:
+    try:
+        validate_consistent_len(sequences, name)
+        return True
+    except ArgumentStructureError:
+        return False
+
+
+def validate_consistent_len(sequences: NumericSequences, name: str) -> None:
+    first_len = len(sequences[0])
+    for i, sequence in enumerate(sequences[1:], 1):
+        if len(sequence) != first_len:
+            raise ArgumentStructureError(
+                f"All sequences in '{name}' must have the same length. "
+                f"Sequence at index 0 has length {first_len}, but sequence at "
+                f"index {i} has length {len(sequence)}."
+            )
+
+
+def is_color_tuple(value: Any) -> bool:
+    return (
+        isinstance(value, SEQUENCE_TYPES)
+        and len(value) in [3, 4]
+        and all(isinstance(val, NUMERIC_TYPES) for val in value)
+    )
+
+
+def is_color_hex(value: Any) -> bool:
+    return isinstance(value, str) and re.match(
+        r"^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", value
+    )
+
+
+def is_color_str(value: Any) -> bool:
+    return isinstance(value, str) and value in _colors
+
+
+def is_color(value: Any) -> bool:
+    return is_color_tuple(value) or is_color_hex(value) or is_color_str(value)
+
+
+def validate_color(value: Any) -> None:
+    if not is_color(value):
+        raise ArgumentTypeError(f"Invalid color: {value}")
+
+
+def is_color_sequence(value: Any) -> bool:
+    return is_sequence(value) and all(is_color(item) for item in value)
+
+
+def validate_color_sequence(value: Any) -> None:
+    if not is_color_sequence(value):
+        raise ArgumentTypeError(f"Invalid color sequence: {value}")
+
+
+def is_color_sequences(sequences: Any) -> bool:
+    return is_sequence(sequences) and all(is_color_sequence(item) for item in sequences)
+
+
+def validate_color_sequences(sequences: Any) -> None:
+    if not is_color_sequences(sequences):
+        raise ArgumentTypeError(f"Invalid color sequences: {sequences}")
+
 
 class PlotterException(Exception):
     pass
 
 
 class Plotter(ABC):
-    def __init__(self, x_data: Any, y_data: Any, **kwargs):
+    def __init__(
+        self,
+        x_data: Union[NumericSequence, NumericSequences],
+        y_data: Union[NumericSequence, NumericSequences, None],
+        **kwargs,
+    ):
         self.x_data = self._validate_data(x_data, "x_data")
         self.y_data = self._validate_data(y_data, "y_data")
-        validate_same_length(self.x_data, self.y_data, "x_data", "y_data")
-        self.data_size = len(self.x_data)
-        self._init_params = {
+        validate_same_length(
+            self.x_data[0],
+            self.y_data[0] if self.y_data is not None else self.x_data[0],
+            "x_data",
+            "y_data",
+        )
+        self.n_sequences = len(self.x_data)
+        self.multi_data = self.n_sequences > 1
+        self.data_size = len(self.x_data[0])
+        # General Axes Parameters that are independent of the number of data sequences
+        self._single_data_params = {
             "title": {"default": "", "type": Text},
             "xlabel": {"default": "", "type": Text},
             "ylabel": {"default": "", "type": Text},
-            "color": {"default": None, "type": Union[Sequence[Color], Color]},
-            "alpha": {"default": 1.0, "type": Union[Sequence[float], float]},
-            "label": {"default": None, "type": Union[Sequence[str], str]},
             "legend": {"default": None, "type": Union[Dict, None]},
-            "zorder": {"default": None, "type": Union[Sequence[float], float]},
-            "figsize": {"default": (21, 14), "type": Tuple[float, float]},
+            "figsize": {"default": (8, 8), "type": Tuple[float, float]},
             "style": {"default": None, "type": str},
             "grid": {"default": None, "type": Dict[str, Any]},
             "tight_layout": {"default": False, "type": bool},
@@ -75,6 +194,26 @@ class Plotter(ABC):
             "x_tick_params": {"default": None, "type": Dict[str, Any]},
             "y_tick_params": {"default": None, "type": Dict[str, Any]},
             "spines": {"default": {}, "type": Dict[str, Any]},
+        }
+        # Specific Parameters that are based on the number of data sequences
+        self._multi_data_params = {
+            "color": {
+                "default": None,
+                "type": Union[ColorSequences, ColorSequence, Color],
+            },
+            "alpha": {
+                "default": 1.0,
+                "type": Union[NumericSequences, NumericSequence, NumericType],
+            },
+            "label": {"default": None, "type": Union[StrSequence, str]},
+            "zorder": {
+                "default": None,
+                "type": Union[NumericSequences, NumericSequence, NumericType],
+            },
+        }
+        self._init_params = {
+            **self._single_data_params,
+            **self._multi_data_params,
         }
         self._set_init_params(**kwargs)
         self.figure: Figure = None
@@ -110,11 +249,43 @@ class Plotter(ABC):
         return self
 
     def _validate_data(
-        self, data: Sequence[Union[float, int, integer]], name: str
-    ) -> Any:
-        validate_type(data, SEQUENCE_TYPES, name)
-        validate_sequence_type(data, NUMERIC_TYPES, name)
+        self,
+        data: Union[NumericSequence, NumericSequences, None],
+        name: Literal["x_data", "y_data"],
+    ) -> NumericSequences:
+        if name == "y_data" and data is None:
+            return data
+        if is_numeric_sequence(data, name):
+            data = [data]
+        validate_numeric_sequences(data, name)
+        validate_consistent_len(data, name)
         return data
+
+    def set_color(self, color: Union[ColorSequences, ColorSequence, Color]):
+        if self.multi_data:
+            if is_color_sequences(color):
+                validate_consistent_len(color, "color")
+                validate_same_length(color[0], self.data_size, "color[0]", "data_size")
+                self.color = color
+                return self
+            elif is_color_sequence(color):
+                validate_same_length(color, self.n_sequences, "color", "n_sequences")
+                self.color = color
+                return self
+            elif is_color(color):
+                self.color = color
+                return self
+        else:
+            if is_color_sequence(color):
+                validate_same_length(color, self.data_size, "color", "data_size")
+                self.color = color
+                return self
+            validate_color(color)
+            self.color = color
+            return self
+        raise ArgumentStructureError(
+            "Invalid color, must be a color, sequence of colors, or sequences of colors."
+        )
 
     def set_title(self, label: str, **kwargs):
         """https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.set_title.html"""
@@ -144,12 +315,6 @@ class Plotter(ABC):
                 f"Style '{style}' is not available in Matplotlib styles: {plt.style.available}."
             )
         return self
-
-    @abstractmethod
-    def set_color(
-        self, color: Union[Sequence[Color], Color, Sequence[float], Sequence[int]]
-    ):
-        raise NotImplementedError
 
     def set_alpha(self, alpha: Union[Sequence[float], float]):
         validate_type(alpha, (*SEQUENCE_TYPES, *NUMERIC_TYPES), "alpha")
