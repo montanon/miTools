@@ -17,36 +17,39 @@ NUMERIC_TYPES = (float, int, integer)
 SEQUENCE_TYPES = (list, tuple, ndarray, Series)
 
 
-def is_numeric(value: Any, name: str) -> bool:
-    try:
-        validate_numeric(value, name)
-        return True
-    except ArgumentTypeError:
-        return False
+def validate_value_in_range(value: Any, min_value: float, max_value: float, name: str):
+    if not isinstance(value, (float, int)):
+        raise ArgumentTypeError(f"'{name}'={value} must be a number.")
+    if not min_value <= value <= max_value:
+        raise ArgumentValueError(
+            f"'{name}'={value} must be between {min_value} and {max_value}."
+        )
+
+
+def is_numeric(value: Any) -> bool:
+    return isinstance(value, NUMERIC_TYPES)
 
 
 def validate_numeric(value: Any, name: str) -> None:
-    validate_type(value, NUMERIC_TYPES, name)
+    if not is_numeric(value):
+        raise ArgumentTypeError(f"'{name}'={value} must be a number.")
 
 
-def is_numeric_sequence(sequence: Any, name: str) -> bool:
-    try:
-        validate_numeric_sequence(sequence, name)
-        return True
-    except ArgumentTypeError:
-        return False
+def is_numeric_sequence(sequence: Any) -> bool:
+    return is_sequence(sequence) and all(
+        isinstance(item, NUMERIC_TYPES) for item in sequence
+    )
 
 
 def validate_numeric_sequence(sequence: Sequence, name: str) -> None:
-    validate_sequence_type(sequence, NUMERIC_TYPES, name)
+    if not is_numeric_sequence(sequence):
+        raise ArgumentTypeError(f"Invalid numeric sequence: {sequence}")
 
 
-def is_numeric_sequences(sequences: Any, name: str) -> bool:
-    try:
-        validate_numeric_sequences(sequences, name)
-        return True
-    except ArgumentTypeError:
-        return False
+def is_numeric_sequences(sequences: Any) -> bool:
+    return is_sequence(sequences) and all(
+        is_numeric_sequence(item) for item in sequences
+    )
 
 
 def validate_numeric_sequences(sequences: Sequence[Sequence], name: str) -> None:

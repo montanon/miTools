@@ -49,6 +49,7 @@ from mitools.visuals.plots.validations import (
     validate_sequence_type,
     validate_type,
     validate_value_in_options,
+    validate_value_in_range,
 )
 
 
@@ -92,11 +93,11 @@ class Plotter(ABC):
             "suptitle": {"default": None, "type": Text},
             "xlim": {"default": None, "type": Union[Tuple[float, float], None]},
             "ylim": {"default": None, "type": Union[Tuple[float, float], None]},
-            "x_ticks": {
+            "xticks": {
                 "default": None,
                 "type": Union[Sequence[Union[float, int]], None],
             },
-            "y_ticks": {
+            "yticks": {
                 "default": None,
                 "type": Union[Sequence[Union[float, int]], None],
             },
@@ -155,7 +156,7 @@ class Plotter(ABC):
     ) -> NumericSequences:
         if name == "y_data" and data is None:
             return data
-        if is_numeric_sequence(data, name):
+        if is_numeric_sequence(data):
             data = [data]
         validate_numeric_sequences(data, name)
         validate_consistent_len(data, name)
@@ -375,27 +376,27 @@ class Plotter(ABC):
         self.set_ylim(ylim)
         return self
 
-    def set_xticks(self, x_ticks: Union[Sequence[Union[float, int]], None]):
-        if x_ticks is not None:
-            validate_type(x_ticks, SEQUENCE_TYPES, "x_ticks")
-            validate_sequence_type(x_ticks, NUMERIC_TYPES, "x_ticks")
-            self.xticks = x_ticks
+    def set_xticks(self, xticks: Union[Sequence[Union[float, int]], None]):
+        if xticks is not None:
+            validate_type(xticks, SEQUENCE_TYPES, "xticks")
+            validate_sequence_type(xticks, NUMERIC_TYPES, "xticks")
+            self.xticks = xticks
         return self
 
-    def set_yticks(self, y_ticks: Union[Sequence[Union[float, int]], None]):
-        if y_ticks is not None:
-            validate_type(y_ticks, SEQUENCE_TYPES, "y_ticks")
-            validate_sequence_type(y_ticks, NUMERIC_TYPES, "y_ticks")
-            self.yticks = y_ticks
+    def set_yticks(self, yticks: Union[Sequence[Union[float, int]], None]):
+        if yticks is not None:
+            validate_type(yticks, SEQUENCE_TYPES, "yticks")
+            validate_sequence_type(yticks, NUMERIC_TYPES, "yticks")
+            self.yticks = yticks
         return self
 
     def set_ticks(
         self,
-        x_ticks: Union[Sequence[Union[float, int]], None] = None,
-        y_ticks: Union[Sequence[Union[float, int]], None] = None,
+        xticks: Union[Sequence[Union[float, int]], None] = None,
+        yticks: Union[Sequence[Union[float, int]], None] = None,
     ):
-        self.set_xticks(x_ticks)
-        self.set_yticks(y_ticks)
+        self.set_xticks(xticks)
+        self.set_yticks(yticks)
         return self
 
     def set_xticklabels(
@@ -487,11 +488,12 @@ class Plotter(ABC):
         if self.multi_data:
             if is_color_sequences(color):
                 validate_consistent_len(color, "color")
-                validate_same_length(color[0], self.data_size, "color[0]", "data_size")
+                validate_sequence_length(color, self.n_sequences, "color")
+                validate_sequence_length(color[0], self.data_size, "color[0]")
                 self.color = color
                 return self
             elif is_color_sequence(color):
-                validate_same_length(color, self.n_sequences, "color", "n_sequences")
+                validate_sequence_length(color, self.n_sequences, "color")
                 self.color = color
                 return self
             elif is_color(color):
@@ -499,7 +501,7 @@ class Plotter(ABC):
                 return self
         else:
             if is_color_sequence(color):
-                validate_same_length(color, self.data_size, "color", "data_size")
+                validate_sequence_length(color, self.data_size, "color")
                 self.color = color
                 return self
             validate_color(color)
@@ -510,14 +512,16 @@ class Plotter(ABC):
         )
 
     def set_alpha(self, alpha: Union[Sequence[float], float]):
+        if is_numeric(alpha):
+            validate_value_in_range(alpha, 0, 1, "alpha")
         if self.multi_data:
             if is_numeric_sequences(alpha):
                 validate_consistent_len(alpha, "alpha")
-                validate_same_length(alpha[0], self.data_size, "alpha[0]", "data_size")
+                validate_sequence_length(alpha[0], self.data_size, "alpha[0]")
                 self.alpha = alpha
                 return self
             elif is_numeric_sequence(alpha):
-                validate_same_length(alpha, self.n_sequences, "alpha", "n_sequences")
+                validate_sequence_length(alpha, self.n_sequences, "alpha")
                 self.alpha = alpha
                 return self
             elif is_numeric(alpha):
@@ -525,10 +529,10 @@ class Plotter(ABC):
                 return self
         else:
             if is_numeric_sequence(alpha):
-                validate_same_length(alpha, self.data_size, "alpha", "data_size")
+                validate_sequence_length(alpha, self.data_size, "alpha")
                 self.alpha = alpha
                 return self
-            validate_numeric(alpha)
+            validate_numeric(alpha, "alpha")
             self.alpha = alpha
             return self
         raise ArgumentStructureError(
@@ -537,7 +541,7 @@ class Plotter(ABC):
 
     def set_label(self, labels: Union[Sequence[str], str]):
         if self.multi_data and is_str_sequence(labels):
-            validate_same_length(labels, self.n_sequences, "labels", "n_sequences")
+            validate_sequence_length(labels, self.n_sequences, "labels")
             self.label = labels
             return self
         if isinstance(labels, str):
@@ -551,13 +555,11 @@ class Plotter(ABC):
         if self.multi_data:
             if is_numeric_sequences(zorder):
                 validate_consistent_len(zorder, "zorder")
-                validate_same_length(
-                    zorder[0], self.data_size, "zorder[0]", "data_size"
-                )
+                validate_sequence_length(zorder[0], self.data_size, "zorder[0]")
                 self.zorder = zorder
                 return self
             elif is_numeric_sequence(zorder):
-                validate_same_length(zorder, self.n_sequences, "zorder", "n_sequences")
+                validate_sequence_length(zorder, self.n_sequences, "zorder")
                 self.zorder = zorder
                 return self
             elif is_numeric(zorder):
@@ -565,10 +567,10 @@ class Plotter(ABC):
                 return self
         else:
             if is_numeric_sequence(zorder):
-                validate_same_length(zorder, self.data_size, "zorder", "data_size")
+                validate_sequence_length(zorder, self.data_size, "zorder")
                 self.zorder = zorder
                 return self
-            validate_numeric(zorder)
+            validate_numeric(zorder, "zorder")
             self.zorder = zorder
             return self
         raise ArgumentStructureError(
