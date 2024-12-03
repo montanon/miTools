@@ -1,0 +1,90 @@
+{
+    "title": "",
+    "xlabel": "",
+    "ylabel": "",
+    "color": [
+        "red",
+        "green",
+        "blue",
+        "yellow"
+    ],
+    "alpha": 1.0,
+    "label": [
+        "A",
+        "B",
+        "C",
+        "D"
+    ],
+    "legend": null,
+    "zorder": null,
+    "figsize": [
+        21,
+        14
+    ],
+    "style": null,
+    "grid": null,
+    "tight_layout": false,
+    "texts": null,
+    "xscale": null,
+    "yscale": null,
+    "background": "white",
+    "figure_background": "white",
+    "suptitle": null,
+    "xlim": null,
+    "ylim": null,
+    "x_ticks": null,
+    "y_ticks": null,
+    "x_tick_labels": null,
+    "y_tick_labels": null,
+    "x_tick_params": null,
+    "y_tick_params": null,
+    "spines": {},
+    "explode": [
+        0.1,
+        0,
+        0,
+        0
+    ],
+    "hatch": [
+        "",
+        "|",
+        "\\",
+        "-"
+    ],
+    "autopct": "%1.1f%%",
+    "pctdistance": 0.68,
+    "labeldistance": 1.1,
+    "shadow": true,
+    "startangle": 0.0,
+    "radius": 1.0,
+    "counterclock": true,
+    "wedgeprops": {
+        "linewidth": 2.5,
+        "edgecolor": "k"
+    },
+    "textprops": {
+        "size": 40,
+        "fontweight": "bold",
+        "color": "k",
+        "ha": "center"
+    },
+    "center": [
+        0,
+        0
+    ],
+    "frame": false,
+    "rotatelabels": false,
+    "normalize": true,
+    "x_data": [
+        10,
+        20,
+        30,
+        40
+    ],
+    "y_data": [
+        10,
+        20,
+        30,
+        40
+    ]
+}
