@@ -193,10 +193,10 @@ class Plotter(ABC):
                 "default": None,
                 "type": Union[Sequence[Union[float, int]], None],
             },
-            "x_tick_labels": {"default": None, "type": Union[Sequence[str], None]},
-            "y_tick_labels": {"default": None, "type": Union[Sequence[str], None]},
-            "x_tick_params": {"default": None, "type": Dict[str, Any]},
-            "y_tick_params": {"default": None, "type": Dict[str, Any]},
+            "xticklabels": {"default": None, "type": Union[Sequence[str], None]},
+            "yticklabels": {"default": None, "type": Union[Sequence[str], None]},
+            "xtickparams": {"default": None, "type": Dict[str, Any]},
+            "ytickparams": {"default": None, "type": Dict[str, Any]},
             "spines": {"default": {}, "type": Dict[str, Any]},
         }
         # Specific Parameters that are based on the number of data sequences
@@ -234,18 +234,7 @@ class Plotter(ABC):
                     else:
                         getattr(self, setter_name)(kwargs[param])
                 else:
-                    if param in ["xscale", "yscale"]:
-                        self.set_scales(**{param: kwargs[param]})
-                    elif param in ["xlim", "ylim"]:
-                        self.set_ax_limits(**{param: kwargs[param]})
-                    elif param in ["x_ticks", "y_ticks"]:
-                        self.set_ticks(**{param: kwargs[param]})
-                    elif param in ["x_tick_labels", "y_tick_labels"]:
-                        self.set_tick_labels(**{param: kwargs[param]})
-                    elif param in ["x_tick_params", "y_tick_params"]:
-                        self.set_tick_params(**{param: kwargs[param]})
-                    else:
-                        raise ArgumentValueError(f"Parameter '{param}' is not valid.")
+                    raise ArgumentValueError(f"Parameter '{param}' is not valid.")
 
     def reset_params(self):
         for param, config in self._init_params.items():
@@ -280,82 +269,9 @@ class Plotter(ABC):
         self.ylabel = dict(ylabel=ylabel, **kwargs)
         return self
 
-    def set_color(self, color: Union[ColorSequences, ColorSequence, Color]):
-        if self.multi_data:
-            if is_color_sequences(color):
-                validate_consistent_len(color, "color")
-                validate_same_length(color[0], self.data_size, "color[0]", "data_size")
-                self.color = color
-                return self
-            elif is_color_sequence(color):
-                validate_same_length(color, self.n_sequences, "color", "n_sequences")
-                self.color = color
-                return self
-            elif is_color(color):
-                self.color = color
-                return self
-        else:
-            if is_color_sequence(color):
-                validate_same_length(color, self.data_size, "color", "data_size")
-                self.color = color
-                return self
-            validate_color(color)
-            self.color = color
-            return self
-        raise ArgumentStructureError(
-            "Invalid color, must be a color, sequence of colors, or sequences of colors."
-        )
-
-    def set_alpha(self, alpha: Union[Sequence[float], float]):
-        if self.multi_data:
-            if is_numeric_sequences(alpha):
-                validate_consistent_len(alpha, "alpha")
-                validate_same_length(alpha[0], self.data_size, "alpha[0]", "data_size")
-                self.alpha = alpha
-                return self
-            elif is_numeric_sequence(alpha):
-                validate_same_length(alpha, self.n_sequences, "alpha", "n_sequences")
-                self.alpha = alpha
-                return self
-            elif is_numeric(alpha):
-                self.alpha = alpha
-                return self
-        else:
-            if is_numeric_sequence(alpha):
-                validate_same_length(alpha, self.data_size, "alpha", "data_size")
-                self.alpha = alpha
-                return self
-            validate_numeric(alpha)
-            self.alpha = alpha
-            return self
-        raise ArgumentStructureError(
-            "Invalid alpha, must be a numeric value, sequence of numbers, or sequences of numbers."
-        )
-
-    def set_label(self, labels: Union[Sequence[str], str]):
-        if self.multi_data and is_str_sequence(labels):
-            validate_same_length(labels, self.n_sequences, "labels", "n_sequences")
-            self.label = labels
-            return self
-        if isinstance(labels, str):
-            self.label = labels
-            return self
-        raise ArgumentStructureError(
-            "Invalid label, must be a string or sequence of strings."
-        )
-
     def set_axes_labels(self, xlabel: str, ylabel: str, **kwargs):
         self.set_xlabel(xlabel, **kwargs)
         self.set_ylabel(ylabel, **kwargs)
-        return self
-
-    def set_style(self, style: str):
-        if style in plt.style.available or style is None:
-            self.style = style
-        else:
-            raise ArgumentValueError(
-                f"Style '{style}' is not available in Matplotlib styles: {plt.style.available}."
-            )
         return self
 
     def set_legend(
@@ -437,16 +353,6 @@ class Plotter(ABC):
         self.legend = legend if show else None
         return self
 
-    def set_zorder(self, zorder: Union[Sequence[float], float]):
-        if is_sequence(zorder):
-            validate_sequence_type(zorder, NUMERIC_TYPES, "zorder")
-            validate_length(zorder, self.data_size, "zorder")
-            self.zorder = zorder
-        else:
-            validate_type(zorder, NUMERIC_TYPES, "zorder")
-            self.zorder = zorder
-        return self
-
     def set_figsize(self, figsize: Tuple[float, float]):
         if isinstance(figsize, list):
             figsize = tuple(figsize)
@@ -456,18 +362,10 @@ class Plotter(ABC):
         self.figsize = figsize
         return self
 
-    def set_scales(
-        self,
-        xscale: Scale = None,
-        yscale: Scale = None,
-    ):
-        _scales = ["linear", "log", "symlog", "logit"]
-        if xscale is not None:
-            validate_value_in_options(xscale, _scales, "xscale")
-            self.xscale = xscale
-        if yscale is not None:
-            validate_value_in_options(yscale, _scales, "yscale")
-            self.yscale = yscale
+    def set_style(self, style: str):
+        if style is not None:
+            validate_value_in_options(style, plt.style.available, "style")
+        self.style = style
         return self
 
     def set_grid(
@@ -483,6 +381,11 @@ class Plotter(ABC):
         self.grid = dict(visible=visible, which=which, axis=axis, **kwargs)
         return self
 
+    def set_tight_layout(self, tight_layout: bool = False):
+        validate_type(tight_layout, bool, "tight_layout")
+        self.tight_layout = tight_layout
+        return self
+
     def set_texts(self, texts: Union[Sequence[Dict], Dict]):
         if isinstance(texts, dict):
             self.texts = [texts]
@@ -492,9 +395,29 @@ class Plotter(ABC):
             self.texts = texts
         return self
 
-    def set_tight_layout(self, tight_layout: bool = False):
-        validate_type(tight_layout, bool, "tight_layout")
-        self.tight_layout = tight_layout
+    def set_xscale(self, xscale: Scale = None):
+        if xscale is not None:
+            validate_value_in_options(
+                xscale, ["linear", "log", "symlog", "logit"], "xscale"
+            )
+        self.xscale = xscale
+        return self
+
+    def set_yscale(self, yscale: Scale = None):
+        if yscale is not None:
+            validate_value_in_options(
+                yscale, ["linear", "log", "symlog", "logit"], "yscale"
+            )
+        self.yscale = yscale
+        return self
+
+    def set_scales(
+        self,
+        xscale: Scale = None,
+        yscale: Scale = None,
+    ):
+        self.set_xscale(xscale)
+        self.set_yscale(yscale)
         return self
 
     def set_background(self, background: Color):
@@ -520,16 +443,15 @@ class Plotter(ABC):
         self.suptitle = dict(t=t, **kwargs)
         return self
 
-    def set_ax_limits(
-        self,
-        xlim: Union[Tuple[float, float], None] = None,
-        ylim: Union[Tuple[float, float], None] = None,
-    ):
+    def set_xlim(self, xlim: Union[Tuple[float, float], None]):
         if xlim is not None:
             validate_type(xlim, (list, tuple), "xlim")
             validate_sequence_length(xlim, 2, "xlim")
             validate_sequence_type(xlim, (*NUMERIC_TYPES, type(None)), "xlim")
             self.xlim = xlim
+        return self
+
+    def set_ylim(self, ylim: Union[Tuple[float, float], None]):
         if ylim is not None:
             validate_type(ylim, (list, tuple), "ylim")
             validate_sequence_length(ylim, 2, "ylim")
@@ -537,51 +459,84 @@ class Plotter(ABC):
             self.ylim = ylim
         return self
 
-    def set_ticks(
+    def set_limits(
         self,
-        x_ticks: Union[Sequence[Union[float, int]], None] = None,
-        y_ticks: Union[Sequence[Union[float, int]], None] = None,
+        xlim: Union[Tuple[float, float], None] = None,
+        ylim: Union[Tuple[float, float], None] = None,
     ):
+        self.set_xlim(xlim)
+        self.set_ylim(ylim)
+        return self
+
+    def set_xticks(self, x_ticks: Union[Sequence[Union[float, int]], None]):
         if x_ticks is not None:
             validate_type(x_ticks, SEQUENCE_TYPES, "x_ticks")
             validate_sequence_type(x_ticks, NUMERIC_TYPES, "x_ticks")
             self.x_ticks = x_ticks
+        return self
+
+    def set_yticks(self, y_ticks: Union[Sequence[Union[float, int]], None]):
         if y_ticks is not None:
             validate_type(y_ticks, SEQUENCE_TYPES, "y_ticks")
             validate_sequence_type(y_ticks, NUMERIC_TYPES, "y_ticks")
             self.y_ticks = y_ticks
         return self
 
-    def set_tick_labels(
+    def set_ticks(
         self,
-        x_tick_labels: Union[Sequence[Union[str, float, int]], None] = None,
-        y_tick_labels: Union[Sequence[Union[str, float, int]], None] = None,
+        x_ticks: Union[Sequence[Union[float, int]], None] = None,
+        y_ticks: Union[Sequence[Union[float, int]], None] = None,
     ):
-        if x_tick_labels is not None:
-            validate_type(x_tick_labels, SEQUENCE_TYPES, "x_tick_labels")
-            validate_sequence_type(
-                x_tick_labels, (str, *NUMERIC_TYPES), "x_tick_labels"
-            )
-            self.x_tick_labels = x_tick_labels
-        if y_tick_labels is not None:
-            validate_type(y_tick_labels, SEQUENCE_TYPES, "y_tick_labels")
-            validate_sequence_type(
-                y_tick_labels, (str, *NUMERIC_TYPES), "y_tick_labels"
-            )
-            self.y_tick_labels = y_tick_labels
+        self.set_xticks(x_ticks)
+        self.set_yticks(y_ticks)
         return self
 
-    def set_tick_params(
-        self,
-        x_tick_params: Dict[str, Any] = None,
-        y_tick_params: Dict[str, Any] = None,
+    def set_xticklabels(
+        self, xticklabels: Union[Sequence[Union[str, float, int]], None]
     ):
-        if x_tick_params is not None:
-            validate_type(x_tick_params, dict, "x_tick_params")
-            self.x_tick_params = x_tick_params
-        if y_tick_params is not None:
-            validate_type(y_tick_params, dict, "y_tick_params")
-            self.y_tick_params = y_tick_params
+        if xticklabels is not None:
+            validate_type(xticklabels, SEQUENCE_TYPES, "xticklabels")
+            validate_sequence_type(xticklabels, (str, *NUMERIC_TYPES), "xticklabels")
+            self.x_tick_labels = xticklabels
+        return self
+
+    def set_yticklabels(
+        self, yticklabels: Union[Sequence[Union[str, float, int]], None]
+    ):
+        if yticklabels is not None:
+            validate_type(yticklabels, SEQUENCE_TYPES, "yticklabels")
+            validate_sequence_type(yticklabels, (str, *NUMERIC_TYPES), "yticklabels")
+            self.y_tick_labels = yticklabels
+        return self
+
+    def set_ticklabels(
+        self,
+        xticklabels: Union[Sequence[Union[str, float, int]], None] = None,
+        yticklabels: Union[Sequence[Union[str, float, int]], None] = None,
+    ):
+        self.set_xticklabels(xticklabels)
+        self.set_yticklabels(yticklabels)
+        return self
+
+    def set_xtickparams(self, xtickparams: Dict[str, Any] = None):
+        if xtickparams is not None:
+            validate_type(xtickparams, dict, "xtickparams")
+            self.xtickparams = xtickparams
+        return self
+
+    def set_ytickparams(self, ytickparams: Dict[str, Any] = None):
+        if ytickparams is not None:
+            validate_type(ytickparams, dict, "ytickparams")
+            self.ytickparams = ytickparams
+        return self
+
+    def set_tickparams(
+        self,
+        xtickparams: Dict[str, Any] = None,
+        ytickparams: Dict[str, Any] = None,
+    ):
+        self.set_xtickparams(xtickparams)
+        self.set_ytickparams(ytickparams)
         return self
 
     def _spine_params(
@@ -620,6 +575,98 @@ class Plotter(ABC):
             "top": self._spine_params(**top) if top is not None else None,
         }
         return self
+
+    def set_color(self, color: Union[ColorSequences, ColorSequence, Color]):
+        if self.multi_data:
+            if is_color_sequences(color):
+                validate_consistent_len(color, "color")
+                validate_same_length(color[0], self.data_size, "color[0]", "data_size")
+                self.color = color
+                return self
+            elif is_color_sequence(color):
+                validate_same_length(color, self.n_sequences, "color", "n_sequences")
+                self.color = color
+                return self
+            elif is_color(color):
+                self.color = color
+                return self
+        else:
+            if is_color_sequence(color):
+                validate_same_length(color, self.data_size, "color", "data_size")
+                self.color = color
+                return self
+            validate_color(color)
+            self.color = color
+            return self
+        raise ArgumentStructureError(
+            "Invalid color, must be a color, sequence of colors, or sequences of colors."
+        )
+
+    def set_alpha(self, alpha: Union[Sequence[float], float]):
+        if self.multi_data:
+            if is_numeric_sequences(alpha):
+                validate_consistent_len(alpha, "alpha")
+                validate_same_length(alpha[0], self.data_size, "alpha[0]", "data_size")
+                self.alpha = alpha
+                return self
+            elif is_numeric_sequence(alpha):
+                validate_same_length(alpha, self.n_sequences, "alpha", "n_sequences")
+                self.alpha = alpha
+                return self
+            elif is_numeric(alpha):
+                self.alpha = alpha
+                return self
+        else:
+            if is_numeric_sequence(alpha):
+                validate_same_length(alpha, self.data_size, "alpha", "data_size")
+                self.alpha = alpha
+                return self
+            validate_numeric(alpha)
+            self.alpha = alpha
+            return self
+        raise ArgumentStructureError(
+            "Invalid alpha, must be a numeric value, sequence of numbers, or sequences of numbers."
+        )
+
+    def set_label(self, labels: Union[Sequence[str], str]):
+        if self.multi_data and is_str_sequence(labels):
+            validate_same_length(labels, self.n_sequences, "labels", "n_sequences")
+            self.label = labels
+            return self
+        if isinstance(labels, str):
+            self.label = labels
+            return self
+        raise ArgumentStructureError(
+            "Invalid label, must be a string or sequence of strings."
+        )
+
+    def set_zorder(self, zorder: Union[Sequence[float], float]):
+        if self.multi_data:
+            if is_numeric_sequences(zorder):
+                validate_consistent_len(zorder, "zorder")
+                validate_same_length(
+                    zorder[0], self.data_size, "zorder[0]", "data_size"
+                )
+                self.zorder = zorder
+                return self
+            elif is_numeric_sequence(zorder):
+                validate_same_length(zorder, self.n_sequences, "zorder", "n_sequences")
+                self.zorder = zorder
+                return self
+            elif is_numeric(zorder):
+                self.zorder = zorder
+                return self
+        else:
+            if is_numeric_sequence(zorder):
+                validate_same_length(zorder, self.data_size, "zorder", "data_size")
+                self.zorder = zorder
+                return self
+            validate_numeric(zorder)
+            self.zorder = zorder
+            return self
+        raise ArgumentStructureError(
+            "Invalid zorder, must be a numeric value, sequence of numbers, or sequences of numbers."
+        )
 
     def prepare_draw(self):
         if self.figure is not None or self.ax is not None:

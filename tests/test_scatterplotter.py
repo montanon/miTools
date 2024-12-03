@@ -76,11 +76,11 @@ class TestScatterPlotter(unittest.TestCase):
                 if param in ["xscale", "yscale"]:
                     plotter2.set_scales(**{param: value})
                 elif param in ["xlim", "ylim"]:
-                    plotter2.set_ax_limits(**{param: value})
+                    plotter2.set_limits(**{param: value})
                 elif param in ["x_ticks", "y_ticks"]:
                     plotter2.set_ticks(**{param: value})
                 elif param in ["x_tick_labels", "y_tick_labels"]:
-                    plotter2.set_tick_labels(**{param: value})
+                    plotter2.set_ticklabels(**{param: value})
                 else:
                     raise ArgumentValueError(f"Parameter '{param}' is not valid.")
         for param in self.valid_params.keys():
@@ -179,10 +179,10 @@ class TestScatterPlotter(unittest.TestCase):
 
     def test_ax_limits_validation(self):
         plotter = ScatterPlotter(self.x_data, self.y_data)
-        plotter.set_ax_limits(xlim=(-1, 1), ylim=(-1, 1))
-        plotter.set_ax_limits(xlim=(-1, None))
+        plotter.set_limits(xlim=(-1, 1), ylim=(-1, 1))
+        plotter.set_limits(xlim=(-1, None))
         with self.assertRaises(ArgumentTypeError):
-            plotter.set_ax_limits(xlim=("invalid", "invalid"))
+            plotter.set_limits(xlim=("invalid", "invalid"))
 
     def test_draw_method(self):
         plotter = ScatterPlotter(self.x_data, self.y_data, **self.valid_params)
