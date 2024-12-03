@@ -388,11 +388,13 @@ class Plotter(ABC):
     ):
         if x_tick_params is not None:
             validate_type(x_tick_params, dict, "x_tick_params")
-            validate_value_in_options(x_tick_params, _tickparams, "x_tick_params")
+            for key in x_tick_params:
+                validate_value_in_options(key, _tickparams, "x_tick_params")
             self.x_tick_params = x_tick_params
         if y_tick_params is not None:
             validate_type(y_tick_params, dict, "y_tick_params")
-            validate_value_in_options(y_tick_params, _tickparams, "y_tick_params")
+            for key in y_tick_params:
+                validate_value_in_options(key, _tickparams, "y_tick_params")
             self.y_tick_params = y_tick_params
         return self
 
