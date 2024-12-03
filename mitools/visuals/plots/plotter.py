@@ -141,6 +141,10 @@ def validate_color_sequences(sequences: Any) -> None:
         raise ArgumentTypeError(f"Invalid color sequences: {sequences}")
 
 
+def is_str_sequence(sequence: Any) -> bool:
+    return is_sequence(sequence) and all(isinstance(item, str) for item in sequence)
+
+
 class PlotterException(Exception):
     pass
 
@@ -261,6 +265,21 @@ class Plotter(ABC):
         validate_consistent_len(data, name)
         return data
 
+    def set_title(self, label: str, **kwargs):
+        """https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.set_title.html"""
+        self.title = dict(label=label, **kwargs)
+        return self
+
+    def set_xlabel(self, xlabel: str, **kwargs):
+        """https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.set_xlabel"""
+        self.xlabel = dict(xlabel=xlabel, **kwargs)
+        return self
+
+    def set_ylabel(self, ylabel: str, **kwargs):
+        """https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.set_ylabel"""
+        self.ylabel = dict(ylabel=ylabel, **kwargs)
+        return self
+
     def set_color(self, color: Union[ColorSequences, ColorSequence, Color]):
         if self.multi_data:
             if is_color_sequences(color):
@@ -287,20 +306,43 @@ class Plotter(ABC):
             "Invalid color, must be a color, sequence of colors, or sequences of colors."
         )
 
-    def set_title(self, label: str, **kwargs):
-        """https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.set_title.html"""
-        self.title = dict(label=label, **kwargs)
-        return self
+    def set_alpha(self, alpha: Union[Sequence[float], float]):
+        if self.multi_data:
+            if is_numeric_sequences(alpha):
+                validate_consistent_len(alpha, "alpha")
+                validate_same_length(alpha[0], self.data_size, "alpha[0]", "data_size")
+                self.alpha = alpha
+                return self
+            elif is_numeric_sequence(alpha):
+                validate_same_length(alpha, self.n_sequences, "alpha", "n_sequences")
+                self.alpha = alpha
+                return self
+            elif is_numeric(alpha):
+                self.alpha = alpha
+                return self
+        else:
+            if is_numeric_sequence(alpha):
+                validate_same_length(alpha, self.data_size, "alpha", "data_size")
+                self.alpha = alpha
+                return self
+            validate_numeric(alpha)
+            self.alpha = alpha
+            return self
+        raise ArgumentStructureError(
+            "Invalid alpha, must be a numeric value, sequence of numbers, or sequences of numbers."
+        )
 
-    def set_xlabel(self, xlabel: str, **kwargs):
-        """https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.set_xlabel"""
-        self.xlabel = dict(xlabel=xlabel, **kwargs)
-        return self
-
-    def set_ylabel(self, ylabel: str, **kwargs):
-        """https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.set_ylabel"""
-        self.ylabel = dict(ylabel=ylabel, **kwargs)
-        return self
+    def set_label(self, labels: Union[Sequence[str], str]):
+        if self.multi_data and is_str_sequence(labels):
+            validate_same_length(labels, self.n_sequences, "labels", "n_sequences")
+            self.label = labels
+            return self
+        if isinstance(labels, str):
+            self.label = labels
+            return self
+        raise ArgumentStructureError(
+            "Invalid label, must be a string or sequence of strings."
+        )
 
     def set_axes_labels(self, xlabel: str, ylabel: str, **kwargs):
         self.set_xlabel(xlabel, **kwargs)
@@ -314,23 +356,6 @@ class Plotter(ABC):
             raise ArgumentValueError(
                 f"Style '{style}' is not available in Matplotlib styles: {plt.style.available}."
             )
-        return self
-
-    def set_alpha(self, alpha: Union[Sequence[float], float]):
-        validate_type(alpha, (*SEQUENCE_TYPES, *NUMERIC_TYPES), "alpha")
-        if is_sequence(alpha):
-            validate_length(alpha, self.data_size, "alpha")
-        self.alpha = alpha
-        return self
-
-    def set_label(self, labels: Union[Sequence[str], str]):
-        validate_type(labels, (str, *SEQUENCE_TYPES), "labels")
-        if isinstance(labels, str):
-            self.label = labels
-        else:
-            validate_sequence_type(labels, str, "labels")
-            validate_length(labels, self.data_size, "labels")
-            self.label = labels
         return self
 
     def set_legend(
