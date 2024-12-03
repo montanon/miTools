@@ -17,6 +17,16 @@ from mitools.visuals.plots.matplotlib_typing import (
     _colors,
 )
 from mitools.visuals.plots.plotter import Plotter
+from mitools.visuals.plots.validations import (
+    NUMERIC_TYPES,
+    SEQUENCE_TYPES,
+    is_sequence,
+    validate_length,
+    validate_sequence_length,
+    validate_sequence_type,
+    validate_type,
+    validate_value_in_options,
+)
 
 
 class BoxPlotterException(Exception):
@@ -75,28 +85,24 @@ class BoxPlotter(Plotter):
                 )
             self.color = color
             return self
-        if (
-            isinstance(color, (tuple, list, ndarray))
-            and len(color) in [3, 4]
-            and all(isinstance(c, (float, int, integer)) for c in color)
-        ):
-            self.color = color
-            return self
-        if isinstance(color, (list, tuple, ndarray, Series)):
-            if len(color) != self.data_size:
-                raise ArgumentStructureError("color must be of the same length as data")
-            if not all(
-                isinstance(c, str)
-                or (
-                    isinstance(c, (tuple, list, ndarray))
-                    and len(c) in [3, 4]
-                    and all(isinstance(x, (float, int, integer)) for x in c)
-                )
-                for c in color
-            ):
-                raise ArgumentTypeError(
-                    "All elements in color must be strings or RGB/RGBA values."
-                )
+        if is_sequence(color):
+            if len(color) in [3, 4]:
+                validate_sequence_type(color, NUMERIC_TYPES, "color")
+                self.color = color
+                return self
+            validate_length(color, self.data_size, "color")
+            for c in color:
+                if isinstance(c, str):
+                    if c not in _colors and not re.match(
+                        r"^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", c
+                    ):
+                        raise ArgumentTypeError(
+                            f"'color' elements must be valid Matplotlib color strings or HEX codes, got {c}"
+                        )
+                else:
+                    validate_type(c, SEQUENCE_TYPES, "color elements")
+                    validate_sequence_length(c, (3, 4), "color elements")
+                    validate_sequence_type(c, NUMERIC_TYPES, "color elements")
             self.color = color
             return self
         raise ArgumentTypeError(
@@ -104,96 +110,92 @@ class BoxPlotter(Plotter):
         )
 
     def set_notch(self, notch: bool):
-        if not isinstance(notch, bool):
-            raise ArgumentTypeError("notch must be a boolean")
+        validate_type(notch, bool, "notch")
         self.notch = notch
         return self
 
     def set_sym(self, sym: str):
+        validate_type(sym, str, "sym")
         self.sym = sym
         return self
 
     def set_whis(self, whis: Union[float, Sequence[float]]):
-        if isinstance(whis, (float, int)):
+        if isinstance(whis, NUMERIC_TYPES):
+            validate_type(whis, NUMERIC_TYPES, "whis")
             self.whis = float(whis)
-        elif isinstance(whis, (list, tuple)) and len(whis) == 2:
+        elif is_sequence(whis):
+            validate_sequence_type(whis, NUMERIC_TYPES, "whis")
+            validate_sequence_length(whis, 2, "whis")
             self.whis = [float(w) for w in whis]
         else:
-            raise ArgumentTypeError("whis must be a float or a sequence of two floats")
+            raise ArgumentTypeError("whis must be a number or sequence of two numbers")
         return self
 
     def set_positions(self, positions: Sequence[float]):
-        if not isinstance(positions, (list, tuple, ndarray)):
-            raise ArgumentTypeError("positions must be array-like")
+        validate_type(positions, SEQUENCE_TYPES, "positions")
+        validate_sequence_type(positions, NUMERIC_TYPES, "positions")
         self.positions = positions
         return self
 
     def set_widths(self, widths: Union[float, Sequence[float]]):
-        if isinstance(widths, (float, int)):
+        if isinstance(widths, NUMERIC_TYPES):
+            validate_type(widths, NUMERIC_TYPES, "widths")
             self.widths = float(widths)
-        elif isinstance(widths, (list, tuple, ndarray)):
-            if len(widths) != self.data_size:
-                raise ArgumentStructureError(
-                    "widths must be of the same length as data"
-                )
+        elif is_sequence(widths):
+            validate_type(widths, SEQUENCE_TYPES, "widths")
+            validate_sequence_type(widths, NUMERIC_TYPES, "widths")
+            validate_length(widths, self.data_size, "widths")
             self.widths = [float(w) for w in widths]
         else:
-            raise ArgumentTypeError("widths must be a float or array-like of floats")
+            raise ArgumentTypeError("widths must be a number or sequence of numbers")
         return self
 
     def set_patch_artist(self, patch_artist: bool):
-        if not isinstance(patch_artist, bool):
-            raise ArgumentTypeError("patch_artist must be a boolean")
+        validate_type(patch_artist, bool, "patch_artist")
         self.patch_artist = patch_artist
         return self
 
     def set_bootstrap(self, bootstrap: Union[int, None]):
-        if not isinstance(bootstrap, (int, type(None))):
-            raise ArgumentTypeError("bootstrap must be an integer or None")
+        validate_type(bootstrap, (int, type(None)), "bootstrap")
         self.bootstrap = bootstrap
         return self
 
     def set_usermedians(self, usermedians: Union[Sequence[float], None]):
-        if not isinstance(usermedians, (list, tuple, ndarray, Series, type(None))):
-            raise ArgumentTypeError("usermedians must be a sequence of floats or None")
+        if usermedians is not None:
+            validate_type(usermedians, SEQUENCE_TYPES, "usermedians")
+            validate_sequence_type(usermedians, NUMERIC_TYPES, "usermedians")
         self.usermedians = usermedians
         return self
 
     def set_conf_intervals(self, conf_intervals: Union[Sequence[float], None]):
-        if not isinstance(conf_intervals, (list, tuple, ndarray, Series, type(None))):
-            raise ArgumentTypeError(
-                "conf_intervals must be a sequence of floats or None"
-            )
+        if conf_intervals is not None:
+            validate_type(conf_intervals, SEQUENCE_TYPES, "conf_intervals")
+            validate_sequence_type(conf_intervals, NUMERIC_TYPES, "conf_intervals")
         self.conf_intervals = conf_intervals
         return self
 
     def set_meanline(self, meanline: bool):
-        if not isinstance(meanline, bool):
-            raise ArgumentTypeError("meanline must be a boolean")
+        validate_type(meanline, bool, "meanline")
         self.meanline = meanline
         return self
 
     def set_showmeans(self, showmeans: bool):
-        if not isinstance(showmeans, bool):
-            raise ArgumentTypeError("showmeans must be a boolean")
+        validate_type(showmeans, bool, "showmeans")
         self.showmeans = showmeans
         return self
 
     def set_showcaps(self, showcaps: bool):
-        if not isinstance(showcaps, bool):
-            raise ArgumentTypeError("showcaps must be a boolean")
+        validate_type(showcaps, bool, "showcaps")
         self.showcaps = showcaps
         return self
 
     def set_showbox(self, showbox: bool):
-        if not isinstance(showbox, bool):
-            raise ArgumentTypeError("showbox must be a boolean")
+        validate_type(showbox, bool, "showbox")
         self.showbox = showbox
         return self
 
     def set_showfliers(self, showfliers: bool):
-        if not isinstance(showfliers, bool):
-            raise ArgumentTypeError("showfliers must be a boolean")
+        validate_type(showfliers, bool, "showfliers")
         self.showfliers = showfliers
         return self
 
@@ -226,14 +228,12 @@ class BoxPlotter(Plotter):
         return self
 
     def set_manage_ticks(self, manage_ticks: bool):
-        if not isinstance(manage_ticks, bool):
-            raise ArgumentTypeError("manage_ticks must be a boolean")
+        validate_type(manage_ticks, bool, "manage_ticks")
         self.manage_ticks = manage_ticks
         return self
 
     def set_autorange(self, autorange: bool):
-        if not isinstance(autorange, bool):
-            raise ArgumentTypeError("autorange must be a boolean")
+        validate_type(autorange, bool, "autorange")
         self.autorange = autorange
         return self
 
@@ -242,10 +242,9 @@ class BoxPlotter(Plotter):
         return self
 
     def set_orientation(self, orientation: Literal["vertical", "horizontal"]):
-        if orientation not in ["vertical", "horizontal"]:
-            raise ArgumentValueError(
-                "orientation must be either 'vertical' or 'horizontal'"
-            )
+        validate_value_in_options(
+            orientation, ["vertical", "horizontal"], "orientation"
+        )
         self.orientation = orientation
         return self
 
