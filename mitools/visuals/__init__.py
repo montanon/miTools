@@ -8,6 +8,7 @@ from mitools.visuals.axes_functions import (
 )
 from mitools.visuals.plots import (
     BarPlotter,
+    BoxPlotter,
     DistributionPlotter,
     HistogramPlotter,
     LinePlotter,
