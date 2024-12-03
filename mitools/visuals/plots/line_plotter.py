@@ -3,13 +3,9 @@ from typing import Any, Sequence, Union
 
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
-from numpy import integer, ndarray
-from pandas import Series
 
 from mitools.exceptions import (
-    ArgumentStructureError,
     ArgumentTypeError,
-    ArgumentValueError,
 )
 from mitools.visuals.plots.matplotlib_typing import (
     Color,
@@ -21,6 +17,16 @@ from mitools.visuals.plots.matplotlib_typing import (
     _colors,
 )
 from mitools.visuals.plots.plotter import Plotter
+from mitools.visuals.plots.validations import (
+    NUMERIC_TYPES,
+    SEQUENCE_TYPES,
+    is_sequence,
+    validate_length,
+    validate_sequence_length,
+    validate_sequence_type,
+    validate_type,
+    validate_value_in_options,
+)
 
 
 class LinePlotterException(Exception):
@@ -44,19 +50,6 @@ class LinePlotter(Plotter):
         self.figure: Figure = None
         self.ax: Axes = None
 
-    def _validate_data(
-        self, data: Sequence[Union[float, int, integer]], name: str
-    ) -> Any:
-        if not isinstance(data, (list, tuple, ndarray, Series)):
-            raise ArgumentTypeError(
-                f"{name} must be a sequence of floats, ints, or integers."
-            )
-        if not all(isinstance(d, (float, int, integer)) for d in data):
-            raise ArgumentTypeError(
-                f"All elements in {name} must be floats, ints, or integers."
-            )
-        return data
-
     def set_color(
         self, color: Union[Sequence[Color], Color, Sequence[float], Sequence[int]]
     ):
@@ -69,31 +62,19 @@ class LinePlotter(Plotter):
                 )
             self.color = color
             return self
-        if (
-            isinstance(color, (tuple, list, ndarray))
-            and len(color) in [3, 4]
-            and all(isinstance(c, (float, int, integer)) for c in color)
-        ):
-            self.color = color
-            return self
-        if isinstance(color, (list, tuple, ndarray, Series)):
-            if len(color) != self.data_size:
-                raise ArgumentStructureError(
-                    "color must be of the same length as x_data and y_data, "
-                    + f"len(color)={len(color)} != len(x_data)={self.data_size}."
-                )
-            if not all(
-                isinstance(c, str)
-                or (
-                    isinstance(c, (tuple, list, ndarray))
-                    and len(c) in [3, 4]
-                    and all(isinstance(x, (float, int, integer)) for x in c)
-                )
-                for c in color
-            ):
-                raise ArgumentTypeError(
-                    "All elements in color must be strings or RGB/RGBA values."
-                )
+        if is_sequence(color):
+            if validate_sequence_length(color, (3, 4), "color") is None:
+                validate_sequence_type(color, NUMERIC_TYPES, "color")
+                self.color = color
+                return self
+            validate_length(color, self.data_size, "color")
+            for c in color:
+                if isinstance(c, str):
+                    validate_value_in_options(c, _colors, "color")
+                else:
+                    validate_type(c, SEQUENCE_TYPES, "color")
+                    validate_sequence_type(c, NUMERIC_TYPES, "color")
+                    validate_sequence_length(c, (3, 4), "color")
             self.color = color
             return self
         raise ArgumentTypeError(
@@ -102,19 +83,13 @@ class LinePlotter(Plotter):
 
     def set_marker(self, marker: Union[Markers, str]):
         if isinstance(marker, str):
-            if marker not in MarkerStyle.markers:
-                raise ArgumentValueError(
-                    f"'marker'={marker} must be a valid Matplotlib marker string"
-                    + f" {MarkerStyle.markers}."
-                )
+            validate_value_in_options(marker, MarkerStyle.markers, "marker")
             self.marker = marker
-        elif isinstance(marker, Sequence):
-            if len(marker) != self.data_size:
-                raise ArgumentStructureError(
-                    "marker sequence must be same length as data"
-                )
-            if not all(m in MarkerStyle.markers for m in marker):
-                raise ArgumentValueError("Invalid marker in sequence")
+        elif is_sequence(marker):
+            validate_length(marker, self.data_size, "marker")
+            validate_sequence_type(marker, str, "marker")
+            for m in marker:
+                validate_value_in_options(m, MarkerStyle.markers, "marker")
             self.marker = marker
         else:
             raise ArgumentTypeError(
@@ -123,71 +98,118 @@ class LinePlotter(Plotter):
         return self
 
     def set_markersize(self, markersize: Union[float, Sequence[float]]):
-        if isinstance(markersize, (int, float)):
+        if isinstance(markersize, NUMERIC_TYPES):
             self.markersize = markersize
-        elif isinstance(markersize, Sequence):
-            if len(markersize) != self.data_size:
-                raise ArgumentStructureError(
-                    "markersize sequence must be same length as data"
-                )
+        elif is_sequence(markersize):
+            validate_length(markersize, self.data_size, "markersize")
+            validate_sequence_type(markersize, NUMERIC_TYPES, "markersize")
             self.markersize = markersize
+        else:
+            raise ArgumentTypeError(
+                "markersize must be a number or sequence of numbers"
+            )
         return self
 
     def set_markerfacecolor(self, markerfacecolor: Union[Color, Sequence[Color]]):
-        self.markerfacecolor = markerfacecolor
-        return self
+        if isinstance(markerfacecolor, str):
+            if markerfacecolor not in _colors and not re.match(
+                r"^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", markerfacecolor
+            ):
+                raise ArgumentTypeError(
+                    f"'markerfacecolor'='{markerfacecolor}' must be a valid Matplotlib color string or HEX code."
+                )
+            self.markerfacecolor = markerfacecolor
+            return self
+        if isinstance(markerfacecolor, SEQUENCE_TYPES):
+            validate_sequence_type(markerfacecolor, NUMERIC_TYPES, "markerfacecolor")
+            validate_sequence_length(markerfacecolor, (3, 4), "markerfacecolor")
+            self.markerfacecolor = markerfacecolor
+            return self
+        if is_sequence(markerfacecolor):
+            validate_length(markerfacecolor, self.data_size, "markerfacecolor")
+            for c in markerfacecolor:
+                if isinstance(c, str):
+                    validate_value_in_options(c, _colors, "markerfacecolor")
+                else:
+                    validate_type(c, SEQUENCE_TYPES, "markerfacecolor")
+                    validate_sequence_type(c, NUMERIC_TYPES, "markerfacecolor")
+                    validate_sequence_length(c, (3, 4), "markerfacecolor")
+            self.markerfacecolor = markerfacecolor
+            return self
+        raise ArgumentTypeError(
+            "markerfacecolor must be a string, RGB/RGBA values, or array-like of strings/RGB/RGBA values."
+        )
 
     def set_markeredgecolor(self, markeredgecolor: Union[Color, Sequence[Color]]):
-        self.markeredgecolor = markeredgecolor
-        return self
+        if isinstance(markeredgecolor, str):
+            if markeredgecolor not in _colors and not re.match(
+                r"^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", markeredgecolor
+            ):
+                raise ArgumentTypeError(
+                    f"'markeredgecolor'='{markeredgecolor}' must be a valid Matplotlib color string or HEX code."
+                )
+            self.markeredgecolor = markeredgecolor
+            return self
+        if isinstance(markeredgecolor, SEQUENCE_TYPES):
+            validate_sequence_type(markeredgecolor, NUMERIC_TYPES, "markeredgecolor")
+            validate_sequence_length(markeredgecolor, (3, 4), "markeredgecolor")
+            self.markeredgecolor = markeredgecolor
+            return self
+        if is_sequence(markeredgecolor):
+            validate_length(markeredgecolor, self.data_size, "markeredgecolor")
+            for c in markeredgecolor:
+                if isinstance(c, str):
+                    validate_value_in_options(c, _colors, "markeredgecolor")
+                else:
+                    validate_type(c, SEQUENCE_TYPES, "markeredgecolor")
+                    validate_sequence_type(c, NUMERIC_TYPES, "markeredgecolor")
+                    validate_sequence_length(c, (3, 4), "markeredgecolor")
+            self.markeredgecolor = markeredgecolor
+            return self
+        raise ArgumentTypeError(
+            "markeredgecolor must be a string, RGB/RGBA values, or array-like of strings/RGB/RGBA values."
+        )
 
     def set_markeredgewidth(self, markeredgewidth: Union[float, Sequence[float]]):
-        if isinstance(markeredgewidth, (int, float)):
+        if isinstance(markeredgewidth, NUMERIC_TYPES):
             self.markeredgewidth = markeredgewidth
-        elif isinstance(markeredgewidth, Sequence):
-            if len(markeredgewidth) != self.data_size:
-                raise ArgumentStructureError(
-                    "markeredgewidth sequence must be same length as data"
-                )
+            return self
+        if is_sequence(markeredgewidth):
+            validate_length(markeredgewidth, self.data_size, "markeredgewidth")
+            validate_sequence_type(markeredgewidth, NUMERIC_TYPES, "markeredgewidth")
             self.markeredgewidth = markeredgewidth
-        return self
+            return self
+        raise ArgumentTypeError(
+            "markeredgewidth must be a number or array-like of numbers."
+        )
 
     def set_linestyle(self, linestyle: LineStyle):
         _valid_styles = ["-", "--", "-.", ":", "None", "none", " ", ""]
         if isinstance(linestyle, str):
-            if linestyle not in _valid_styles:
-                raise ArgumentValueError(f"linestyle must be one of {_valid_styles}")
+            validate_value_in_options(linestyle, _valid_styles, "linestyle")
             self.linestyle = linestyle
-        elif isinstance(linestyle, (list, tuple)) and all(
-            ls in _valid_styles for ls in linestyle
-        ):
-            if len(linestyle) != self.data_size:
-                raise ArgumentStructureError(
-                    "linestyle must be of the same length as x_data and y_data, "
-                    + f"len(linestyle)={len(linestyle)} != len(x_data)={self.data_size}."
-                )
+        elif is_sequence(linestyle):
+            validate_length(linestyle, self.data_size, "linestyle")
+            validate_sequence_type(linestyle, str, "linestyle")
+            for ls in linestyle:
+                validate_value_in_options(ls, _valid_styles, "linestyle")
             self.linestyle = linestyle
         else:
-            raise ArgumentTypeError("Invalid linestyle format")
+            raise ArgumentTypeError(
+                "linestyle must be a string or array-like of strings"
+            )
         return self
 
     def set_linewidth(self, linewidth: Union[Sequence[float], float]):
-        if isinstance(linewidth, (float, int)):
+        if isinstance(linewidth, NUMERIC_TYPES):
             self.linewidth = linewidth
-        elif isinstance(linewidth, (list, tuple, ndarray, Series)) and all(
-            isinstance(lw, (float, int)) for lw in linewidth
-        ):
-            if len(linewidth) != self.data_size:
-                raise ArgumentStructureError(
-                    "linewidth must be of the same length as x_data and y_data, "
-                    + f"len(linewdith)={len(linewidth)} != len(x_data)={self.data_size}."
-                )
+            return self
+        if is_sequence(linewidth):
+            validate_length(linewidth, self.data_size, "linewidth")
+            validate_sequence_type(linewidth, NUMERIC_TYPES, "linewidth")
             self.linewidth = linewidth
-        else:
-            raise ArgumentTypeError(
-                "linewidth must be a float or an array-like of floats or ints."
-            )
-        return self
+            return self
+        raise ArgumentTypeError("linewidth must be a number or array-like of numbers.")
 
     def _create_plot(self):
         plot_kwargs = {

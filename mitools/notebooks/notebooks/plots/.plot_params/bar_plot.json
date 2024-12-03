@@ -1,0 +1,227 @@
+{
+    "title": {
+        "label": "a) Bar Plot",
+        "fontsize": 24,
+        "fontweight": "bold",
+        "color": "k",
+        "loc": "left"
+    },
+    "xlabel": {
+        "xlabel": "Age",
+        "color": "k",
+        "fontsize": 22,
+        "fontweight": "bold"
+    },
+    "ylabel": {
+        "ylabel": "Aginess",
+        "color": "k",
+        "fontsize": 22,
+        "fontweight": "bold"
+    },
+    "color": [
+        "red",
+        "blue",
+        "green",
+        "pink",
+        "brown"
+    ],
+    "alpha": 0.5,
+    "label": null,
+    "legend": {
+        "show": true,
+        "kwargs": {
+            "loc": "upper left",
+            "ncol": 1,
+            "frameon": false,
+            "fancybox": true,
+            "framealpha": 0.8,
+            "labels": [
+                "Agey!",
+                "More Agey!"
+            ],
+            "fontsize": 18,
+            "facecolor": "inherit"
+        }
+    },
+    "zorder": null,
+    "figsize": [
+        10,
+        10
+    ],
+    "style": null,
+    "grid": {
+        "visible": false,
+        "which": "major",
+        "axis": "both",
+        "color": "lightgray",
+        "zorder": -100
+    },
+    "tight_layout": true,
+    "texts": [
+        {
+            "s": "Agey!",
+            "x": 1,
+            "y": 3.25,
+            "fontsize": 28,
+            "color": "darkgray",
+            "horizontalalignment": "center",
+            "verticalalignment": "bottom"
+        },
+        {
+            "s": "More Agey!",
+            "x": 4,
+            "y": 1.25,
+            "fontsize": 28,
+            "color": "darkgray",
+            "horizontalalignment": "center",
+            "verticalalignment": "bottom"
+        }
+    ],
+    "xscale": null,
+    "yscale": null,
+    "background": "lightgray",
+    "figure_background": "darkgray",
+    "suptitle": {
+        "t": "BarPlotter Object",
+        "fontsize": 24,
+        "color": "k",
+        "fontweight": "bold"
+    },
+    "xlim": null,
+    "ylim": null,
+    "x_ticks": [
+        1.0,
+        2.0,
+        3.0,
+        4.0,
+        5.0
+    ],
+    "y_ticks": [
+        0.0,
+        1.0,
+        2.0,
+        3.0,
+        4.0,
+        5.0,
+        6.0,
+        7.0,
+        8.0,
+        9.0
+    ],
+    "x_tick_labels": [
+        "0-10",
+        "11-15",
+        "16-25",
+        "26-30",
+        "31-35"
+    ],
+    "y_tick_labels": [
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+    ],
+    "x_tick_params": {
+        "labelsize": 18,
+        "color": "k",
+        "rotation": 45,
+        "size": 10,
+        "width": 5
+    },
+    "y_tick_params": {
+        "color": "k",
+        "size": 0,
+        "width": 5
+    },
+    "spines": {
+        "left": {
+            "visible": true,
+            "position": null,
+            "color": "k",
+            "linewidth": 2.5,
+            "linestyle": "--",
+            "alpha": null,
+            "bounds": null,
+            "capstyle": null
+        },
+        "right": {
+            "visible": true,
+            "position": null,
+            "color": "k",
+            "linewidth": 2.5,
+            "linestyle": "--",
+            "alpha": null,
+            "bounds": null,
+            "capstyle": null
+        },
+        "bottom": {
+            "visible": true,
+            "position": null,
+            "color": "k",
+            "linewidth": 2.5,
+            "linestyle": "--",
+            "alpha": null,
+            "bounds": null,
+            "capstyle": null
+        },
+        "top": {
+            "visible": true,
+            "position": null,
+            "color": "k",
+            "linewidth": 2.5,
+            "linestyle": "--",
+            "alpha": null,
+            "bounds": null,
+            "capstyle": null
+        }
+    },
+    "width": 0.35,
+    "bottom": 0.0,
+    "align": "center",
+    "edgecolor": [
+        "red",
+        "blue",
+        "green",
+        "pink",
+        "brown"
+    ],
+    "linewidth": 3.5,
+    "xerr": 0.25,
+    "yerr": 0.15,
+    "ecolor": "gray",
+    "capsize": 10,
+    "error_kw": null,
+    "log": false,
+    "orientation": "vertical",
+    "facecolor": null,
+    "fill": true,
+    "linestyle": "--",
+    "hatch": [
+        "//",
+        "\\\\",
+        "||",
+        "oo",
+        "xx"
+    ],
+    "colormap": null,
+    "x_data": [
+        1,
+        2,
+        3,
+        4,
+        5
+    ],
+    "y_data": [
+        3,
+        5,
+        6,
+        1,
+        9
+    ]
+}

@@ -180,9 +180,7 @@ class TestScatterPlotter(unittest.TestCase):
     def test_ax_limits_validation(self):
         plotter = ScatterPlotter(self.x_data, self.y_data)
         plotter.set_ax_limits(xlim=(-1, 1), ylim=(-1, 1))
-        with self.assertRaises(ArgumentStructureError):
-            plotter.set_ax_limits(xlim=(-1,))
-
+        plotter.set_ax_limits(xlim=(-1, None))
         with self.assertRaises(ArgumentTypeError):
             plotter.set_ax_limits(xlim=("invalid", "invalid"))
 

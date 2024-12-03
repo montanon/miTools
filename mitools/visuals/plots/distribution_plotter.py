@@ -15,11 +15,22 @@ from mitools.exceptions import (
 )
 from mitools.visuals.plots.matplotlib_typing import (
     Color,
-    EdgeColor,
     FaceColor,
     _colors,
 )
 from mitools.visuals.plots.plotter import Plotter
+from mitools.visuals.plots.validations import (
+    NUMERIC_TYPES,
+    SEQUENCE_TYPES,
+    is_sequence,
+    validate_length,
+    validate_non_negative,
+    validate_sequence_length,
+    validate_sequence_non_negative,
+    validate_sequence_type,
+    validate_type,
+    validate_value_in_options,
+)
 
 
 class DistributionPlotterException(Exception):
@@ -63,11 +74,10 @@ class DistributionPlotter(Plotter):
                 )
             self.color = color
             return self
-        if (
-            isinstance(color, (tuple, list, ndarray))
-            and len(color) in [3, 4]
-            and all(isinstance(c, (float, int, integer)) for c in color)
-        ) and len(color) == 1:
+        if is_sequence(color):
+            validate_sequence_type(color, NUMERIC_TYPES, "color")
+            validate_sequence_length(color, (3, 4), "color")
+            validate_length(color, 1, "color")
             self.color = color
             return self
         raise ArgumentTypeError(
@@ -83,21 +93,17 @@ class DistributionPlotter(Plotter):
             "linear",
             "cosine",
         ]
-        if kernel not in _kernels:
-            raise ArgumentValueError(f"'kernel'={kernel} must be one of {_kernels}")
+        validate_type(kernel, str, "kernel")
+        validate_value_in_options(kernel, _kernels, "kernel")
         self.kernel = kernel
         return self
 
     def set_hatch(self, hatch: Union[Sequence[str], str]):
         if isinstance(hatch, str):
             self.hatch = hatch
-        elif isinstance(hatch, (list, tuple, ndarray, Series)):
-            if len(hatch) != self.data_size:
-                raise ArgumentStructureError(
-                    "hatch must be of the same length as x_data and y_data"
-                )
-            if not all(isinstance(h, str) for h in hatch):
-                raise ArgumentTypeError("All hatch values must be strings")
+        elif is_sequence(hatch):
+            validate_length(hatch, self.data_size, "hatch")
+            validate_sequence_type(hatch, str, "hatch")
             self.hatch = hatch
         else:
             raise ArgumentTypeError("hatch must be a string or sequence of strings")
@@ -106,57 +112,42 @@ class DistributionPlotter(Plotter):
     def set_bandwidth(self, bandwidth: Union[str, float]):
         _methods = ["scott", "silverman"]
         if isinstance(bandwidth, str):
-            if bandwidth not in _methods:
-                raise ArgumentValueError(
-                    f"'bandwidth'={bandwidth} must be one of {_methods}"
-                )
+            validate_value_in_options(bandwidth, _methods, "bandwidth")
             self.bandwidth = bandwidth
-        elif isinstance(bandwidth, (float, int)):
+        else:
+            validate_type(bandwidth, NUMERIC_TYPES, "bandwidth")
             if bandwidth <= 0:
                 raise ArgumentValueError(f"'bandwidth'={bandwidth} must be positive")
             self.bandwidth = float(bandwidth)
-        else:
-            raise ArgumentTypeError(
-                f"'bandwidth'={bandwidth} must be a string or positive number"
-            )
         return self
 
     def set_gridsize(self, gridsize: int):
-        if not isinstance(gridsize, int) or gridsize < 1:
-            raise ArgumentValueError(
-                f"'gridsize'={gridsize} must be a positive integer"
-            )
+        validate_type(gridsize, int, "gridsize")
+        if gridsize < 1:
+            raise ArgumentValueError(f"'gridsize'={gridsize} must be positive")
         self.gridsize = gridsize
         return self
 
     def set_cut(self, cut: float):
-        if not isinstance(cut, (int, float)) or cut <= 0:
-            raise ArgumentValueError(f"'cut'={cut} must be a positive number")
+        validate_type(cut, NUMERIC_TYPES, "cut")
+        if cut <= 0:
+            raise ArgumentValueError(f"'cut'={cut} must be positive")
         self.cut = float(cut)
         return self
 
     def set_fill(self, fill: bool):
-        if not isinstance(fill, bool):
-            raise ArgumentTypeError(f"'fill'={fill} must be a boolean")
+        validate_type(fill, bool, "fill")
         self.fill = fill
         return self
 
     def set_linewidth(self, linewidth: Union[Sequence[float], float]):
-        if isinstance(linewidth, (float, int)):
-            if linewidth < 0:
-                raise ArgumentValueError(
-                    f"'linewidth'={linewidth} must be non-negative"
-                )
+        if isinstance(linewidth, NUMERIC_TYPES):
+            validate_non_negative(linewidth, "linewidth")
             self.linewidth = linewidth
-        elif isinstance(linewidth, (list, tuple, ndarray, Series)):
-            if len(linewidth) != self.data_size:
-                raise ArgumentStructureError(
-                    "linewidth must be of the same length as data"
-                )
-            if not all(isinstance(lw, (float, int)) and lw >= 0 for lw in linewidth):
-                raise ArgumentTypeError(
-                    "All linewidth values must be non-negative numbers"
-                )
+        elif is_sequence(linewidth):
+            validate_length(linewidth, self.data_size, "linewidth")
+            validate_sequence_type(linewidth, NUMERIC_TYPES, "linewidth")
+            validate_sequence_non_negative(linewidth, "linewidth")
             self.linewidth = linewidth
         else:
             raise ArgumentTypeError("linewidth must be a number or sequence of numbers")
@@ -164,33 +155,36 @@ class DistributionPlotter(Plotter):
 
     def set_linestyle(self, linestyle: str):
         _valid_styles = ["-", "--", "-.", ":", "None", "none", " ", ""]
-        if linestyle not in _valid_styles:
-            raise ArgumentValueError(f"linestyle must be one of {_valid_styles}")
+        validate_value_in_options(linestyle, _valid_styles, "linestyle")
         self.linestyle = linestyle
         return self
 
     def set_facecolor(self, facecolor: FaceColor, alpha: float = None):
-        if isinstance(facecolor, str) or (
-            isinstance(facecolor, (list, tuple))
-            and len(facecolor) in [3, 4]
-            and all(isinstance(x, (int, float, integer)) for x in facecolor)
-        ):
-            if isinstance(alpha, (float, int, integer)) and (
-                alpha > 1.0 or alpha < 0.0
+        if isinstance(facecolor, str):
+            if facecolor not in _colors and not re.match(
+                r"^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", facecolor
             ):
-                raise ArgumentValueError(f"'alpha'={alpha} must be between 0.0 and 1.0")
-            self.facecolor = dict(facecolor=facecolor, alpha=alpha)
+                raise ArgumentTypeError(
+                    f"'facecolor'='{facecolor}' must be a valid Matplotlib color string or HEX code."
+                )
+        elif isinstance(facecolor, SEQUENCE_TYPES):
+            validate_sequence_type(facecolor, NUMERIC_TYPES, "facecolor")
+            validate_sequence_length(facecolor, (3, 4), "facecolor")
         else:
             raise ArgumentTypeError(
                 "facecolor must be a color string or RGB/RGBA values"
             )
+        if alpha is not None:
+            validate_type(alpha, NUMERIC_TYPES, "alpha")
+            if alpha > 1.0 or alpha < 0.0:
+                raise ArgumentValueError(f"'alpha'={alpha} must be between 0.0 and 1.0")
+        self.facecolor = dict(facecolor=facecolor, alpha=alpha)
         return self
 
     def set_orientation(self, orientation: Literal["vertical", "horizontal"]):
-        if orientation not in ["vertical", "horizontal"]:
-            raise ArgumentValueError(
-                "orientation must be either 'vertical' or 'horizontal'"
-            )
+        validate_value_in_options(
+            orientation, ["vertical", "horizontal"], "orientation"
+        )
         self.orientation = orientation
         return self
 
