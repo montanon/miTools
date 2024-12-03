@@ -127,8 +127,6 @@ class BoxPlotter(Plotter):
     def set_positions(self, positions: Sequence[float]):
         if not isinstance(positions, (list, tuple, ndarray)):
             raise ArgumentTypeError("positions must be array-like")
-        if len(positions) != self.data_size:
-            raise ArgumentStructureError("positions must be of the same length as data")
         self.positions = positions
         return self
 
@@ -276,7 +274,7 @@ class BoxPlotter(Plotter):
                 "showbox": self.showbox,
                 "showfliers": self.showfliers,
                 "boxprops": self.boxprops,
-                "box_labels": self.box_labels,
+                "labels": self.box_labels,
                 "flierprops": self.flierprops,
                 "medianprops": self.medianprops,
                 "meanprops": self.meanprops,
