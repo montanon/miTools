@@ -12,5 +12,6 @@ from mitools.visuals.plots import (
     DistributionPlotter,
     HistogramPlotter,
     LinePlotter,
+    PiePlotter,
     ScatterPlotter,
 )

@@ -13,5 +13,6 @@ from mitools.visuals.plots.matplotlib_typing import (
     Scale,
     _colors,
 )
+from mitools.visuals.plots.pie_plotter import PiePlotter
 from mitools.visuals.plots.plotter import Plotter
 from mitools.visuals.plots.scatter_plotter import ScatterPlotter
