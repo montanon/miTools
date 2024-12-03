@@ -1,9 +1,10 @@
 import json
 import re
+from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Dict, Literal, Sequence, Tuple, Union
 
-import matplotlib.colors as mcolors
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.colors import Colormap, Normalize
@@ -18,36 +19,14 @@ from mitools.exceptions import (
     ArgumentTypeError,
     ArgumentValueError,
 )
-
-_colors = list(mcolors.get_named_colors_mapping().keys())
-Color = Union[str, Sequence[float]]
-Marker = Union[str, int, Path, MarkerStyle]
-Markers = Union[Marker, Sequence[Marker]]
-Cmap = Union[
-    Literal[
-        "magma",
-        "inferno",
-        "plasma",
-        "viridis",
-        "cividis",
-        "twilight",
-        "twilight_shifted",
-        "turbo",
-    ],
-    Colormap,
-]
-Norm = Union[str, Normalize]
-EdgeColor = Union[Literal["face", "none", None], Color, Sequence[Color]]
-FaceColor = Union[Color, Sequence[Color]]
-LineStyle = Literal["solid", "dashed", "dashdot", "dotted", "-", "--", "-.", ":"]
-Scale = Literal["linear", "log", "symlog", "logit"]
+from mitools.visuals.plots.matplotlib_typing import Color, Scale, _tickparams
 
 
-class ScatterPlotterException(Exception):
+class PlotterException(Exception):
     pass
 
 
-class ScatterPlotter:
+class Plotter(ABC):
     def __init__(self, x_data: Any, y_data: Any, **kwargs):
         self.x_data = self._validate_data(x_data, "x_data")
         self.y_data = self._validate_data(y_data, "y_data")
@@ -60,25 +39,14 @@ class ScatterPlotter:
             "title": {"default": "", "type": Text},
             "xlabel": {"default": "", "type": Text},
             "ylabel": {"default": "", "type": Text},
-            "size": {"default": None, "type": Union[Sequence[float], float]},
             "color": {"default": None, "type": Union[Sequence[Color], Color]},
-            "marker": {"default": "o", "type": Markers},
-            "colormap": {"default": None, "type": Cmap},
-            "normalization": {"default": None, "type": Norm},
-            "vmin": {"default": None, "type": float},
-            "vmax": {"default": None, "type": float},
             "alpha": {"default": 1.0, "type": Union[Sequence[float], float]},
-            "linewidth": {"default": None, "type": Union[Sequence[float], float]},
-            "edgecolor": {"default": None, "type": EdgeColor},
-            "facecolor": {"default": None, "type": FaceColor},
             "label": {"default": None, "type": Union[Sequence[str], str]},
             "legend": {"default": None, "type": Union[Dict, None]},
             "zorder": {"default": None, "type": Union[Sequence[float], float]},
-            "plot_non_finite": {"default": False, "type": bool},
             "figsize": {"default": (21, 14), "type": Tuple[float, float]},
             "style": {"default": "dark_background", "type": str},
             "grid": {"default": None, "type": Dict[str, Any]},
-            "hover": {"default": False, "type": bool},
             "tight_layout": {"default": False, "type": bool},
             "texts": {"default": None, "type": Union[Sequence[Text], Text]},
             "xscale": {"default": None, "type": Scale},
@@ -98,14 +66,26 @@ class ScatterPlotter:
             },
             "x_tick_labels": {"default": None, "type": Union[Sequence[str], None]},
             "y_tick_labels": {"default": None, "type": Union[Sequence[str], None]},
+            "x_tick_params": {"default": None, "type": Dict[str, Any]},
+            "y_tick_params": {"default": None, "type": Dict[str, Any]},
+            "spines": {"default": {}, "type": Dict[str, Any]},
         }
 
+        self._set_init_params(**kwargs)
+
+        self.figure: Figure = None
+        self.ax: Axes = None
+
+    def _set_init_params(self, **kwargs):
         for param, config in self._init_params.items():
             setattr(self, param, config["default"])
-            if param in kwargs:
+            if param in kwargs and kwargs[param] is not None:
                 setter_name = f"set_{param}"
                 if hasattr(self, setter_name):
-                    getattr(self, setter_name)(kwargs[param])
+                    if isinstance(kwargs[param], dict):
+                        getattr(self, setter_name)(**kwargs[param])
+                    else:
+                        getattr(self, setter_name)(kwargs[param])
                 else:
                     if param in ["xscale", "yscale"]:
                         self.set_scales(**{param: kwargs[param]})
@@ -115,10 +95,15 @@ class ScatterPlotter:
                         self.set_ticks(**{param: kwargs[param]})
                     elif param in ["x_tick_labels", "y_tick_labels"]:
                         self.set_tick_labels(**{param: kwargs[param]})
+                    elif param in ["x_tick_params", "y_tick_params"]:
+                        self.set_tick_params(**{param: kwargs[param]})
                     else:
                         raise ArgumentValueError(f"Parameter '{param}' is not valid.")
-        self.figure: Figure = None
-        self.ax: Axes = None
+
+    def reset_params(self):
+        for param, config in self._init_params.items():
+            setattr(self, param, config["default"])
+        return self
 
     def _validate_data(
         self, data: Sequence[Union[float, int, integer]], name: str
@@ -133,26 +118,17 @@ class ScatterPlotter:
             )
         return data
 
-    def set_title(self, title: str, **kwargs):
-        if isinstance(title, dict):
-            kwargs = {k: v for k, v in title.items() if k not in ["label"]}
-            title = title["label"]
+    def set_title(self, label: str, **kwargs):
         """https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.set_title.html"""
-        self.title = dict(label=title, **kwargs)
+        self.title = dict(label=label, **kwargs)
         return self
 
     def set_xlabel(self, xlabel: str, **kwargs):
-        if isinstance(xlabel, dict):
-            kwargs = {k: v for k, v in xlabel.items() if k not in ["xlabel"]}
-            xlabel = xlabel["xlabel"]
         """https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.set_xlabel"""
         self.xlabel = dict(xlabel=xlabel, **kwargs)
         return self
 
     def set_ylabel(self, ylabel: str, **kwargs):
-        if isinstance(ylabel, dict):
-            kwargs = {k: v for k, v in ylabel.items() if k not in ["ylabel"]}
-            ylabel = ylabel["ylabel"]
         """https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.set_ylabel"""
         self.ylabel = dict(ylabel=ylabel, **kwargs)
         return self
@@ -171,175 +147,11 @@ class ScatterPlotter:
             )
         return self
 
-    def set_size(self, size_data: Union[Sequence[float], float]):
-        if isinstance(size_data, (list, tuple, ndarray, Series, float, int, integer)):
-            if not isinstance(size_data, (float, int, integer)):
-                if len(size_data) != self.data_size:
-                    raise ArgumentStructureError(
-                        "size_data must be of the same length as x_data and y_data,"
-                        + f"len(size_data)={len(size_data)} != len(x_data)={self.data_size}."
-                    )
-                if not all(isinstance(s, (float, int, integer)) for s in size_data):
-                    raise ArgumentTypeError(
-                        "All elements in size_data must be numeric."
-                    )
-            self.size = size_data
-        else:
-            raise ArgumentTypeError(
-                "size_data must be array-like or a single numeric value."
-            )
-        return self
-
+    @abstractmethod
     def set_color(
         self, color: Union[Sequence[Color], Color, Sequence[float], Sequence[int]]
     ):
-        if isinstance(color, str):
-            if color not in _colors and not re.match(
-                r"^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", color
-            ):
-                raise ArgumentTypeError(
-                    f"'color'='{color}' must be a valid Matplotlib color string or HEX code."
-                )
-            self.color = color
-            return self
-        if (
-            isinstance(color, (tuple, list, ndarray))
-            and len(color) in [3, 4]
-            and all(isinstance(c, (float, int, integer)) for c in color)
-        ):
-            self.color = color
-            return self
-        if isinstance(color, (list, tuple, ndarray, Series)):
-            if len(color) != self.data_size:
-                raise ArgumentStructureError(
-                    "color must be of the same length as x_data and y_data, "
-                    + f"len(color)={len(color)} != len(x_data)={self.data_size}."
-                )
-            if not all(
-                isinstance(c, str)
-                or (
-                    isinstance(c, (tuple, list, ndarray))
-                    and len(c) in [3, 4]
-                    and all(isinstance(x, (float, int, integer)) for x in c)
-                )
-                or isinstance(c, (int, float, integer))
-                for c in color
-            ):
-                raise ArgumentTypeError(
-                    "All elements in color must be strings or RGB/RGBA values."
-                )
-            self.color = color
-            return self
-        raise ArgumentTypeError(
-            "color must be a string, RGB/RGBA values, or array-like of strings/RGB/RGBA values."
-        )
-
-    def set_marker(
-        self,
-        marker: Union[Markers, dict],
-        fillstyle: Literal["full", "left", "right", "bottom", "top", "none"] = None,
-    ):
-        if fillstyle is not None and fillstyle not in MarkerStyle.fillstyles:
-            raise ArgumentValueError(
-                f"'fillstyle'={fillstyle} must be a valid Matplotlib fillstyle string {MarkerStyle.fillstyles}."
-            )
-        if isinstance(marker, dict):
-            marker = MarkerStyle(**marker)
-        if isinstance(marker, str):
-            if marker not in MarkerStyle.markers:
-                raise ArgumentValueError(
-                    f"'marker'={marker} must be a valid Matplotlib marker string"
-                    + f" {MarkerStyle.markers} or a MarkerStyle object."
-                )
-            self.marker = MarkerStyle(marker, fillstyle=fillstyle)
-        elif isinstance(marker, MarkerStyle):
-            self.marker = MarkerStyle(marker.get_marker(), fillstyle=fillstyle)
-        elif isinstance(marker, Sequence):
-            if not all(isinstance(m, (MarkerStyle, str)) for m in marker):
-                raise ArgumentTypeError(
-                    "All elements in marker must be MarkerStyle objects or valid Matplotlib marker strings."
-                )
-            if len(marker) != self.data_size:
-                raise ArgumentStructureError(
-                    "marker must be of the same length as x_data and y_data, "
-                    + f"len(marker)={len(marker)} != len(x_data)={self.data_size}."
-                )
-            self.marker = [
-                MarkerStyle(m.get_marker(), fillstyle=fillstyle)
-                if isinstance(m, MarkerStyle)
-                else MarkerStyle(m, fillstyle=fillstyle)
-                for m in marker
-            ]
-        else:
-            raise ArgumentTypeError(
-                "marker must be a string, a MarkerStyle object, or a sequence of MarkerStyle objects."
-            )
-        return self
-
-    def set_colormap(self, cmap: Cmap):
-        _cmaps = [
-            "magma",
-            "inferno",
-            "plasma",
-            "viridis",
-            "cividis",
-            "twilight",
-            "twilight_shifted",
-            "turbo",
-        ]
-        if isinstance(cmap, str) and cmap in _cmaps or isinstance(cmap, Colormap):
-            self.colormap = cmap
-        else:
-            raise ArgumentTypeError(
-                f"'cmap'={cmap} must be a Colormap object or a valid Colormap string from {_cmaps}."
-            )
-        return self
-
-    def set_normalization(self, normalization: Norm):
-        _normalizations = [
-            "linear",
-            "log",
-            "symlog",
-            "asinh",
-            "logit",
-            "function",
-            "functionlog",
-        ]
-        if (
-            isinstance(normalization, Normalize)
-            or isinstance(normalization, str)
-            and normalization in _normalizations
-        ):
-            self.normalization = normalization
-        else:
-            raise ArgumentTypeError(
-                "normalize must be a valid Normalize object or a valid Matplotlib normalization string"
-                + f" of {_normalizations}."
-            )
-        return self
-
-    def set_vmin(self, vmin: Union[float, int]):
-        if self.normalization is not None and not isinstance(self.normalization, str):
-            raise ArgumentValueError(
-                f"Normalization {self.normalization} has been set. vmin only work when 'self.normalization' is a str."
-            )
-        if isinstance(vmin, (float, int)):
-            self.vmin = vmin
-        return self
-
-    def set_vmax(self, vmax: Union[float, int]):
-        if self.normalization is not None and not isinstance(self.normalization, str):
-            raise ArgumentValueError(
-                f"Normalization {self.normalization} has been set. vmax only work when 'self.normalization' is a str."
-            )
-        if isinstance(vmax, (float, int)):
-            self.vmax = vmax
-        return self
-
-    def set_normalization_range(self, vmin: float, vmax: float):
-        self.set_vmin(vmin)
-        self.set_vmax(vmax)
-        return self
+        raise NotImplementedError
 
     def set_alpha(self, alpha: Union[Sequence[float], float]):
         if isinstance(alpha, (list, tuple, ndarray, Series, float, int)):
@@ -353,92 +165,6 @@ class ScatterPlotter:
         else:
             raise ArgumentTypeError(
                 "alpha must be a numeric value or an array-like of numeric values."
-            )
-        return self
-
-    def set_linewidth(self, linewidth: Union[Sequence[float], float]):
-        if isinstance(linewidth, (float, int)):
-            self.linewidth = linewidth
-        elif isinstance(linewidth, (list, tuple, ndarray, Series)) and all(
-            isinstance(lw, (float, int)) for lw in linewidth
-        ):
-            if len(linewidth) != self.data_size:
-                raise ArgumentStructureError(
-                    "linewidth must be of the same length as x_data and y_data, "
-                    + f"len(linewdith)={len(linewidth)} != len(x_data)={self.data_size}."
-                )
-            self.linewidth = linewidth
-        else:
-            raise ArgumentTypeError(
-                "linewidth must be a float or an array-like of floats or ints."
-            )
-        return self
-
-    def set_edgecolor(self, edgecolor: EdgeColor):
-        if edgecolor in ["face", "none", None]:
-            self.edgecolor = edgecolor
-        elif isinstance(edgecolor, str) or (
-            isinstance(edgecolor, (list, tuple))
-            and len(edgecolor) in [3, 4]
-            and all(isinstance(x, (int, float, integer)) for x in edgecolor)
-        ):
-            self.edgecolor = edgecolor
-        elif isinstance(edgecolor, (list, tuple, ndarray, Series)):
-            if len(edgecolor) != self.data_size:
-                raise ArgumentStructureError(
-                    "edgecolor must be of the same length as x_data and y_data, "
-                    + f"len(edgecolor)={len(edgecolor)} != len(x_data)={self.data_size}."
-                )
-            for ec in edgecolor:
-                if not (
-                    isinstance(ec, str)
-                    or (
-                        isinstance(ec, (list, tuple))
-                        and len(ec) in [3, 4]
-                        and all(isinstance(x, (int, float, integer)) for x in ec)
-                    )
-                ):
-                    raise ArgumentTypeError(
-                        "Each edgecolor must be a string or RGB/RGBA values."
-                    )
-            self.edgecolor = edgecolor
-        else:
-            raise ArgumentTypeError(
-                "edgecolor must be 'face', 'none', None, a color string, RGB/RGBA values, "
-                + "or an array-like of color strings/RGB/RGBA values."
-            )
-        return self
-
-    def set_facecolor(self, facecolor: FaceColor):
-        if isinstance(facecolor, str) or (
-            isinstance(facecolor, (list, tuple))
-            and len(facecolor) in [3, 4]
-            and all(isinstance(x, (int, float, integer)) for x in facecolor)
-        ):
-            self.facecolor = facecolor
-        elif isinstance(facecolor, (list, tuple, ndarray, Series)):
-            if len(facecolor) != self.data_size:
-                raise ArgumentStructureError(
-                    "facecolor must be of the same length as x_data and y_data, "
-                    + f"len(facecolor)={len(facecolor)} != len(x_data)={self.data_size}."
-                )
-            for fc in facecolor:
-                if not (
-                    isinstance(fc, str)
-                    or (
-                        isinstance(fc, (list, tuple))
-                        and len(fc) in [3, 4]
-                        and all(isinstance(x, (int, float, integer)) for x in fc)
-                    )
-                ):
-                    raise ArgumentTypeError(
-                        "Each facecolor must be a string or RGB/RGBA values."
-                    )
-            self.facecolor = facecolor
-        else:
-            raise ArgumentTypeError(
-                f"'facecolor'={facecolor} must be a color string, RGB/RGBA values, "
-                + "or an array-like of color strings/RGB/RGBA values."
             )
         return self
 
@@ -476,72 +202,74 @@ class ScatterPlotter:
         facecolor: Union[str, None] = "inherit",
         **kwargs,
     ):
-        if isinstance(show, dict):
-            self.legend = show
-            return self
         if show not in [True, False]:
             raise ArgumentTypeError("'show' must be a boolean")
+        if "kwargs" not in kwargs:
+            legend_kwargs = {
+                "loc": loc,
+                "ncol": ncol,
+                "frameon": frameon,
+                "fancybox": fancybox,
+                "framealpha": framealpha,
+            }
+            if labels is not None:
+                if isinstance(labels, str):
+                    legend_kwargs["labels"] = [labels]
+                elif isinstance(labels, (list, tuple)) and all(
+                    isinstance(lbl, str) for lbl in labels
+                ):
+                    legend_kwargs["labels"] = labels
+                else:
+                    raise ArgumentTypeError(
+                        "'labels' must be a string or sequence of strings"
+                    )
+            if handles is not None:
+                if not isinstance(handles, (list, tuple)):
+                    raise ArgumentTypeError(
+                        "'handles' must be a sequence of Artist objects"
+                    )
+                legend_kwargs["handles"] = handles
+            if bbox_to_anchor is not None:
+                if not isinstance(bbox_to_anchor, tuple) or len(bbox_to_anchor) not in [
+                    2,
+                    4,
+                ]:
+                    raise ArgumentTypeError(
+                        "'bbox_to_anchor' must be a tuple of 2 or 4 floats"
+                    )
+                legend_kwargs["bbox_to_anchor"] = bbox_to_anchor
 
-        legend_kwargs = {
-            "loc": loc,
-            "ncol": ncol,
-            "frameon": frameon,
-            "fancybox": fancybox,
-            "framealpha": framealpha,
-        }
-        if labels is not None:
-            if isinstance(labels, str):
-                legend_kwargs["labels"] = [labels]
-            elif isinstance(labels, (list, tuple)) and all(
-                isinstance(l, str) for l in labels
-            ):
-                legend_kwargs["labels"] = labels
-            else:
-                raise ArgumentTypeError(
-                    "'labels' must be a string or sequence of strings"
-                )
-        if handles is not None:
-            if not isinstance(handles, (list, tuple)):
-                raise ArgumentTypeError(
-                    "'handles' must be a sequence of Artist objects"
-                )
-            legend_kwargs["handles"] = handles
-        if bbox_to_anchor is not None:
-            if not isinstance(bbox_to_anchor, tuple) or len(bbox_to_anchor) not in [
-                2,
-                4,
-            ]:
-                raise ArgumentTypeError(
-                    "'bbox_to_anchor' must be a tuple of 2 or 4 floats"
-                )
-            legend_kwargs["bbox_to_anchor"] = bbox_to_anchor
+            if fontsize is not None:
+                if not isinstance(fontsize, (int, str)):
+                    raise ArgumentTypeError("'fontsize' must be an integer or string")
+                legend_kwargs["fontsize"] = fontsize
 
-        if fontsize is not None:
-            if not isinstance(fontsize, (int, str)):
-                raise ArgumentTypeError("'fontsize' must be an integer or string")
-            legend_kwargs["fontsize"] = fontsize
+            if title is not None:
+                if not isinstance(title, str):
+                    raise ArgumentTypeError("'title' must be a string")
+                legend_kwargs["title"] = title
 
-        if title is not None:
-            if not isinstance(title, str):
-                raise ArgumentTypeError("'title' must be a string")
-            legend_kwargs["title"] = title
+            if title_fontsize is not None:
+                if not isinstance(title_fontsize, (int, str)):
+                    raise ArgumentTypeError(
+                        "'title_fontsize' must be an integer or string"
+                    )
+                legend_kwargs["title_fontsize"] = title_fontsize
 
-        if title_fontsize is not None:
-            if not isinstance(title_fontsize, (int, str)):
-                raise ArgumentTypeError("'title_fontsize' must be an integer or string")
-            legend_kwargs["title_fontsize"] = title_fontsize
+            if edgecolor is not None:
+                if not isinstance(edgecolor, str):
+                    raise ArgumentTypeError("'edgecolor' must be a string")
+                legend_kwargs["edgecolor"] = edgecolor
 
-        if edgecolor is not None:
-            if not isinstance(edgecolor, str):
-                raise ArgumentTypeError("'edgecolor' must be a string")
-            legend_kwargs["edgecolor"] = edgecolor
-
-        if facecolor is not None:
-            if not isinstance(facecolor, str):
-                raise ArgumentTypeError("'facecolor' must be a string")
-            legend_kwargs["facecolor"] = facecolor
-        legend_kwargs.update(kwargs)
-        self.legend = {"show": show, "kwargs": legend_kwargs} if show else None
+            if facecolor is not None:
+                if not isinstance(facecolor, str):
+                    raise ArgumentTypeError("'facecolor' must be a string")
+                legend_kwargs["facecolor"] = facecolor
+            legend_kwargs.update(kwargs)
+            legend = {"show": show, "kwargs": legend_kwargs}
+        else:
+            legend = {"show": show, "kwargs": kwargs["kwargs"]}
+        self.legend = legend if show else None
         return self
 
     def set_zorder(self, zorder: Union[Sequence[float], float]):
@@ -558,12 +286,6 @@ class ScatterPlotter:
             self.zorder = zorder
         else:
             raise ArgumentTypeError("zorder must be a float or sequence of floats")
-        return self
-
-    def set_plot_non_finite(self, plot_non_finite: bool):
-        if plot_non_finite not in [True, False]:
-            raise ArgumentTypeError("plot_non_finite must be a bool.")
-        self.plot_non_finite = plot_non_finite
         return self
 
     def set_figsize(self, figsize: Tuple[float, float]):
@@ -597,20 +319,11 @@ class ScatterPlotter:
 
     def set_grid(
         self,
-        visible: Union[bool, Dict] = None,
+        visible: bool = None,
         which: Literal["major", "minor", "both"] = "major",
         axis: Literal["both", "x", "y"] = "both",
         **kwargs,
     ):
-        if isinstance(visible, dict):
-            kwargs = {
-                k: v
-                for k, v in visible.items()
-                if k not in ["visible", "which", "axis"]
-            }
-            which = visible.get("which", "major")
-            axis = visible.get("axis", "both")
-            visible = visible.get("visible", True)
         if visible not in [True, False]:
             raise ArgumentTypeError("visible must be a bool.")
         if which not in ["major", "minor", "both"]:
@@ -633,12 +346,6 @@ class ScatterPlotter:
             )
         return self
 
-    def set_hover(self, hover: bool):
-        if hover not in [True, False]:
-            raise ArgumentTypeError("hover must be a bool.")
-        self.hover = hover
-        return self
-
     def set_tight_layout(self, tight_layout: bool = False):
         if tight_layout in [True, False]:
             self.tight_layout = tight_layout
@@ -654,11 +361,8 @@ class ScatterPlotter:
         self.figure_background = figure_background
         return self
 
-    def set_suptitle(self, suptitle: Union[str, Dict], **kwargs):
-        if isinstance(suptitle, dict):
-            kwargs = {k: v for k, v in suptitle.items() if k not in ["t"]}
-            suptitle = suptitle["t"]
-        self.suptitle = dict(t=suptitle, **kwargs)
+    def set_suptitle(self, t: str, **kwargs):
+        self.suptitle = dict(t=t, **kwargs)
         return self
 
     def set_ax_limits(
@@ -726,39 +430,80 @@ class ScatterPlotter:
             self.y_tick_labels = y_tick_labels
         return self
 
-    def draw(self, show: bool = False):
+    def set_tick_params(
+        self,
+        x_tick_params: Dict[str, Any] = None,
+        y_tick_params: Dict[str, Any] = None,
+    ):
+        if x_tick_params is not None:
+            if not isinstance(x_tick_params, dict) and not all(
+                param in _tickparams for param in x_tick_params
+            ):
+                raise ArgumentTypeError(
+                    "x_tick_params must be a dictionary with keys in "
+                    + f"{_tickparams}"
+                )
+            self.x_tick_params = x_tick_params
+        if y_tick_params is not None:
+            if not isinstance(y_tick_params, dict) and not all(
+                param in _tickparams for param in y_tick_params
+            ):
+                raise ArgumentTypeError(
+                    "y_tick_params must be a dictionary with keys in "
+                    + f"{_tickparams}"
+                )
+            self.y_tick_params = y_tick_params
+        return self
+
+    def _spine_params(
+        self,
+        visible: Union[bool, Dict[str, bool]] = True,
+        position: Union[Dict[str, Union[Tuple[float, float], str]], None] = None,
+        color: Union[Color, Dict[str, Color]] = None,
+        linewidth: Union[float, Dict[str, float]] = None,
+        linestyle: Union[str, Dict[str, str]] = None,
+        alpha: Union[float, Dict[str, float]] = None,
+        bounds: Union[Tuple[float, float], Dict[str, Tuple[float, float]]] = None,
+        capstyle: Union[Literal["butt", "round", "projecting"], Dict[str, str]] = None,
+    ):
+        return {
+            "visible": visible,
+            "position": position,
+            "color": color,
+            "linewidth": linewidth,
+            "linestyle": linestyle,
+            "alpha": alpha,
+            "bounds": bounds,
+            "capstyle": capstyle,
+        }
+
+    def set_spines(
+        self,
+        left: Dict[str, Any] = None,
+        right: Dict[str, Any] = None,
+        bottom: Dict[str, Any] = None,
+        top: Dict[str, Any] = None,
+    ):
+        self.spines = {
+            "left": self._spine_params(**left) if left is not None else None,
+            "right": self._spine_params(**right) if right is not None else None,
+            "bottom": self._spine_params(**bottom) if bottom is not None else None,
+            "top": self._spine_params(**top) if top is not None else None,
+        }
+        return self
+
+    def prepare_draw(self):
+        if self.figure is not None or self.ax is not None:
+            self.clear()
         if self.style is not None:
-            default_style = plt.rcParams.copy()
+            self._default_style = plt.rcParams.copy()
             plt.style.use(self.style)
         if not self.ax and not self.figure:
             self.figure, self.ax = plt.subplots(figsize=self.figsize)
-
-        if self.grid is not None:
+        if self.grid is not None and self.grid["visible"]:
             self.ax.grid(**self.grid)
 
-        scatter_kwargs = {
-            "x": self.x_data,
-            "y": self.y_data,
-            "s": self.size,
-            "c": self.color,
-            "marker": self.marker,
-            "cmap": self.colormap,
-            "norm": self.normalization,
-            "vmin": self.vmin,
-            "vmax": self.vmax,
-            "alpha": self.alpha,
-            "linewidth": self.linewidth,
-            "edgecolor": self.edgecolor,
-            "facecolor": self.facecolor,
-            "label": self.label,
-            "zorder": self.zorder,
-            "plotnonfinite": self.plot_non_finite,
-        }
-
-        try:
-            self.ax.scatter(**scatter_kwargs)
-        except Exception as e:
-            raise ScatterPlotterException(f"Error while creating scatter plot: {e}")
+    def _apply_common_properties(self):
         if self.title:
             self.ax.set_title(**self.title)
         if self.xlabel:
@@ -800,15 +545,56 @@ class ScatterPlotter:
             self.ax.set_xticklabels(self.x_tick_labels)
         if self.y_tick_labels is not None:
             self.ax.set_yticklabels(self.y_tick_labels)
-        if self.hover and self.label is not None:
-            pass
+        if self.x_tick_params is not None:
+            self.ax.tick_params(axis="x", **self.x_tick_params)
+        if self.y_tick_params is not None:
+            self.ax.tick_params(axis="y", **self.y_tick_params)
+        if self.spines:
+            for spine, spine_params in self.spines.items():
+                if spine_params is not None:
+                    for param, values in spine_params.items():
+                        if values is not None:
+                            if param == "visible":
+                                self.ax.spines[spine].set_visible(values)
+                            elif param == "position":
+                                if isinstance(values, str):
+                                    self.ax.spines[spine].set_position(values)
+                                else:
+                                    self.ax.spines[spine].set_position(("data", values))
+                            elif param == "color":
+                                self.ax.spines[spine].set_color(values)
+                            elif param == "linewidth":
+                                self.ax.spines[spine].set_linewidth(values)
+                            elif param == "linestyle":
+                                self.ax.spines[spine].set_linestyle(values)
+                            elif param == "alpha":
+                                self.ax.spines[spine].set_alpha(values)
+                            elif param == "bounds":
+                                self.ax.spines[spine].set_bounds(*values)
+                            elif param == "capstyle":
+                                self.ax.spines[spine].set_capstyle(values)
+
+    def _finalize_draw(self, show: bool = True):
         if self.tight_layout:
             plt.tight_layout()
         if show:
             plt.show()
         if self.style is not None:
-            plt.rcParams.update(default_style)
+            plt.rcParams.update(self._default_style)
         return self.ax
+
+    @abstractmethod
+    def _create_plot(self):
+        raise NotImplementedError
+
+    def draw(self, show: bool = True):
+        self.prepare_draw()
+        try:
+            self._create_plot()
+        except Exception as e:
+            raise PlotterException(f"Error while creating plot: {e}")
+        self._apply_common_properties()
+        return self._finalize_draw(show)
 
     def save_plot(
         self,
@@ -823,11 +609,9 @@ class ScatterPlotter:
             try:
                 self.figure.savefig(file_path, dpi=dpi, bbox_inches=bbox_inches)
             except Exception as e:
-                raise ScatterPlotterException(f"Error while saving scatter plot: {e}")
+                raise PlotterException(f"Error while saving scatter plot: {e}")
         else:
-            raise ScatterPlotterException(
-                "Plot not drawn yet. Call draw() before saving."
-            )
+            raise PlotterException("Plot not drawn yet. Call draw() before saving.")
         return self
 
     def clear(self):
@@ -842,10 +626,13 @@ class ScatterPlotter:
             return None
         elif isinstance(value, dict):
             return {k: self._to_serializable(v) for k, v in value.items()}
-        elif isinstance(value, (list, tuple, ndarray, Series)):
+        elif isinstance(value, ndarray):
+            return value.tolist()
+        elif isinstance(value, Series):
+            return value.to_list()
+        elif isinstance(value, (list, tuple)):
             return [self._to_serializable(v) for v in value]
         elif isinstance(value, Colormap):
-            print(value)
             return value.name
         elif isinstance(value, Normalize):
             return value.__class__.__name__.lower()
@@ -855,14 +642,8 @@ class ScatterPlotter:
             marker = dict(
                 marker=value.get_marker(),
                 fillstyle=value.get_fillstyle(),
-                transform=value.get_transform(),
                 capstyle=value.get_capstyle(),
                 joinstyle=value.get_joinstyle(),
-            )
-            marker["transform"] = (
-                marker["transform"].__class__.__name__.lower()
-                if marker["transform"]
-                else None
             )
             return marker
 
@@ -880,9 +661,13 @@ class ScatterPlotter:
             json.dump(init_params, f, indent=4)
 
     @classmethod
-    def from_json(cls, file_path: Union[str, Path]) -> "ScatterPlotter":
+    def from_json(cls, file_path: Union[str, Path]) -> "Plotter":
         with open(file_path, "r") as f:
             params = json.load(f)
         x_data = params.pop("x_data") if "x_data" in params else []
         y_data = params.pop("y_data") if "y_data" in params else []
+        if "xlim" in params and params["xlim"] is not None:
+            params["xlim"] = tuple(params["xlim"])
+        if "ylim" in params and params["ylim"] is not None:
+            params["ylim"] = tuple(params["ylim"])
         return cls(x_data=x_data, y_data=y_data, **params)

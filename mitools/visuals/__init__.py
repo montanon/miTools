@@ -1,4 +1,4 @@
-from .axes_functions import (
+from mitools.visuals.axes_functions import (
     adjust_ax_labels_fontsize,
     adjust_ax_text_limits,
     adjust_axes_array_limits,
@@ -6,4 +6,10 @@ from .axes_functions import (
     is_ax_empty,
     set_axes_limits,
 )
-from .plots import ScatterPlotter
+from mitools.visuals.plots import (
+    BarPlotter,
+    DistributionPlotter,
+    HistogramPlotter,
+    LinePlotter,
+    ScatterPlotter,
+)

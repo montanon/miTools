@@ -1,3 +1,5 @@
+import os
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -190,6 +192,72 @@ class TestScatterPlotter(unittest.TestCase):
         self.assertIsInstance(ax, plt.Axes)
         self.assertIsNotNone(plotter.figure)
         self.assertIsNotNone(plotter.ax)
+
+    def test_save_and_load_plotter(self):
+        plotter1 = ScatterPlotter(self.x_data, self.y_data, **self.valid_params)
+
+        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tmp:
+            temp_path = tmp.name
+        try:
+            plotter1.save_plotter(temp_path, data=True)
+            plotter2 = ScatterPlotter.from_json(temp_path)
+            for param in self.valid_params.keys():
+                if param in ["marker"]:
+                    marker1 = getattr(plotter1, param)
+                    marker2 = getattr(plotter2, param)
+                    self.assertEqual(
+                        marker1.get_marker(),
+                        marker2.get_marker(),
+                        f"Parameter {param} differs between saved and loaded plotter",
+                    )
+                elif param in ["x_ticks", "y_ticks"]:
+                    for val1, val2 in zip(
+                        getattr(plotter1, param), getattr(plotter2, param)
+                    ):
+                        self.assertEqual(
+                            val1,
+                            val2,
+                            f"Parameter {param} differs between saved and loaded plotter",
+                        )
+                else:
+                    self.assertEqual(
+                        getattr(plotter1, param),
+                        getattr(plotter2, param),
+                        f"Parameter {param} differs between saved and loaded plotter",
+                    )
+            np.testing.assert_array_equal(plotter1.x_data, plotter2.x_data)
+            np.testing.assert_array_equal(plotter1.y_data, plotter2.y_data)
+        finally:
+            os.unlink(temp_path)
+
+    def test_init_params_completeness(self):
+        plotter = ScatterPlotter(self.x_data, self.y_data)
+        instance_attrs = set(
+            attr
+            for attr in dir(plotter)
+            if not attr.startswith("_") and not callable(getattr(plotter, attr))
+        )
+        init_params = set(plotter._init_params.keys())
+        required_attrs = {"x_data", "y_data", "data_size", "figure", "ax"}
+        missing_params = instance_attrs - init_params - required_attrs
+        extra_params = init_params - instance_attrs
+        self.assertEqual(
+            missing_params,
+            set(),
+            f"The following attributes are not included in _init_params: {missing_params}",
+        )
+        self.assertEqual(
+            extra_params,
+            set(),
+            f"The following _init_params don't correspond to any attributes: {extra_params}",
+        )
+        required_keys = {"default", "type"}
+        for param, config in plotter._init_params.items():
+            self.assertTrue(
+                all(key in config for key in required_keys),
+                f"Parameter '{param}' is missing required keys in _init_params. "
+                f"Required: {required_keys}, Found: {set(config.keys())}",
+            )
 
     def tearDown(self):
         plt.close("all")
