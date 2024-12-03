@@ -472,14 +472,14 @@ class Plotter(ABC):
         if x_ticks is not None:
             validate_type(x_ticks, SEQUENCE_TYPES, "x_ticks")
             validate_sequence_type(x_ticks, NUMERIC_TYPES, "x_ticks")
-            self.x_ticks = x_ticks
+            self.xticks = x_ticks
         return self
 
     def set_yticks(self, y_ticks: Union[Sequence[Union[float, int]], None]):
         if y_ticks is not None:
             validate_type(y_ticks, SEQUENCE_TYPES, "y_ticks")
             validate_sequence_type(y_ticks, NUMERIC_TYPES, "y_ticks")
-            self.y_ticks = y_ticks
+            self.yticks = y_ticks
         return self
 
     def set_ticks(
@@ -497,7 +497,7 @@ class Plotter(ABC):
         if xticklabels is not None:
             validate_type(xticklabels, SEQUENCE_TYPES, "xticklabels")
             validate_sequence_type(xticklabels, (str, *NUMERIC_TYPES), "xticklabels")
-            self.x_tick_labels = xticklabels
+            self.xticklabels = xticklabels
         return self
 
     def set_yticklabels(
@@ -506,7 +506,7 @@ class Plotter(ABC):
         if yticklabels is not None:
             validate_type(yticklabels, SEQUENCE_TYPES, "yticklabels")
             validate_sequence_type(yticklabels, (str, *NUMERIC_TYPES), "yticklabels")
-            self.y_tick_labels = yticklabels
+            self.yticklabels = yticklabels
         return self
 
     def set_ticklabels(
@@ -686,14 +686,10 @@ class Plotter(ABC):
             self.ax.set_xlabel(**self.xlabel)
             if "color" in self.xlabel:
                 self.ax.tick_params(axis="x", colors=self.xlabel["color"])
-                self.ax.spines["bottom"].set_color(self.xlabel["color"])
-                self.ax.spines["top"].set_color(self.xlabel["color"])
         if self.ylabel:
             self.ax.set_ylabel(**self.ylabel)
             if "color" in self.ylabel:
                 self.ax.tick_params(axis="y", colors=self.ylabel["color"])
-                self.ax.spines["left"].set_color(self.ylabel["color"])
-                self.ax.spines["right"].set_color(self.ylabel["color"])
         if self.xscale:
             self.ax.set_xscale(self.xscale)
         if self.yscale:
@@ -713,18 +709,18 @@ class Plotter(ABC):
             self.ax.set_xlim(self.xlim)
         if self.ylim is not None:
             self.ax.set_ylim(self.ylim)
-        if self.x_ticks is not None:
-            self.ax.set_xticks(self.x_ticks)
-        if self.y_ticks is not None:
-            self.ax.set_yticks(self.y_ticks)
-        if self.x_tick_labels is not None:
-            self.ax.set_xticklabels(self.x_tick_labels)
-        if self.y_tick_labels is not None:
-            self.ax.set_yticklabels(self.y_tick_labels)
-        if self.x_tick_params is not None:
-            self.ax.tick_params(axis="x", **self.x_tick_params)
-        if self.y_tick_params is not None:
-            self.ax.tick_params(axis="y", **self.y_tick_params)
+        if self.xticks is not None:
+            self.ax.set_xticks(self.xticks)
+        if self.yticks is not None:
+            self.ax.set_yticks(self.yticks)
+        if self.xticklabels is not None:
+            self.ax.set_xticklabels(self.xticklabels)
+        if self.yticklabels is not None:
+            self.ax.set_yticklabels(self.yticklabels)
+        if self.xtickparams is not None:
+            self.ax.tick_params(axis="x", **self.xtickparams)
+        if self.ytickparams is not None:
+            self.ax.tick_params(axis="y", **self.ytickparams)
         if self.spines:
             for spine, spine_params in self.spines.items():
                 if spine_params is not None:
