@@ -33,6 +33,16 @@ def validate_sequence_type(
         )
 
 
+def validate_non_negative(value: Union[float, int, integer], param_name: str) -> None:
+    if value < 0:
+        raise ArgumentValueError(f"'{param_name}'={value} must be non-negative")
+
+
+def validate_sequence_non_negative(sequence: Sequence, param_name: str) -> None:
+    if any(item < 0 for item in sequence):
+        raise ArgumentValueError(f"All elements in '{param_name}' must be non-negative")
+
+
 def is_sequence(value: Any) -> bool:
     return isinstance(value, SEQUENCE_TYPES)
 
