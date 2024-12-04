@@ -222,7 +222,12 @@ def is_color_str(value: Any) -> bool:
 
 
 def is_color(value: Any) -> bool:
-    return is_color_tuple(value) or is_color_hex(value) or is_color_str(value)
+    return (
+        is_color_tuple(value)
+        or is_color_hex(value)
+        or is_color_str(value)
+        or isinstance(value, float)
+    )
 
 
 def validate_color(value: Any) -> None:
