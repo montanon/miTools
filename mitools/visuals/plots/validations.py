@@ -215,6 +215,9 @@ def is_marker(value: Any) -> bool:
                 and valid_joinstyle
             )
         return isinstance(value, (Path, MarkerStyle))
+    elif value is None:
+        return True
+    return False
 
 
 def is_marker_sequence(sequence: Sequence[Any]) -> bool:
@@ -316,6 +319,7 @@ def is_color(value: Any) -> bool:
         or is_color_hex(value)
         or is_color_str(value)
         or isinstance(value, float)
+        or value is None
     )
 
 
