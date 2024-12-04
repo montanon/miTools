@@ -348,16 +348,6 @@ class ScatterPlotter(Plotter):
         self.set_vmax(vmax)
         return self
 
-    def get_sequences_param(self, param_name: str, n_sequence: int):
-        param_value = getattr(self, param_name)
-        if self._multi_data:
-            param_structure = self._multi_params_structure.get(param_name)
-            if param_structure in ["sequences", "sequence"]:
-                return param_value[n_sequence]
-            elif param_structure == "value":
-                return param_value
-        return param_value
-
     def _create_scatter_kwargs(self, n_sequence: int):
         scatter_kwargs = {
             "x": self.x_data[n_sequence],

@@ -690,6 +690,16 @@ class Plotter(ABC):
             plt.rcParams.update(self._default_style)
         return self.ax
 
+    def get_sequences_param(self, param_name: str, n_sequence: int):
+        param_value = getattr(self, param_name)
+        if self._multi_data:
+            param_structure = self._multi_params_structure.get(param_name)
+            if param_structure in ["sequences", "sequence"]:
+                return param_value[n_sequence]
+            elif param_structure == "value":
+                return param_value
+        return param_value
+
     @abstractmethod
     def _create_plot(self):
         raise NotImplementedError
