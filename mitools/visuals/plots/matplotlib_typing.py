@@ -1,11 +1,12 @@
 from pathlib import Path
-from typing import Any, Dict, Literal, Sequence, Union
+from typing import Any, Dict, Literal, Sequence, Tuple, Union
 
 from matplotlib.colors import Colormap, Normalize, get_named_colors_mapping
 from matplotlib.markers import MarkerStyle
 from numpy import integer
 
 NumericType = Union[int, float, integer]
+NumericTuple = Tuple[NumericType, NumericType]
 NumericSequence = Sequence[NumericType]
 NumericSequences = Sequence[NumericSequence]
 Color = Union[str, Sequence[float]]
@@ -50,6 +51,11 @@ CMAPS = [
     "twilight_shifted",
     "turbo",
 ]
+BINS = ["auto", "fd", "doane", "scott", "stone", "rice", "sturges", "sqrt"]
+BinsSequence = Sequence[Union[int, str, Sequence[float]]]
+BinsSequences = Sequence[BinsSequence]
+LiteralSequence = Sequence[Literal]
+LiteralSequences = Sequence[LiteralSequence]
 CmapSequence = Sequence[Cmap]
 Norm = Union[str, Normalize]
 NormSequence = Sequence[Norm]
@@ -62,6 +68,8 @@ LineStyle = Union[
 ]
 Scale = Literal["linear", "log", "symlog", "logit"]
 TickParams = Dict[str, Any]
+HIST_ALIGN = ["left", "mid", "right"]
+HIST_HISTTYPE = ["bar", "barstacked", "step", "stepfilled"]
 TICKPARAMS = [
     "size",
     "width",

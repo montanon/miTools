@@ -13,6 +13,7 @@ from mitools.exceptions import (
     ArgumentValueError,
 )
 from mitools.visuals.plots.matplotlib_typing import (
+    BINS,
     CMAPS,
     COLORS,
     MARKERS,
@@ -26,6 +27,45 @@ T = TypeVar("T")
 
 NUMERIC_TYPES = (float, int, integer)
 SEQUENCE_TYPES = (list, tuple, ndarray, Series)
+
+
+def is_numeric_tuple(value: Any) -> bool:
+    return isinstance(value, tuple) and all(
+        isinstance(item, NUMERIC_TYPES) for item in value
+    )
+
+
+def is_numeric_tuple_sequence(sequence: Sequence[Any]) -> bool:
+    return is_sequence(sequence) and all(is_numeric_tuple(val) for val in sequence)
+
+
+def is_numeric_tuple_sequences(sequences: Sequence[Sequence[Any]]) -> bool:
+    return is_sequence(sequences) and all(
+        is_numeric_tuple_sequence(seq) for seq in sequences
+    )
+
+
+def validate_numeric_tuple_sequence(sequence: Sequence[Any]) -> None:
+    if not is_numeric_tuple_sequence(sequence):
+        raise ArgumentTypeError(f"Invalid numeric tuple sequence: {sequence}")
+
+
+def is_bins_sequences(sequences: Sequence[Sequence[Any]]) -> bool:
+    return is_sequence(sequences) and all(is_bins_sequence(seq) for seq in sequences)
+
+
+def is_bins_sequence(sequence: Sequence[Any]) -> bool:
+    return is_sequence(sequence) and all(is_bin(val) for val in sequence)
+
+
+def is_bin(value: Any) -> bool:
+    if isinstance(value, (int, str, *SEQUENCE_TYPES)):
+        if isinstance(value, str):
+            return value in BINS
+        if isinstance(value, SEQUENCE_TYPES):
+            return all(isinstance(item, NUMERIC_TYPES) for item in value)
+        return True
+    return False
 
 
 def is_normalization(value: Any) -> bool:

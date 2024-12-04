@@ -6,22 +6,54 @@ from matplotlib.figure import Figure
 from numpy import integer, ndarray
 from pandas import Series
 
-from mitools.exceptions import (
-    ArgumentStructureError,
-    ArgumentTypeError,
-    ArgumentValueError,
+from mitools.exceptions import ArgumentStructureError
+from mitools.visuals.plots.matplotlib_typing import (
+    BinsSequence,
+    BinsSequences,
+    Cmap,
+    CmapSequence,
+    Color,
+    ColorSequence,
+    ColorSequences,
+    EdgeColor,
+    EdgeColorSequence,
+    EdgeColorSequences,
+    LiteralSequence,
+    LiteralSequences,
+    Marker,
+    MarkerSequence,
+    MarkerSequences,
+    Norm,
+    NormSequence,
+    NumericSequence,
+    NumericSequences,
+    NumericTuple,
+    NumericType,
 )
-from mitools.visuals.plots.matplotlib_typing import COLORS, Color, EdgeColor
 from mitools.visuals.plots.plotter import Plotter
 from mitools.visuals.plots.validations import (
     NUMERIC_TYPES,
-    SEQUENCE_TYPES,
-    is_sequence,
-    validate_length,
+    is_color,
+    is_color_sequence,
+    is_color_sequences,
+    is_colormap,
+    is_colormap_sequence,
+    is_edgecolor_sequence,
+    is_edgecolor_sequences,
+    is_marker_sequence,
+    is_marker_sequences,
+    is_normalization,
+    is_normalization_sequence,
+    is_numeric,
+    is_numeric_sequence,
+    is_numeric_sequences,
+    validate_color,
+    validate_consistent_len,
+    validate_edgecolor,
+    validate_marker,
+    validate_numeric,
     validate_sequence_length,
-    validate_sequence_type,
     validate_type,
-    validate_value_in_options,
 )
 
 
@@ -30,34 +62,74 @@ class HistogramPlotterException(Exception):
 
 
 class HistogramPlotter(Plotter):
-    def __init__(self, x_data: Any, y_data: Any = None, **kwargs):
+    def __init__(
+        self,
+        x_data: Union[NumericSequences, NumericSequence],
+        y_data: Union[NumericSequences, NumericSequence, None] = None,
+        **kwargs,
+    ):
         super().__init__(
             x_data=x_data, y_data=x_data if y_data is None else y_data, **kwargs
         )
         self._hist_params = {
-            "bins": {"default": "auto", "type": Union[int, str, Sequence[float]]},
-            "range": {"default": None, "type": Union[Tuple[float, float], None]},
-            "weights": {"default": None, "type": Union[Sequence[float], None]},
-            "cumulative": {"default": False, "type": bool},
-            "bottom": {"default": None, "type": Union[Sequence[float], float, None]},
-            "histtype": {
-                "default": "bar",
-                "type": Literal["bar", "barstacked", "step", "stepfilled"],
-            },
-            "align": {"default": "mid", "type": Literal["left", "mid", "right"]},
+            # General Axes.scatter Parameters that are independent of the number of data sequences
             "orientation": {
                 "default": "vertical",
                 "type": Literal["horizontal", "vertical"],
             },
-            "rwidth": {"default": None, "type": Union[float, None]},
-            "log": {"default": False, "type": bool},
             "stacked": {"default": False, "type": bool},
-            "edgecolor": {"default": None, "type": EdgeColor},
-            "facecolor": {"default": None, "type": Color},
-            "fill": {"default": True, "type": bool},
-            "linestyle": {"default": "-", "type": str},
-            "linewidth": {"default": None, "type": Union[float, None]},
-            "hatch": {"default": None, "type": Union[Sequence[str], str]},
+            "log": {"default": False, "type": bool},
+            # Specific Parameters that are based on the number of data sequences
+            "bins": {"default": "auto", "type": Union[BinsSequence, BinsSequences]},
+            "range": {
+                "default": None,
+                "type": Union[Sequence[NumericTuple], NumericTuple, None],
+            },
+            "weights": {
+                "default": None,
+                "type": Union[NumericSequences, NumericSequence, None],
+            },
+            "cumulative": {"default": False, "type": Union[Sequence[bool], bool]},
+            "bottom": {
+                "default": None,
+                "type": Union[NumericSequences, NumericSequence, NumericType, None],
+            },
+            "histtype": {
+                "default": "bar",
+                "type": Union[
+                    LiteralSequence,
+                    Literal["bar", "barstacked", "step", "stepfilled"],
+                ],
+            },
+            "align": {
+                "default": "mid",
+                "type": Union[LiteralSequence, Literal["left", "mid", "right"]],
+            },
+            "rwidth": {
+                "default": None,
+                "type": Union[NumericSequence, NumericType, None],
+            },
+            "edgecolor": {
+                "default": None,
+                "type": Union[EdgeColorSequences, EdgeColorSequence, EdgeColor],
+            },
+            "facecolor": {
+                "default": None,
+                "type": Union[ColorSequences, ColorSequence, Color],
+            },
+            "fill": {"default": True, "type": Union[Sequence[bool], bool]},
+            "linestyle": {
+                "default": "-",
+                "type": Union[LiteralSequences, LiteralSequence, Literal],
+            },
+            "linewidth": {
+                "default": None,
+                "type": Union[NumericSequences, NumericSequence, NumericType],
+            },
+            "hatch": {
+                "default": None,
+                "type": Union[LiteralSequences, LiteralSequence, Literal],
+            },
         }
         self._init_params.update(self._hist_params)
         self._set_init_params(**kwargs)
