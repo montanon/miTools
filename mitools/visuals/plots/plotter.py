@@ -1,8 +1,7 @@
 import json
-import re
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Dict, Literal, Sequence, Tuple, TypeVar, Union
+from typing import Any, Dict, Literal, Sequence, Tuple, Union
 
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
@@ -10,12 +9,11 @@ from matplotlib.colors import Colormap, Normalize
 from matplotlib.figure import Figure
 from matplotlib.markers import MarkerStyle
 from matplotlib.text import Text
-from numpy import integer, ndarray
+from numpy import ndarray
 from pandas import Series
 
 from mitools.exceptions import (
     ArgumentStructureError,
-    ArgumentTypeError,
     ArgumentValueError,
 )
 from mitools.visuals.plots.matplotlib_typing import (
@@ -37,11 +35,9 @@ from mitools.visuals.plots.validations import (
     is_numeric,
     is_numeric_sequence,
     is_numeric_sequences,
-    is_sequence,
     is_str_sequence,
     validate_color,
     validate_consistent_len,
-    validate_length,
     validate_numeric,
     validate_numeric_sequences,
     validate_same_length,
@@ -518,10 +514,15 @@ class Plotter(ABC):
             if is_numeric_sequences(alpha):
                 validate_consistent_len(alpha, "alpha")
                 validate_sequence_length(alpha[0], self.data_size, "alpha[0]")
+                for seq in self.alpha:
+                    for val in seq:
+                        validate_value_in_range(val, 0, 1, "alpha")
                 self.alpha = alpha
                 return self
             elif is_numeric_sequence(alpha):
                 validate_sequence_length(alpha, self.n_sequences, "alpha")
+                for val in alpha:
+                    validate_value_in_range(val, 0, 1, "alpha")
                 self.alpha = alpha
                 return self
             elif is_numeric(alpha):
