@@ -1,13 +1,16 @@
 from pathlib import Path
-from typing import Any, Dict, Literal, Sequence, Union
+from typing import Any, Dict, Literal, Sequence, Tuple, Union
 
 from matplotlib.colors import Colormap, Normalize, get_named_colors_mapping
 from matplotlib.markers import MarkerStyle
 from numpy import integer
 
 NumericType = Union[int, float, integer]
+NumericTuple = Tuple[NumericType, NumericType]
 NumericSequence = Sequence[NumericType]
 NumericSequences = Sequence[NumericSequence]
+DictSequence = Sequence[Dict[str, Any]]
+DictSequences = Sequence[DictSequence]
 Color = Union[str, Sequence[float]]
 ColorSequence = Sequence[Color]
 ColorSequences = Sequence[ColorSequence]
@@ -31,6 +34,10 @@ Cmap = Union[
     ],
     Colormap,
 ]
+KERNELS = ["gaussian", "tophat", "epanechnikov", "exponential", "linear", "cosine"]
+ORIENTATIONS = ["horizontal", "vertical"]
+BANDWIDTH_METHODS = ["scott", "silverman"]
+BARS_ALIGN = ["center", "edge"]
 NORMALIZATIONS = [
     "linear",
     "log",
@@ -50,6 +57,12 @@ CMAPS = [
     "twilight_shifted",
     "turbo",
 ]
+BINS = ["auto", "fd", "doane", "scott", "stone", "rice", "sturges", "sqrt"]
+Bins = Union[int, str]
+BinsSequence = Sequence[Bins]
+BinsSequences = Sequence[BinsSequence]
+LiteralSequence = Sequence[Literal["literal"]]
+LiteralSequences = Sequence[LiteralSequence]
 CmapSequence = Sequence[Cmap]
 Norm = Union[str, Normalize]
 NormSequence = Sequence[Norm]
@@ -62,6 +75,10 @@ LineStyle = Union[
 ]
 Scale = Literal["linear", "log", "symlog", "logit"]
 TickParams = Dict[str, Any]
+LINESTYLES = ["-", "--", "-.", ":", "None", "none", " ", ""]
+HATCHES = ["/", "\\", "|", "-", "+", "x", "o", "O", ".", "*"]
+HIST_ALIGN = ["left", "mid", "right"]
+HIST_HISTTYPE = ["bar", "barstacked", "step", "stepfilled"]
 TICKPARAMS = [
     "size",
     "width",

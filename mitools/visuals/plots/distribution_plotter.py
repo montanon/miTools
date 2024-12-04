@@ -1,34 +1,44 @@
-import re
-from typing import Any, Dict, Literal, Sequence, Union
+from typing import Literal, Sequence, Union
 
 import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
-from numpy import integer, ndarray
+from numpy import ndarray
 from pandas import Series
 from scipy import stats
 
 from mitools.exceptions import (
     ArgumentStructureError,
     ArgumentTypeError,
-    ArgumentValueError,
 )
 from mitools.visuals.plots.matplotlib_typing import (
-    COLORS,
+    BANDWIDTH_METHODS,
+    HATCHES,
+    KERNELS,
+    LINESTYLES,
+    ORIENTATIONS,
     Color,
+    ColorSequence,
+    LiteralSequence,
+    NumericSequence,
+    NumericSequences,
+    NumericType,
 )
 from mitools.visuals.plots.plotter import Plotter
 from mitools.visuals.plots.validations import (
     NUMERIC_TYPES,
-    SEQUENCE_TYPES,
+    is_color,
+    is_color_sequence,
+    is_literal,
+    is_literal_sequence,
+    is_numeric,
+    is_numeric_sequence,
     is_sequence,
-    validate_length,
-    validate_non_negative,
+    validate_literal,
+    validate_numeric,
     validate_sequence_length,
-    validate_sequence_non_negative,
     validate_sequence_type,
-    validate_type,
-    validate_value_in_options,
+    validate_value_in_range,
 )
 
 
@@ -37,155 +47,154 @@ class DistributionPlotterException(Exception):
 
 
 class DistributionPlotter(Plotter):
-    def __init__(self, x_data: Any, y_data: Any = None, **kwargs):
+    def __init__(
+        self,
+        x_data: Union[NumericSequences, NumericSequence],
+        y_data: None = None,
+        **kwargs,
+    ):
+        super().__init__(x_data=x_data, y_data=None, **kwargs)
         self._dist_params = {
-            "kernel": {"default": "gaussian", "type": str},
-            "bandwidth": {"default": "scott", "type": Union[str, float]},
+            # General Axes.scatter Parameters that are independent of the number of data sequences
+            "kernel": {"default": "gaussian", "type": Literal["kernels"]},
+            "bandwidth": {
+                "default": "scott",
+                "type": Union[Literal["bandwidth_methods"], float],
+            },
             "gridsize": {"default": 1_000, "type": int},
             "cut": {"default": 3, "type": float},
-            "fill": {"default": True, "type": bool},
-            "linewidth": {"default": None, "type": Union[Sequence[float], float]},
-            "linestyle": {"default": "-", "type": str},
-            "facecolor": {"default": {}, "type": Dict[str, Any]},
             "orientation": {
                 "default": "vertical",
-                "type": Literal["vertical", "horizontal"],
+                "type": Literal["horizontal", "vertical"],
             },
-            "hatch": {"default": None, "type": str},
+            # Specific Parameters that are based on the number of data sequences
+            "fill": {"default": True, "type": Union[Sequence[bool], bool]},
+            "linestyle": {
+                "default": "-",
+                "type": Union[LiteralSequence, Literal["linestyles"]],
+            },
+            "linewidth": {
+                "default": None,
+                "type": Union[NumericSequence, NumericType],
+            },
+            "facecolor": {
+                "default": None,
+                "type": Union[ColorSequence, Color],
+            },
+            "hatch": {
+                "default": None,
+                "type": Union[LiteralSequence, Literal["hatches"]],
+            },
         }
-        super().__init__(
-            x_data=x_data, y_data=x_data if y_data is None else y_data, **kwargs
-        )
         self._init_params.update(self._dist_params)
         self._set_init_params(**kwargs)
         self.figure: Figure = None
         self.ax: Axes = None
 
-    def set_color(
-        self, color: Union[Sequence[Color], Color, Sequence[float], Sequence[int]]
-    ):
-        if isinstance(color, str):
-            if color not in COLORS and not re.match(
-                r"^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", color
-            ):
-                raise ArgumentTypeError(
-                    f"'color'='{color}' must be a valid Matplotlib color string or HEX code."
-                )
-            self.color = color
-            return self
-        if is_sequence(color):
-            validate_sequence_type(color, NUMERIC_TYPES, "color")
-            validate_sequence_length(color, (3, 4), "color")
-            validate_length(color, 1, "color")
-            self.color = color
-            return self
-        raise ArgumentTypeError(
-            "color must be a string, RGB/RGBA values, or array-like of strings/RGB/RGBA values."
-        )
-
     def set_kernel(self, kernel: str):
-        _kernels = [
-            "gaussian",
-            "tophat",
-            "epanechnikov",
-            "exponential",
-            "linear",
-            "cosine",
-        ]
-        validate_type(kernel, str, "kernel")
-        validate_value_in_options(kernel, _kernels, "kernel")
+        validate_literal(kernel, KERNELS)
         self.kernel = kernel
         return self
 
-    def set_hatch(self, hatch: Union[Sequence[str], str]):
-        if isinstance(hatch, str):
-            self.hatch = hatch
-        elif is_sequence(hatch):
-            validate_length(hatch, self.data_size, "hatch")
-            validate_sequence_type(hatch, str, "hatch")
-            self.hatch = hatch
-        else:
-            raise ArgumentTypeError("hatch must be a string or sequence of strings")
-        return self
-
-    def set_bandwidth(self, bandwidth: Union[str, float]):
-        _methods = ["scott", "silverman"]
+    def set_bandwidth(self, bandwidth: Union[Literal["bandwidth_methods"], float]):
         if isinstance(bandwidth, str):
-            validate_value_in_options(bandwidth, _methods, "bandwidth")
+            validate_literal(bandwidth, BANDWIDTH_METHODS)
             self.bandwidth = bandwidth
-        else:
-            validate_type(bandwidth, NUMERIC_TYPES, "bandwidth")
-            if bandwidth <= 0:
-                raise ArgumentValueError(f"'bandwidth'={bandwidth} must be positive")
+        elif isinstance(bandwidth, NUMERIC_TYPES):
+            validate_value_in_range(bandwidth, 1e-9, np.inf, "bandwidth")
             self.bandwidth = float(bandwidth)
         return self
 
-    def set_gridsize(self, gridsize: int):
-        validate_type(gridsize, int, "gridsize")
-        if gridsize < 1:
-            raise ArgumentValueError(f"'gridsize'={gridsize} must be positive")
-        self.gridsize = gridsize
+    def set_gridsize(self, gridsize: NumericType):
+        validate_numeric(gridsize, "gridsize")
+        validate_value_in_range(gridsize, 1, np.inf, "gridsize")
+        self.gridsize = int(gridsize)
         return self
 
-    def set_cut(self, cut: float):
-        validate_type(cut, NUMERIC_TYPES, "cut")
-        if cut <= 0:
-            raise ArgumentValueError(f"'cut'={cut} must be positive")
+    def set_cut(self, cut: NumericType):
+        validate_numeric(cut, "cut")
+        validate_value_in_range(cut, 0, np.inf, "cut")
         self.cut = float(cut)
         return self
 
-    def set_fill(self, fill: bool):
-        validate_type(fill, bool, "fill")
-        self.fill = fill
-        return self
-
-    def set_linewidth(self, linewidth: Union[Sequence[float], float]):
-        if isinstance(linewidth, NUMERIC_TYPES):
-            validate_non_negative(linewidth, "linewidth")
-            self.linewidth = linewidth
-        elif is_sequence(linewidth):
-            validate_length(linewidth, self.data_size, "linewidth")
-            validate_sequence_type(linewidth, NUMERIC_TYPES, "linewidth")
-            validate_sequence_non_negative(linewidth, "linewidth")
-            self.linewidth = linewidth
-        else:
-            raise ArgumentTypeError("linewidth must be a number or sequence of numbers")
-        return self
-
-    def set_linestyle(self, linestyle: str):
-        _valid_styles = ["-", "--", "-.", ":", "None", "none", " ", ""]
-        validate_value_in_options(linestyle, _valid_styles, "linestyle")
-        self.linestyle = linestyle
-        return self
-
-    def set_facecolor(self, facecolor: Color, alpha: float = None):
-        if isinstance(facecolor, str):
-            if facecolor not in COLORS and not re.match(
-                r"^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", facecolor
-            ):
-                raise ArgumentTypeError(
-                    f"'facecolor'='{facecolor}' must be a valid Matplotlib color string or HEX code."
-                )
-        elif isinstance(facecolor, SEQUENCE_TYPES):
-            validate_sequence_type(facecolor, NUMERIC_TYPES, "facecolor")
-            validate_sequence_length(facecolor, (3, 4), "facecolor")
-        else:
-            raise ArgumentTypeError(
-                "facecolor must be a color string or RGB/RGBA values"
-            )
-        if alpha is not None:
-            validate_type(alpha, NUMERIC_TYPES, "alpha")
-            if alpha > 1.0 or alpha < 0.0:
-                raise ArgumentValueError(f"'alpha'={alpha} must be between 0.0 and 1.0")
-        self.facecolor = dict(facecolor=facecolor, alpha=alpha)
-        return self
-
-    def set_orientation(self, orientation: Literal["vertical", "horizontal"]):
-        validate_value_in_options(
-            orientation, ["vertical", "horizontal"], "orientation"
-        )
+    def set_orientation(self, orientation: Literal["horizontal", "vertical"]):
+        validate_literal(orientation, ORIENTATIONS)
         self.orientation = orientation
         return self
+
+    def set_fill(self, fill: Union[Sequence[bool], bool]):
+        if self._multi_data and is_sequence(fill):
+            validate_sequence_length(fill, self._n_sequences, "fill")
+            validate_sequence_type(fill, bool, "fill")
+            self.fill = fill
+            self._multi_params_structure["fill"] = "sequence"
+            return self
+        elif isinstance(fill, bool):
+            self.fill = fill
+            self._multi_params_structure["fill"] = "value"
+            return self
+        raise ArgumentStructureError(
+            "Invalid fill, must be a boolean or sequence of booleans."
+        )
+
+    def set_linestyle(
+        self,
+        linestyles: Union[LiteralSequence, Literal["linestyles"]],
+    ):
+        if self._multi_data and is_literal_sequence(linestyles, LINESTYLES):
+            validate_sequence_length(linestyles, self._n_sequences, "linestyle")
+            self.linestyle = linestyles
+            self._multi_params_structure["linestyle"] = "sequence"
+            return self
+        elif is_literal(linestyles, LINESTYLES):
+            self.linestyle = linestyles
+            self._multi_params_structure["linestyle"] = "value"
+            return self
+        raise ArgumentStructureError(
+            f"Invalid linestyle, must be a literal or sequence of literals from {LINESTYLES}."
+        )
+
+    def set_linewidth(self, linewidths: Union[NumericSequence, NumericType]):
+        if self._multi_data and is_numeric_sequence(linewidths):
+            validate_sequence_length(linewidths, self._n_sequences, "linewidth")
+            self.linewidth = linewidths
+            self._multi_params_structure["linewidth"] = "sequence"
+            return self
+        elif is_numeric(linewidths):
+            self.linewidth = linewidths
+            self._multi_params_structure["linewidth"] = "value"
+            return self
+        raise ArgumentStructureError(
+            "Invalid linewidth, must be a numeric value, sequence of numbers, or sequences of numbers."
+        )
+
+    def set_facecolor(self, facecolors: Union[ColorSequence, Color]):
+        if self._multi_data and is_color_sequence(facecolors):
+            validate_sequence_length(facecolors, self._n_sequences, "facecolors")
+            self.facecolor = facecolors
+            self._multi_params_structure["facecolor"] = "sequence"
+            return self
+        elif is_color(facecolors):
+            self.facecolor = facecolors
+            self._multi_params_structure["facecolor"] = "value"
+            return self
+        raise ArgumentStructureError(
+            "Invalid facecolors, must be a color, sequence of colors, or sequences of colors."
+        )
+
+    def set_hatch(self, hatches: Union[LiteralSequence, Literal["hatches"]]):
+        if self._multi_data and is_literal_sequence(hatches, HATCHES):
+            validate_sequence_length(hatches, self._n_sequences, "hatch")
+            self.hatch = hatches
+            self._multi_params_structure["hatch"] = "sequence"
+            return self
+        elif is_literal(hatches, HATCHES):
+            self.hatch = hatches
+            self._multi_params_structure["hatch"] = "value"
+            return self
+        raise ArgumentStructureError(
+            f"Invalid hatch, must be a literal or sequence of literals from {HATCHES}."
+        )
 
     def _compute_kde(self, data):
         kde = stats.gaussian_kde(
@@ -202,35 +211,48 @@ class DistributionPlotter(Plotter):
         kde_values = kde(grid)
         return grid, kde_values
 
+    def _create_dist_kwargs(self, n_sequence: int):
+        dist_kwargs = {
+            "color": self.get_sequences_param("color", n_sequence),
+            "alpha": self.get_sequences_param("alpha", n_sequence),
+            "label": self.get_sequences_param("label", n_sequence),
+            "linewidth": self.get_sequences_param("linewidth", n_sequence),
+            "linestyle": self.get_sequences_param("linestyle", n_sequence),
+            "zorder": self.get_sequences_param("zorder", n_sequence),
+        }
+        return dist_kwargs
+
+    def _create_fill_kwargs(self, n_sequence: int):
+        fill_kwargs = {
+            "facecolor": self.get_sequences_param("facecolor", n_sequence),
+            "alpha": self.get_sequences_param("alpha", n_sequence),
+            "hatch": self.get_sequences_param("hatch", n_sequence),
+            "zorder": self.get_sequences_param("zorder", n_sequence),
+            "edgecolor": self.get_sequences_param("color", n_sequence),
+        }
+        return fill_kwargs
+
     def _create_plot(self):
-        try:
-            if isinstance(self.x_data, (list, tuple, ndarray, Series)):
-                grid, density = self._compute_kde(self.x_data)
-            else:
-                raise ArgumentTypeError("Data must be array-like")
-            plot_kwargs = {
-                "color": self.color,
-                "alpha": self.alpha,
-                "label": self.label,
-                "linewidth": self.linewidth,
-                "linestyle": self.linestyle,
-                "zorder": self.zorder,
-            }
-            if self.fill:
-                fill_kwargs = {
-                    "facecolor": self.facecolor.get("facecolor", self.color),
-                    "alpha": self.facecolor.get("alpha", self.alpha),
-                    "hatch": self.hatch,
-                }
-                if self.orientation == "vertical":
-                    self.ax.fill_between(grid, density, **fill_kwargs)
+        for n_sequence in range(self._n_sequences):
+            try:
+                if isinstance(self.x_data[n_sequence], (list, tuple, ndarray, Series)):
+                    grid, density = self._compute_kde(self.x_data[n_sequence])
                 else:
-                    self.ax.fill_betweenx(grid, density, **fill_kwargs)
-            if self.orientation == "vertical":
-                self.ax.plot(grid, density, **plot_kwargs)
-            else:
-                self.ax.plot(density, grid, **plot_kwargs)
-        except Exception as e:
-            raise DistributionPlotterException(
-                f"Error while creating distribution plot: {e}"
-            )
+                    raise ArgumentTypeError("Data must be array-like")
+                plot_kwargs = self._create_dist_kwargs(n_sequence)
+                fill = self.get_sequences_param("fill", n_sequence)
+                orientation = self.get_sequences_param("orientation", n_sequence)
+                if fill:
+                    fill_kwargs = self._create_fill_kwargs(n_sequence)
+                    if orientation == "vertical":
+                        self.ax.fill_between(grid, density, **fill_kwargs)
+                    else:
+                        self.ax.fill_betweenx(grid, density, **fill_kwargs)
+                if orientation == "vertical":
+                    self.ax.plot(grid, density, **plot_kwargs)
+                else:
+                    self.ax.plot(density, grid, **plot_kwargs)
+            except Exception as e:
+                raise DistributionPlotterException(
+                    f"Error while creating distribution plot: {e}"
+                )

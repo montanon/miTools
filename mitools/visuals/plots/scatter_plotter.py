@@ -24,6 +24,7 @@ from mitools.visuals.plots.matplotlib_typing import (
 )
 from mitools.visuals.plots.plotter import Plotter
 from mitools.visuals.plots.validations import (
+    NUMERIC_TYPES,
     is_color,
     is_color_sequence,
     is_color_sequences,
@@ -43,6 +44,7 @@ from mitools.visuals.plots.validations import (
     validate_edgecolor,
     validate_marker,
     validate_numeric,
+    validate_same,
     validate_sequence_length,
     validate_type,
 )
@@ -59,6 +61,7 @@ class ScatterPlotter(Plotter):
         y_data: Union[NumericSequences, NumericSequence],
         **kwargs,
     ):
+        super().__init__(x_data, y_data, **kwargs)
         self._scatter_params = {
             # General Axes.scatter Parameters that are independent of the number of data sequences
             "plot_non_finite": {"default": False, "type": bool},
@@ -89,7 +92,6 @@ class ScatterPlotter(Plotter):
             "vmin": {"default": None, "type": Union[NumericSequence, NumericType]},
             "vmax": {"default": None, "type": Union[NumericSequence, NumericType]},
         }
-        super().__init__(x_data, y_data, **kwargs)
         self._init_params.update(self._scatter_params)
         self._set_init_params(**kwargs)
         self.figure: Figure = None
@@ -109,7 +111,9 @@ class ScatterPlotter(Plotter):
         if self._multi_data:
             if is_numeric_sequences(sizes):
                 validate_consistent_len(sizes, "sizes")
-                validate_sequence_length(sizes[0], self.data_size, "sizes[0]")
+                if any(len(sequence) != 1 for sequence in sizes):
+                    max_len = max(len(sequence) for sequence in sizes)
+                    validate_same(max_len, self.data_size, "len(sizes)", "data_size")
                 self.size = sizes
                 self._multi_params_structure["size"] = "sequences"
                 return self
@@ -118,7 +122,7 @@ class ScatterPlotter(Plotter):
                 self.size = sizes
                 self._multi_params_structure["size"] = "sequence"
                 return self
-            elif is_numeric(sizes):
+            elif is_numeric(sizes) or sizes is None:
                 self.size = sizes
                 self._multi_params_structure["size"] = "value"
                 return self
@@ -128,7 +132,8 @@ class ScatterPlotter(Plotter):
                 self.size = sizes
                 self._multi_params_structure["size"] = "sequence"
                 return self
-            validate_numeric(sizes, "sizes")
+            if sizes is not None:
+                validate_numeric(sizes, "sizes")
             self.size = sizes
             self._multi_params_structure["size"] = "value"
             return self
@@ -140,7 +145,9 @@ class ScatterPlotter(Plotter):
         if self._multi_data:
             if is_marker_sequences(markers):
                 validate_consistent_len(markers, "markers")
-                validate_sequence_length(markers[0], self.data_size, "markers[0]")
+                if any(len(sequence) != 1 for sequence in markers):
+                    max_len = max(len(sequence) for sequence in markers)
+                    validate_same(max_len, self.data_size, "len(markers)", "data_size")
                 self.marker = markers
                 self._multi_params_structure["marker"] = "sequences"
                 return self
@@ -173,7 +180,11 @@ class ScatterPlotter(Plotter):
         if self._multi_data:
             if is_numeric_sequences(linewidths):
                 validate_consistent_len(linewidths, "linewidths")
-                validate_sequence_length(linewidths[0], self.data_size, "linewidths[0]")
+                if any(len(sequence) != 1 for sequence in linewidths):
+                    max_len = max(len(sequence) for sequence in linewidths)
+                    validate_same(
+                        max_len, self.data_size, "len(linewidths)", "data_size"
+                    )
                 self.linewidth = linewidths
                 self._multi_params_structure["linewidth"] = "sequences"
                 return self
@@ -206,7 +217,11 @@ class ScatterPlotter(Plotter):
         if self._multi_data:
             if is_edgecolor_sequences(edgecolors):
                 validate_consistent_len(edgecolors, "edgecolors")
-                validate_sequence_length(edgecolors[0], self.data_size, "edgecolors[0]")
+                if any(len(sequence) != 1 for sequence in edgecolors):
+                    max_len = max(len(sequence) for sequence in edgecolors)
+                    validate_same(
+                        max_len, self.data_size, "len(edgecolors)", "data_size"
+                    )
                 self.edgecolor = edgecolors
                 self._multi_params_structure["edgecolor"] = "sequences"
                 return self
@@ -237,8 +252,11 @@ class ScatterPlotter(Plotter):
         if self._multi_data:
             if is_color_sequences(facecolors):
                 validate_consistent_len(facecolors, "facecolors")
-                validate_sequence_length(facecolors, self._n_sequences, "facecolors")
-                validate_sequence_length(facecolors[0], self.data_size, "facecolors[0]")
+                if any(len(sequence) != 1 for sequence in facecolors):
+                    max_len = max(len(sequence) for sequence in facecolors)
+                    validate_same(
+                        max_len, self.data_size, "len(facecolors)", "data_size"
+                    )
                 self.facecolor = facecolors
                 self._multi_params_structure["facecolor"] = "sequences"
                 return self
@@ -330,16 +348,6 @@ class ScatterPlotter(Plotter):
         self.set_vmax(vmax)
         return self
 
-    def get_sequences_param(self, param_name: str, n_sequence: int):
-        param_value = getattr(self, param_name)
-        if self._multi_data:
-            param_structure = self._multi_params_structure.get(param_name)
-            if param_structure in ["sequences", "sequence"]:
-                return param_value[n_sequence]
-            elif param_structure == "value":
-                return param_value
-        return param_value
-
     def _create_scatter_kwargs(self, n_sequence: int):
         scatter_kwargs = {
             "x": self.x_data[n_sequence],
@@ -359,6 +367,11 @@ class ScatterPlotter(Plotter):
             "zorder": self.get_sequences_param("zorder", n_sequence),
             "plotnonfinite": self.plot_non_finite,
         }
+        if (
+            not isinstance(scatter_kwargs.get("alpha", []), NUMERIC_TYPES)
+            and len(scatter_kwargs.get("alpha", [])) == 1
+        ):
+            scatter_kwargs["alpha"] = scatter_kwargs["alpha"][0]
         return scatter_kwargs
 
     def _create_plot(self):

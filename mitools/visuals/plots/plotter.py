@@ -40,6 +40,7 @@ from mitools.visuals.plots.validations import (
     validate_consistent_len,
     validate_numeric,
     validate_numeric_sequences,
+    validate_same,
     validate_same_length,
     validate_sequence_length,
     validate_sequence_type,
@@ -77,7 +78,7 @@ class Plotter(ABC):
             "xlabel": {"default": "", "type": Text},
             "ylabel": {"default": "", "type": Text},
             "legend": {"default": None, "type": Union[Dict, None]},
-            "figsize": {"default": (8, 8), "type": Tuple[float, float]},
+            "figsize": {"default": (10, 8), "type": Tuple[float, float]},
             "style": {"default": None, "type": str},
             "grid": {"default": None, "type": Dict[str, Any]},
             "tight_layout": {"default": False, "type": bool},
@@ -134,7 +135,10 @@ class Plotter(ABC):
             if param in kwargs and kwargs[param] is not None:
                 setter_name = f"set_{param}"
                 if hasattr(self, setter_name):
-                    if isinstance(kwargs[param], dict):
+                    if isinstance(kwargs[param], dict) and param not in [
+                        "xtickparams",
+                        "ytickparams",
+                    ]:
                         getattr(self, setter_name)(**kwargs[param])
                     else:
                         getattr(self, setter_name)(kwargs[param])
@@ -486,7 +490,9 @@ class Plotter(ABC):
             if is_color_sequences(color):
                 validate_consistent_len(color, "color")
                 validate_sequence_length(color, self._n_sequences, "color")
-                validate_sequence_length(color[0], self.data_size, "color[0]")
+                if any(len(sequence) != 1 for sequence in color):
+                    max_len = max(len(sequence) for sequence in color)
+                    validate_same(max_len, self.data_size, "len(color)", "data_size")
                 self.color = color
                 self._multi_params_structure["color"] = "sequences"
                 return self
@@ -519,7 +525,9 @@ class Plotter(ABC):
         if self._multi_data:
             if is_numeric_sequences(alpha):
                 validate_consistent_len(alpha, "alpha")
-                validate_sequence_length(alpha[0], self.data_size, "alpha[0]")
+                if any(len(sequence) != 1 for sequence in alpha):
+                    max_len = max(len(sequence) for sequence in alpha)
+                    validate_same(max_len, self.data_size, "len(alpha)", "data_size")
                 for seq in alpha:
                     for val in seq:
                         validate_value_in_range(val, 0, 1, "alpha")
@@ -569,7 +577,9 @@ class Plotter(ABC):
         if self._multi_data:
             if is_numeric_sequences(zorder):
                 validate_consistent_len(zorder, "zorder")
-                validate_sequence_length(zorder[0], self.data_size, "zorder[0]")
+                if any(len(sequence) != 1 for sequence in zorder):
+                    max_len = max(len(sequence) for sequence in zorder)
+                    validate_same(max_len, self.data_size, "len(zorder)", "data_size")
                 self.zorder = zorder
                 self._multi_params_structure["zorder"] = "sequences"
                 return self
@@ -683,6 +693,16 @@ class Plotter(ABC):
             plt.rcParams.update(self._default_style)
         return self.ax
 
+    def get_sequences_param(self, param_name: str, n_sequence: int):
+        param_value = getattr(self, param_name)
+        if self._multi_data:
+            param_structure = self._multi_params_structure.get(param_name)
+            if param_structure in ["sequences", "sequence"]:
+                return param_value[n_sequence]
+            elif param_structure == "value":
+                return param_value
+        return param_value
+
     @abstractmethod
     def _create_plot(self):
         raise NotImplementedError
@@ -772,4 +792,6 @@ class Plotter(ABC):
             params["ylim"] = tuple(params["ylim"])
         if "center" in params and params["center"] is not None:
             params["center"] = tuple(params["center"])
+        if "range" in params and params["range"] is not None:
+            params["range"] = tuple(params["range"])
         return cls(x_data=x_data, y_data=y_data, **params)

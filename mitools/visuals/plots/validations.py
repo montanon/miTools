@@ -13,6 +13,7 @@ from mitools.exceptions import (
     ArgumentValueError,
 )
 from mitools.visuals.plots.matplotlib_typing import (
+    BINS,
     CMAPS,
     COLORS,
     MARKERS,
@@ -26,6 +27,99 @@ T = TypeVar("T")
 
 NUMERIC_TYPES = (float, int, integer)
 SEQUENCE_TYPES = (list, tuple, ndarray, Series)
+
+
+def is_dict_sequence(sequence: Sequence[Any]) -> bool:
+    return is_sequence(sequence) and all(isinstance(item, dict) for item in sequence)
+
+
+def is_literal(value: Any, options: Sequence[Any]) -> bool:
+    return (isinstance(value, str) and value in options) or value is None
+
+
+def validate_literal(value: Any, options: Sequence[Any]) -> None:
+    if not is_literal(value, options):
+        raise ArgumentTypeError(f"Invalid literal: {value}")
+
+
+def is_literal_sequence(sequence: Sequence[Any], options: Sequence[Any]) -> bool:
+    return is_sequence(sequence) and all(is_literal(val, options) for val in sequence)
+
+
+def validate_literal_sequence(sequence: Sequence[Any], options: Sequence[Any]) -> None:
+    if not is_literal_sequence(sequence, options):
+        raise ArgumentTypeError(f"Invalid literal sequence: {sequence}")
+
+
+def is_literal_sequences(
+    sequences: Sequence[Sequence[Any]], options: Sequence[Any]
+) -> bool:
+    return is_sequence(sequences) and all(
+        is_literal_sequence(seq, options) for seq in sequences
+    )
+
+
+def validate_same(value1: Any, value2: Any, param_name1: str, param_name2: str):
+    if value1 != value2:
+        raise ArgumentValueError(
+            f"{param_name1}={value1} and {param_name2}={value2} must be the same."
+        )
+
+
+def is_numeric_tuple(value: Any, size: int = None) -> bool:
+    return (
+        isinstance(value, tuple)
+        and all(isinstance(item, NUMERIC_TYPES) for item in value)
+        and len(value) == size
+        if size
+        else True
+    )
+
+
+def validate_numeric_tuple(value: Any, size: int) -> None:
+    if not is_numeric_tuple(value, size):
+        raise ArgumentTypeError(f"Invalid numeric tuple: {value}")
+
+
+def is_numeric_tuple_sequence(sequence: Sequence[Any], size: int = None) -> bool:
+    return is_sequence(sequence) and all(
+        is_numeric_tuple(val, size) for val in sequence
+    )
+
+
+def is_numeric_tuple_sequences(
+    sequences: Sequence[Sequence[Any]], size: int = None
+) -> bool:
+    return is_sequence(sequences) and all(
+        is_numeric_tuple_sequence(seq, size) for seq in sequences
+    )
+
+
+def validate_numeric_tuple_sequence(sequence: Sequence[Any]) -> None:
+    if not is_numeric_tuple_sequence(sequence):
+        raise ArgumentTypeError(f"Invalid numeric tuple sequence: {sequence}")
+
+
+def is_bins_sequences(sequences: Sequence[Sequence[Any]]) -> bool:
+    return is_sequence(sequences) and all(is_bins_sequence(seq) for seq in sequences)
+
+
+def is_bins_sequence(sequence: Sequence[Any]) -> bool:
+    return is_sequence(sequence) and all(is_bins(val) for val in sequence)
+
+
+def validate_bins(bins: Any) -> None:
+    if not is_bins(bins):
+        raise ArgumentTypeError(f"Invalid bins: {bins}")
+
+
+def is_bins(value: Any) -> bool:
+    if isinstance(value, (int, str)):
+        if isinstance(value, int):
+            return is_value_in_range(value, 0, 1_000_000)
+        if isinstance(value, str):
+            return value in BINS
+    return False
 
 
 def is_normalization(value: Any) -> bool:
@@ -125,6 +219,9 @@ def is_marker(value: Any) -> bool:
                 and valid_joinstyle
             )
         return isinstance(value, (Path, MarkerStyle))
+    elif value is None:
+        return True
+    return False
 
 
 def is_marker_sequence(sequence: Sequence[Any]) -> bool:
@@ -163,7 +260,7 @@ def validate_numeric(value: Any, name: str) -> None:
 
 def is_numeric_sequence(sequence: Any) -> bool:
     return is_sequence(sequence) and all(
-        isinstance(item, NUMERIC_TYPES) for item in sequence
+        isinstance(item, NUMERIC_TYPES) or item is None for item in sequence
     )
 
 
@@ -193,13 +290,12 @@ def is_consistent_len(sequences: NumericSequences, name: str) -> bool:
 
 
 def validate_consistent_len(sequences: NumericSequences, name: str) -> None:
-    first_len = len(sequences[0])
-    for i, sequence in enumerate(sequences[1:], 1):
-        if len(sequence) != first_len:
+    max_len = max(len(sequence) for sequence in sequences)
+    for i, sequence in enumerate(sequences):
+        if len(sequence) not in [max_len, 1]:
             raise ArgumentStructureError(
-                f"All sequences in '{name}' must have the same length. "
-                f"Sequence at index 0 has length {first_len}, but sequence at "
-                f"index {i} has length {len(sequence)}."
+                f"All sequences in '{name}' must have the same length or length 1. "
+                f"Sequence at index {i} has length {len(sequence)}, but max length of sequences in '{name}' is {max_len}."
             )
 
 
@@ -226,7 +322,8 @@ def is_color(value: Any) -> bool:
         is_color_tuple(value)
         or is_color_hex(value)
         or is_color_str(value)
-        or isinstance(value, float)
+        or isinstance(value, NUMERIC_TYPES)
+        or value is None
     )
 
 
