@@ -30,7 +30,7 @@ SEQUENCE_TYPES = (list, tuple, ndarray, Series)
 
 
 def is_literal(value: Any, options: Sequence[Any]) -> bool:
-    return isinstance(value, str) and value in options
+    return (isinstance(value, str) and value in options) or value is None
 
 
 def validate_literal(value: Any, options: Sequence[Any]) -> None:
