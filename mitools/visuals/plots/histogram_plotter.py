@@ -15,12 +15,9 @@ from mitools.visuals.plots.matplotlib_typing import (
     BinsSequences,
     Color,
     ColorSequence,
-    ColorSequences,
     EdgeColor,
     EdgeColorSequence,
-    EdgeColorSequences,
     LiteralSequence,
-    LiteralSequences,
     NumericSequence,
     NumericSequences,
     NumericTuple,
@@ -31,32 +28,23 @@ from mitools.visuals.plots.validations import (
     NUMERIC_TYPES,
     is_bins,
     is_bins_sequence,
-    is_bins_sequences,
     is_color,
     is_color_sequence,
-    is_color_sequences,
+    is_edgecolor,
     is_edgecolor_sequence,
-    is_edgecolor_sequences,
     is_literal,
     is_literal_sequence,
-    is_literal_sequences,
     is_numeric,
     is_numeric_sequence,
     is_numeric_sequences,
     is_numeric_tuple_sequence,
     is_sequence,
-    validate_bins,
-    validate_color,
     validate_consistent_len,
-    validate_edgecolor,
     validate_literal,
-    validate_numeric,
     validate_numeric_tuple,
-    validate_same,
     validate_sequence_length,
     validate_sequence_type,
     validate_type,
-    validate_value_in_options,
 )
 
 
@@ -279,12 +267,12 @@ class HistogramPlotter(Plotter):
         )
 
     def set_edgecolor(self, edgecolors: Union[EdgeColorSequence, EdgeColor]):
-        if self._multi_data and is_color_sequence(edgecolors):
+        if self._multi_data and is_edgecolor_sequence(edgecolors):
             validate_sequence_length(edgecolors, self._n_sequences, "edgecolors")
             self.edgecolor = edgecolors
             self._multi_params_structure["edgecolor"] = "sequence"
             return self
-        elif is_color(edgecolors):
+        elif is_edgecolor(edgecolors):
             self.edgecolor = edgecolors
             self._multi_params_structure["edgecolor"] = "value"
             return self
