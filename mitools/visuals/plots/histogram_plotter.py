@@ -483,7 +483,9 @@ class HistogramPlotter(Plotter):
             "Invalid linewidths, must be a numeric value, sequence of numbers, or sequences of numbers."
         )
 
-    def set_hatch(self, hatches: Union[LiteralSequences, LiteralSequence, Literal]):
+    def set_hatch(
+        self, hatches: Union[LiteralSequences, LiteralSequence, Literal["hatches"]]
+    ):
         if self._multi_data:
             if is_literal_sequences(hatches, HATCHES):
                 validate_consistent_len(hatches, "hatch")
