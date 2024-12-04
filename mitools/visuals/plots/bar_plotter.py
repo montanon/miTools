@@ -9,23 +9,15 @@ from mitools.visuals.plots.matplotlib_typing import (
     HATCHES,
     LINESTYLES,
     ORIENTATIONS,
-    Cmap,
-    CmapSequence,
     Color,
     ColorSequence,
     ColorSequences,
     DictSequence,
-    DictSequences,
     EdgeColor,
     EdgeColorSequence,
     EdgeColorSequences,
     LiteralSequence,
     LiteralSequences,
-    Marker,
-    MarkerSequence,
-    MarkerSequences,
-    Norm,
-    NormSequence,
     NumericSequence,
     NumericSequences,
     NumericType,
@@ -36,18 +28,13 @@ from mitools.visuals.plots.validations import (
     is_color,
     is_color_sequence,
     is_color_sequences,
-    is_colormap,
-    is_colormap_sequence,
     is_dict_sequence,
     is_edgecolor,
     is_edgecolor_sequence,
     is_edgecolor_sequences,
     is_literal,
     is_literal_sequence,
-    is_marker_sequence,
-    is_marker_sequences,
-    is_normalization,
-    is_normalization_sequence,
+    is_literal_sequences,
     is_numeric,
     is_numeric_sequence,
     is_numeric_sequences,
@@ -56,7 +43,6 @@ from mitools.visuals.plots.validations import (
     validate_consistent_len,
     validate_edgecolor,
     validate_literal,
-    validate_marker,
     validate_numeric,
     validate_same,
     validate_sequence_length,
@@ -128,7 +114,7 @@ class BarPlotter(Plotter):
             "fill": {"default": True, "type": Union[Sequence[bool], bool]},
             "hatch": {
                 "default": None,
-                "type": Union[LiteralSequence, Literal["hatches"]],
+                "type": Union[LiteralSequences, LiteralSequence, Literal["hatches"]],
             },
             "linestyle": {
                 "default": "-",
@@ -199,7 +185,7 @@ class BarPlotter(Plotter):
                 self._multi_params_structure["bottom"] = "sequences"
                 return self
             elif is_numeric_sequence(bottoms):
-                validate_sequence_length(bottoms, self.data_size, "bottom")
+                validate_sequence_length(bottoms, self._n_sequences, "bottom")
                 self.bottom = bottoms
                 self._multi_params_structure["bottom"] = "sequence"
                 return self
@@ -235,13 +221,37 @@ class BarPlotter(Plotter):
             f"Invalid align, must be a literal or sequence of literals from {BARS_ALIGN}."
         )
 
-    def set_edgecolor(self, edgecolors: Union[EdgeColorSequence, EdgeColor]):
-        if self._multi_data and is_edgecolor_sequence(edgecolors):
-            validate_sequence_length(edgecolors, self._n_sequences, "edgecolors")
-            self.edgecolor = edgecolors
-            self._multi_params_structure["edgecolor"] = "sequence"
-            return self
-        elif is_edgecolor(edgecolors):
+    def set_edgecolor(
+        self, edgecolors: Union[EdgeColorSequences, EdgeColorSequence, EdgeColor]
+    ):
+        if self._multi_data:
+            if is_edgecolor_sequences(edgecolors):
+                validate_consistent_len(edgecolors, "edgecolor")
+                if any(len(sequence) != 1 for sequence in edgecolors):
+                    max_len = max(len(sequence) for sequence in edgecolors)
+                    validate_same(
+                        max_len, self.data_size, "len(edgecolor)", "data_size"
+                    )
+                self.edgecolor = edgecolors
+                self._multi_params_structure["edgecolor"] = "sequences"
+                return self
+            elif is_edgecolor_sequence(edgecolors):
+                validate_sequence_length(edgecolors, self._n_sequences, "edgecolor")
+                self.edgecolor = edgecolors
+                self._multi_params_structure["edgecolor"] = "sequence"
+                return self
+            elif is_edgecolor(edgecolors):
+                self.edgecolor = edgecolors
+                self._multi_params_structure["edgecolor"] = "value"
+                return self
+        else:
+            if is_edgecolor_sequence(edgecolors):
+                validate_sequence_length(edgecolors, self.data_size, "edgecolor")
+                self.edgecolor = edgecolors
+                self._multi_params_structure["edgecolor"] = "sequence"
+                return self
+            if edgecolors is not None:
+                validate_edgecolor(edgecolors)
             self.edgecolor = edgecolors
             self._multi_params_structure["edgecolor"] = "value"
             return self
@@ -343,7 +353,7 @@ class BarPlotter(Plotter):
                 self._multi_params_structure["ecolor"] = "sequences"
                 return self
             elif is_color_sequence(ecolors):
-                validate_sequence_length(ecolors, self.data_size, "ecolor")
+                validate_sequence_length(ecolors, self._n_sequences, "ecolor")
                 self.ecolor = ecolors
                 self._multi_params_structure["ecolor"] = "sequence"
                 return self
@@ -357,7 +367,8 @@ class BarPlotter(Plotter):
                 self.ecolor = ecolors
                 self._multi_params_structure["ecolor"] = "sequence"
                 return self
-            validate_color(ecolors, "ecolor")
+            if ecolors is not None:
+                validate_color(ecolors)
             self.ecolor = ecolors
             self._multi_params_structure["ecolor"] = "value"
             return self
@@ -422,13 +433,35 @@ class BarPlotter(Plotter):
             "Invalid fill, must be a boolean or sequence of booleans."
         )
 
-    def set_hatch(self, hatches: Union[LiteralSequence, Literal["hatches"]]):
-        if self._multi_data and is_literal_sequence(hatches, HATCHES):
-            validate_sequence_length(hatches, self._n_sequences, "hatch")
-            self.hatch = hatches
-            self._multi_params_structure["hatch"] = "sequence"
-            return self
-        elif is_literal(hatches, HATCHES):
+    def set_hatch(
+        self, hatches: Union[LiteralSequences, LiteralSequence, Literal["hatches"]]
+    ):
+        if self._multi_data:
+            if is_literal_sequences(hatches, HATCHES):
+                validate_consistent_len(hatches, "hatches")
+                if any(len(sequence) != 1 for sequence in hatches):
+                    max_len = max(len(sequence) for sequence in hatches)
+                    validate_same(max_len, self.data_size, "len(hatches)", "data_size")
+                self.hatch = hatches
+                self._multi_params_structure["hatch"] = "sequences"
+                return self
+            elif is_literal_sequence(hatches, HATCHES):
+                validate_sequence_length(hatches, self._n_sequences, "hatches")
+                self.hatch = hatches
+                self._multi_params_structure["hatch"] = "sequence"
+                return self
+            elif is_literal(hatches, HATCHES):
+                self.hatch = hatches
+                self._multi_params_structure["hatch"] = "value"
+                return self
+        else:
+            if is_literal_sequence(hatches, HATCHES):
+                validate_sequence_length(hatches, self.data_size, "hatches")
+                self.hatch = hatches
+                self._multi_params_structure["hatch"] = "sequence"
+                return self
+            if hatches is not None:
+                validate_literal(hatches, HATCHES)
             self.hatch = hatches
             self._multi_params_structure["hatch"] = "value"
             return self
@@ -471,7 +504,6 @@ class BarPlotter(Plotter):
             "fill": self.get_sequences_param("fill", n_sequence),
             "linestyle": self.get_sequences_param("linestyle", n_sequence),
             "hatch": self.get_sequences_param("hatch", n_sequence),
-            "colormap": self.get_sequences_param("colormap", n_sequence),
             "alpha": self.get_sequences_param("alpha", n_sequence),
             "label": self.get_sequences_param("label", n_sequence),
             "zorder": self.get_sequences_param("zorder", n_sequence),

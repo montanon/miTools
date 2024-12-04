@@ -322,7 +322,7 @@ def is_color(value: Any) -> bool:
         is_color_tuple(value)
         or is_color_hex(value)
         or is_color_str(value)
-        or isinstance(value, float)
+        or isinstance(value, NUMERIC_TYPES)
         or value is None
     )
 
