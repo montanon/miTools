@@ -32,6 +32,8 @@ Cmap = Union[
     ],
     Colormap,
 ]
+KERNELS = ["gaussian", "tophat", "epanechnikov", "exponential", "linear", "cosine"]
+BANDWIDTH_METHODS = ["scott", "silverman"]
 NORMALIZATIONS = [
     "linear",
     "log",

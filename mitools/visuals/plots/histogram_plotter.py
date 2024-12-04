@@ -9,6 +9,7 @@ from mitools.visuals.plots.matplotlib_typing import (
     HIST_ALIGN,
     HIST_HISTTYPE,
     LINESTYLES,
+    ORIENTATIONS,
     Bins,
     BinsSequence,
     BinsSequences,
@@ -95,7 +96,7 @@ class HistogramPlotter(Plotter):
             "cumulative": {"default": False, "type": Union[Sequence[bool], bool]},
             "bottom": {
                 "default": None,
-                "type": Union[NumericSequences, NumericSequence, NumericType, None],
+                "type": Union[NumericSequence, NumericType, None],
             },
             "histtype": {
                 "default": "bar",
@@ -123,15 +124,15 @@ class HistogramPlotter(Plotter):
             "fill": {"default": True, "type": Union[Sequence[bool], bool]},
             "linestyle": {
                 "default": "-",
-                "type": Union[LiteralSequences, LiteralSequence, Literal["linestyles"]],
+                "type": Union[LiteralSequence, Literal["linestyles"]],
             },
             "linewidth": {
                 "default": None,
-                "type": Union[NumericSequences, NumericSequence, NumericType],
+                "type": Union[NumericSequence, NumericType],
             },
             "hatch": {
                 "default": None,
-                "type": Union[LiteralSequences, LiteralSequence, Literal["hatches"]],
+                "type": Union[LiteralSequence, Literal["hatches"]],
             },
         }
         self._init_params.update(self._hist_params)
@@ -140,8 +141,7 @@ class HistogramPlotter(Plotter):
         self.ax: Axes = None
 
     def set_orientation(self, orientation: Literal["horizontal", "vertical"]):
-        _valid_orientations = ["horizontal", "vertical"]
-        validate_value_in_options(orientation, _valid_orientations, "orientation")
+        validate_literal(orientation, ORIENTATIONS)
         self.orientation = orientation
         return self
 
@@ -217,40 +217,17 @@ class HistogramPlotter(Plotter):
     def set_bottom(
         self, bottom: Union[NumericSequences, NumericSequence, NumericType, None]
     ):
-        if self._multi_data:
-            if is_numeric_sequences(bottom):
-                validate_consistent_len(bottom, "bottom")
-                if any(len(sequence) != 1 for sequence in bottom):
-                    max_len = max(len(sequence) for sequence in bottom)
-                    validate_same(max_len, self.data_size, "len(bottom)", "data_size")
-                self.bottom = bottom
-                self._multi_params_structure["bottom"] = "sequences"
-                return self
-            elif is_numeric_sequence(bottom):
-                validate_sequence_length(bottom, self._n_sequences, "bottom")
-                self.bottom = bottom
-                self._multi_params_structure["bottom"] = "sequence"
-                return self
-            elif is_numeric(bottom):
-                self.bottom = bottom
-                self._multi_params_structure["bottom"] = "value"
-                return self
-        else:
-            if is_numeric_sequence(bottom):
-                validate_sequence_length(bottom, self.data_size, "bottom")
-                self.bottom = bottom
-                self._multi_params_structure["bottom"] = "sequence"
-                return self
-            elif bottom is not None:
-                validate_numeric(bottom, "bottom")
-                self.bottom = bottom
-                self._multi_params_structure["bottom"] = "value"
-                return self
+        if self._multi_data and is_numeric_sequence(bottom):
+            validate_sequence_length(bottom, self._n_sequences, "bottom")
+            self.bottom = bottom
+            self._multi_params_structure["bottom"] = "sequence"
+            return self
+        elif is_numeric(bottom) or bottom is None:
             self.bottom = bottom
             self._multi_params_structure["bottom"] = "value"
             return self
         raise ArgumentStructureError(
-            "Invalid bottom, must be a numeric value, sequence of numbers, sequences of numbers, or None."
+            "Invalid bottom, must be a numeric value, sequence of numbers, or None."
         )
 
     def set_histtype(
@@ -346,112 +323,47 @@ class HistogramPlotter(Plotter):
 
     def set_linestyle(
         self,
-        linestyles: Union[LiteralSequences, LiteralSequence, Literal["linestyles"]],
+        linestyles: Union[LiteralSequence, Literal["linestyles"]],
     ):
-        if self._multi_data:
-            if is_literal_sequences(linestyles, LINESTYLES):
-                validate_consistent_len(linestyles, "linestyle")
-                if any(len(sequence) != 1 for sequence in linestyles):
-                    max_len = max(len(sequence) for sequence in linestyles)
-                    validate_same(
-                        max_len, self.data_size, "len(linestyle)", "data_size"
-                    )
-                self.linestyle = linestyles
-                self._multi_params_structure["linestyle"] = "sequences"
-                return self
-            elif is_literal_sequence(linestyles, LINESTYLES):
-                validate_sequence_length(linestyles, self._n_sequences, "linestyle")
-                self.linestyle = linestyles
-                self._multi_params_structure["linestyle"] = "sequence"
-                return self
-            elif is_literal(linestyles, LINESTYLES):
-                self.linestyle = linestyles
-                self._multi_params_structure["linestyle"] = "value"
-                return self
-        else:
-            if is_literal_sequence(linestyles, LINESTYLES):
-                validate_sequence_length(linestyles, self.data_size, "linestyle")
-                self.linestyle = linestyles
-                self._multi_params_structure["linestyle"] = "sequence"
-                return self
-            validate_literal(linestyles, LINESTYLES)
+        if self._multi_data and is_literal_sequence(linestyles, LINESTYLES):
+            validate_sequence_length(linestyles, self._n_sequences, "linestyle")
+            self.linestyle = linestyles
+            self._multi_params_structure["linestyle"] = "sequence"
+            return self
+        elif is_literal(linestyles, LINESTYLES):
             self.linestyle = linestyles
             self._multi_params_structure["linestyle"] = "value"
             return self
         raise ArgumentStructureError(
-            f"Invalid linestyles, must be a literal or sequence of literals from {LINESTYLES}."
+            f"Invalid linestyle, must be a literal or sequence of literals from {LINESTYLES}."
         )
 
-    def set_linewidth(
-        self, linewidths: Union[NumericSequences, NumericSequence, NumericType]
-    ):
-        if self._multi_data:
-            if is_numeric_sequences(linewidths):
-                validate_consistent_len(linewidths, "linewidths")
-                if any(len(sequence) != 1 for sequence in linewidths):
-                    max_len = max(len(sequence) for sequence in linewidths)
-                    validate_same(
-                        max_len, self.data_size, "len(linewidths)", "data_size"
-                    )
-                self.linewidth = linewidths
-                self._multi_params_structure["linewidth"] = "sequences"
-                return self
-            elif is_numeric_sequence(linewidths):
-                validate_sequence_length(linewidths, self._n_sequences, "linewidths")
-                self.linewidth = linewidths
-                self._multi_params_structure["linewidth"] = "sequence"
-                return self
-            elif is_numeric(linewidths):
-                self.linewidth = linewidths
-                self._multi_params_structure["linewidth"] = "value"
-                return self
-        else:
-            if is_numeric_sequence(linewidths):
-                validate_sequence_length(linewidths, self.data_size, "linewidths")
-                self.linewidth = linewidths
-                self._multi_params_structure["linewidth"] = "sequence"
-                return self
-            validate_numeric(linewidths, "linewidths")
+    def set_linewidth(self, linewidths: Union[NumericSequence, NumericType]):
+        if self._multi_data and is_numeric_sequence(linewidths):
+            validate_sequence_length(linewidths, self._n_sequences, "linewidth")
+            self.linewidth = linewidths
+            self._multi_params_structure["linewidth"] = "sequence"
+            return self
+        elif is_numeric(linewidths):
             self.linewidth = linewidths
             self._multi_params_structure["linewidth"] = "value"
             return self
         raise ArgumentStructureError(
-            "Invalid linewidths, must be a numeric value, sequence of numbers, or sequences of numbers."
+            "Invalid linewidth, must be a numeric value, sequence of numbers, or sequences of numbers."
         )
 
-    def set_hatch(
-        self, hatches: Union[LiteralSequences, LiteralSequence, Literal["hatches"]]
-    ):
-        if self._multi_data:
-            if is_literal_sequences(hatches, HATCHES):
-                validate_consistent_len(hatches, "hatch")
-                if any(len(sequence) != 1 for sequence in hatches):
-                    max_len = max(len(sequence) for sequence in hatches)
-                    validate_same(max_len, self.data_size, "len(hatch)", "data_size")
-                self.hatch = hatches
-                self._multi_params_structure["hatch"] = "sequences"
-                return self
-            elif is_literal_sequence(hatches, HATCHES):
-                validate_sequence_length(hatches, self._n_sequences, "hatch")
-                self.hatch = hatches
-                self._multi_params_structure["hatch"] = "sequence"
-                return self
-            elif is_literal(hatches, HATCHES):
-                self.hatch = hatches
-                self._multi_params_structure["hatch"] = "value"
-                return self
-        else:
-            if is_literal_sequence(hatches, HATCHES):
-                validate_sequence_length(hatches, self.data_size, "hatch")
-                self.hatch = hatches
-                self._multi_params_structure["hatch"] = "sequence"
-                return self
-            validate_literal(hatches, HATCHES)
+    def set_hatch(self, hatches: Union[LiteralSequence, Literal["hatches"]]):
+        if self._multi_data and is_literal_sequence(hatches, HATCHES):
+            validate_sequence_length(hatches, self._n_sequences, "hatch")
+            self.hatch = hatches
+            self._multi_params_structure["hatch"] = "sequence"
+            return self
+        elif is_literal(hatches, HATCHES):
             self.hatch = hatches
             self._multi_params_structure["hatch"] = "value"
             return self
         raise ArgumentStructureError(
-            f"Invalid hatches, must be a literal or sequence of literals from {HATCHES}."
+            f"Invalid hatch, must be a literal or sequence of literals from {HATCHES}."
         )
 
     def _create_hist_kwargs(self, n_sequence: int):

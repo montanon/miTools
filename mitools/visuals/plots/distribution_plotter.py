@@ -14,21 +14,60 @@ from mitools.exceptions import (
     ArgumentValueError,
 )
 from mitools.visuals.plots.matplotlib_typing import (
-    COLORS,
+    BANDWIDTH_METHODS,
+    HATCHES,
+    HIST_ALIGN,
+    HIST_HISTTYPE,
+    KERNELS,
+    LINESTYLES,
+    Bins,
+    BinsSequence,
+    BinsSequences,
     Color,
+    ColorSequence,
+    ColorSequences,
+    EdgeColor,
+    EdgeColorSequence,
+    EdgeColorSequences,
+    LiteralSequence,
+    LiteralSequences,
+    NumericSequence,
+    NumericSequences,
+    NumericTuple,
+    NumericType,
 )
 from mitools.visuals.plots.plotter import Plotter
 from mitools.visuals.plots.validations import (
     NUMERIC_TYPES,
-    SEQUENCE_TYPES,
+    is_bins,
+    is_bins_sequence,
+    is_bins_sequences,
+    is_color,
+    is_color_sequence,
+    is_color_sequences,
+    is_edgecolor_sequence,
+    is_edgecolor_sequences,
+    is_literal,
+    is_literal_sequence,
+    is_literal_sequences,
+    is_numeric,
+    is_numeric_sequence,
+    is_numeric_sequences,
+    is_numeric_tuple_sequence,
     is_sequence,
-    validate_length,
-    validate_non_negative,
+    validate_bins,
+    validate_color,
+    validate_consistent_len,
+    validate_edgecolor,
+    validate_literal,
+    validate_numeric,
+    validate_numeric_tuple,
+    validate_same,
     validate_sequence_length,
-    validate_sequence_non_negative,
     validate_sequence_type,
     validate_type,
     validate_value_in_options,
+    validate_value_in_range,
 )
 
 
@@ -37,100 +76,64 @@ class DistributionPlotterException(Exception):
 
 
 class DistributionPlotter(Plotter):
-    def __init__(self, x_data: Any, y_data: Any = None, **kwargs):
+    def __init__(
+        self,
+        x_data: Union[NumericSequences, NumericSequence],
+        y_data: None = None,
+        **kwargs,
+    ):
+        super().__init__(x_data=x_data, y_data=None, **kwargs)
         self._dist_params = {
-            "kernel": {"default": "gaussian", "type": str},
-            "bandwidth": {"default": "scott", "type": Union[str, float]},
+            # General Axes.scatter Parameters that are independent of the number of data sequences
+            "kernel": {"default": "gaussian", "type": Literal["kernels"]},
+            "bandwidth": {
+                "default": "scott",
+                "type": Union[Literal["bandwidth_methods"], float],
+            },
             "gridsize": {"default": 1_000, "type": int},
             "cut": {"default": 3, "type": float},
-            "fill": {"default": True, "type": bool},
-            "linewidth": {"default": None, "type": Union[Sequence[float], float]},
-            "linestyle": {"default": "-", "type": str},
-            "facecolor": {"default": {}, "type": Dict[str, Any]},
             "orientation": {
                 "default": "vertical",
                 "type": Literal["vertical", "horizontal"],
             },
-            "hatch": {"default": None, "type": str},
+            # Specific Parameters that are based on the number of data sequences
+            "fill": {"default": True, "type": bool},
+            "linewidth": {"default": None, "type": Union[Sequence[float], float]},
+            "linestyle": {"default": "-", "type": str},
+            "facecolor": {"default": {}, "type": Dict[str, Any]},
+            "hatch": {
+                "default": None,
+                "type": Union[LiteralSequences, LiteralSequence, Literal["hatches"]],
+            },
         }
-        super().__init__(
-            x_data=x_data, y_data=x_data if y_data is None else y_data, **kwargs
-        )
         self._init_params.update(self._dist_params)
         self._set_init_params(**kwargs)
         self.figure: Figure = None
         self.ax: Axes = None
 
-    def set_color(
-        self, color: Union[Sequence[Color], Color, Sequence[float], Sequence[int]]
-    ):
-        if isinstance(color, str):
-            if color not in COLORS and not re.match(
-                r"^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", color
-            ):
-                raise ArgumentTypeError(
-                    f"'color'='{color}' must be a valid Matplotlib color string or HEX code."
-                )
-            self.color = color
-            return self
-        if is_sequence(color):
-            validate_sequence_type(color, NUMERIC_TYPES, "color")
-            validate_sequence_length(color, (3, 4), "color")
-            validate_length(color, 1, "color")
-            self.color = color
-            return self
-        raise ArgumentTypeError(
-            "color must be a string, RGB/RGBA values, or array-like of strings/RGB/RGBA values."
-        )
-
     def set_kernel(self, kernel: str):
-        _kernels = [
-            "gaussian",
-            "tophat",
-            "epanechnikov",
-            "exponential",
-            "linear",
-            "cosine",
-        ]
-        validate_type(kernel, str, "kernel")
-        validate_value_in_options(kernel, _kernels, "kernel")
+        validate_literal(kernel, KERNELS, "kernel")
         self.kernel = kernel
         return self
 
-    def set_hatch(self, hatch: Union[Sequence[str], str]):
-        if isinstance(hatch, str):
-            self.hatch = hatch
-        elif is_sequence(hatch):
-            validate_length(hatch, self.data_size, "hatch")
-            validate_sequence_type(hatch, str, "hatch")
-            self.hatch = hatch
-        else:
-            raise ArgumentTypeError("hatch must be a string or sequence of strings")
-        return self
-
-    def set_bandwidth(self, bandwidth: Union[str, float]):
-        _methods = ["scott", "silverman"]
+    def set_bandwidth(self, bandwidth: Union[Literal["bandwidth_methods"], float]):
         if isinstance(bandwidth, str):
-            validate_value_in_options(bandwidth, _methods, "bandwidth")
+            validate_literal(bandwidth, BANDWIDTH_METHODS)
             self.bandwidth = bandwidth
-        else:
-            validate_type(bandwidth, NUMERIC_TYPES, "bandwidth")
-            if bandwidth <= 0:
-                raise ArgumentValueError(f"'bandwidth'={bandwidth} must be positive")
+        elif isinstance(bandwidth, NUMERIC_TYPES):
+            validate_value_in_range(bandwidth, 1e-9, np.inf, "bandwidth")
             self.bandwidth = float(bandwidth)
         return self
 
-    def set_gridsize(self, gridsize: int):
-        validate_type(gridsize, int, "gridsize")
-        if gridsize < 1:
-            raise ArgumentValueError(f"'gridsize'={gridsize} must be positive")
-        self.gridsize = gridsize
+    def set_gridsize(self, gridsize: NumericType):
+        validate_numeric(gridsize, NUMERIC_TYPES, "gridsize")
+        validate_value_in_range(gridsize, 1, np.inf, "gridsize")
+        self.gridsize = int(gridsize)
         return self
 
-    def set_cut(self, cut: float):
-        validate_type(cut, NUMERIC_TYPES, "cut")
-        if cut <= 0:
-            raise ArgumentValueError(f"'cut'={cut} must be positive")
+    def set_cut(self, cut: NumericType):
+        validate_numeric(cut, NUMERIC_TYPES, "cut")
+        validate_value_in_range(cut, 0, np.inf, "cut")
         self.cut = float(cut)
         return self
 
