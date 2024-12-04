@@ -82,7 +82,7 @@ class HistogramPlotter(Plotter):
             # Specific Parameters that are based on the number of data sequences
             "bins": {
                 "default": "auto",
-                "type": Union[BinsSequences, BinsSequence, Bins],
+                "type": Union[BinsSequence, Bins],
             },
             "range": {
                 "default": None,
@@ -114,16 +114,16 @@ class HistogramPlotter(Plotter):
             },
             "edgecolor": {
                 "default": None,
-                "type": Union[EdgeColorSequences, EdgeColorSequence, EdgeColor],
+                "type": Union[EdgeColorSequence, EdgeColor],
             },
             "facecolor": {
                 "default": None,
-                "type": Union[ColorSequences, ColorSequence, Color],
+                "type": Union[ColorSequence, Color],
             },
             "fill": {"default": True, "type": Union[Sequence[bool], bool]},
             "linestyle": {
                 "default": "-",
-                "type": Union[LiteralSequences, LiteralSequence, Literal],
+                "type": Union[LiteralSequences, LiteralSequence, Literal["linestyles"]],
             },
             "linewidth": {
                 "default": None,
@@ -131,7 +131,7 @@ class HistogramPlotter(Plotter):
             },
             "hatch": {
                 "default": None,
-                "type": Union[LiteralSequences, LiteralSequence, Literal],
+                "type": Union[LiteralSequences, LiteralSequence, Literal["hatches"]],
             },
         }
         self._init_params.update(self._hist_params)
@@ -156,37 +156,17 @@ class HistogramPlotter(Plotter):
         return self
 
     def set_bins(self, bins: Union[BinsSequences, BinsSequence, Bins]):
-        if self._multi_data:
-            if is_bins_sequences(bins):
-                validate_consistent_len(bins, "bins")
-                if any(len(sequence) != 1 for sequence in bins):
-                    max_len = max(len(sequence) for sequence in bins)
-                    validate_same(max_len, self.data_size, "len(bins)", "data_size")
-                self.bins = bins
-                self._multi_params_structure["bins"] = "sequences"
-                return self
-            elif is_bins_sequence(bins):
-                validate_sequence_length(bins, self.data_size, "bins")
-                self.bins = bins
-                self._multi_params_structure["bins"] = "sequence"
-                return self
-            elif is_bins(bins):
-                self.bins = bins
-                self._multi_params_structure["bins"] = "value"
-                return self
-        else:
-            if is_bins_sequence(bins):
-                validate_sequence_length(bins, self.data_size, "bins")
-                self.bins = bins
-                self._multi_params_structure["bins"] = "sequence"
-                return self
-            if bins is not None:
-                validate_bins(bins)
+        if self._multi_data and is_bins_sequence(bins):
+            validate_sequence_length(bins, self._n_sequences, "bins")
+            self.bins = bins
+            self._multi_params_structure["bins"] = "sequence"
+            return self
+        elif is_bins(bins):
             self.bins = bins
             self._multi_params_structure["bins"] = "value"
             return self
         raise ArgumentStructureError(
-            "Invalid bins, must be a sequence of sequences of bins or a sequence of bins."
+            "Invalid bins, must be a bin, sequence of bins, or sequences of bins."
         )
 
     def set_range(self, range: Union[Sequence[NumericTuple], NumericTuple, None]):
@@ -321,71 +301,27 @@ class HistogramPlotter(Plotter):
             "Invalid rwidth, must be a numeric value, sequence of numbers, or None."
         )
 
-    def set_edgecolor(
-        self, edgecolors: Union[EdgeColorSequences, EdgeColorSequence, EdgeColor]
-    ):
-        if self._multi_data:
-            if is_edgecolor_sequences(edgecolors):
-                validate_consistent_len(edgecolors, "edgecolors")
-                if any(len(sequence) != 1 for sequence in edgecolors):
-                    max_len = max(len(sequence) for sequence in edgecolors)
-                    validate_same(
-                        max_len, self.data_size, "len(edgecolors)", "data_size"
-                    )
-                self.edgecolor = edgecolors
-                self._multi_params_structure["edgecolor"] = "sequences"
-                return self
-            elif is_edgecolor_sequence(edgecolors):
-                validate_sequence_length(edgecolors, self._n_sequences, "edgecolors")
-                self.edgecolor = edgecolors
-                self._multi_params_structure["edgecolor"] = "sequence"
-                return self
-            elif validate_edgecolor(edgecolors):
-                self.edgecolor = edgecolors
-                self._multi_params_structure["edgecolor"] = "value"
-                return self
-        else:
-            if is_edgecolor_sequence(edgecolors):
-                validate_sequence_length(edgecolors, self.data_size, "edgecolors")
-                self.edgecolor = edgecolors
-                self._multi_params_structure["edgecolor"] = "sequence"
-                return self
-            validate_edgecolor(edgecolors)
+    def set_edgecolor(self, edgecolors: Union[EdgeColorSequence, EdgeColor]):
+        if self._multi_data and is_color_sequence(edgecolors):
+            validate_sequence_length(edgecolors, self._n_sequences, "edgecolors")
+            self.edgecolor = edgecolors
+            self._multi_params_structure["edgecolor"] = "sequence"
+            return self
+        elif is_color(edgecolors):
             self.edgecolor = edgecolors
             self._multi_params_structure["edgecolor"] = "value"
             return self
         raise ArgumentStructureError(
-            "Invalid edgecolors, must be a edgecolor, sequence of edgecolors, or sequences of edgecolors."
+            "Invalid edgecolors, must be a color, sequence of colors, or sequences of colors."
         )
 
-    def set_facecolor(self, facecolors: Union[ColorSequences, ColorSequence, Color]):
-        if self._multi_data:
-            if is_color_sequences(facecolors):
-                validate_consistent_len(facecolors, "facecolors")
-                if any(len(sequence) != 1 for sequence in facecolors):
-                    max_len = max(len(sequence) for sequence in facecolors)
-                    validate_same(
-                        max_len, self.data_size, "len(facecolors)", "data_size"
-                    )
-                self.facecolor = facecolors
-                self._multi_params_structure["facecolor"] = "sequences"
-                return self
-            elif is_color_sequence(facecolors):
-                validate_sequence_length(facecolors, self._n_sequences, "facecolors")
-                self.facecolor = facecolors
-                self._multi_params_structure["facecolor"] = "sequence"
-                return self
-            elif is_color(facecolors):
-                self.facecolor = facecolors
-                self._multi_params_structure["facecolor"] = "value"
-                return self
-        else:
-            if is_color_sequence(facecolors):
-                validate_sequence_length(facecolors, self.data_size, "facecolors")
-                self.facecolor = facecolors
-                self._multi_params_structure["facecolor"] = "sequence"
-                return self
-            validate_color(facecolors)
+    def set_facecolor(self, facecolors: Union[ColorSequence, Color]):
+        if self._multi_data and is_color_sequence(facecolors):
+            validate_sequence_length(facecolors, self._n_sequences, "facecolors")
+            self.facecolor = facecolors
+            self._multi_params_structure["facecolor"] = "sequence"
+            return self
+        elif is_color(facecolors):
             self.facecolor = facecolors
             self._multi_params_structure["facecolor"] = "value"
             return self

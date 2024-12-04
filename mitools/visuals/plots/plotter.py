@@ -78,7 +78,7 @@ class Plotter(ABC):
             "xlabel": {"default": "", "type": Text},
             "ylabel": {"default": "", "type": Text},
             "legend": {"default": None, "type": Union[Dict, None]},
-            "figsize": {"default": (8, 8), "type": Tuple[float, float]},
+            "figsize": {"default": (10, 8), "type": Tuple[float, float]},
             "style": {"default": None, "type": str},
             "grid": {"default": None, "type": Dict[str, Any]},
             "tight_layout": {"default": False, "type": bool},
@@ -135,7 +135,10 @@ class Plotter(ABC):
             if param in kwargs and kwargs[param] is not None:
                 setter_name = f"set_{param}"
                 if hasattr(self, setter_name):
-                    if isinstance(kwargs[param], dict):
+                    if isinstance(kwargs[param], dict) and param not in [
+                        "xtickparams",
+                        "ytickparams",
+                    ]:
                         getattr(self, setter_name)(**kwargs[param])
                     else:
                         getattr(self, setter_name)(kwargs[param])
@@ -789,4 +792,6 @@ class Plotter(ABC):
             params["ylim"] = tuple(params["ylim"])
         if "center" in params and params["center"] is not None:
             params["center"] = tuple(params["center"])
+        if "range" in params and params["range"] is not None:
+            params["range"] = tuple(params["range"])
         return cls(x_data=x_data, y_data=y_data, **params)

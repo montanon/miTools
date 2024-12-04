@@ -66,7 +66,7 @@ def is_numeric_tuple(value: Any, size: int = None) -> bool:
     return (
         isinstance(value, tuple)
         and all(isinstance(item, NUMERIC_TYPES) for item in value)
-        and all(len(val) == size for val in value)
+        and len(value) == size
         if size
         else True
     )
