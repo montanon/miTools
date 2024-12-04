@@ -119,6 +119,7 @@ class Plotter(ABC):
                 "type": Union[NumericSequences, NumericSequence, NumericType],
             },
         }
+        self._multi_params_structure = {}
         self._init_params = {
             **self._single_data_params,
             **self._multi_data_params,
@@ -518,23 +519,28 @@ class Plotter(ABC):
                     for val in seq:
                         validate_value_in_range(val, 0, 1, "alpha")
                 self.alpha = alpha
+                self._multi_params_structure["alpha"] = "sequences"
                 return self
             elif is_numeric_sequence(alpha):
                 validate_sequence_length(alpha, self.n_sequences, "alpha")
                 for val in alpha:
                     validate_value_in_range(val, 0, 1, "alpha")
                 self.alpha = alpha
+                self._multi_params_structure["alpha"] = "sequence"
                 return self
             elif is_numeric(alpha):
                 self.alpha = alpha
+                self._multi_params_structure["alpha"] = "value"
                 return self
         else:
             if is_numeric_sequence(alpha):
                 validate_sequence_length(alpha, self.data_size, "alpha")
                 self.alpha = alpha
+                self._multi_params_structure["alpha"] = "sequence"
                 return self
             validate_numeric(alpha, "alpha")
             self.alpha = alpha
+            self._multi_params_structure["alpha"] = "value"
             return self
         raise ArgumentStructureError(
             "Invalid alpha, must be a numeric value, sequence of numbers, or sequences of numbers."
@@ -544,35 +550,42 @@ class Plotter(ABC):
         if self.multi_data and is_str_sequence(labels):
             validate_sequence_length(labels, self.n_sequences, "labels")
             self.label = labels
+            self._multi_params_structure["label"] = "sequence"
             return self
         if isinstance(labels, str):
             self.label = labels
+            self._multi_params_structure["label"] = "value"
             return self
         raise ArgumentStructureError(
             "Invalid label, must be a string or sequence of strings."
         )
 
-    def set_zorder(self, zorder: Union[Sequence[float], float]):
+    def set_zorder(self, zorder: Union[NumericSequences, NumericSequence, NumericType]):
         if self.multi_data:
             if is_numeric_sequences(zorder):
                 validate_consistent_len(zorder, "zorder")
                 validate_sequence_length(zorder[0], self.data_size, "zorder[0]")
                 self.zorder = zorder
+                self._multi_params_structure["zorder"] = "sequences"
                 return self
             elif is_numeric_sequence(zorder):
                 validate_sequence_length(zorder, self.n_sequences, "zorder")
                 self.zorder = zorder
+                self._multi_params_structure["zorder"] = "sequence"
                 return self
             elif is_numeric(zorder):
                 self.zorder = zorder
+                self._multi_params_structure["zorder"] = "value"
                 return self
         else:
             if is_numeric_sequence(zorder):
                 validate_sequence_length(zorder, self.data_size, "zorder")
                 self.zorder = zorder
+                self._multi_params_structure["zorder"] = "sequence"
                 return self
             validate_numeric(zorder, "zorder")
             self.zorder = zorder
+            self._multi_params_structure["zorder"] = "value"
             return self
         raise ArgumentStructureError(
             "Invalid zorder, must be a numeric value, sequence of numbers, or sequences of numbers."
