@@ -1,30 +1,47 @@
-import re
-from typing import Any, Sequence, Union
+from typing import Literal, Union
 
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
-from mitools.exceptions import (
-    ArgumentTypeError,
-)
+from mitools.exceptions import ArgumentStructureError
 from mitools.visuals.plots.matplotlib_typing import (
-    COLORS,
+    LINESTYLES,
     Color,
+    ColorSequence,
+    ColorSequences,
     EdgeColor,
-    LineStyle,
+    EdgeColorSequence,
+    EdgeColorSequences,
+    LiteralSequence,
+    Marker,
     MarkerSequence,
-    MarkerStyle,
+    MarkerSequences,
+    NumericSequence,
+    NumericSequences,
+    NumericType,
 )
 from mitools.visuals.plots.plotter import Plotter
 from mitools.visuals.plots.validations import (
-    NUMERIC_TYPES,
-    SEQUENCE_TYPES,
-    is_sequence,
-    validate_length,
+    is_color,
+    is_color_sequence,
+    is_color_sequences,
+    is_edgecolor,
+    is_edgecolor_sequence,
+    is_edgecolor_sequences,
+    is_literal,
+    is_literal_sequence,
+    is_marker_sequence,
+    is_marker_sequences,
+    is_numeric,
+    is_numeric_sequence,
+    is_numeric_sequences,
+    validate_color,
+    validate_consistent_len,
+    validate_edgecolor,
+    validate_marker,
+    validate_numeric,
+    validate_same,
     validate_sequence_length,
-    validate_sequence_type,
-    validate_type,
-    validate_value_in_options,
 )
 
 
@@ -33,15 +50,39 @@ class LinePlotterException(Exception):
 
 
 class LinePlotter(Plotter):
-    def __init__(self, x_data: Any, y_data: Any, **kwargs):
+    def __init__(
+        self,
+        x_data: Union[NumericSequences, NumericSequence],
+        y_data: Union[NumericSequences, NumericSequence],
+        **kwargs,
+    ):
         self._line_params = {
-            "marker": {"default": None, "type": MarkerSequence},
-            "markersize": {"default": None, "type": Union[Sequence[float], float]},
-            "markeredgewidth": {"default": None, "type": Union[Sequence[float], float]},
-            "markeredgecolor": {"default": None, "type": EdgeColor},
-            "markerfacecolor": {"default": None, "type": Color},
-            "linestyle": {"default": "-", "type": LineStyle},
-            "linewidth": {"default": None, "type": Union[Sequence[float], float]},
+            # Specific Parameters that are based on the number of data sequences
+            "marker": {
+                "default": "o",
+                "type": Union[MarkerSequences, MarkerSequence, Marker],
+            },
+            "markersize": {
+                "default": None,
+                "type": Union[NumericSequences, NumericSequence, NumericType],
+            },
+            "markeredgewidth": {
+                "default": None,
+                "type": Union[NumericSequences, NumericSequence, NumericType],
+            },
+            "markeredgecolor": {
+                "default": None,
+                "type": Union[EdgeColorSequences, EdgeColorSequence, EdgeColor],
+            },
+            "markerfacecolor": {
+                "default": None,
+                "type": Union[ColorSequences, ColorSequence, Color],
+            },
+            "linestyle": {
+                "default": "-",
+                "type": Union[LiteralSequence, Literal["linestyles"]],
+            },
+            "linewidth": {"default": None, "type": Union[NumericSequence, NumericType]},
         }
         super().__init__(x_data, y_data, **kwargs)
         self._init_params.update(self._line_params)
@@ -49,166 +90,233 @@ class LinePlotter(Plotter):
         self.figure: Figure = None
         self.ax: Axes = None
 
-    def set_color(
-        self, color: Union[Sequence[Color], Color, Sequence[float], Sequence[int]]
-    ):
-        if isinstance(color, str):
-            if color not in COLORS and not re.match(
-                r"^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", color
-            ):
-                raise ArgumentTypeError(
-                    f"'color'='{color}' must be a valid Matplotlib color string or HEX code."
-                )
-            self.color = color
-            return self
-        if is_sequence(color):
-            if validate_sequence_length(color, (3, 4), "color") is None:
-                validate_sequence_type(color, NUMERIC_TYPES, "color")
-                self.color = color
+    def set_marker(self, markers: Union[MarkerSequences, MarkerSequence, Marker]):
+        if self._multi_data:
+            if is_marker_sequences(markers):
+                validate_consistent_len(markers, "markers")
+                if any(len(sequence) != 1 for sequence in markers):
+                    max_len = max(len(sequence) for sequence in markers)
+                    validate_same(max_len, self.data_size, "len(markers)", "data_size")
+                self.marker = markers
+                self._multi_params_structure["marker"] = "sequences"
                 return self
-            validate_length(color, self.data_size, "color")
-            for c in color:
-                if isinstance(c, str):
-                    validate_value_in_options(c, COLORS, "color")
-                else:
-                    validate_type(c, SEQUENCE_TYPES, "color")
-                    validate_sequence_type(c, NUMERIC_TYPES, "color")
-                    validate_sequence_length(c, (3, 4), "color")
-            self.color = color
+            elif is_marker_sequence(markers):
+                validate_sequence_length(markers, self._n_sequences, "markers")
+                self.marker = markers
+                self._multi_params_structure["marker"] = "sequence"
+                return self
+            elif is_numeric(markers):
+                self.marker = markers
+                self._multi_params_structure["marker"] = "value"
+                return self
+        else:
+            if is_marker_sequence(markers):
+                validate_sequence_length(markers, self.data_size, "markers")
+                self.marker = markers
+                self._multi_params_structure["marker"] = "sequence"
+                return self
+            validate_marker(markers)
+            self.marker = markers
+            self._multi_params_structure["marker"] = "value"
             return self
-        raise ArgumentTypeError(
-            "color must be a string, RGB/RGBA values, or array-like of strings/RGB/RGBA values."
+        raise ArgumentStructureError(
+            "Invalid markers, must be a marker, sequence of markers, or sequences of markers."
         )
 
-    def set_marker(self, marker: Union[MarkerSequence, str]):
-        if isinstance(marker, str):
-            validate_value_in_options(marker, MarkerStyle.markers, "marker")
-            self.marker = marker
-        elif is_sequence(marker):
-            validate_length(marker, self.data_size, "marker")
-            validate_sequence_type(marker, str, "marker")
-            for m in marker:
-                validate_value_in_options(m, MarkerStyle.markers, "marker")
-            self.marker = marker
+    def set_markersize(
+        self, markersize: Union[NumericSequences, NumericSequence, NumericType]
+    ):
+        if self._multi_data:
+            if is_numeric_sequences(markersize):
+                validate_consistent_len(markersize, "markersize")
+                if any(len(sequence) != 1 for sequence in markersize):
+                    max_len = max(len(sequence) for sequence in markersize)
+                    validate_same(
+                        max_len, self.data_size, "len(markersize)", "data_size"
+                    )
+                self.markersize = markersize
+                self._multi_params_structure["markersize"] = "sequences"
+                return self
+            elif is_numeric_sequence(markersize):
+                validate_sequence_length(markersize, self._n_sequences, "markersize")
+                self.markersize = markersize
+                self._multi_params_structure["markersize"] = "sequence"
+                return self
+            elif is_numeric(markersize) or markersize is None:
+                self.markersize = markersize
+                self._multi_params_structure["markersize"] = "value"
+                return self
         else:
-            raise ArgumentTypeError(
-                "marker must be a string or sequence of valid Matplotlib marker strings"
-            )
-        return self
-
-    def set_markersize(self, markersize: Union[float, Sequence[float]]):
-        if isinstance(markersize, NUMERIC_TYPES):
+            if is_numeric_sequence(markersize):
+                validate_sequence_length(markersize, self.data_size, "markersize")
+                self.markersize = markersize
+                self._multi_params_structure["markersize"] = "sequence"
+                return self
+            if markersize is not None:
+                validate_numeric(markersize, "markersize")
             self.markersize = markersize
-        elif is_sequence(markersize):
-            validate_length(markersize, self.data_size, "markersize")
-            validate_sequence_type(markersize, NUMERIC_TYPES, "markersize")
-            self.markersize = markersize
-        else:
-            raise ArgumentTypeError(
-                "markersize must be a number or sequence of numbers"
-            )
-        return self
+            self._multi_params_structure["markersize"] = "value"
+            return self
+        raise ArgumentStructureError(
+            "Invalid markersizes, must be a numeric value, sequence of numbers, or sequences of numbers."
+        )
 
-    def set_markerfacecolor(self, markerfacecolor: Union[Color, Sequence[Color]]):
-        if isinstance(markerfacecolor, str):
-            if markerfacecolor not in COLORS and not re.match(
-                r"^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", markerfacecolor
-            ):
-                raise ArgumentTypeError(
-                    f"'markerfacecolor'='{markerfacecolor}' must be a valid Matplotlib color string or HEX code."
+    def set_markeredgewidth(
+        self, markeredgewidth: Union[NumericSequences, NumericSequence, NumericType]
+    ):
+        if self._multi_data:
+            if is_numeric_sequences(markeredgewidth):
+                validate_consistent_len(markeredgewidth, "markeredgewidth")
+                if any(len(sequence) != 1 for sequence in markeredgewidth):
+                    max_len = max(len(sequence) for sequence in markeredgewidth)
+                    validate_same(
+                        max_len, self.data_size, "len(markeredgewidth)", "data_size"
+                    )
+                self.markeredgewidth = markeredgewidth
+                self._multi_params_structure["markeredgewidth"] = "sequences"
+                return self
+            elif is_numeric_sequence(markeredgewidth):
+                validate_sequence_length(
+                    markeredgewidth, self._n_sequences, "markeredgewidth"
                 )
-            self.markerfacecolor = markerfacecolor
-            return self
-        if isinstance(markerfacecolor, SEQUENCE_TYPES):
-            validate_sequence_type(markerfacecolor, NUMERIC_TYPES, "markerfacecolor")
-            validate_sequence_length(markerfacecolor, (3, 4), "markerfacecolor")
-            self.markerfacecolor = markerfacecolor
-            return self
-        if is_sequence(markerfacecolor):
-            validate_length(markerfacecolor, self.data_size, "markerfacecolor")
-            for c in markerfacecolor:
-                if isinstance(c, str):
-                    validate_value_in_options(c, COLORS, "markerfacecolor")
-                else:
-                    validate_type(c, SEQUENCE_TYPES, "markerfacecolor")
-                    validate_sequence_type(c, NUMERIC_TYPES, "markerfacecolor")
-                    validate_sequence_length(c, (3, 4), "markerfacecolor")
-            self.markerfacecolor = markerfacecolor
-            return self
-        raise ArgumentTypeError(
-            "markerfacecolor must be a string, RGB/RGBA values, or array-like of strings/RGB/RGBA values."
-        )
-
-    def set_markeredgecolor(self, markeredgecolor: Union[Color, Sequence[Color]]):
-        if isinstance(markeredgecolor, str):
-            if markeredgecolor not in COLORS and not re.match(
-                r"^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", markeredgecolor
-            ):
-                raise ArgumentTypeError(
-                    f"'markeredgecolor'='{markeredgecolor}' must be a valid Matplotlib color string or HEX code."
-                )
-            self.markeredgecolor = markeredgecolor
-            return self
-        if isinstance(markeredgecolor, SEQUENCE_TYPES):
-            validate_sequence_type(markeredgecolor, NUMERIC_TYPES, "markeredgecolor")
-            validate_sequence_length(markeredgecolor, (3, 4), "markeredgecolor")
-            self.markeredgecolor = markeredgecolor
-            return self
-        if is_sequence(markeredgecolor):
-            validate_length(markeredgecolor, self.data_size, "markeredgecolor")
-            for c in markeredgecolor:
-                if isinstance(c, str):
-                    validate_value_in_options(c, COLORS, "markeredgecolor")
-                else:
-                    validate_type(c, SEQUENCE_TYPES, "markeredgecolor")
-                    validate_sequence_type(c, NUMERIC_TYPES, "markeredgecolor")
-                    validate_sequence_length(c, (3, 4), "markeredgecolor")
-            self.markeredgecolor = markeredgecolor
-            return self
-        raise ArgumentTypeError(
-            "markeredgecolor must be a string, RGB/RGBA values, or array-like of strings/RGB/RGBA values."
-        )
-
-    def set_markeredgewidth(self, markeredgewidth: Union[float, Sequence[float]]):
-        if isinstance(markeredgewidth, NUMERIC_TYPES):
-            self.markeredgewidth = markeredgewidth
-            return self
-        if is_sequence(markeredgewidth):
-            validate_length(markeredgewidth, self.data_size, "markeredgewidth")
-            validate_sequence_type(markeredgewidth, NUMERIC_TYPES, "markeredgewidth")
-            self.markeredgewidth = markeredgewidth
-            return self
-        raise ArgumentTypeError(
-            "markeredgewidth must be a number or array-like of numbers."
-        )
-
-    def set_linestyle(self, linestyle: LineStyle):
-        _valid_styles = ["-", "--", "-.", ":", "None", "none", " ", ""]
-        if isinstance(linestyle, str):
-            validate_value_in_options(linestyle, _valid_styles, "linestyle")
-            self.linestyle = linestyle
-        elif is_sequence(linestyle):
-            validate_length(linestyle, self.data_size, "linestyle")
-            validate_sequence_type(linestyle, str, "linestyle")
-            for ls in linestyle:
-                validate_value_in_options(ls, _valid_styles, "linestyle")
-            self.linestyle = linestyle
+                self.markeredgewidth = markeredgewidth
+                self._multi_params_structure["markeredgewidth"] = "sequence"
+                return self
+            elif is_numeric(markeredgewidth) or markeredgewidth is None:
+                self.markeredgewidth = markeredgewidth
+                self._multi_params_structure["markeredgewidth"] = "value"
+                return self
         else:
-            raise ArgumentTypeError(
-                "linestyle must be a string or array-like of strings"
-            )
-        return self
+            if is_numeric_sequence(markeredgewidth):
+                validate_sequence_length(
+                    markeredgewidth, self.data_size, "markeredgewidth"
+                )
+                self.markeredgewidth = markeredgewidth
+                self._multi_params_structure["markeredgewidth"] = "sequence"
+                return self
+            if markeredgewidth is not None:
+                validate_numeric(markeredgewidth, "markeredgewidth")
+            self.markeredgewidth = markeredgewidth
+            self._multi_params_structure["markeredgewidth"] = "value"
+            return self
+        raise ArgumentStructureError(
+            "Invalid markeredgewidth, must be a numeric value, sequence of numbers, or sequences of numbers."
+        )
 
-    def set_linewidth(self, linewidth: Union[Sequence[float], float]):
-        if isinstance(linewidth, NUMERIC_TYPES):
-            self.linewidth = linewidth
+    def set_markeredgecolor(
+        self, markeredgecolor: Union[EdgeColorSequences, EdgeColorSequence, EdgeColor]
+    ):
+        if self._multi_data:
+            if is_edgecolor_sequences(markeredgecolor):
+                validate_consistent_len(markeredgecolor, "markeredgecolor")
+                if any(len(sequence) != 1 for sequence in markeredgecolor):
+                    max_len = max(len(sequence) for sequence in markeredgecolor)
+                    validate_same(
+                        max_len, self.data_size, "len(markeredgecolor)", "data_size"
+                    )
+                self.markeredgecolor = markeredgecolor
+                self._multi_params_structure["markeredgecolor"] = "sequences"
+                return self
+            elif is_edgecolor_sequence(markeredgecolor):
+                validate_sequence_length(
+                    markeredgecolor, self._n_sequences, "markeredgecolor"
+                )
+                self.markeredgecolor = markeredgecolor
+                self._multi_params_structure["markeredgecolor"] = "sequence"
+                return self
+            elif is_edgecolor(markeredgecolor):
+                self.markeredgecolor = markeredgecolor
+                self._multi_params_structure["markeredgecolor"] = "value"
+                return self
+        else:
+            if is_edgecolor_sequence(markeredgecolor):
+                validate_sequence_length(
+                    markeredgecolor, self.data_size, "markeredgecolor"
+                )
+                self.markeredgecolor = markeredgecolor
+                self._multi_params_structure["markeredgecolor"] = "sequence"
+                return self
+            if markeredgecolor is not None:
+                validate_edgecolor(markeredgecolor)
+            self.markeredgecolor = markeredgecolor
+            self._multi_params_structure["markeredgecolor"] = "value"
             return self
-        if is_sequence(linewidth):
-            validate_length(linewidth, self.data_size, "linewidth")
-            validate_sequence_type(linewidth, NUMERIC_TYPES, "linewidth")
-            self.linewidth = linewidth
+        raise ArgumentStructureError(
+            "Invalid markeredgecolor, must be a edgecolor, sequence of edgecolors, or sequences of edgecolors."
+        )
+
+    def set_markerfacecolor(
+        self, markerfacecolor: Union[ColorSequences, ColorSequence, Color]
+    ):
+        if self._multi_data:
+            if is_color_sequences(markerfacecolor):
+                validate_consistent_len(markerfacecolor, "markerfacecolor")
+                if any(len(sequence) != 1 for sequence in markerfacecolor):
+                    max_len = max(len(sequence) for sequence in markerfacecolor)
+                    validate_same(
+                        max_len, self.data_size, "len(markerfacecolor)", "data_size"
+                    )
+                self.markerfacecolor = markerfacecolor
+                self._multi_params_structure["markerfacecolor"] = "sequences"
+                return self
+            elif is_color_sequence(markerfacecolor):
+                validate_sequence_length(
+                    markerfacecolor, self._n_sequences, "markerfacecolor"
+                )
+                self.markerfacecolor = markerfacecolor
+                self._multi_params_structure["markerfacecolor"] = "sequence"
+                return self
+            elif is_color(markerfacecolor):
+                self.markerfacecolor = markerfacecolor
+                self._multi_params_structure["markerfacecolor"] = "value"
+                return self
+        else:
+            if is_color_sequence(markerfacecolor):
+                validate_sequence_length(
+                    markerfacecolor, self.data_size, "markerfacecolor"
+                )
+                self.markerfacecolor = markerfacecolor
+                self._multi_params_structure["markerfacecolor"] = "sequence"
+                return self
+            if markerfacecolor is not None:
+                validate_color(markerfacecolor)
+            self.markerfacecolor = markerfacecolor
+            self._multi_params_structure["markerfacecolor"] = "value"
             return self
-        raise ArgumentTypeError("linewidth must be a number or array-like of numbers.")
+        raise ArgumentStructureError(
+            "Invalid markerfacecolor, must be a color, sequence of colors, or sequences of colors."
+        )
+
+    def set_linestyle(
+        self,
+        linestyles: Union[LiteralSequence, Literal["linestyles"]],
+    ):
+        if self._multi_data and is_literal_sequence(linestyles, LINESTYLES):
+            validate_sequence_length(linestyles, self._n_sequences, "linestyle")
+            self.linestyle = linestyles
+            self._multi_params_structure["linestyle"] = "sequence"
+            return self
+        elif is_literal(linestyles, LINESTYLES):
+            self.linestyle = linestyles
+            self._multi_params_structure["linestyle"] = "value"
+            return self
+        raise ArgumentStructureError(
+            f"Invalid linestyle, must be a literal or sequence of literals from {LINESTYLES}."
+        )
+
+    def set_linewidth(self, linewidths: Union[NumericSequence, NumericType]):
+        if self._multi_data and is_numeric_sequence(linewidths):
+            validate_sequence_length(linewidths, self._n_sequences, "linewidth")
+            self.linewidth = linewidths
+            self._multi_params_structure["linewidth"] = "sequence"
+            return self
+        elif is_numeric(linewidths):
+            self.linewidth = linewidths
+            self._multi_params_structure["linewidth"] = "value"
+            return self
+        raise ArgumentStructureError(
+            "Invalid linewidth, must be a numeric value, sequence of numbers, or sequences of numbers."
+        )
 
     def _create_plot(self):
         plot_kwargs = {
