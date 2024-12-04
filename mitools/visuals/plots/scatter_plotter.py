@@ -1,14 +1,9 @@
-import re
-from typing import Any, Literal, Sequence, Union
+from typing import Union
 
 from matplotlib.axes import Axes
-from matplotlib.colors import Colormap, Normalize
 from matplotlib.figure import Figure
-from matplotlib.markers import MarkerStyle
-from numpy import integer, ndarray
-from pandas import Series
 
-from mitools.exceptions import ArgumentStructureError, ArgumentTypeError
+from mitools.exceptions import ArgumentStructureError
 from mitools.visuals.plots.matplotlib_typing import (
     Cmap,
     CmapSequence,
@@ -26,23 +21,16 @@ from mitools.visuals.plots.matplotlib_typing import (
     NumericSequence,
     NumericSequences,
     NumericType,
-    _colors,
-    _markers,
-    _markers_fillstyles,
 )
 from mitools.visuals.plots.plotter import Plotter
 from mitools.visuals.plots.validations import (
-    NUMERIC_TYPES,
-    SEQUENCE_TYPES,
     is_color,
     is_color_sequence,
     is_color_sequences,
     is_colormap,
     is_colormap_sequence,
-    is_edgecolor,
     is_edgecolor_sequence,
     is_edgecolor_sequences,
-    is_marker,
     is_marker_sequence,
     is_marker_sequences,
     is_normalization,
@@ -50,18 +38,13 @@ from mitools.visuals.plots.validations import (
     is_numeric,
     is_numeric_sequence,
     is_numeric_sequences,
-    is_sequence,
     validate_color,
     validate_consistent_len,
     validate_edgecolor,
-    validate_length,
     validate_marker,
     validate_numeric,
-    validate_same_length,
     validate_sequence_length,
-    validate_sequence_type,
     validate_type,
-    validate_value_in_options,
 )
 
 
