@@ -22,6 +22,7 @@ from mitools.visuals.plots.matplotlib_typing import (
 )
 from mitools.visuals.plots.plotter import Plotter
 from mitools.visuals.plots.validations import (
+    NUMERIC_TYPES,
     is_color,
     is_color_sequence,
     is_color_sequences,
@@ -318,22 +319,34 @@ class LinePlotter(Plotter):
             "Invalid linewidth, must be a numeric value, sequence of numbers, or sequences of numbers."
         )
 
-    def _create_plot(self):
-        plot_kwargs = {
-            "color": self.color,
-            "marker": self.marker,
-            "markersize": self.markersize,
-            "markerfacecolor": self.markerfacecolor,
-            "markeredgecolor": self.markeredgecolor,
-            "markeredgewidth": self.markeredgewidth,
-            "linestyle": self.linestyle,
-            "linewidth": self.linewidth,
-            "alpha": self.alpha,
-            "label": self.label,
-            "zorder": self.zorder,
+    def _create_line_kwargs(self, n_sequence: int):
+        line_kwargs = {
+            "color": self.get_sequences_param("color", n_sequence),
+            "marker": self.get_sequences_param("marker", n_sequence),
+            "markersize": self.get_sequences_param("markersize", n_sequence),
+            "markerfacecolor": self.get_sequences_param("markerfacecolor", n_sequence),
+            "markeredgecolor": self.get_sequences_param("markeredgecolor", n_sequence),
+            "markeredgewidth": self.get_sequences_param("markeredgewidth", n_sequence),
+            "linestyle": self.get_sequences_param("linestyle", n_sequence),
+            "linewidth": self.get_sequences_param("linewidth", n_sequence),
+            "alpha": self.get_sequences_param("alpha", n_sequence),
+            "label": self.get_sequences_param("label", n_sequence),
+            "zorder": self.get_sequences_param("zorder", n_sequence),
         }
-        plot_kwargs = {k: v for k, v in plot_kwargs.items() if v is not None}
-        try:
-            self.ax.plot(self.x_data, self.y_data, **plot_kwargs)
-        except Exception as e:
-            raise LinePlotterException(f"Error while creating line plot: {e}")
+        if (
+            not isinstance(line_kwargs.get("alpha", []), NUMERIC_TYPES)
+            and len(line_kwargs.get("alpha", [])) == 1
+        ):
+            line_kwargs["alpha"] = line_kwargs["alpha"][0]
+        return line_kwargs
+
+    def _create_plot(self):
+        for n_sequence in range(self._n_sequences):
+            plot_kwargs = self._create_line_kwargs(n_sequence)
+            plot_kwargs = {k: v for k, v in plot_kwargs.items() if v is not None}
+            try:
+                self.ax.plot(
+                    self.x_data[n_sequence], self.y_data[n_sequence], **plot_kwargs
+                )
+            except Exception as e:
+                raise LinePlotterException(f"Error while creating line plot: {e}")
