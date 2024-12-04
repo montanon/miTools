@@ -29,6 +29,10 @@ NUMERIC_TYPES = (float, int, integer)
 SEQUENCE_TYPES = (list, tuple, ndarray, Series)
 
 
+def is_dict_sequence(sequence: Sequence[Any]) -> bool:
+    return is_sequence(sequence) and all(isinstance(item, dict) for item in sequence)
+
+
 def is_literal(value: Any, options: Sequence[Any]) -> bool:
     return (isinstance(value, str) and value in options) or value is None
 

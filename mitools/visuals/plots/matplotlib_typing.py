@@ -9,6 +9,8 @@ NumericType = Union[int, float, integer]
 NumericTuple = Tuple[NumericType, NumericType]
 NumericSequence = Sequence[NumericType]
 NumericSequences = Sequence[NumericSequence]
+DictSequence = Sequence[Dict[str, Any]]
+DictSequences = Sequence[DictSequence]
 Color = Union[str, Sequence[float]]
 ColorSequence = Sequence[Color]
 ColorSequences = Sequence[ColorSequence]
@@ -35,6 +37,7 @@ Cmap = Union[
 KERNELS = ["gaussian", "tophat", "epanechnikov", "exponential", "linear", "cosine"]
 ORIENTATIONS = ["horizontal", "vertical"]
 BANDWIDTH_METHODS = ["scott", "silverman"]
+BARS_ALIGN = ["center", "edge"]
 NORMALIZATIONS = [
     "linear",
     "log",
