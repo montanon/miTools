@@ -68,8 +68,8 @@ class Plotter(ABC):
             "x_data",
             "y_data",
         )
-        self.n_sequences = len(self.x_data)
-        self.multi_data = self.n_sequences > 1
+        self._n_sequences = len(self.x_data)
+        self._multi_data = self._n_sequences > 1
         self.data_size = len(self.x_data[0])
         # General Axes Parameters that are independent of the number of data sequences
         self._single_data_params = {
@@ -482,27 +482,32 @@ class Plotter(ABC):
         return self
 
     def set_color(self, color: Union[ColorSequences, ColorSequence, Color]):
-        if self.multi_data:
+        if self._multi_data:
             if is_color_sequences(color):
                 validate_consistent_len(color, "color")
-                validate_sequence_length(color, self.n_sequences, "color")
+                validate_sequence_length(color, self._n_sequences, "color")
                 validate_sequence_length(color[0], self.data_size, "color[0]")
                 self.color = color
+                self._multi_params_structure["color"] = "sequences"
                 return self
             elif is_color_sequence(color):
-                validate_sequence_length(color, self.n_sequences, "color")
+                validate_sequence_length(color, self._n_sequences, "color")
                 self.color = color
+                self._multi_params_structure["color"] = "sequence"
                 return self
             elif is_color(color):
                 self.color = color
+                self._multi_params_structure["color"] = "value"
                 return self
         else:
             if is_color_sequence(color):
                 validate_sequence_length(color, self.data_size, "color")
                 self.color = color
+                self._multi_params_structure["color"] = "sequence"
                 return self
             validate_color(color)
             self.color = color
+            self._multi_params_structure["color"] = "value"
             return self
         raise ArgumentStructureError(
             "Invalid color, must be a color, sequence of colors, or sequences of colors."
@@ -511,18 +516,18 @@ class Plotter(ABC):
     def set_alpha(self, alpha: Union[Sequence[float], float]):
         if is_numeric(alpha):
             validate_value_in_range(alpha, 0, 1, "alpha")
-        if self.multi_data:
+        if self._multi_data:
             if is_numeric_sequences(alpha):
                 validate_consistent_len(alpha, "alpha")
                 validate_sequence_length(alpha[0], self.data_size, "alpha[0]")
-                for seq in self.alpha:
+                for seq in alpha:
                     for val in seq:
                         validate_value_in_range(val, 0, 1, "alpha")
                 self.alpha = alpha
                 self._multi_params_structure["alpha"] = "sequences"
                 return self
             elif is_numeric_sequence(alpha):
-                validate_sequence_length(alpha, self.n_sequences, "alpha")
+                validate_sequence_length(alpha, self._n_sequences, "alpha")
                 for val in alpha:
                     validate_value_in_range(val, 0, 1, "alpha")
                 self.alpha = alpha
@@ -547,8 +552,8 @@ class Plotter(ABC):
         )
 
     def set_label(self, labels: Union[Sequence[str], str]):
-        if self.multi_data and is_str_sequence(labels):
-            validate_sequence_length(labels, self.n_sequences, "labels")
+        if self._multi_data and is_str_sequence(labels):
+            validate_sequence_length(labels, self._n_sequences, "labels")
             self.label = labels
             self._multi_params_structure["label"] = "sequence"
             return self
@@ -561,7 +566,7 @@ class Plotter(ABC):
         )
 
     def set_zorder(self, zorder: Union[NumericSequences, NumericSequence, NumericType]):
-        if self.multi_data:
+        if self._multi_data:
             if is_numeric_sequences(zorder):
                 validate_consistent_len(zorder, "zorder")
                 validate_sequence_length(zorder[0], self.data_size, "zorder[0]")
@@ -569,7 +574,7 @@ class Plotter(ABC):
                 self._multi_params_structure["zorder"] = "sequences"
                 return self
             elif is_numeric_sequence(zorder):
-                validate_sequence_length(zorder, self.n_sequences, "zorder")
+                validate_sequence_length(zorder, self._n_sequences, "zorder")
                 self.zorder = zorder
                 self._multi_params_structure["zorder"] = "sequence"
                 return self

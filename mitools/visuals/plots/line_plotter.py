@@ -8,13 +8,12 @@ from mitools.exceptions import (
     ArgumentTypeError,
 )
 from mitools.visuals.plots.matplotlib_typing import (
+    COLORS,
     Color,
     EdgeColor,
-    FaceColor,
     LineStyle,
-    Markers,
+    MarkerSequence,
     MarkerStyle,
-    _colors,
 )
 from mitools.visuals.plots.plotter import Plotter
 from mitools.visuals.plots.validations import (
@@ -36,11 +35,11 @@ class LinePlotterException(Exception):
 class LinePlotter(Plotter):
     def __init__(self, x_data: Any, y_data: Any, **kwargs):
         self._line_params = {
-            "marker": {"default": None, "type": Markers},
+            "marker": {"default": None, "type": MarkerSequence},
             "markersize": {"default": None, "type": Union[Sequence[float], float]},
             "markeredgewidth": {"default": None, "type": Union[Sequence[float], float]},
             "markeredgecolor": {"default": None, "type": EdgeColor},
-            "markerfacecolor": {"default": None, "type": FaceColor},
+            "markerfacecolor": {"default": None, "type": Color},
             "linestyle": {"default": "-", "type": LineStyle},
             "linewidth": {"default": None, "type": Union[Sequence[float], float]},
         }
@@ -54,7 +53,7 @@ class LinePlotter(Plotter):
         self, color: Union[Sequence[Color], Color, Sequence[float], Sequence[int]]
     ):
         if isinstance(color, str):
-            if color not in _colors and not re.match(
+            if color not in COLORS and not re.match(
                 r"^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", color
             ):
                 raise ArgumentTypeError(
@@ -70,7 +69,7 @@ class LinePlotter(Plotter):
             validate_length(color, self.data_size, "color")
             for c in color:
                 if isinstance(c, str):
-                    validate_value_in_options(c, _colors, "color")
+                    validate_value_in_options(c, COLORS, "color")
                 else:
                     validate_type(c, SEQUENCE_TYPES, "color")
                     validate_sequence_type(c, NUMERIC_TYPES, "color")
@@ -81,7 +80,7 @@ class LinePlotter(Plotter):
             "color must be a string, RGB/RGBA values, or array-like of strings/RGB/RGBA values."
         )
 
-    def set_marker(self, marker: Union[Markers, str]):
+    def set_marker(self, marker: Union[MarkerSequence, str]):
         if isinstance(marker, str):
             validate_value_in_options(marker, MarkerStyle.markers, "marker")
             self.marker = marker
@@ -112,7 +111,7 @@ class LinePlotter(Plotter):
 
     def set_markerfacecolor(self, markerfacecolor: Union[Color, Sequence[Color]]):
         if isinstance(markerfacecolor, str):
-            if markerfacecolor not in _colors and not re.match(
+            if markerfacecolor not in COLORS and not re.match(
                 r"^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", markerfacecolor
             ):
                 raise ArgumentTypeError(
@@ -129,7 +128,7 @@ class LinePlotter(Plotter):
             validate_length(markerfacecolor, self.data_size, "markerfacecolor")
             for c in markerfacecolor:
                 if isinstance(c, str):
-                    validate_value_in_options(c, _colors, "markerfacecolor")
+                    validate_value_in_options(c, COLORS, "markerfacecolor")
                 else:
                     validate_type(c, SEQUENCE_TYPES, "markerfacecolor")
                     validate_sequence_type(c, NUMERIC_TYPES, "markerfacecolor")
@@ -142,7 +141,7 @@ class LinePlotter(Plotter):
 
     def set_markeredgecolor(self, markeredgecolor: Union[Color, Sequence[Color]]):
         if isinstance(markeredgecolor, str):
-            if markeredgecolor not in _colors and not re.match(
+            if markeredgecolor not in COLORS and not re.match(
                 r"^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", markeredgecolor
             ):
                 raise ArgumentTypeError(
@@ -159,7 +158,7 @@ class LinePlotter(Plotter):
             validate_length(markeredgecolor, self.data_size, "markeredgecolor")
             for c in markeredgecolor:
                 if isinstance(c, str):
-                    validate_value_in_options(c, _colors, "markeredgecolor")
+                    validate_value_in_options(c, COLORS, "markeredgecolor")
                 else:
                     validate_type(c, SEQUENCE_TYPES, "markeredgecolor")
                     validate_sequence_type(c, NUMERIC_TYPES, "markeredgecolor")

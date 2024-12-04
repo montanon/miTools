@@ -13,13 +13,13 @@ from mitools.exceptions import (
     ArgumentValueError,
 )
 from mitools.visuals.plots.matplotlib_typing import (
+    CMAPS,
+    COLORS,
+    MARKERS,
+    MARKERS_FILLSTYLES,
+    NORMALIZATIONS,
     NumericSequences,
     NumericType,
-    _cmaps,
-    _colors,
-    _markers,
-    _markers_fillstyles,
-    _normalizations,
 )
 
 T = TypeVar("T")
@@ -29,7 +29,7 @@ SEQUENCE_TYPES = (list, tuple, ndarray, Series)
 
 
 def is_normalization(value: Any) -> bool:
-    return (isinstance(value, str) and value in _normalizations) or isinstance(
+    return (isinstance(value, str) and value in NORMALIZATIONS) or isinstance(
         value, Normalize
     )
 
@@ -39,7 +39,7 @@ def is_normalization_sequence(sequence: Sequence[Any]) -> bool:
 
 
 def is_colormap(value: Any) -> bool:
-    return (isinstance(value, str) and value in _cmaps) or isinstance(value, Colormap)
+    return (isinstance(value, str) and value in CMAPS) or isinstance(value, Colormap)
 
 
 def is_colormap_sequence(sequence: Sequence[Any]) -> bool:
@@ -86,18 +86,18 @@ def validate_marker(value: Any):
 
 def is_marker(value: Any) -> bool:
     if isinstance(value, (str, int, Path, MarkerStyle, dict)):
-        if isinstance(str):
-            return value in _markers
-        if isinstance(int):
+        if isinstance(value, str):
+            return value in MARKERS
+        if isinstance(value, int):
             return is_value_in_range(value, 0, 11)
         if isinstance(value, dict):
             valid_keys = all(
                 key in ["marker", "fillstyle", "transform", "capstyle", "joinstyle"]
                 for key in value
             )
-            valid_marker = value["marker"] in _markers if "marker" in value else True
+            valid_marker = value["marker"] in MARKERS if "marker" in value else True
             valid_fillstyle = (
-                value["fillstyle"] in _markers_fillstyles
+                value["fillstyle"] in MARKERS_FILLSTYLES
                 if "fillstyle" in value
                 else True
             )
@@ -218,7 +218,7 @@ def is_color_hex(value: Any) -> bool:
 
 
 def is_color_str(value: Any) -> bool:
-    return isinstance(value, str) and value in _colors
+    return isinstance(value, str) and value in COLORS
 
 
 def is_color(value: Any) -> bool:
@@ -282,6 +282,10 @@ def validate_sequence_non_negative(sequence: Sequence, param_name: str) -> None:
 
 def is_sequence(value: Any) -> bool:
     return isinstance(value, SEQUENCE_TYPES)
+
+
+def is_sequences(sequences: Any) -> bool:
+    return is_sequence(sequences) and all(is_sequence(item) for item in sequences)
 
 
 def validate_sequence_length(

@@ -35,8 +35,8 @@ class TestPlotter(TestCase):
         plotter = DummyPlotter(x_data, y_data)
         self.assertEqual(plotter.x_data, [x_data])
         self.assertEqual(plotter.y_data, [y_data])
-        self.assertEqual(plotter.n_sequences, 1)
-        self.assertFalse(plotter.multi_data)
+        self.assertEqual(plotter._n_sequences, 1)
+        self.assertFalse(plotter._multi_data)
         self.assertEqual(plotter.data_size, 4)
 
     def test_init_multi_sequence(self):
@@ -45,8 +45,8 @@ class TestPlotter(TestCase):
         plotter = DummyPlotter(x_data, y_data)
         self.assertEqual(plotter.x_data, x_data)
         self.assertEqual(plotter.y_data, y_data)
-        self.assertEqual(plotter.n_sequences, 2)
-        self.assertTrue(plotter.multi_data)
+        self.assertEqual(plotter._n_sequences, 2)
+        self.assertTrue(plotter._multi_data)
         self.assertEqual(plotter.data_size, 3)
 
     def test_init_y_data_none(self):
@@ -55,8 +55,8 @@ class TestPlotter(TestCase):
         plotter = DummyPlotter(x_data, y_data)
         self.assertEqual(plotter.x_data, [x_data])
         self.assertIsNone(plotter.y_data)
-        self.assertEqual(plotter.n_sequences, 1)
-        self.assertFalse(plotter.multi_data)
+        self.assertEqual(plotter._n_sequences, 1)
+        self.assertFalse(plotter._multi_data)
         self.assertEqual(plotter.data_size, 4)
 
     def test_init_invalid_x_data(self):

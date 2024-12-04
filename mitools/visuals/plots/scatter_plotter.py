@@ -106,52 +106,62 @@ class ScatterPlotter(Plotter):
         return self
 
     def set_size(self, sizes: Union[NumericSequences, NumericSequence, NumericType]):
-        if self.multi_data:
+        if self._multi_data:
             if is_numeric_sequences(sizes):
                 validate_consistent_len(sizes, "sizes")
                 validate_sequence_length(sizes[0], self.data_size, "sizes[0]")
                 self.size = sizes
+                self._multi_params_structure["size"] = "sequences"
                 return self
             elif is_numeric_sequence(sizes):
-                validate_sequence_length(sizes, self.n_sequences, "sizes")
+                validate_sequence_length(sizes, self._n_sequences, "sizes")
                 self.size = sizes
+                self._multi_params_structure["size"] = "sequence"
                 return self
             elif is_numeric(sizes):
                 self.size = sizes
+                self._multi_params_structure["size"] = "value"
                 return self
         else:
             if is_numeric_sequence(sizes):
                 validate_sequence_length(sizes, self.data_size, "sizes")
                 self.size = sizes
+                self._multi_params_structure["size"] = "sequence"
                 return self
             validate_numeric(sizes, "sizes")
             self.size = sizes
+            self._multi_params_structure["size"] = "value"
             return self
         raise ArgumentStructureError(
             "Invalid sizes, must be a numeric value, sequence of numbers, or sequences of numbers."
         )
 
     def set_marker(self, markers: Union[MarkerSequences, MarkerSequence, Marker]):
-        if self.multi_data:
+        if self._multi_data:
             if is_marker_sequences(markers):
                 validate_consistent_len(markers, "markers")
                 validate_sequence_length(markers[0], self.data_size, "markers[0]")
                 self.marker = markers
+                self._multi_params_structure["marker"] = "sequences"
                 return self
             elif is_marker_sequence(markers):
-                validate_sequence_length(markers, self.n_sequences, "markers")
+                validate_sequence_length(markers, self._n_sequences, "markers")
                 self.marker = markers
+                self._multi_params_structure["marker"] = "sequence"
                 return self
             elif is_numeric(markers):
                 self.marker = markers
+                self._multi_params_structure["marker"] = "value"
                 return self
         else:
             if is_marker_sequence(markers):
                 validate_sequence_length(markers, self.data_size, "markers")
                 self.marker = markers
+                self._multi_params_structure["marker"] = "sequence"
                 return self
-            validate_marker(markers, "markers")
+            validate_marker(markers)
             self.marker = markers
+            self._multi_params_structure["marker"] = "value"
             return self
         raise ArgumentStructureError(
             "Invalid markers, must be a marker, sequence of markers, or sequences of markers."
@@ -160,26 +170,31 @@ class ScatterPlotter(Plotter):
     def set_linewidth(
         self, linewidths: Union[NumericSequences, NumericSequence, NumericType]
     ):
-        if self.multi_data:
+        if self._multi_data:
             if is_numeric_sequences(linewidths):
                 validate_consistent_len(linewidths, "linewidths")
                 validate_sequence_length(linewidths[0], self.data_size, "linewidths[0]")
                 self.linewidth = linewidths
+                self._multi_params_structure["linewidth"] = "sequences"
                 return self
             elif is_numeric_sequence(linewidths):
-                validate_sequence_length(linewidths, self.n_sequences, "linewidths")
+                validate_sequence_length(linewidths, self._n_sequences, "linewidths")
                 self.linewidth = linewidths
+                self._multi_params_structure["linewidth"] = "sequence"
                 return self
             elif is_numeric(linewidths):
                 self.linewidth = linewidths
+                self._multi_params_structure["linewidth"] = "value"
                 return self
         else:
             if is_numeric_sequence(linewidths):
                 validate_sequence_length(linewidths, self.data_size, "linewidths")
                 self.linewidth = linewidths
+                self._multi_params_structure["linewidth"] = "sequence"
                 return self
             validate_numeric(linewidths, "linewidths")
             self.linewidth = linewidths
+            self._multi_params_structure["linewidth"] = "value"
             return self
         raise ArgumentStructureError(
             "Invalid linewidths, must be a numeric value, sequence of numbers, or sequences of numbers."
@@ -188,101 +203,119 @@ class ScatterPlotter(Plotter):
     def set_edgecolor(
         self, edgecolors: Union[EdgeColorSequences, EdgeColorSequence, EdgeColor]
     ):
-        if self.multi_data:
+        if self._multi_data:
             if is_edgecolor_sequences(edgecolors):
                 validate_consistent_len(edgecolors, "edgecolors")
                 validate_sequence_length(edgecolors[0], self.data_size, "edgecolors[0]")
                 self.edgecolor = edgecolors
+                self._multi_params_structure["edgecolor"] = "sequences"
                 return self
             elif is_edgecolor_sequence(edgecolors):
-                validate_sequence_length(edgecolors, self.n_sequences, "edgecolors")
+                validate_sequence_length(edgecolors, self._n_sequences, "edgecolors")
                 self.edgecolor = edgecolors
+                self._multi_params_structure["edgecolor"] = "sequence"
                 return self
             elif validate_edgecolor(edgecolors):
                 self.edgecolor = edgecolors
+                self._multi_params_structure["edgecolor"] = "value"
                 return self
         else:
             if is_edgecolor_sequence(edgecolors):
                 validate_sequence_length(edgecolors, self.data_size, "edgecolors")
                 self.edgecolor = edgecolors
+                self._multi_params_structure["edgecolor"] = "sequence"
                 return self
             validate_edgecolor(edgecolors)
             self.edgecolor = edgecolors
+            self._multi_params_structure["edgecolor"] = "value"
             return self
         raise ArgumentStructureError(
             "Invalid edgecolors, must be a edgecolor, sequence of edgecolors, or sequences of edgecolors."
         )
 
     def set_facecolor(self, facecolors: Union[ColorSequences, ColorSequence, Color]):
-        if self.multi_data:
+        if self._multi_data:
             if is_color_sequences(facecolors):
                 validate_consistent_len(facecolors, "facecolors")
-                validate_sequence_length(facecolors, self.n_sequences, "facecolors")
+                validate_sequence_length(facecolors, self._n_sequences, "facecolors")
                 validate_sequence_length(facecolors[0], self.data_size, "facecolors[0]")
                 self.facecolor = facecolors
+                self._multi_params_structure["facecolor"] = "sequences"
                 return self
             elif is_color_sequence(facecolors):
-                validate_sequence_length(facecolors, self.n_sequences, "facecolors")
+                validate_sequence_length(facecolors, self._n_sequences, "facecolors")
                 self.facecolor = facecolors
+                self._multi_params_structure["facecolor"] = "sequence"
                 return self
             elif is_color(facecolors):
                 self.facecolor = facecolors
+                self._multi_params_structure["facecolor"] = "value"
                 return self
         else:
             if is_color_sequence(facecolors):
                 validate_sequence_length(facecolors, self.data_size, "facecolors")
                 self.facecolor = facecolors
+                self._multi_params_structure["facecolor"] = "sequence"
                 return self
             validate_color(facecolors)
             self.facecolor = facecolors
+            self._multi_params_structure["facecolor"] = "value"
             return self
         raise ArgumentStructureError(
             "Invalid facecolors, must be a color, sequence of colors, or sequences of colors."
         )
 
     def set_colormap(self, colormaps: Union[CmapSequence, Cmap]):
-        if self.multi_data and is_colormap_sequence(colormaps):
-            validate_sequence_length(colormaps, self.n_sequences, "colormaps")
+        if self._multi_data and is_colormap_sequence(colormaps):
+            validate_sequence_length(colormaps, self._n_sequences, "colormaps")
             self.colormap = colormaps
+            self._multi_params_structure["colormap"] = "sequence"
             return self
         elif is_colormap(colormaps):
             self.colormap = colormaps
+            self._multi_params_structure["colormap"] = "value"
             return self
         raise ArgumentStructureError(
             "Invalid colormaps, must be a colormap, sequence of colormaps, or sequences of colormaps."
         )
 
     def set_normalization(self, normalization: Union[NormSequence, Norm]):
-        if self.multi_data and is_normalization_sequence(normalization):
-            validate_sequence_length(normalization, self.n_sequences, "normalization")
+        if self._multi_data and is_normalization_sequence(normalization):
+            validate_sequence_length(normalization, self._n_sequences, "normalization")
             self.normalization = normalization
+            self._multi_params_structure["normalization"] = "sequence"
             return self
         elif is_normalization(normalization):
             self.normalization = normalization
+            self._multi_params_structure["normalization"] = "value"
             return self
         raise ArgumentStructureError(
             "Invalid normalization, must be a normalization, sequence of normalizations, or sequences of normalizations."
         )
 
     def set_vmin(self, vmin: Union[NumericSequence, NumericType]):
-        if self.multi_data and is_numeric_sequence(vmin):
-            validate_sequence_length(vmin, self.n_sequences, "vmin")
+        if self._multi_data and is_numeric_sequence(vmin):
+            validate_sequence_length(vmin, self._n_sequences, "vmin")
             self.vmin = vmin
+            self._multi_params_structure["vmin"] = "sequence"
             return self
         elif is_numeric(vmin):
             self.vmin = vmin
+            self._multi_params_structure["vmin"] = "value"
             return self
         raise ArgumentStructureError(
             "Invalid vmin, must be a numeric value, sequence of numbers, or sequences of numbers."
         )
 
     def set_vmax(self, vmax: Union[NumericSequence, NumericType]):
-        if self.multi_data and is_numeric_sequence(vmax):
-            validate_sequence_length(vmax, self.n_sequences, "vmax")
+        if self._multi_data and is_numeric_sequence(vmax):
+            validate_sequence_length(vmax, self._n_sequences, "vmax")
             self.vmax = vmax
+            self._multi_params_structure["vmax"] = "sequence"
             return self
         elif is_numeric(vmax):
             self.vmax = vmax
+            self._multi_params_structure["vmax"] = "value"
             return self
         raise ArgumentStructureError(
             "Invalid vmax, must be a numeric value, sequence of numbers, or sequences of numbers."
@@ -297,29 +330,44 @@ class ScatterPlotter(Plotter):
         self.set_vmax(vmax)
         return self
 
-    def _create_plot(self):
+    def get_sequences_param(self, param_name: str, n_sequence: int):
+        param_value = getattr(self, param_name)
+        if self._multi_data:
+            param_structure = self._multi_params_structure.get(param_name)
+            if param_structure in ["sequences", "sequence"]:
+                return param_value[n_sequence]
+            elif param_structure == "value":
+                return param_value
+        return param_value
+
+    def _create_scatter_kwargs(self, n_sequence: int):
         scatter_kwargs = {
-            "x": self.x_data,
-            "y": self.y_data,
-            "s": self.size,
-            "c": self.color,
-            "marker": self.marker,
-            "cmap": self.colormap,
-            "norm": self.normalization,
-            "vmin": self.vmin,
-            "vmax": self.vmax,
-            "alpha": self.alpha,
-            "linewidth": self.linewidth,
-            "edgecolor": self.edgecolor,
-            "facecolor": self.facecolor,
-            "label": self.label,
-            "zorder": self.zorder,
+            "x": self.x_data[n_sequence],
+            "y": self.y_data[n_sequence],
+            "s": self.get_sequences_param("size", n_sequence),
+            "c": self.get_sequences_param("color", n_sequence),
+            "marker": self.get_sequences_param("marker", n_sequence),
+            "cmap": self.get_sequences_param("colormap", n_sequence),
+            "norm": self.get_sequences_param("normalization", n_sequence),
+            "vmin": self.get_sequences_param("vmin", n_sequence),
+            "vmax": self.get_sequences_param("vmax", n_sequence),
+            "alpha": self.get_sequences_param("alpha", n_sequence),
+            "linewidth": self.get_sequences_param("linewidth", n_sequence),
+            "edgecolor": self.get_sequences_param("edgecolor", n_sequence),
+            "facecolor": self.get_sequences_param("facecolor", n_sequence),
+            "label": self.get_sequences_param("label", n_sequence),
+            "zorder": self.get_sequences_param("zorder", n_sequence),
             "plotnonfinite": self.plot_non_finite,
         }
-        scatter_kwargs = {k: v for k, v in scatter_kwargs.items() if v is not None}
-        try:
-            self.ax.scatter(**scatter_kwargs)
-        except Exception as e:
-            raise ScatterPlotterException(f"Error while creating scatter plot: {e}")
+        return scatter_kwargs
+
+    def _create_plot(self):
+        for n_sequence in range(self._n_sequences):
+            scatter_kwargs = self._create_scatter_kwargs(n_sequence)
+            scatter_kwargs = {k: v for k, v in scatter_kwargs.items() if v is not None}
+            try:
+                self.ax.scatter(**scatter_kwargs)
+            except Exception as e:
+                raise ScatterPlotterException(f"Error while creating scatter plot: {e}")
         if self.hover and self.label is not None:
             pass

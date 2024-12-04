@@ -12,9 +12,9 @@ Color = Union[str, Sequence[float]]
 ColorSequence = Sequence[Color]
 ColorSequences = Sequence[ColorSequence]
 StrSequence = Sequence[str]
-_colors = set(get_named_colors_mapping().keys())
-_markers = set(MarkerStyle.markers.keys()) + set(MarkerStyle.filled_markers)
-_markers_fillstyles = set(MarkerStyle.fillstyles)
+COLORS = set(get_named_colors_mapping().keys())
+MARKERS = set(MarkerStyle.markers.keys()).union(set(MarkerStyle.filled_markers))
+MARKERS_FILLSTYLES = set(MarkerStyle.fillstyles)
 Marker = Union[str, int, Path, MarkerStyle, dict]
 MarkerSequence = Union[Marker, Sequence[Marker]]
 MarkerSequences = Sequence[MarkerSequence]
@@ -31,7 +31,7 @@ Cmap = Union[
     ],
     Colormap,
 ]
-_normalizations = [
+NORMALIZATIONS = [
     "linear",
     "log",
     "symlog",
@@ -40,7 +40,7 @@ _normalizations = [
     "function",
     "functionlog",
 ]
-_cmaps = [
+CMAPS = [
     "magma",
     "inferno",
     "plasma",
@@ -62,7 +62,7 @@ LineStyle = Union[
 ]
 Scale = Literal["linear", "log", "symlog", "logit"]
 TickParams = Dict[str, Any]
-_tickparams = [
+TICKPARAMS = [
     "size",
     "width",
     "color",
