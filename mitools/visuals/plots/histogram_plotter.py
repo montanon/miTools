@@ -1,10 +1,7 @@
-import re
-from typing import Any, Literal, Sequence, Tuple, Union
+from typing import Literal, Sequence, Union
 
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
-from numpy import integer, ndarray
-from pandas import Series
 
 from mitools.exceptions import ArgumentStructureError
 from mitools.visuals.plots.matplotlib_typing import (
@@ -15,8 +12,6 @@ from mitools.visuals.plots.matplotlib_typing import (
     Bins,
     BinsSequence,
     BinsSequences,
-    Cmap,
-    CmapSequence,
     Color,
     ColorSequence,
     ColorSequences,
@@ -25,11 +20,6 @@ from mitools.visuals.plots.matplotlib_typing import (
     EdgeColorSequences,
     LiteralSequence,
     LiteralSequences,
-    Marker,
-    MarkerSequence,
-    MarkerSequences,
-    Norm,
-    NormSequence,
     NumericSequence,
     NumericSequences,
     NumericTuple,
@@ -44,29 +34,21 @@ from mitools.visuals.plots.validations import (
     is_color,
     is_color_sequence,
     is_color_sequences,
-    is_edgecolor,
     is_edgecolor_sequence,
     is_edgecolor_sequences,
     is_literal,
     is_literal_sequence,
     is_literal_sequences,
-    is_marker_sequence,
-    is_marker_sequences,
-    is_normalization,
-    is_normalization_sequence,
     is_numeric,
     is_numeric_sequence,
     is_numeric_sequences,
-    is_numeric_tuple,
     is_numeric_tuple_sequence,
-    is_numeric_tuple_sequences,
     is_sequence,
     validate_bins,
     validate_color,
     validate_consistent_len,
     validate_edgecolor,
     validate_literal,
-    validate_marker,
     validate_numeric,
     validate_numeric_tuple,
     validate_same,
