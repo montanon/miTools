@@ -9,8 +9,8 @@ from mitools.exceptions import (
     ArgumentValueError,
 )
 from mitools.visuals.plots.matplotlib_typing import (
+    COLORS,
     Color,
-    _colors,
 )
 from mitools.visuals.plots.plotter import Plotter
 from mitools.visuals.plots.validations import (
@@ -60,7 +60,7 @@ class PiePlotter(Plotter):
         self, color: Union[Sequence[Color], Color, Sequence[float], Sequence[int]]
     ):
         if isinstance(color, str):
-            if color not in _colors and not re.match(
+            if color not in COLORS and not re.match(
                 r"^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", color
             ):
                 raise ArgumentTypeError(
@@ -72,7 +72,7 @@ class PiePlotter(Plotter):
             validate_length(color, self.data_size, "color")
             for c in color:
                 if isinstance(c, str):
-                    validate_value_in_options(c, _colors, "color")
+                    validate_value_in_options(c, COLORS, "color")
                 else:
                     validate_type(c, SEQUENCE_TYPES, "color")
                     validate_sequence_type(c, NUMERIC_TYPES, "color")

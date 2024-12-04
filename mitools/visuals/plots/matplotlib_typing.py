@@ -3,11 +3,21 @@ from typing import Any, Dict, Literal, Sequence, Union
 
 from matplotlib.colors import Colormap, Normalize, get_named_colors_mapping
 from matplotlib.markers import MarkerStyle
+from numpy import integer
 
-_colors = list(get_named_colors_mapping().keys())
+NumericType = Union[int, float, integer]
+NumericSequence = Sequence[NumericType]
+NumericSequences = Sequence[NumericSequence]
 Color = Union[str, Sequence[float]]
-Marker = Union[str, int, Path, MarkerStyle]
-Markers = Union[Marker, Sequence[Marker]]
+ColorSequence = Sequence[Color]
+ColorSequences = Sequence[ColorSequence]
+StrSequence = Sequence[str]
+COLORS = set(get_named_colors_mapping().keys())
+MARKERS = set(MarkerStyle.markers.keys()).union(set(MarkerStyle.filled_markers))
+MARKERS_FILLSTYLES = set(MarkerStyle.fillstyles)
+Marker = Union[str, int, Path, MarkerStyle, dict]
+MarkerSequence = Union[Marker, Sequence[Marker]]
+MarkerSequences = Sequence[MarkerSequence]
 Cmap = Union[
     Literal[
         "magma",
@@ -21,16 +31,38 @@ Cmap = Union[
     ],
     Colormap,
 ]
+NORMALIZATIONS = [
+    "linear",
+    "log",
+    "symlog",
+    "asinh",
+    "logit",
+    "function",
+    "functionlog",
+]
+CMAPS = [
+    "magma",
+    "inferno",
+    "plasma",
+    "viridis",
+    "cividis",
+    "twilight",
+    "twilight_shifted",
+    "turbo",
+]
+CmapSequence = Sequence[Cmap]
 Norm = Union[str, Normalize]
+NormSequence = Sequence[Norm]
 EdgeColor = Union[Literal["face", "none", None], Color, Sequence[Color]]
-FaceColor = Union[Color, Sequence[Color]]
+EdgeColorSequence = Sequence[EdgeColor]
+EdgeColorSequences = Sequence[EdgeColorSequence]
 LineStyle = Union[
     Literal["-", "--", "-.", ":", "None", "none", " ", ""],
     Sequence[Literal["-", "--", "-.", ":", "None", "none", " ", ""]],
 ]
 Scale = Literal["linear", "log", "symlog", "logit"]
 TickParams = Dict[str, Any]
-_tickparams = [
+TICKPARAMS = [
     "size",
     "width",
     "color",

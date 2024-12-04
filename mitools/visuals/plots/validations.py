@@ -1,5 +1,9 @@
+import re
+from pathlib import Path
 from typing import Any, Sequence, Tuple, Type, TypeVar, Union
 
+from matplotlib.colors import Colormap, Normalize
+from matplotlib.markers import MarkerStyle
 from numpy import integer, ndarray
 from pandas import Series
 
@@ -8,11 +12,249 @@ from mitools.exceptions import (
     ArgumentTypeError,
     ArgumentValueError,
 )
+from mitools.visuals.plots.matplotlib_typing import (
+    CMAPS,
+    COLORS,
+    MARKERS,
+    MARKERS_FILLSTYLES,
+    NORMALIZATIONS,
+    NumericSequences,
+    NumericType,
+)
 
 T = TypeVar("T")
 
 NUMERIC_TYPES = (float, int, integer)
 SEQUENCE_TYPES = (list, tuple, ndarray, Series)
+
+
+def is_normalization(value: Any) -> bool:
+    return (isinstance(value, str) and value in NORMALIZATIONS) or isinstance(
+        value, Normalize
+    )
+
+
+def is_normalization_sequence(sequence: Sequence[Any]) -> bool:
+    return is_sequence(sequence) and all(is_normalization(val) for val in sequence)
+
+
+def is_colormap(value: Any) -> bool:
+    return (isinstance(value, str) and value in CMAPS) or isinstance(value, Colormap)
+
+
+def is_colormap_sequence(sequence: Sequence[Any]) -> bool:
+    return is_sequence(sequence) and all(is_colormap(val) for val in sequence)
+
+
+def is_facecolor(value: Any) -> bool:
+    return is_color(value)
+
+
+def is_edgecolor(value: Any) -> bool:
+    return value in ["face", "none", None] or is_color(value)
+
+
+def validate_edgecolor(value: Any) -> None:
+    if not is_edgecolor(value):
+        raise ArgumentTypeError(f"Invalid edgecolor: {value}")
+
+
+def is_edgecolor_sequence(sequence: Sequence[Any]) -> bool:
+    return is_sequence(sequence) and all(is_edgecolor(val) for val in sequence)
+
+
+def validate_edgecolor_sequence(sequence: Sequence[Any]) -> None:
+    if not is_edgecolor_sequence(sequence):
+        raise ArgumentTypeError(f"Invalid edgecolor sequence: {sequence}")
+
+
+def is_edgecolor_sequences(sequences: Sequence[Sequence[Any]]) -> bool:
+    return is_sequence(sequences) and all(
+        is_edgecolor_sequence(seq) for seq in sequences
+    )
+
+
+def validate_edgecolor_sequences(sequences: Sequence[Sequence[Any]]) -> None:
+    if not is_edgecolor_sequences(sequences):
+        raise ArgumentTypeError(f"Invalid edgecolor sequences: {sequences}")
+
+
+def validate_marker(value: Any):
+    if not is_marker(value):
+        raise ArgumentTypeError(f"Invalid marker: {value}")
+
+
+def is_marker(value: Any) -> bool:
+    if isinstance(value, (str, int, Path, MarkerStyle, dict)):
+        if isinstance(value, str):
+            return value in MARKERS
+        if isinstance(value, int):
+            return is_value_in_range(value, 0, 11)
+        if isinstance(value, dict):
+            valid_keys = all(
+                key in ["marker", "fillstyle", "transform", "capstyle", "joinstyle"]
+                for key in value
+            )
+            valid_marker = value["marker"] in MARKERS if "marker" in value else True
+            valid_fillstyle = (
+                value["fillstyle"] in MARKERS_FILLSTYLES
+                if "fillstyle" in value
+                else True
+            )
+            valid_transform = (
+                isinstance(value["transform"], (str, Normalize))
+                if "transform" in value
+                else True
+            )
+            valid_capstyle = (
+                value["capstyle"] in ["butt", "round", "projecting"]
+                if "capstyle" in value
+                else True
+            )
+            valid_joinstyle = (
+                value["joinstyle"] in ["miter", "round", "bevel"]
+                if "joinstyle" in value
+                else True
+            )
+            return (
+                valid_keys
+                and valid_marker
+                and valid_fillstyle
+                and valid_transform
+                and valid_capstyle
+                and valid_joinstyle
+            )
+        return isinstance(value, (Path, MarkerStyle))
+
+
+def is_marker_sequence(sequence: Sequence[Any]) -> bool:
+    return is_sequence(sequence) and all(is_marker(val) for val in sequence)
+
+
+def is_marker_sequences(sequences: Sequence[Sequence[Any]]) -> bool:
+    return is_sequence(sequences) and all(
+        is_marker_sequence(sequence) for sequence in sequences
+    )
+
+
+def is_value_in_range(value: Any, min_value: NumericType, max_value: NumericType):
+    return (
+        isinstance(value, NUMERIC_TYPES) and min_value <= value and value <= max_value
+    )
+
+
+def validate_value_in_range(value: Any, min_value: float, max_value: float, name: str):
+    if not isinstance(value, (float, int)):
+        raise ArgumentTypeError(f"'{name}'={value} must be a number.")
+    if not min_value <= value <= max_value:
+        raise ArgumentValueError(
+            f"'{name}'={value} must be between {min_value} and {max_value}."
+        )
+
+
+def is_numeric(value: Any) -> bool:
+    return isinstance(value, NUMERIC_TYPES)
+
+
+def validate_numeric(value: Any, name: str) -> None:
+    if not is_numeric(value):
+        raise ArgumentTypeError(f"'{name}'={value} must be a number.")
+
+
+def is_numeric_sequence(sequence: Any) -> bool:
+    return is_sequence(sequence) and all(
+        isinstance(item, NUMERIC_TYPES) for item in sequence
+    )
+
+
+def validate_numeric_sequence(sequence: Sequence, name: str) -> None:
+    if not is_numeric_sequence(sequence):
+        raise ArgumentTypeError(f"Invalid numeric sequence: {sequence}")
+
+
+def is_numeric_sequences(sequences: Any) -> bool:
+    return is_sequence(sequences) and all(
+        is_numeric_sequence(item) for item in sequences
+    )
+
+
+def validate_numeric_sequences(sequences: Sequence[Sequence], name: str) -> None:
+    validate_sequence_type(sequences, SEQUENCE_TYPES, name)
+    for sequence in sequences:
+        validate_numeric_sequence(sequence, name)
+
+
+def is_consistent_len(sequences: NumericSequences, name: str) -> bool:
+    try:
+        validate_consistent_len(sequences, name)
+        return True
+    except ArgumentStructureError:
+        return False
+
+
+def validate_consistent_len(sequences: NumericSequences, name: str) -> None:
+    first_len = len(sequences[0])
+    for i, sequence in enumerate(sequences[1:], 1):
+        if len(sequence) != first_len:
+            raise ArgumentStructureError(
+                f"All sequences in '{name}' must have the same length. "
+                f"Sequence at index 0 has length {first_len}, but sequence at "
+                f"index {i} has length {len(sequence)}."
+            )
+
+
+def is_color_tuple(value: Any) -> bool:
+    return (
+        isinstance(value, SEQUENCE_TYPES)
+        and len(value) in [3, 4]
+        and all(isinstance(val, NUMERIC_TYPES) for val in value)
+    )
+
+
+def is_color_hex(value: Any) -> bool:
+    return isinstance(value, str) and re.match(
+        r"^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", value
+    )
+
+
+def is_color_str(value: Any) -> bool:
+    return isinstance(value, str) and value in COLORS
+
+
+def is_color(value: Any) -> bool:
+    return (
+        is_color_tuple(value)
+        or is_color_hex(value)
+        or is_color_str(value)
+        or isinstance(value, float)
+    )
+
+
+def validate_color(value: Any) -> None:
+    if not is_color(value):
+        raise ArgumentTypeError(f"Invalid color: {value}")
+
+
+def is_color_sequence(value: Any) -> bool:
+    return is_sequence(value) and all(is_color(item) for item in value)
+
+
+def validate_color_sequence(value: Any) -> None:
+    if not is_color_sequence(value):
+        raise ArgumentTypeError(f"Invalid color sequence: {value}")
+
+
+def is_color_sequences(sequences: Any) -> bool:
+    return is_sequence(sequences) and all(is_color_sequence(item) for item in sequences)
+
+
+def validate_color_sequences(sequences: Any) -> None:
+    if not is_color_sequences(sequences):
+        raise ArgumentTypeError(f"Invalid color sequences: {sequences}")
+
+
+def is_str_sequence(sequence: Any) -> bool:
+    return is_sequence(sequence) and all(isinstance(item, str) for item in sequence)
 
 
 def validate_type(
@@ -45,6 +287,10 @@ def validate_sequence_non_negative(sequence: Sequence, param_name: str) -> None:
 
 def is_sequence(value: Any) -> bool:
     return isinstance(value, SEQUENCE_TYPES)
+
+
+def is_sequences(sequences: Any) -> bool:
+    return is_sequence(sequences) and all(is_sequence(item) for item in sequences)
 
 
 def validate_sequence_length(

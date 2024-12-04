@@ -51,10 +51,10 @@ class TestScatterPlotter(unittest.TestCase):
             "suptitle": "Super Title",
             "xlim": (-1, 11),
             "ylim": (-2, 2),
-            "x_ticks": np.arange(-1, 11, 1),
-            "y_ticks": np.arange(-2, 2, 0.5),
-            "x_tick_labels": [str(i) for i in range(-1, 11)],
-            "y_tick_labels": [f"{i:.1f}" for i in np.arange(-2, 2, 0.5)],
+            "xticks": np.arange(-1, 11, 1),
+            "yticks": np.arange(-2, 2, 0.5),
+            "xticklabels": [str(i) for i in range(-1, 11)],
+            "yticklabels": [f"{i:.1f}" for i in np.arange(-2, 2, 0.5)],
         }
 
     def test_initialization_validation(self):
@@ -71,38 +71,12 @@ class TestScatterPlotter(unittest.TestCase):
         for param, value in self.valid_params.items():
             setter_name = f"set_{param}"
             if hasattr(plotter2, setter_name):
-                getattr(plotter2, setter_name)(value)
-            else:
-                if param in ["xscale", "yscale"]:
-                    plotter2.set_scales(**{param: value})
-                elif param in ["xlim", "ylim"]:
-                    plotter2.set_ax_limits(**{param: value})
-                elif param in ["x_ticks", "y_ticks"]:
-                    plotter2.set_ticks(**{param: value})
-                elif param in ["x_tick_labels", "y_tick_labels"]:
-                    plotter2.set_tick_labels(**{param: value})
+                if isinstance(value, dict):
+                    getattr(plotter2, setter_name)(**value)
                 else:
-                    raise ArgumentValueError(f"Parameter '{param}' is not valid.")
+                    getattr(plotter2, setter_name)(value)
         for param in self.valid_params.keys():
-            if param in ["marker"]:
-                marker1 = getattr(plotter1, param)
-                marker2 = getattr(plotter2, param)
-                self.assertEqual(
-                    marker1.get_marker(),
-                    marker2.get_marker(),
-                    f"Parameter {param} differs between init and setter methods",
-                )
-                self.assertEqual(
-                    marker1.get_joinstyle(),
-                    marker2.get_joinstyle(),
-                    f"Parameter {param} differs between init and setter methods",
-                )
-                self.assertEqual(
-                    marker1.get_marker(),
-                    marker2.get_marker(),
-                    f"Parameter {param} differs between init and setter methods",
-                )
-            elif param in ["x_ticks", "y_ticks"]:
+            if param in ["xticks", "yticks"]:
                 for val1, val2 in zip(
                     getattr(plotter1, param), getattr(plotter2, param)
                 ):
@@ -179,10 +153,10 @@ class TestScatterPlotter(unittest.TestCase):
 
     def test_ax_limits_validation(self):
         plotter = ScatterPlotter(self.x_data, self.y_data)
-        plotter.set_ax_limits(xlim=(-1, 1), ylim=(-1, 1))
-        plotter.set_ax_limits(xlim=(-1, None))
+        plotter.set_limits(xlim=(-1, 1), ylim=(-1, 1))
+        plotter.set_limits(xlim=(-1, None))
         with self.assertRaises(ArgumentTypeError):
-            plotter.set_ax_limits(xlim=("invalid", "invalid"))
+            plotter.set_limits(xlim=("invalid", "invalid"))
 
     def test_draw_method(self):
         plotter = ScatterPlotter(self.x_data, self.y_data, **self.valid_params)
@@ -193,22 +167,13 @@ class TestScatterPlotter(unittest.TestCase):
 
     def test_save_and_load_plotter(self):
         plotter1 = ScatterPlotter(self.x_data, self.y_data, **self.valid_params)
-
         with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tmp:
             temp_path = tmp.name
         try:
             plotter1.save_plotter(temp_path, data=True)
             plotter2 = ScatterPlotter.from_json(temp_path)
             for param in self.valid_params.keys():
-                if param in ["marker"]:
-                    marker1 = getattr(plotter1, param)
-                    marker2 = getattr(plotter2, param)
-                    self.assertEqual(
-                        marker1.get_marker(),
-                        marker2.get_marker(),
-                        f"Parameter {param} differs between saved and loaded plotter",
-                    )
-                elif param in ["x_ticks", "y_ticks"]:
+                if param in ["xticks", "yticks"]:
                     for val1, val2 in zip(
                         getattr(plotter1, param), getattr(plotter2, param)
                     ):

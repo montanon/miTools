@@ -13,8 +13,8 @@ from mitools.exceptions import (
     ArgumentValueError,
 )
 from mitools.visuals.plots.matplotlib_typing import (
+    COLORS,
     Color,
-    _colors,
 )
 from mitools.visuals.plots.plotter import Plotter
 from mitools.visuals.plots.validations import (
@@ -77,7 +77,7 @@ class BoxPlotter(Plotter):
         self, color: Union[Sequence[Color], Color, Sequence[float], Sequence[int]]
     ):
         if isinstance(color, str):
-            if color not in _colors and not re.match(
+            if color not in COLORS and not re.match(
                 r"^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", color
             ):
                 raise ArgumentTypeError(
@@ -93,7 +93,7 @@ class BoxPlotter(Plotter):
             validate_length(color, self.data_size, "color")
             for c in color:
                 if isinstance(c, str):
-                    if c not in _colors and not re.match(
+                    if c not in COLORS and not re.match(
                         r"^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", c
                     ):
                         raise ArgumentTypeError(

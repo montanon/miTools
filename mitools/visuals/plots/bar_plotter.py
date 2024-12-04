@@ -9,11 +9,10 @@ from mitools.exceptions import (
     ArgumentTypeError,
 )
 from mitools.visuals.plots.matplotlib_typing import (
+    COLORS,
     Cmap,
     Color,
     EdgeColor,
-    FaceColor,
-    _colors,
 )
 from mitools.visuals.plots.plotter import Plotter
 from mitools.visuals.plots.validations import (
@@ -52,7 +51,7 @@ class BarPlotter(Plotter):
                 "default": "vertical",
                 "type": Literal["vertical", "horizontal"],
             },
-            "facecolor": {"default": None, "type": FaceColor},
+            "facecolor": {"default": None, "type": Color},
             "fill": {"default": True, "type": bool},
             "linestyle": {"default": "-", "type": str},
             "hatch": {"default": None, "type": Union[Sequence[str], str]},
@@ -68,7 +67,7 @@ class BarPlotter(Plotter):
         self, color: Union[Sequence[Color], Color, Sequence[float], Sequence[int]]
     ):
         if isinstance(color, str):
-            if color not in _colors and not re.match(
+            if color not in COLORS and not re.match(
                 r"^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", color
             ):
                 raise ArgumentTypeError(
@@ -86,7 +85,7 @@ class BarPlotter(Plotter):
             validate_length(color, self.data_size, "color")
             for c in color:
                 if isinstance(c, str):
-                    if c not in _colors and not re.match(
+                    if c not in COLORS and not re.match(
                         r"^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", c
                     ):
                         raise ArgumentTypeError(
@@ -137,7 +136,7 @@ class BarPlotter(Plotter):
 
     def set_edgecolor(self, edgecolor: EdgeColor):
         if isinstance(edgecolor, str):
-            if edgecolor not in _colors and not re.match(
+            if edgecolor not in COLORS and not re.match(
                 r"^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", edgecolor
             ):
                 raise ArgumentTypeError(
@@ -152,7 +151,7 @@ class BarPlotter(Plotter):
                 validate_length(edgecolor, self.data_size, "edgecolor")
                 for ec in edgecolor:
                     if isinstance(ec, str):
-                        if ec not in _colors and not re.match(
+                        if ec not in COLORS and not re.match(
                             r"^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", ec
                         ):
                             raise ArgumentTypeError(
@@ -211,7 +210,7 @@ class BarPlotter(Plotter):
         if isinstance(ecolor, str):
             if (
                 ecolor not in ["face", "none"]
-                and ecolor not in _colors
+                and ecolor not in COLORS
                 and not re.match(r"^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", ecolor)
             ):
                 raise ArgumentTypeError(
@@ -250,9 +249,9 @@ class BarPlotter(Plotter):
         self.orientation = orientation
         return self
 
-    def set_facecolor(self, facecolor: FaceColor):
+    def set_facecolor(self, facecolor: Color):
         if isinstance(facecolor, str):
-            if facecolor not in _colors and not re.match(
+            if facecolor not in COLORS and not re.match(
                 r"^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", facecolor
             ):
                 raise ArgumentTypeError(
@@ -264,7 +263,7 @@ class BarPlotter(Plotter):
                 validate_length(facecolor, self.data_size, "facecolor")
                 for fc in facecolor:
                     if isinstance(fc, str):
-                        if fc not in _colors and not re.match(
+                        if fc not in COLORS and not re.match(
                             r"^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", fc
                         ):
                             raise ArgumentTypeError(
