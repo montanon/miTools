@@ -453,38 +453,55 @@ class BarPlotter(Plotter):
             f"Invalid linestyle, must be a literal or sequence of literals from {LINESTYLES}."
         )
 
-    def _create_plot(self):
+    def _create_bar_kwargs(self, n_sequence: int):
         bar_kwargs = {
-            "width": self.width,
-            "bottom": self.bottom,
-            "align": self.align,
-            "color": self.color,
-            "edgecolor": self.edgecolor,
-            "linewidth": self.linewidth,
-            "xerr": self.xerr,
-            "yerr": self.yerr,
-            "ecolor": self.ecolor,
-            "capsize": self.capsize,
-            "error_kw": self.error_kw,
+            "width": self.get_sequences_param("width", n_sequence),
+            "bottom": self.get_sequences_param("bottom", n_sequence),
+            "align": self.get_sequences_param("align", n_sequence),
+            "color": self.get_sequences_param("color", n_sequence),
+            "edgecolor": self.get_sequences_param("edgecolor", n_sequence),
+            "linewidth": self.get_sequences_param("linewidth", n_sequence),
+            "xerr": self.get_sequences_param("xerr", n_sequence),
+            "yerr": self.get_sequences_param("yerr", n_sequence),
+            "ecolor": self.get_sequences_param("ecolor", n_sequence),
+            "capsize": self.get_sequences_param("capsize", n_sequence),
+            "error_kw": self.get_sequences_param("error_kw", n_sequence),
             "log": self.log,
-            "facecolor": self.facecolor,
-            "fill": self.fill,
-            "linestyle": self.linestyle,
-            "hatch": self.hatch,
-            "colormap": self.colormap,
-            "alpha": self.alpha,
-            "label": self.label,
-            "zorder": self.zorder,
+            "facecolor": self.get_sequences_param("facecolor", n_sequence),
+            "fill": self.get_sequences_param("fill", n_sequence),
+            "linestyle": self.get_sequences_param("linestyle", n_sequence),
+            "hatch": self.get_sequences_param("hatch", n_sequence),
+            "colormap": self.get_sequences_param("colormap", n_sequence),
+            "alpha": self.get_sequences_param("alpha", n_sequence),
+            "label": self.get_sequences_param("label", n_sequence),
+            "zorder": self.get_sequences_param("zorder", n_sequence),
         }
-        bar_kwargs = {k: v for k, v in bar_kwargs.items() if v is not None}
+        if (
+            not isinstance(bar_kwargs.get("alpha", []), NUMERIC_TYPES)
+            and len(bar_kwargs.get("alpha", [])) == 1
+        ):
+            bar_kwargs["alpha"] = bar_kwargs["alpha"][0]
+        return bar_kwargs
 
-        try:
-            if self.orientation == "vertical":
-                self.ax.bar(self.x_data[0], self.y_data[0], **bar_kwargs)
-            else:
-                bar_kwargs["height"] = self.y_data[0]
-                y_data = bar_kwargs.pop("width")
-                bar_kwargs["left"] = bar_kwargs.pop("bottom")
-                self.ax.barh(self.x_data, y_data, **bar_kwargs)
-        except Exception as e:
-            raise BarPlotterException(f"Error while creating bar plot: {e}")
+    def _create_plot(self):
+        for n_sequence in range(self._n_sequences):
+            bar_kwargs = self._create_bar_kwargs(n_sequence)
+            bar_kwargs = {k: v for k, v in bar_kwargs.items() if v is not None}
+            try:
+                if self.orientation == "vertical":
+                    self.ax.bar(
+                        self.x_data[n_sequence],
+                        self.y_data[n_sequence],
+                        **bar_kwargs,
+                    )
+                else:
+                    bar_kwargs["height"] = self.y_data[n_sequence]
+                    y_data = bar_kwargs.pop("width")
+                    bar_kwargs["left"] = bar_kwargs.pop("bottom")
+                    self.ax.barh(
+                        self.x_data[n_sequence],
+                        y_data,
+                        **bar_kwargs,
+                    )
+            except Exception as e:
+                raise BarPlotterException(f"Error while creating bar plot: {e}")
