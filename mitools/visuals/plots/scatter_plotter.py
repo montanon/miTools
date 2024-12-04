@@ -44,6 +44,7 @@ from mitools.visuals.plots.validations import (
     validate_edgecolor,
     validate_marker,
     validate_numeric,
+    validate_same,
     validate_sequence_length,
     validate_type,
 )
@@ -60,6 +61,7 @@ class ScatterPlotter(Plotter):
         y_data: Union[NumericSequences, NumericSequence],
         **kwargs,
     ):
+        super().__init__(x_data, y_data, **kwargs)
         self._scatter_params = {
             # General Axes.scatter Parameters that are independent of the number of data sequences
             "plot_non_finite": {"default": False, "type": bool},
@@ -90,7 +92,6 @@ class ScatterPlotter(Plotter):
             "vmin": {"default": None, "type": Union[NumericSequence, NumericType]},
             "vmax": {"default": None, "type": Union[NumericSequence, NumericType]},
         }
-        super().__init__(x_data, y_data, **kwargs)
         self._init_params.update(self._scatter_params)
         self._set_init_params(**kwargs)
         self.figure: Figure = None
@@ -110,7 +111,9 @@ class ScatterPlotter(Plotter):
         if self._multi_data:
             if is_numeric_sequences(sizes):
                 validate_consistent_len(sizes, "sizes")
-                validate_sequence_length(sizes[0], self.data_size, "sizes[0]")
+                if any(len(sequence) != 1 for sequence in sizes):
+                    max_len = max(len(sequence) for sequence in sizes)
+                    validate_same(max_len, self.data_size, "len(sizes)", "data_size")
                 self.size = sizes
                 self._multi_params_structure["size"] = "sequences"
                 return self
@@ -142,7 +145,9 @@ class ScatterPlotter(Plotter):
         if self._multi_data:
             if is_marker_sequences(markers):
                 validate_consistent_len(markers, "markers")
-                validate_sequence_length(markers[0], self.data_size, "markers[0]")
+                if any(len(sequence) != 1 for sequence in markers):
+                    max_len = max(len(sequence) for sequence in markers)
+                    validate_same(max_len, self.data_size, "len(markers)", "data_size")
                 self.marker = markers
                 self._multi_params_structure["marker"] = "sequences"
                 return self
@@ -175,7 +180,11 @@ class ScatterPlotter(Plotter):
         if self._multi_data:
             if is_numeric_sequences(linewidths):
                 validate_consistent_len(linewidths, "linewidths")
-                validate_sequence_length(linewidths[0], self.data_size, "linewidths[0]")
+                if any(len(sequence) != 1 for sequence in linewidths):
+                    max_len = max(len(sequence) for sequence in linewidths)
+                    validate_same(
+                        max_len, self.data_size, "len(linewidths)", "data_size"
+                    )
                 self.linewidth = linewidths
                 self._multi_params_structure["linewidth"] = "sequences"
                 return self
@@ -208,7 +217,11 @@ class ScatterPlotter(Plotter):
         if self._multi_data:
             if is_edgecolor_sequences(edgecolors):
                 validate_consistent_len(edgecolors, "edgecolors")
-                validate_sequence_length(edgecolors[0], self.data_size, "edgecolors[0]")
+                if any(len(sequence) != 1 for sequence in edgecolors):
+                    max_len = max(len(sequence) for sequence in edgecolors)
+                    validate_same(
+                        max_len, self.data_size, "len(edgecolors)", "data_size"
+                    )
                 self.edgecolor = edgecolors
                 self._multi_params_structure["edgecolor"] = "sequences"
                 return self
@@ -239,8 +252,11 @@ class ScatterPlotter(Plotter):
         if self._multi_data:
             if is_color_sequences(facecolors):
                 validate_consistent_len(facecolors, "facecolors")
-                validate_sequence_length(facecolors, self._n_sequences, "facecolors")
-                validate_sequence_length(facecolors[0], self.data_size, "facecolors[0]")
+                if any(len(sequence) != 1 for sequence in facecolors):
+                    max_len = max(len(sequence) for sequence in facecolors)
+                    validate_same(
+                        max_len, self.data_size, "len(facecolors)", "data_size"
+                    )
                 self.facecolor = facecolors
                 self._multi_params_structure["facecolor"] = "sequences"
                 return self

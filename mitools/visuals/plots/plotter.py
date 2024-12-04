@@ -40,6 +40,7 @@ from mitools.visuals.plots.validations import (
     validate_consistent_len,
     validate_numeric,
     validate_numeric_sequences,
+    validate_same,
     validate_same_length,
     validate_sequence_length,
     validate_sequence_type,
@@ -486,7 +487,9 @@ class Plotter(ABC):
             if is_color_sequences(color):
                 validate_consistent_len(color, "color")
                 validate_sequence_length(color, self._n_sequences, "color")
-                validate_sequence_length(color[0], self.data_size, "color[0]")
+                if any(len(sequence) != 1 for sequence in color):
+                    max_len = max(len(sequence) for sequence in color)
+                    validate_same(max_len, self.data_size, "len(color)", "data_size")
                 self.color = color
                 self._multi_params_structure["color"] = "sequences"
                 return self
@@ -519,7 +522,9 @@ class Plotter(ABC):
         if self._multi_data:
             if is_numeric_sequences(alpha):
                 validate_consistent_len(alpha, "alpha")
-                validate_sequence_length(alpha[0], self.data_size, "alpha[0]")
+                if any(len(sequence) != 1 for sequence in alpha):
+                    max_len = max(len(sequence) for sequence in alpha)
+                    validate_same(max_len, self.data_size, "len(alpha)", "data_size")
                 for seq in alpha:
                     for val in seq:
                         validate_value_in_range(val, 0, 1, "alpha")
@@ -569,7 +574,9 @@ class Plotter(ABC):
         if self._multi_data:
             if is_numeric_sequences(zorder):
                 validate_consistent_len(zorder, "zorder")
-                validate_sequence_length(zorder[0], self.data_size, "zorder[0]")
+                if any(len(sequence) != 1 for sequence in zorder):
+                    max_len = max(len(sequence) for sequence in zorder)
+                    validate_same(max_len, self.data_size, "len(zorder)", "data_size")
                 self.zorder = zorder
                 self._multi_params_structure["zorder"] = "sequences"
                 return self
