@@ -8,24 +8,55 @@ from matplotlib.markers import MarkerStyle
 from numpy import integer, ndarray
 from pandas import Series
 
-from mitools.exceptions import (
-    ArgumentTypeError,
-)
+from mitools.exceptions import ArgumentStructureError, ArgumentTypeError
 from mitools.visuals.plots.matplotlib_typing import (
     Cmap,
+    CmapSequence,
     Color,
+    ColorSequence,
+    ColorSequences,
     EdgeColor,
-    FaceColor,
-    Markers,
+    EdgeColorSequence,
+    EdgeColorSequences,
+    Marker,
+    MarkerSequence,
+    MarkerSequences,
     Norm,
+    NormSequence,
+    NumericSequence,
+    NumericSequences,
+    NumericType,
     _colors,
+    _markers,
+    _markers_fillstyles,
 )
 from mitools.visuals.plots.plotter import Plotter
 from mitools.visuals.plots.validations import (
     NUMERIC_TYPES,
     SEQUENCE_TYPES,
+    is_color,
+    is_color_sequence,
+    is_color_sequences,
+    is_colormap,
+    is_colormap_sequence,
+    is_edgecolor,
+    is_edgecolor_sequence,
+    is_edgecolor_sequences,
+    is_marker,
+    is_marker_sequence,
+    is_marker_sequences,
+    is_normalization,
+    is_normalization_sequence,
+    is_numeric,
+    is_numeric_sequence,
+    is_numeric_sequences,
     is_sequence,
+    validate_color,
+    validate_consistent_len,
+    validate_edgecolor,
     validate_length,
+    validate_marker,
+    validate_numeric,
     validate_same_length,
     validate_sequence_length,
     validate_sequence_type,
@@ -39,217 +70,47 @@ class ScatterPlotterException(Exception):
 
 
 class ScatterPlotter(Plotter):
-    def __init__(self, x_data: Any, y_data: Any, **kwargs):
+    def __init__(
+        self,
+        x_data: Union[NumericSequences, NumericSequence],
+        y_data: Union[NumericSequences, NumericSequence],
+        **kwargs,
+    ):
         self._scatter_params = {
-            "size": {"default": None, "type": Union[Sequence[float], float]},
-            "marker": {"default": "o", "type": Markers},
-            "colormap": {"default": None, "type": Cmap},
-            "normalization": {"default": None, "type": Norm},
-            "vmin": {"default": None, "type": float},
-            "vmax": {"default": None, "type": float},
-            "linewidth": {"default": None, "type": Union[Sequence[float], float]},
-            "edgecolor": {"default": None, "type": EdgeColor},
-            "facecolor": {"default": None, "type": FaceColor},
+            # General Axes.scatter Parameters that are independent of the number of data sequences
             "plot_non_finite": {"default": False, "type": bool},
             "hover": {"default": False, "type": bool},
+            # Specific Parameters that are based on the number of data sequences
+            "size": {
+                "default": None,
+                "type": Union[NumericSequences, NumericSequence, NumericType],
+            },
+            "marker": {
+                "default": "o",
+                "type": Union[MarkerSequences, MarkerSequence, Marker],
+            },
+            "linewidth": {
+                "default": None,
+                "type": Union[NumericSequences, NumericSequence, NumericType],
+            },
+            "edgecolor": {
+                "default": None,
+                "type": Union[EdgeColorSequences, EdgeColorSequence, EdgeColor],
+            },
+            "facecolor": {
+                "default": None,
+                "type": Union[ColorSequences, ColorSequence, Color],
+            },
+            "colormap": {"default": None, "type": Union[CmapSequence, Cmap]},
+            "normalization": {"default": None, "type": Union[NormSequence, Norm]},
+            "vmin": {"default": None, "type": Union[NumericSequence, NumericType]},
+            "vmax": {"default": None, "type": Union[NumericSequence, NumericType]},
         }
         super().__init__(x_data, y_data, **kwargs)
         self._init_params.update(self._scatter_params)
         self._set_init_params(**kwargs)
         self.figure: Figure = None
         self.ax: Axes = None
-
-    def set_size(self, size_data: Union[Sequence[float], float]):
-        validate_type(size_data, (*SEQUENCE_TYPES, *NUMERIC_TYPES), "size_data")
-        if is_sequence(size_data):
-            validate_sequence_length(size_data, self.data_size, "size_data")
-            validate_sequence_type(size_data, NUMERIC_TYPES, "size_data")
-        self.size = size_data
-        return self
-
-    def set_color(
-        self, color: Union[Sequence[Color], Color, Sequence[float], Sequence[int]]
-    ):
-        if isinstance(color, str):
-            if color not in _colors and not re.match(
-                r"^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$", color
-            ):
-                raise ArgumentTypeError(
-                    f"'color'='{color}' must be a valid Matplotlib color string or HEX code."
-                )
-            self.color = color
-            return self
-        if isinstance(color, (tuple, list, ndarray)):
-            if len(color) in [3, 4]:
-                validate_sequence_type(color, NUMERIC_TYPES, "color")
-                self.color = color
-                return self
-        if is_sequence(color):
-            validate_length(color, self.data_size, "color")
-            if not all(
-                isinstance(c, str)
-                or (
-                    isinstance(c, (tuple, list, ndarray))
-                    and len(c) in [3, 4]
-                    and all(isinstance(x, (float, int, integer)) for x in c)
-                )
-                or isinstance(c, (int, float, integer))
-                for c in color
-            ):
-                raise ArgumentTypeError(
-                    "All elements in color must be strings or RGB/RGBA values."
-                )
-
-            self.color = color
-            return self
-        raise ArgumentTypeError(
-            "color must be a string, RGB/RGBA values, or array-like of strings/RGB/RGBA values."
-        )
-
-    def set_marker(
-        self,
-        marker: Union[Markers, dict],
-        fillstyle: Literal["full", "left", "right", "bottom", "top", "none"] = None,
-        **kwargs,
-    ):
-        if fillstyle is not None:
-            validate_value_in_options(fillstyle, MarkerStyle.fillstyles, "fillstyle")
-        if isinstance(marker, dict):
-            marker = MarkerStyle(**marker)
-        if isinstance(marker, str):
-            validate_value_in_options(marker, MarkerStyle.markers, "marker")
-            self.marker = MarkerStyle(marker, fillstyle=fillstyle, **kwargs)
-        elif isinstance(marker, MarkerStyle):
-            self.marker = MarkerStyle(
-                marker.get_marker(), fillstyle=fillstyle, **kwargs
-            )
-        elif is_sequence(marker):
-            validate_sequence_type(marker, (MarkerStyle, str), "marker")
-            validate_length(marker, self.data_size, "marker")
-            self.marker = [
-                MarkerStyle(m.get_marker(), fillstyle=fillstyle, **kwargs)
-                if isinstance(m, MarkerStyle)
-                else MarkerStyle(m, fillstyle=fillstyle, **kwargs)
-                for m in marker
-            ]
-        else:
-            raise ArgumentTypeError(
-                "marker must be a string, a MarkerStyle object, or a sequence of MarkerStyle objects."
-            )
-        return self
-
-    def set_colormap(self, cmap: Cmap):
-        _cmaps = [
-            "magma",
-            "inferno",
-            "plasma",
-            "viridis",
-            "cividis",
-            "twilight",
-            "twilight_shifted",
-            "turbo",
-        ]
-        validate_type(cmap, (str, Colormap), "cmap")
-        if isinstance(cmap, str):
-            validate_value_in_options(cmap, _cmaps, "cmap")
-        self.colormap = cmap
-        return self
-
-    def set_normalization(self, normalization: Norm):
-        _normalizations = [
-            "linear",
-            "log",
-            "symlog",
-            "asinh",
-            "logit",
-            "function",
-            "functionlog",
-        ]
-        validate_type(normalization, (str, Normalize), "normalization")
-        if isinstance(normalization, str):
-            validate_value_in_options(normalization, _normalizations, "normalization")
-        self.normalization = normalization
-        return self
-
-    def set_vmin(self, vmin: Union[float, int]):
-        if self.normalization is not None:
-            validate_type(self.normalization, str, "normalization")
-        validate_type(vmin, NUMERIC_TYPES, "vmin")
-        self.vmin = vmin
-        return self
-
-    def set_vmax(self, vmax: Union[float, int]):
-        if self.normalization is not None:
-            validate_type(self.normalization, str, "normalization")
-        validate_type(vmax, NUMERIC_TYPES, "vmax")
-        self.vmax = vmax
-        return self
-
-    def set_normalization_range(self, vmin: float, vmax: float):
-        self.set_vmin(vmin)
-        self.set_vmax(vmax)
-        return self
-
-    def set_linewidth(self, linewidth: Union[Sequence[float], float]):
-        if is_sequence(linewidth):
-            validate_type(linewidth, SEQUENCE_TYPES, "linewidth")
-            validate_sequence_type(linewidth, NUMERIC_TYPES, "linewidth")
-            validate_same_length(linewidth, self.x_data, "linewidth", "x_data")
-        else:
-            validate_type(linewidth, NUMERIC_TYPES, "linewidth")
-        self.linewidth = linewidth
-        return self
-
-    def set_edgecolor(self, edgecolor: EdgeColor):
-        if edgecolor in ["face", "none", None]:
-            self.edgecolor = edgecolor
-            return self
-        if isinstance(edgecolor, str):
-            self.edgecolor = edgecolor
-            return self
-        if isinstance(edgecolor, (list, tuple)):
-            validate_sequence_length(edgecolor, (3, 4), "edgecolor")
-            validate_sequence_type(edgecolor, NUMERIC_TYPES, "edgecolor")
-            self.edgecolor = edgecolor
-            return self
-        validate_type(edgecolor, SEQUENCE_TYPES, "edgecolor")
-        validate_same_length(edgecolor, self.x_data, "edgecolor", "x_data")
-        for ec in edgecolor:
-            if isinstance(ec, str):
-                continue
-            if isinstance(ec, (list, tuple)):
-                validate_sequence_length(ec, (3, 4), "edgecolor values")
-                validate_sequence_type(ec, NUMERIC_TYPES, "edgecolor values")
-                continue
-            raise ArgumentTypeError(
-                "Each edgecolor must be a string or RGB/RGBA values."
-            )
-        self.edgecolor = edgecolor
-        return self
-
-    def set_facecolor(self, facecolor: FaceColor):
-        if isinstance(facecolor, str):
-            self.facecolor = facecolor
-            return self
-        if isinstance(facecolor, (list, tuple)):
-            validate_sequence_length(facecolor, (3, 4), "facecolor")
-            validate_sequence_type(facecolor, NUMERIC_TYPES, "facecolor")
-            self.facecolor = facecolor
-            return self
-        validate_type(facecolor, SEQUENCE_TYPES, "facecolor")
-        validate_same_length(facecolor, self.x_data, "facecolor", "x_data")
-        for fc in facecolor:
-            if isinstance(fc, str):
-                continue
-            if isinstance(fc, (list, tuple)):
-                validate_sequence_length(fc, (3, 4), "facecolor values")
-                validate_sequence_type(fc, NUMERIC_TYPES, "facecolor values")
-                continue
-            raise ArgumentTypeError(
-                "Each facecolor must be a string or RGB/RGBA values."
-            )
-        self.facecolor = facecolor
-        return self
 
     def set_plot_non_finite(self, plot_non_finite: bool):
         validate_type(plot_non_finite, bool, "plot_non_finite")
@@ -259,6 +120,198 @@ class ScatterPlotter(Plotter):
     def set_hover(self, hover: bool):
         validate_type(hover, bool, "hover")
         self.hover = hover
+        return self
+
+    def set_size(self, sizes: Union[NumericSequences, NumericSequence, NumericType]):
+        if self.multi_data:
+            if is_numeric_sequences(sizes):
+                validate_consistent_len(sizes, "sizes")
+                validate_sequence_length(sizes[0], self.data_size, "sizes[0]")
+                self.size = sizes
+                return self
+            elif is_numeric_sequence(sizes):
+                validate_sequence_length(sizes, self.n_sequences, "sizes")
+                self.size = sizes
+                return self
+            elif is_numeric(sizes):
+                self.size = sizes
+                return self
+        else:
+            if is_numeric_sequence(sizes):
+                validate_sequence_length(sizes, self.data_size, "sizes")
+                self.size = sizes
+                return self
+            validate_numeric(sizes, "sizes")
+            self.size = sizes
+            return self
+        raise ArgumentStructureError(
+            "Invalid sizes, must be a numeric value, sequence of numbers, or sequences of numbers."
+        )
+
+    def set_marker(self, markers: Union[MarkerSequences, MarkerSequence, Marker]):
+        if self.multi_data:
+            if is_marker_sequences(markers):
+                validate_consistent_len(markers, "markers")
+                validate_sequence_length(markers[0], self.data_size, "markers[0]")
+                self.marker = markers
+                return self
+            elif is_marker_sequence(markers):
+                validate_sequence_length(markers, self.n_sequences, "markers")
+                self.marker = markers
+                return self
+            elif is_numeric(markers):
+                self.marker = markers
+                return self
+        else:
+            if is_marker_sequence(markers):
+                validate_sequence_length(markers, self.data_size, "markers")
+                self.marker = markers
+                return self
+            validate_marker(markers, "markers")
+            self.marker = markers
+            return self
+        raise ArgumentStructureError(
+            "Invalid markers, must be a marker, sequence of markers, or sequences of markers."
+        )
+
+    def set_linewidth(
+        self, linewidths: Union[NumericSequences, NumericSequence, NumericType]
+    ):
+        if self.multi_data:
+            if is_numeric_sequences(linewidths):
+                validate_consistent_len(linewidths, "linewidths")
+                validate_sequence_length(linewidths[0], self.data_size, "linewidths[0]")
+                self.linewidth = linewidths
+                return self
+            elif is_numeric_sequence(linewidths):
+                validate_sequence_length(linewidths, self.n_sequences, "linewidths")
+                self.linewidth = linewidths
+                return self
+            elif is_numeric(linewidths):
+                self.linewidth = linewidths
+                return self
+        else:
+            if is_numeric_sequence(linewidths):
+                validate_sequence_length(linewidths, self.data_size, "linewidths")
+                self.linewidth = linewidths
+                return self
+            validate_numeric(linewidths, "linewidths")
+            self.linewidth = linewidths
+            return self
+        raise ArgumentStructureError(
+            "Invalid linewidths, must be a numeric value, sequence of numbers, or sequences of numbers."
+        )
+
+    def set_edgecolor(
+        self, edgecolors: Union[EdgeColorSequences, EdgeColorSequence, EdgeColor]
+    ):
+        if self.multi_data:
+            if is_edgecolor_sequences(edgecolors):
+                validate_consistent_len(edgecolors, "edgecolors")
+                validate_sequence_length(edgecolors[0], self.data_size, "edgecolors[0]")
+                self.edgecolor = edgecolors
+                return self
+            elif is_edgecolor_sequence(edgecolors):
+                validate_sequence_length(edgecolors, self.n_sequences, "edgecolors")
+                self.edgecolor = edgecolors
+                return self
+            elif validate_edgecolor(edgecolors):
+                self.edgecolor = edgecolors
+                return self
+        else:
+            if is_edgecolor_sequence(edgecolors):
+                validate_sequence_length(edgecolors, self.data_size, "edgecolors")
+                self.edgecolor = edgecolors
+                return self
+            validate_edgecolor(edgecolors)
+            self.edgecolor = edgecolors
+            return self
+        raise ArgumentStructureError(
+            "Invalid edgecolors, must be a edgecolor, sequence of edgecolors, or sequences of edgecolors."
+        )
+
+    def set_facecolor(self, facecolors: Union[ColorSequences, ColorSequence, Color]):
+        if self.multi_data:
+            if is_color_sequences(facecolors):
+                validate_consistent_len(facecolors, "facecolors")
+                validate_sequence_length(facecolors, self.n_sequences, "facecolors")
+                validate_sequence_length(facecolors[0], self.data_size, "facecolors[0]")
+                self.facecolor = facecolors
+                return self
+            elif is_color_sequence(facecolors):
+                validate_sequence_length(facecolors, self.n_sequences, "facecolors")
+                self.facecolor = facecolors
+                return self
+            elif is_color(facecolors):
+                self.facecolor = facecolors
+                return self
+        else:
+            if is_color_sequence(facecolors):
+                validate_sequence_length(facecolors, self.data_size, "facecolors")
+                self.facecolor = facecolors
+                return self
+            validate_color(facecolors)
+            self.facecolor = facecolors
+            return self
+        raise ArgumentStructureError(
+            "Invalid facecolors, must be a color, sequence of colors, or sequences of colors."
+        )
+
+    def set_colormap(self, colormaps: Union[CmapSequence, Cmap]):
+        if self.multi_data and is_colormap_sequence(colormaps):
+            validate_sequence_length(colormaps, self.n_sequences, "colormaps")
+            self.colormap = colormaps
+            return self
+        elif is_colormap(colormaps):
+            self.colormap = colormaps
+            return self
+        raise ArgumentStructureError(
+            "Invalid colormaps, must be a colormap, sequence of colormaps, or sequences of colormaps."
+        )
+
+    def set_normalization(self, normalization: Union[NormSequence, Norm]):
+        if self.multi_data and is_normalization_sequence(normalization):
+            validate_sequence_length(normalization, self.n_sequences, "normalization")
+            self.normalization = normalization
+            return self
+        elif is_normalization(normalization):
+            self.normalization = normalization
+            return self
+        raise ArgumentStructureError(
+            "Invalid normalization, must be a normalization, sequence of normalizations, or sequences of normalizations."
+        )
+
+    def set_vmin(self, vmin: Union[NumericSequence, NumericType]):
+        if self.multi_data and is_numeric_sequence(vmin):
+            validate_sequence_length(vmin, self.n_sequences, "vmin")
+            self.vmin = vmin
+            return self
+        elif is_numeric(vmin):
+            self.vmin = vmin
+            return self
+        raise ArgumentStructureError(
+            "Invalid vmin, must be a numeric value, sequence of numbers, or sequences of numbers."
+        )
+
+    def set_vmax(self, vmax: Union[NumericSequence, NumericType]):
+        if self.multi_data and is_numeric_sequence(vmax):
+            validate_sequence_length(vmax, self.n_sequences, "vmax")
+            self.vmax = vmax
+            return self
+        elif is_numeric(vmax):
+            self.vmax = vmax
+            return self
+        raise ArgumentStructureError(
+            "Invalid vmax, must be a numeric value, sequence of numbers, or sequences of numbers."
+        )
+
+    def set_normalization_range(
+        self,
+        vmin: Union[NumericSequence, NumericType],
+        vmax: Union[NumericSequence, NumericType],
+    ):
+        self.set_vmin(vmin)
+        self.set_vmax(vmax)
         return self
 
     def _create_plot(self):

@@ -1,6 +1,9 @@
 import re
+from pathlib import Path
 from typing import Any, Sequence, Tuple, Type, TypeVar, Union
 
+from matplotlib.colors import Colormap, Normalize
+from matplotlib.markers import MarkerStyle
 from numpy import integer, ndarray
 from pandas import Series
 
@@ -9,12 +12,135 @@ from mitools.exceptions import (
     ArgumentTypeError,
     ArgumentValueError,
 )
-from mitools.visuals.plots.matplotlib_typing import NumericSequences, _colors
+from mitools.visuals.plots.matplotlib_typing import (
+    NumericSequences,
+    NumericType,
+    _cmaps,
+    _colors,
+    _markers,
+    _markers_fillstyles,
+    _normalizations,
+)
 
 T = TypeVar("T")
 
 NUMERIC_TYPES = (float, int, integer)
 SEQUENCE_TYPES = (list, tuple, ndarray, Series)
+
+
+def is_normalization(value: Any) -> bool:
+    return (isinstance(value, str) and value in _normalizations) or isinstance(
+        value, Normalize
+    )
+
+
+def is_normalization_sequence(sequence: Sequence[Any]) -> bool:
+    return is_sequence(sequence) and all(is_normalization(val) for val in sequence)
+
+
+def is_colormap(value: Any) -> bool:
+    return (isinstance(value, str) and value in _cmaps) or isinstance(value, Colormap)
+
+
+def is_colormap_sequence(sequence: Sequence[Any]) -> bool:
+    return is_sequence(sequence) and all(is_colormap(val) for val in sequence)
+
+
+def is_facecolor(value: Any) -> bool:
+    return is_color(value)
+
+
+def is_edgecolor(value: Any) -> bool:
+    return value in ["face", "none", None] or is_color(value)
+
+
+def validate_edgecolor(value: Any) -> None:
+    if not is_edgecolor(value):
+        raise ArgumentTypeError(f"Invalid edgecolor: {value}")
+
+
+def is_edgecolor_sequence(sequence: Sequence[Any]) -> bool:
+    return is_sequence(sequence) and all(is_edgecolor(val) for val in sequence)
+
+
+def validate_edgecolor_sequence(sequence: Sequence[Any]) -> None:
+    if not is_edgecolor_sequence(sequence):
+        raise ArgumentTypeError(f"Invalid edgecolor sequence: {sequence}")
+
+
+def is_edgecolor_sequences(sequences: Sequence[Sequence[Any]]) -> bool:
+    return is_sequence(sequences) and all(
+        is_edgecolor_sequence(seq) for seq in sequences
+    )
+
+
+def validate_edgecolor_sequences(sequences: Sequence[Sequence[Any]]) -> None:
+    if not is_edgecolor_sequences(sequences):
+        raise ArgumentTypeError(f"Invalid edgecolor sequences: {sequences}")
+
+
+def validate_marker(value: Any):
+    if not is_marker(value):
+        raise ArgumentTypeError(f"Invalid marker: {value}")
+
+
+def is_marker(value: Any) -> bool:
+    if isinstance(value, (str, int, Path, MarkerStyle, dict)):
+        if isinstance(str):
+            return value in _markers
+        if isinstance(int):
+            return is_value_in_range(value, 0, 11)
+        if isinstance(value, dict):
+            valid_keys = all(
+                key in ["marker", "fillstyle", "transform", "capstyle", "joinstyle"]
+                for key in value
+            )
+            valid_marker = value["marker"] in _markers if "marker" in value else True
+            valid_fillstyle = (
+                value["fillstyle"] in _markers_fillstyles
+                if "fillstyle" in value
+                else True
+            )
+            valid_transform = (
+                isinstance(value["transform"], (str, Normalize))
+                if "transform" in value
+                else True
+            )
+            valid_capstyle = (
+                value["capstyle"] in ["butt", "round", "projecting"]
+                if "capstyle" in value
+                else True
+            )
+            valid_joinstyle = (
+                value["joinstyle"] in ["miter", "round", "bevel"]
+                if "joinstyle" in value
+                else True
+            )
+            return (
+                valid_keys
+                and valid_marker
+                and valid_fillstyle
+                and valid_transform
+                and valid_capstyle
+                and valid_joinstyle
+            )
+        return isinstance(value, (Path, MarkerStyle))
+
+
+def is_marker_sequence(sequence: Sequence[Any]) -> bool:
+    return is_sequence(sequence) and all(is_marker(val) for val in sequence)
+
+
+def is_marker_sequences(sequences: Sequence[Sequence[Any]]) -> bool:
+    return is_sequence(sequences) and all(
+        is_marker_sequence(sequence) for sequence in sequences
+    )
+
+
+def is_value_in_range(value: Any, min_value: NumericType, max_value: NumericType):
+    return (
+        isinstance(value, NUMERIC_TYPES) and min_value <= value and value <= max_value
+    )
 
 
 def validate_value_in_range(value: Any, min_value: float, max_value: float, name: str):

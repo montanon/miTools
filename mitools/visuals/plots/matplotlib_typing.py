@@ -12,9 +12,12 @@ Color = Union[str, Sequence[float]]
 ColorSequence = Sequence[Color]
 ColorSequences = Sequence[ColorSequence]
 StrSequence = Sequence[str]
-_colors = list(get_named_colors_mapping().keys())
-Marker = Union[str, int, Path, MarkerStyle]
-Markers = Union[Marker, Sequence[Marker]]
+_colors = set(get_named_colors_mapping().keys())
+_markers = set(MarkerStyle.markers.keys()) + set(MarkerStyle.filled_markers)
+_markers_fillstyles = set(MarkerStyle.fillstyles)
+Marker = Union[str, int, Path, MarkerStyle, dict]
+MarkerSequence = Union[Marker, Sequence[Marker]]
+MarkerSequences = Sequence[MarkerSequence]
 Cmap = Union[
     Literal[
         "magma",
@@ -28,9 +31,31 @@ Cmap = Union[
     ],
     Colormap,
 ]
+_normalizations = [
+    "linear",
+    "log",
+    "symlog",
+    "asinh",
+    "logit",
+    "function",
+    "functionlog",
+]
+_cmaps = [
+    "magma",
+    "inferno",
+    "plasma",
+    "viridis",
+    "cividis",
+    "twilight",
+    "twilight_shifted",
+    "turbo",
+]
+CmapSequence = Sequence[Cmap]
 Norm = Union[str, Normalize]
+NormSequence = Sequence[Norm]
 EdgeColor = Union[Literal["face", "none", None], Color, Sequence[Color]]
-FaceColor = Union[Color, Sequence[Color]]
+EdgeColorSequence = Sequence[EdgeColor]
+EdgeColorSequences = Sequence[EdgeColorSequence]
 LineStyle = Union[
     Literal["-", "--", "-.", ":", "None", "none", " ", ""],
     Sequence[Literal["-", "--", "-.", ":", "None", "none", " ", ""]],
