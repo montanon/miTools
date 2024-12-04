@@ -33,6 +33,7 @@ Cmap = Union[
     Colormap,
 ]
 KERNELS = ["gaussian", "tophat", "epanechnikov", "exponential", "linear", "cosine"]
+ORIENTATIONS = ["horizontal", "vertical"]
 BANDWIDTH_METHODS = ["scott", "silverman"]
 NORMALIZATIONS = [
     "linear",
