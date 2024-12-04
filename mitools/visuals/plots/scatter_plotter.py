@@ -24,6 +24,7 @@ from mitools.visuals.plots.matplotlib_typing import (
 )
 from mitools.visuals.plots.plotter import Plotter
 from mitools.visuals.plots.validations import (
+    NUMERIC_TYPES,
     is_color,
     is_color_sequence,
     is_color_sequences,
@@ -118,7 +119,7 @@ class ScatterPlotter(Plotter):
                 self.size = sizes
                 self._multi_params_structure["size"] = "sequence"
                 return self
-            elif is_numeric(sizes):
+            elif is_numeric(sizes) or sizes is None:
                 self.size = sizes
                 self._multi_params_structure["size"] = "value"
                 return self
@@ -128,7 +129,8 @@ class ScatterPlotter(Plotter):
                 self.size = sizes
                 self._multi_params_structure["size"] = "sequence"
                 return self
-            validate_numeric(sizes, "sizes")
+            if sizes is not None:
+                validate_numeric(sizes, "sizes")
             self.size = sizes
             self._multi_params_structure["size"] = "value"
             return self
@@ -359,6 +361,11 @@ class ScatterPlotter(Plotter):
             "zorder": self.get_sequences_param("zorder", n_sequence),
             "plotnonfinite": self.plot_non_finite,
         }
+        if (
+            not isinstance(scatter_kwargs.get("alpha", []), NUMERIC_TYPES)
+            and len(scatter_kwargs.get("alpha", [])) == 1
+        ):
+            scatter_kwargs["alpha"] = scatter_kwargs["alpha"][0]
         return scatter_kwargs
 
     def _create_plot(self):

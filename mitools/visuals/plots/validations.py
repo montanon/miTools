@@ -163,7 +163,7 @@ def validate_numeric(value: Any, name: str) -> None:
 
 def is_numeric_sequence(sequence: Any) -> bool:
     return is_sequence(sequence) and all(
-        isinstance(item, NUMERIC_TYPES) for item in sequence
+        isinstance(item, NUMERIC_TYPES) or item is None for item in sequence
     )
 
 
@@ -193,13 +193,12 @@ def is_consistent_len(sequences: NumericSequences, name: str) -> bool:
 
 
 def validate_consistent_len(sequences: NumericSequences, name: str) -> None:
-    first_len = len(sequences[0])
-    for i, sequence in enumerate(sequences[1:], 1):
-        if len(sequence) != first_len:
+    max_len = max(len(sequence) for sequence in sequences)
+    for i, sequence in enumerate(sequences):
+        if len(sequence) not in [max_len, 1]:
             raise ArgumentStructureError(
-                f"All sequences in '{name}' must have the same length. "
-                f"Sequence at index 0 has length {first_len}, but sequence at "
-                f"index {i} has length {len(sequence)}."
+                f"All sequences in '{name}' must have the same length or length 1. "
+                f"Sequence at index {i} has length {len(sequence)}, but max length of sequences in '{name}' is {max_len}."
             )
 
 
