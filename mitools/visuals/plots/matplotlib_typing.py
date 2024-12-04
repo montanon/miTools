@@ -52,7 +52,8 @@ CMAPS = [
     "turbo",
 ]
 BINS = ["auto", "fd", "doane", "scott", "stone", "rice", "sturges", "sqrt"]
-BinsSequence = Sequence[Union[int, str, Sequence[float]]]
+Bins = Union[int, str]
+BinsSequence = Sequence[Bins]
 BinsSequences = Sequence[BinsSequence]
 LiteralSequence = Sequence[Literal]
 LiteralSequences = Sequence[LiteralSequence]
@@ -68,6 +69,8 @@ LineStyle = Union[
 ]
 Scale = Literal["linear", "log", "symlog", "logit"]
 TickParams = Dict[str, Any]
+LINESTYLES = ["-", "--", "-.", ":", "None", "none", " ", ""]
+HATCHES = ["/", "\\", "|", "-", "+", "x", "o", "O", ".", "*"]
 HIST_ALIGN = ["left", "mid", "right"]
 HIST_HISTTYPE = ["bar", "barstacked", "step", "stepfilled"]
 TICKPARAMS = [

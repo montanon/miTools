@@ -29,19 +29,65 @@ NUMERIC_TYPES = (float, int, integer)
 SEQUENCE_TYPES = (list, tuple, ndarray, Series)
 
 
-def is_numeric_tuple(value: Any) -> bool:
-    return isinstance(value, tuple) and all(
-        isinstance(item, NUMERIC_TYPES) for item in value
+def is_literal(value: Any, options: Sequence[Any]) -> bool:
+    return isinstance(value, str) and value in options
+
+
+def validate_literal(value: Any, options: Sequence[Any]) -> None:
+    if not is_literal(value, options):
+        raise ArgumentTypeError(f"Invalid literal: {value}")
+
+
+def is_literal_sequence(sequence: Sequence[Any], options: Sequence[Any]) -> bool:
+    return is_sequence(sequence) and all(is_literal(val, options) for val in sequence)
+
+
+def validate_literal_sequence(sequence: Sequence[Any], options: Sequence[Any]) -> None:
+    if not is_literal_sequence(sequence, options):
+        raise ArgumentTypeError(f"Invalid literal sequence: {sequence}")
+
+
+def is_literal_sequences(
+    sequences: Sequence[Sequence[Any]], options: Sequence[Any]
+) -> bool:
+    return is_sequence(sequences) and all(
+        is_literal_sequence(seq, options) for seq in sequences
     )
 
 
-def is_numeric_tuple_sequence(sequence: Sequence[Any]) -> bool:
-    return is_sequence(sequence) and all(is_numeric_tuple(val) for val in sequence)
+def validate_same(value1: Any, value2: Any, param_name1: str, param_name2: str):
+    if value1 != value2:
+        raise ArgumentValueError(
+            f"{param_name1}={value1} and {param_name2}={value2} must be the same."
+        )
 
 
-def is_numeric_tuple_sequences(sequences: Sequence[Sequence[Any]]) -> bool:
+def is_numeric_tuple(value: Any, size: int = None) -> bool:
+    return (
+        isinstance(value, tuple)
+        and all(isinstance(item, NUMERIC_TYPES) for item in value)
+        and all(len(val) == size for val in value)
+        if size
+        else True
+    )
+
+
+def validate_numeric_tuple(value: Any, size: int) -> None:
+    if not is_numeric_tuple(value, size):
+        raise ArgumentTypeError(f"Invalid numeric tuple: {value}")
+
+
+def is_numeric_tuple_sequence(sequence: Sequence[Any], size: int = None) -> bool:
+    return is_sequence(sequence) and all(
+        is_numeric_tuple(val, size) for val in sequence
+    )
+
+
+def is_numeric_tuple_sequences(
+    sequences: Sequence[Sequence[Any]], size: int = None
+) -> bool:
     return is_sequence(sequences) and all(
-        is_numeric_tuple_sequence(seq) for seq in sequences
+        is_numeric_tuple_sequence(seq, size) for seq in sequences
     )
 
 
@@ -55,16 +101,20 @@ def is_bins_sequences(sequences: Sequence[Sequence[Any]]) -> bool:
 
 
 def is_bins_sequence(sequence: Sequence[Any]) -> bool:
-    return is_sequence(sequence) and all(is_bin(val) for val in sequence)
+    return is_sequence(sequence) and all(is_bins(val) for val in sequence)
 
 
-def is_bin(value: Any) -> bool:
-    if isinstance(value, (int, str, *SEQUENCE_TYPES)):
+def validate_bins(bins: Any) -> None:
+    if not is_bins(bins):
+        raise ArgumentTypeError(f"Invalid bins: {bins}")
+
+
+def is_bins(value: Any) -> bool:
+    if isinstance(value, (int, str)):
+        if isinstance(value, int):
+            return is_value_in_range(value, 0, 1_000_000)
         if isinstance(value, str):
             return value in BINS
-        if isinstance(value, SEQUENCE_TYPES):
-            return all(isinstance(item, NUMERIC_TYPES) for item in value)
-        return True
     return False
 
 
