@@ -152,7 +152,7 @@ class ScatterPlotter(Plotter):
         return scatter_kwargs
 
     def _create_plot(self):
-        for n_sequence in range(self._n_sequences):
+        for n_sequence in range(self.n_sequences):
             scatter_kwargs = self._create_scatter_kwargs(n_sequence)
             scatter_kwargs = {k: v for k, v in scatter_kwargs.items() if v is not None}
             try:

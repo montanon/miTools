@@ -115,7 +115,7 @@ class LinePlotter(Plotter):
         return line_kwargs
 
     def _create_plot(self):
-        for n_sequence in range(self._n_sequences):
+        for n_sequence in range(self.n_sequences):
             plot_kwargs = self._create_line_kwargs(n_sequence)
             plot_kwargs = {k: v for k, v in plot_kwargs.items() if v is not None}
             try:
