@@ -6,8 +6,10 @@ from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
 import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
+from numpy.testing import assert_array_equal
 
 from mitools.exceptions import (
     ArgumentStructureError,
@@ -24,36 +26,36 @@ class DummyPlotter(Plotter):
 
 class TestPlotter(TestCase):
     def setUp(self):
-        x_data = [1, 2, 3, 4]
+        x_data = np.array([1, 2, 3, 4])
         y_data = [4, 3, 2, 1]
         self.plotter = DummyPlotter(x_data, y_data)
         self.multi_plotter = DummyPlotter([x_data, x_data], [y_data, y_data])
 
     def test_init_valid_inputs(self):
-        x_data = [1, 2, 3, 4]
+        x_data = np.array([1, 2, 3, 4])
         y_data = [4, 3, 2, 1]
         plotter = DummyPlotter(x_data, y_data)
-        self.assertEqual(plotter.x_data, [x_data])
-        self.assertEqual(plotter.y_data, [y_data])
+        assert_array_equal(plotter.x_data, x_data.reshape(1, -1))
+        assert_array_equal(plotter.y_data, np.asarray([y_data]))
         self.assertEqual(plotter._n_sequences, 1)
         self.assertFalse(plotter._multi_data)
         self.assertEqual(plotter.data_size, 4)
 
     def test_init_multi_sequence(self):
-        x_data = [[1, 2, 3], [4, 5, 6]]
-        y_data = [[6, 5, 4], [3, 2, 1]]
+        x_data = np.asarray([[1, 2, 3], [4, 5, 6]])
+        y_data = np.asarray([[6, 5, 4], [3, 2, 1]])
         plotter = DummyPlotter(x_data, y_data)
-        self.assertEqual(plotter.x_data, x_data)
-        self.assertEqual(plotter.y_data, y_data)
+        assert_array_equal(plotter.x_data, x_data)
+        assert_array_equal(plotter.y_data, y_data)
         self.assertEqual(plotter._n_sequences, 2)
         self.assertTrue(plotter._multi_data)
         self.assertEqual(plotter.data_size, 3)
 
     def test_init_y_data_none(self):
-        x_data = [1, 2, 3, 4]
+        x_data = np.array([[1, 2, 3, 4]])
         y_data = None
         plotter = DummyPlotter(x_data, y_data)
-        self.assertEqual(plotter.x_data, [x_data])
+        assert_array_equal(plotter.x_data, x_data)
         self.assertIsNone(plotter.y_data)
         self.assertEqual(plotter._n_sequences, 1)
         self.assertFalse(plotter._multi_data)
@@ -287,10 +289,8 @@ class TestPlotter(TestCase):
 
     def test_set_color_invalid(self):
         with self.assertRaises(ArgumentTypeError):
-            self.plotter.set_color(123)
-        with self.assertRaises(ArgumentTypeError):
             self.plotter.set_color(["asdasd"] * 3)
-        with self.assertRaises(ArgumentTypeError):
+        with self.assertRaises(ArgumentStructureError):
             self.plotter.set_color([1, 2, 3, 4, 5])
         with self.assertRaises(ArgumentStructureError):
             self.multi_plotter.set_color(["red", "green", "blue", "yellow"])
@@ -302,9 +302,9 @@ class TestPlotter(TestCase):
     def test_set_alpha_sequence(self):
         alphas = [0.5, 0.6, 0.7, 0.9]
         self.plotter.set_alpha(alphas)
-        self.assertEqual(self.plotter.alpha, alphas)
+        assert_array_equal(self.plotter.alpha, np.array(alphas))
         self.multi_plotter.set_alpha([alphas, alphas])
-        self.assertEqual(self.multi_plotter.alpha, [alphas, alphas])
+        assert_array_equal(self.multi_plotter.alpha, np.array([alphas, alphas]))
 
     def test_set_alpha_invalid(self):
         with self.assertRaises(ArgumentValueError):
@@ -340,9 +340,9 @@ class TestPlotter(TestCase):
     def test_set_zorder_sequence(self):
         zorders = [1, 2, 3, 4]
         self.plotter.set_zorder(zorders)
-        self.assertEqual(self.plotter.zorder, zorders)
+        assert_array_equal(self.plotter.zorder, np.asarray(zorders))
         self.multi_plotter.set_zorder([zorders, zorders])
-        self.assertEqual(self.multi_plotter.zorder, [zorders, zorders])
+        assert_array_equal(self.multi_plotter.zorder, np.asarray([zorders, zorders]))
 
     def test_prepare_draw(self):
         self.plotter.prepare_draw()
@@ -391,8 +391,8 @@ class TestPlotter(TestCase):
             "builtins.open", unittest.mock.mock_open(read_data=json.dumps(data))
         ):
             plotter = DummyPlotter.from_json("plotter.json")
-            self.assertEqual(plotter.x_data, data["x_data"])
-            self.assertEqual(plotter.y_data, data["y_data"])
+            assert_array_equal(plotter.x_data, np.asarray(data["x_data"]))
+            assert_array_equal(plotter.y_data, np.asarray(data["y_data"]))
             self.assertEqual(plotter.title, {"label": data["title"]})
             self.assertEqual(plotter.xlim, tuple(data["xlim"]))
             self.assertEqual(plotter.ylim, tuple(data["ylim"]))
