@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Literal, Sequence, Union
+from typing import Any, Dict, Literal, Optional, Sequence, Union
 
 import numpy as np
 
@@ -61,7 +61,10 @@ from mitools.visuals.plots.validations import (
     is_str,
     is_str_sequence,
     validate_sequence_length,
+    validate_sequence_values_in_range,
+    validate_sequences_values_in_range,
     validate_subsequences_length,
+    validate_value_in_range,
 )
 
 
@@ -139,6 +142,8 @@ class Setter(ABC):
         self,
         sequences: Union[NumericSequences, NumericSequence, NumericType],
         param_name: str,
+        min_value: NumericType = None,
+        max_value: NumericType = None,
     ):
         if self.multi_data:
             if is_numeric_sequences(sequences):
@@ -150,11 +155,17 @@ class Setter(ABC):
                 validate_subsequences_length(
                     expanded_sequences, self.data_size, param_name
                 )
+                validate_sequences_values_in_range(
+                    expanded_sequences, min_value, max_value, param_name
+                )
                 setattr(self, param_name, np.asarray(expanded_sequences))
                 self.multi_params_structure[param_name] = "sequences"
                 return self
             elif is_numeric_sequence(sequences):
                 validate_sequence_length(sequences, self.n_sequences, param_name)
+                validate_sequence_values_in_range(
+                    sequences, min_value, max_value, param_name
+                )
                 setattr(self, param_name, sequences)
                 self.multi_params_structure[param_name] = "sequence"
                 return self
@@ -165,10 +176,14 @@ class Setter(ABC):
         else:
             if is_numeric_sequence(sequences):
                 validate_sequence_length(sequences, self.data_size, param_name)
+                validate_sequence_values_in_range(
+                    sequences, min_value, max_value, param_name
+                )
                 setattr(self, param_name, sequences)
                 self.multi_params_structure[param_name] = "sequence"
                 return self
             elif is_numeric(sequences):
+                validate_value_in_range(sequences, min_value, max_value, param_name)
                 setattr(self, param_name, sequences)
                 self.multi_params_structure[param_name] = "value"
                 return self
@@ -177,14 +192,22 @@ class Setter(ABC):
         )
 
     def set_numeric_sequence(
-        self, sequence: Union[NumericSequence, NumericType], param_name: str
+        self,
+        sequence: Union[NumericSequence, NumericType],
+        param_name: str,
+        min_value: NumericType = None,
+        max_value: NumericType = None,
     ):
         if self.multi_data and is_numeric_sequence(sequence):
             validate_sequence_length(sequence, self.n_sequences, param_name)
+            validate_sequence_values_in_range(
+                sequence, min_value, max_value, param_name
+            )
             setattr(self, param_name, np.asarray(sequence))
             self.multi_params_structure[param_name] = "sequence"
             return self
         elif is_numeric(sequence):
+            validate_value_in_range(sequence, min_value, max_value, param_name)
             setattr(self, param_name, sequence)
             self.multi_params_structure[param_name] = "value"
             return self

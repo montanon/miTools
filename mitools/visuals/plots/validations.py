@@ -2,6 +2,7 @@ import re
 from pathlib import Path
 from typing import Any, Sequence, Tuple, Type, TypeVar, Union
 
+import numpy as np
 from matplotlib.colors import Colormap, Normalize
 from matplotlib.markers import MarkerStyle
 from numpy import integer, ndarray
@@ -248,13 +249,43 @@ def is_value_in_range(value: Any, min_value: NumericType, max_value: NumericType
     )
 
 
-def validate_value_in_range(value: Any, min_value: float, max_value: float, name: str):
+def validate_value_in_range(
+    value: Any, min_value: Union[float, None], max_value: Union[float, None], name: str
+):
+    max_value = max_value if max_value is not None else np.inf
+    min_value = min_value if min_value is not None else -np.inf
     if not isinstance(value, (float, int)):
         raise ArgumentTypeError(f"'{name}'={value} must be a number.")
     if not min_value <= value <= max_value:
         raise ArgumentValueError(
             f"'{name}'={value} must be between {min_value} and {max_value}."
         )
+
+
+def validate_sequence_values_in_range(
+    sequence: Sequence,
+    min_value: Union[float, None],
+    max_value: Union[float, None],
+    name: str,
+):
+    if min_value is None and max_value is None:
+        return
+    if not is_numeric_sequence(sequence):
+        raise ArgumentTypeError(f"Invalid numeric sequence: {sequence}")
+    for val in sequence:
+        validate_value_in_range(val, min_value, max_value, name)
+
+
+def validate_sequences_values_in_range(
+    sequences: Sequence[Sequence],
+    min_value: Union[float, None],
+    max_value: Union[float, None],
+    name: str,
+):
+    if min_value is None and max_value is None:
+        return
+    for sequence in sequences:
+        validate_sequence_values_in_range(sequence, min_value, max_value, name)
 
 
 def is_numeric(value: Any) -> bool:
@@ -341,7 +372,11 @@ def validate_color(value: Any) -> None:
 
 
 def is_color_sequence(value: Any) -> bool:
-    return is_sequence(value) and all(is_color(item) for item in value)
+    return (
+        not isinstance(value, tuple)
+        and is_sequence(value)
+        and all(is_color(item) for item in value)
+    )
 
 
 def validate_color_sequence(value: Any) -> None:

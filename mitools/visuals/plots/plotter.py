@@ -498,7 +498,9 @@ class Plotter(Setter, ABC):
         return self.set_color_sequences(color, param_name="color")
 
     def set_alpha(self, alpha: Union[NumericSequences, NumericSequence, NumericType]):
-        return self.set_numeric_sequences(alpha, param_name="alpha")
+        return self.set_numeric_sequences(
+            alpha, param_name="alpha", min_value=0, max_value=1
+        )
 
     def set_label(self, labels: Union[Sequence[str], str]):
         if self._multi_data and is_str_sequence(labels):
