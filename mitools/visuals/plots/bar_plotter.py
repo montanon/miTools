@@ -39,7 +39,7 @@ class BarPlotter(Plotter):
         self,
         x_data: Union[NumericSequences, NumericSequence],
         y_data: Union[NumericSequences, NumericSequence],
-        kind: Literal["bar", "stacked"],
+        kind: Literal["bar", "stacked"] = "bar",
         **kwargs,
     ):
         self._bar_params = {
