@@ -309,7 +309,7 @@ class TestPlotter(TestCase):
     def test_set_alpha_invalid(self):
         with self.assertRaises(ArgumentValueError):
             self.plotter.set_alpha(123)
-        with self.assertRaises(ArgumentTypeError):
+        with self.assertRaises(ArgumentStructureError):
             self.plotter.set_alpha(["asdasd"] * 3)
         with self.assertRaises(ArgumentStructureError):
             self.plotter.set_alpha([1, 2, 3, 4, 5])
