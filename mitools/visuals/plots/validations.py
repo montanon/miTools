@@ -66,37 +66,45 @@ def validate_same(value1: Any, value2: Any, param_name1: str, param_name2: str):
         )
 
 
-def is_numeric_tuple(value: Any, size: int = None) -> bool:
+def is_numeric_tuple(value: Any, sizes: Union[Sequence[int], int] = None) -> bool:
+    if isinstance(sizes, int):
+        sizes = [sizes]
     return (
         isinstance(value, tuple)
         and all(isinstance(item, NUMERIC_TYPES) for item in value)
-        and len(value) == size
-        if size
+        and len(value) in sizes
+        if sizes
         else True
     )
 
 
-def validate_numeric_tuple(value: Any, size: int) -> None:
-    if not is_numeric_tuple(value, size):
+def validate_numeric_tuple(value: Any, sizes: Sequence[int]) -> None:
+    if not is_numeric_tuple(value, sizes):
         raise ArgumentTypeError(f"Invalid numeric tuple: {value}")
 
 
-def is_numeric_tuple_sequence(sequence: Sequence[Any], size: int = None) -> bool:
-    return is_sequence(sequence) and all(
-        is_numeric_tuple(val, size) for val in sequence
+def is_numeric_tuple_sequence(
+    sequence: Sequence[Any], sizes: Sequence[int] = None
+) -> bool:
+    return (
+        is_sequence(sequence)
+        and not isinstance(sequence, tuple)
+        and all(is_numeric_tuple(val, sizes) for val in sequence)
     )
 
 
 def is_numeric_tuple_sequences(
-    sequences: Sequence[Sequence[Any]], size: int = None
+    sequences: Sequence[Sequence[Any]], sizes: Sequence[int] = None
 ) -> bool:
     return is_sequence(sequences) and all(
-        is_numeric_tuple_sequence(seq, size) for seq in sequences
+        is_numeric_tuple_sequence(seq, sizes) for seq in sequences
     )
 
 
-def validate_numeric_tuple_sequence(sequence: Sequence[Any]) -> None:
-    if not is_numeric_tuple_sequence(sequence):
+def validate_numeric_tuple_sequence(
+    sequence: Sequence[Any], sizes: Sequence[int]
+) -> None:
+    if not is_numeric_tuple_sequence(sequence, sizes):
         raise ArgumentTypeError(f"Invalid numeric tuple sequence: {sequence}")
 
 
@@ -405,6 +413,13 @@ def validate_sequence_length(
         raise ArgumentStructureError(msg)
 
 
+def validate_subsequences_length(
+    sequences: Sequence, expected_length: Union[int, Tuple[int, ...]], param_name: str
+):
+    for i, sequence in enumerate(sequences):
+        validate_sequence_length(sequence, expected_length, f"{param_name}[{i}]")
+
+
 def validate_same_length(
     sequence1: Sequence, sequence2: Sequence, param_name1: str, param_name2: str
 ) -> None:
@@ -428,3 +443,29 @@ def validate_value_in_options(
         raise ArgumentValueError(
             f"'{param_name}' must be one of {valid_options}, got {value}"
         )
+
+
+def is_str(value: Any) -> bool:
+    return isinstance(value, str)
+
+
+def is_bool(value: Any) -> bool:
+    return isinstance(value, bool)
+
+
+def validate_bool(value: Any, param_name: str) -> None:
+    if not is_bool(value):
+        raise ArgumentTypeError(f"'{param_name}' must be a boolean, got {type(value)}")
+
+
+def is_bool_sequence(sequence: Any) -> bool:
+    return is_sequence(sequence) and all(isinstance(item, bool) for item in sequence)
+
+
+def validate_bool_sequence(sequence: Sequence, param_name: str) -> None:
+    if not is_bool_sequence(sequence):
+        raise ArgumentTypeError(f"Invalid bool sequence: {sequence}")
+
+
+def is_dict(value: Any) -> bool:
+    return isinstance(value, dict)

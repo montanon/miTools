@@ -8,7 +8,6 @@ from pandas import Series
 from scipy import stats
 
 from mitools.exceptions import (
-    ArgumentStructureError,
     ArgumentTypeError,
 )
 from mitools.visuals.plots.matplotlib_typing import (
@@ -27,17 +26,8 @@ from mitools.visuals.plots.matplotlib_typing import (
 from mitools.visuals.plots.plotter import Plotter
 from mitools.visuals.plots.validations import (
     NUMERIC_TYPES,
-    is_color,
-    is_color_sequence,
-    is_literal,
-    is_literal_sequence,
-    is_numeric,
-    is_numeric_sequence,
-    is_sequence,
     validate_literal,
     validate_numeric,
-    validate_sequence_length,
-    validate_sequence_type,
     validate_value_in_range,
 )
 
@@ -123,78 +113,22 @@ class DistributionPlotter(Plotter):
         return self
 
     def set_fill(self, fill: Union[Sequence[bool], bool]):
-        if self._multi_data and is_sequence(fill):
-            validate_sequence_length(fill, self._n_sequences, "fill")
-            validate_sequence_type(fill, bool, "fill")
-            self.fill = fill
-            self._multi_params_structure["fill"] = "sequence"
-            return self
-        elif isinstance(fill, bool):
-            self.fill = fill
-            self._multi_params_structure["fill"] = "value"
-            return self
-        raise ArgumentStructureError(
-            "Invalid fill, must be a boolean or sequence of booleans."
-        )
+        return self.set_bool_sequence(fill, "fill")
 
     def set_linestyle(
         self,
         linestyles: Union[LiteralSequence, Literal["linestyles"]],
     ):
-        if self._multi_data and is_literal_sequence(linestyles, LINESTYLES):
-            validate_sequence_length(linestyles, self._n_sequences, "linestyle")
-            self.linestyle = linestyles
-            self._multi_params_structure["linestyle"] = "sequence"
-            return self
-        elif is_literal(linestyles, LINESTYLES):
-            self.linestyle = linestyles
-            self._multi_params_structure["linestyle"] = "value"
-            return self
-        raise ArgumentStructureError(
-            f"Invalid linestyle, must be a literal or sequence of literals from {LINESTYLES}."
-        )
+        return self.set_literal_sequence(linestyles, LINESTYLES, "linestyles")
 
     def set_linewidth(self, linewidths: Union[NumericSequence, NumericType]):
-        if self._multi_data and is_numeric_sequence(linewidths):
-            validate_sequence_length(linewidths, self._n_sequences, "linewidth")
-            self.linewidth = linewidths
-            self._multi_params_structure["linewidth"] = "sequence"
-            return self
-        elif is_numeric(linewidths):
-            self.linewidth = linewidths
-            self._multi_params_structure["linewidth"] = "value"
-            return self
-        raise ArgumentStructureError(
-            "Invalid linewidth, must be a numeric value, sequence of numbers, or sequences of numbers."
-        )
+        return self.set_numeric_sequence(linewidths, "linewidth")
 
     def set_facecolor(self, facecolors: Union[ColorSequence, Color]):
-        if self._multi_data and is_color_sequence(facecolors):
-            validate_sequence_length(facecolors, self._n_sequences, "facecolors")
-            self.facecolor = facecolors
-            self._multi_params_structure["facecolor"] = "sequence"
-            return self
-        elif is_color(facecolors):
-            self.facecolor = facecolors
-            self._multi_params_structure["facecolor"] = "value"
-            return self
-        raise ArgumentStructureError(
-            "Invalid facecolors, must be a color, sequence of colors, or sequences of colors."
-        )
+        return self.set_color_sequence(facecolors, "facecolor")
 
     def set_hatch(self, hatches: Union[LiteralSequence, Literal["hatches"]]):
-        if self._multi_data and is_literal_sequence(hatches, HATCHES):
-            validate_sequence_length(hatches, self._n_sequences, "hatch")
-            self.hatch = hatches
-            self._multi_params_structure["hatch"] = "sequence"
-            return self
-        elif is_literal(hatches, HATCHES):
-            self.hatch = hatches
-            self._multi_params_structure["hatch"] = "value"
-            return self
-        raise ArgumentStructureError(
-            f"Invalid hatch, must be a literal or sequence of literals from {HATCHES}."
-        )
+        return self.set_literal_sequence(hatches, HATCHES, "hatch")
 
     def _compute_kde(self, data):
         kde = stats.gaussian_kde(

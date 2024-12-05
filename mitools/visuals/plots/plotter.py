@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any, Dict, Literal, Sequence, Tuple, Union
 
 import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.colors import Colormap, Normalize
 from matplotlib.figure import Figure
@@ -17,11 +18,28 @@ from mitools.exceptions import (
     ArgumentValueError,
 )
 from mitools.visuals.plots.matplotlib_typing import (
+    Bins,
+    BinsSequence,
+    Cmap,
+    CmapSequence,
     Color,
     ColorSequence,
     ColorSequences,
+    DictSequence,
+    EdgeColor,
+    EdgeColorSequence,
+    EdgeColorSequences,
+    LiteralSequence,
+    LiteralSequences,
+    Marker,
+    MarkerSequence,
+    MarkerSequences,
+    Norm,
+    NormSequence,
     NumericSequence,
     NumericSequences,
+    NumericTuple,
+    NumericTupleSequence,
     NumericType,
     Scale,
     StrSequence,
@@ -29,24 +47,43 @@ from mitools.visuals.plots.matplotlib_typing import (
 from mitools.visuals.plots.validations import (
     NUMERIC_TYPES,
     SEQUENCE_TYPES,
+    is_bins,
+    is_bins_sequence,
+    is_bool,
+    is_bool_sequence,
     is_color,
     is_color_sequence,
     is_color_sequences,
+    is_colormap,
+    is_colormap_sequence,
+    is_dict,
+    is_dict_sequence,
+    is_edgecolor,
+    is_edgecolor_sequence,
+    is_edgecolor_sequences,
+    is_literal,
+    is_literal_sequence,
+    is_literal_sequences,
+    is_marker,
+    is_marker_sequence,
+    is_marker_sequences,
+    is_normalization,
+    is_normalization_sequence,
     is_numeric,
     is_numeric_sequence,
     is_numeric_sequences,
+    is_numeric_tuple,
+    is_numeric_tuple_sequence,
+    is_str,
     is_str_sequence,
-    validate_color,
     validate_consistent_len,
-    validate_numeric,
     validate_numeric_sequences,
-    validate_same,
     validate_same_length,
     validate_sequence_length,
     validate_sequence_type,
+    validate_subsequences_length,
     validate_type,
     validate_value_in_options,
-    validate_value_in_range,
 )
 
 
@@ -161,7 +198,7 @@ class Plotter(ABC):
             data = [data]
         validate_numeric_sequences(data, name)
         validate_consistent_len(data, name)
-        return data
+        return np.asarray(data)
 
     def set_title(self, label: str, **kwargs):
         """https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.set_title.html"""
@@ -486,78 +523,10 @@ class Plotter(ABC):
         return self
 
     def set_color(self, color: Union[ColorSequences, ColorSequence, Color]):
-        if self._multi_data:
-            if is_color_sequences(color):
-                validate_consistent_len(color, "color")
-                validate_sequence_length(color, self._n_sequences, "color")
-                if any(len(sequence) != 1 for sequence in color):
-                    max_len = max(len(sequence) for sequence in color)
-                    validate_same(max_len, self.data_size, "len(color)", "data_size")
-                self.color = color
-                self._multi_params_structure["color"] = "sequences"
-                return self
-            elif is_color_sequence(color):
-                validate_sequence_length(color, self._n_sequences, "color")
-                self.color = color
-                self._multi_params_structure["color"] = "sequence"
-                return self
-            elif is_color(color):
-                self.color = color
-                self._multi_params_structure["color"] = "value"
-                return self
-        else:
-            if is_color_sequence(color):
-                validate_sequence_length(color, self.data_size, "color")
-                self.color = color
-                self._multi_params_structure["color"] = "sequence"
-                return self
-            validate_color(color)
-            self.color = color
-            self._multi_params_structure["color"] = "value"
-            return self
-        raise ArgumentStructureError(
-            "Invalid color, must be a color, sequence of colors, or sequences of colors."
-        )
+        return self.set_color_sequences(color, param_name="color")
 
-    def set_alpha(self, alpha: Union[Sequence[float], float]):
-        if is_numeric(alpha):
-            validate_value_in_range(alpha, 0, 1, "alpha")
-        if self._multi_data:
-            if is_numeric_sequences(alpha):
-                validate_consistent_len(alpha, "alpha")
-                if any(len(sequence) != 1 for sequence in alpha):
-                    max_len = max(len(sequence) for sequence in alpha)
-                    validate_same(max_len, self.data_size, "len(alpha)", "data_size")
-                for seq in alpha:
-                    for val in seq:
-                        validate_value_in_range(val, 0, 1, "alpha")
-                self.alpha = alpha
-                self._multi_params_structure["alpha"] = "sequences"
-                return self
-            elif is_numeric_sequence(alpha):
-                validate_sequence_length(alpha, self._n_sequences, "alpha")
-                for val in alpha:
-                    validate_value_in_range(val, 0, 1, "alpha")
-                self.alpha = alpha
-                self._multi_params_structure["alpha"] = "sequence"
-                return self
-            elif is_numeric(alpha):
-                self.alpha = alpha
-                self._multi_params_structure["alpha"] = "value"
-                return self
-        else:
-            if is_numeric_sequence(alpha):
-                validate_sequence_length(alpha, self.data_size, "alpha")
-                self.alpha = alpha
-                self._multi_params_structure["alpha"] = "sequence"
-                return self
-            validate_numeric(alpha, "alpha")
-            self.alpha = alpha
-            self._multi_params_structure["alpha"] = "value"
-            return self
-        raise ArgumentStructureError(
-            "Invalid alpha, must be a numeric value, sequence of numbers, or sequences of numbers."
-        )
+    def set_alpha(self, alpha: Union[NumericSequences, NumericSequence, NumericType]):
+        return self.set_numeric_sequences(alpha, param_name="alpha")
 
     def set_label(self, labels: Union[Sequence[str], str]):
         if self._multi_data and is_str_sequence(labels):
@@ -574,37 +543,7 @@ class Plotter(ABC):
         )
 
     def set_zorder(self, zorder: Union[NumericSequences, NumericSequence, NumericType]):
-        if self._multi_data:
-            if is_numeric_sequences(zorder):
-                validate_consistent_len(zorder, "zorder")
-                if any(len(sequence) != 1 for sequence in zorder):
-                    max_len = max(len(sequence) for sequence in zorder)
-                    validate_same(max_len, self.data_size, "len(zorder)", "data_size")
-                self.zorder = zorder
-                self._multi_params_structure["zorder"] = "sequences"
-                return self
-            elif is_numeric_sequence(zorder):
-                validate_sequence_length(zorder, self._n_sequences, "zorder")
-                self.zorder = zorder
-                self._multi_params_structure["zorder"] = "sequence"
-                return self
-            elif is_numeric(zorder):
-                self.zorder = zorder
-                self._multi_params_structure["zorder"] = "value"
-                return self
-        else:
-            if is_numeric_sequence(zorder):
-                validate_sequence_length(zorder, self.data_size, "zorder")
-                self.zorder = zorder
-                self._multi_params_structure["zorder"] = "sequence"
-                return self
-            validate_numeric(zorder, "zorder")
-            self.zorder = zorder
-            self._multi_params_structure["zorder"] = "value"
-            return self
-        raise ArgumentStructureError(
-            "Invalid zorder, must be a numeric value, sequence of numbers, or sequences of numbers."
-        )
+        return self.set_numeric_sequences(zorder, param_name="zorder")
 
     def prepare_draw(self):
         if self.figure is not None or self.ax is not None:
@@ -795,3 +734,374 @@ class Plotter(ABC):
         if "range" in params and params["range"] is not None:
             params["range"] = tuple(params["range"])
         return cls(x_data=x_data, y_data=y_data, **params)
+
+    def set_color_sequences(
+        self,
+        colors: Union[ColorSequences, ColorSequence, Color],
+        param_name: str,
+    ) -> Any:
+        if self._multi_data:
+            if is_color_sequences(colors):
+                validate_sequence_length(colors, self._n_sequences, param_name)
+                validate_subsequences_length(colors, [1, self.data_size], param_name)
+                setattr(self, param_name, colors)
+                self._multi_params_structure[param_name] = "sequences"
+                return self
+            elif is_color_sequence(colors):
+                validate_sequence_length(colors, self._n_sequences, param_name)
+                setattr(self, param_name, colors)
+                self._multi_params_structure[param_name] = "sequence"
+                return self
+            elif is_color(colors):
+                setattr(self, param_name, colors)
+                self._multi_params_structure[param_name] = "value"
+                return self
+        else:
+            if is_color_sequence(colors):
+                validate_sequence_length(colors, self.data_size, param_name)
+                setattr(self, param_name, colors)
+                self._multi_params_structure[param_name] = "sequence"
+                return self
+            elif is_color(colors):
+                setattr(self, param_name, colors)
+                self._multi_params_structure[param_name] = "value"
+                return self
+        raise ArgumentStructureError(
+            f"Invalid {param_name}, must be a color, sequence of colors, or sequences of colors."
+        )
+
+    def set_color_sequence(self, colors: Union[ColorSequence, Color], param_name: str):
+        if self._multi_data and is_color_sequence(colors):
+            validate_sequence_length(colors, self._n_sequences, param_name)
+            setattr(self, param_name, colors)
+            self._multi_params_structure[param_name] = "sequence"
+            return self
+        elif is_color(colors):
+            setattr(self, param_name, colors)
+            self._multi_params_structure[param_name] = "value"
+            return self
+        raise ArgumentStructureError(
+            f"Invalid {param_name}, must be a color or sequence of colors."
+        )
+
+    def set_numeric_sequences(
+        self,
+        sequences: Union[NumericSequences, NumericSequence, NumericType],
+        param_name: str,
+    ):
+        if self._multi_data:
+            if is_numeric_sequences(sequences):
+                validate_sequence_length(sequences, self._n_sequences, param_name)
+                expanded_sequences = []
+                for seq in sequences:
+                    if len(np.asarray(seq)) == 1:
+                        expanded_sequences.append(np.repeat(seq, self.data_size))
+                    else:
+                        expanded_sequences.append(seq)
+                validate_subsequences_length(
+                    expanded_sequences, self.data_size, param_name
+                )
+                sequences = expanded_sequences
+                setattr(self, param_name, np.asarray(sequences))
+                self._multi_params_structure[param_name] = "sequences"
+                return self
+            elif is_numeric_sequence(sequences):
+                validate_sequence_length(sequences, self._n_sequences, param_name)
+                setattr(self, param_name, sequences)
+                self._multi_params_structure[param_name] = "sequence"
+                return self
+            elif is_numeric(sequences):
+                setattr(self, param_name, sequences)
+                self._multi_params_structure[param_name] = "value"
+                return self
+        else:
+            if is_numeric_sequence(sequences):
+                validate_sequence_length(sequences, self.data_size, param_name)
+                setattr(self, param_name, sequences)
+                self._multi_params_structure[param_name] = "sequence"
+                return self
+            elif is_numeric(sequences):
+                setattr(self, param_name, sequences)
+                self._multi_params_structure[param_name] = "value"
+                return self
+        raise ArgumentStructureError(
+            f"Invalid {param_name}, must be a numeric value, numeric sequences, or sequence of numeric sequences."
+        )
+
+    def set_numeric_sequence(
+        self, sequence: Union[NumericSequence, NumericType], param_name: str
+    ):
+        if self._multi_data and is_numeric_sequence(sequence):
+            validate_sequence_length(sequence, self._n_sequences, param_name)
+            setattr(self, param_name, np.asarray(sequence))
+            self._multi_params_structure[param_name] = "sequence"
+            return self
+        elif is_numeric(sequence):
+            setattr(self, param_name, sequence)
+            self._multi_params_structure[param_name] = "value"
+            return self
+        raise ArgumentStructureError(
+            f"Invalid {param_name}, must be a numeric value or sequence of numbers."
+        )
+
+    def set_literal_sequences(
+        self,
+        sequences: Union[LiteralSequences, LiteralSequence, Literal["options"]],
+        options: Sequence[str],
+        param_name: str,
+    ):
+        if self._multi_data:
+            if is_literal_sequences(sequences, options):
+                validate_sequence_length(sequences, self._n_sequences, param_name)
+                validate_subsequences_length(sequences, [1, self.data_size], param_name)
+                setattr(self, param_name, sequences)
+                self._multi_params_structure[param_name] = "sequences"
+                return self
+            elif is_literal_sequence(sequences, options):
+                validate_sequence_length(sequences, self._n_sequences, param_name)
+                setattr(self, param_name, sequences)
+                self._multi_params_structure[param_name] = "sequence"
+                return self
+            elif is_literal(sequences, options):
+                setattr(self, param_name, sequences)
+                self._multi_params_structure[param_name] = "value"
+                return self
+        else:
+            if is_literal_sequence(sequences, options):
+                validate_sequence_length(sequences, self.data_size, param_name)
+                setattr(self, param_name, sequences)
+                self._multi_params_structure[param_name] = "sequence"
+                return self
+            elif is_literal(sequences, options):
+                setattr(self, param_name, sequences)
+                self._multi_params_structure[param_name] = "value"
+                return self
+        raise ArgumentStructureError(
+            f"Invalid {param_name}, must be a literal or sequence of literals."
+        )
+
+    def set_literal_sequence(
+        self,
+        sequence: Union[LiteralSequence, Literal["options"]],
+        options: Sequence[str],
+        param_name: str,
+    ):
+        if self._multi_data and is_literal_sequence(sequence, options):
+            validate_sequence_length(sequence, self._n_sequences, param_name)
+            setattr(self, param_name, sequence)
+            self._multi_params_structure[param_name] = "sequence"
+            return self
+        elif is_literal(sequence, options):
+            setattr(self, param_name, sequence)
+            self._multi_params_structure[param_name] = "value"
+            return self
+        raise ArgumentStructureError(
+            f"Invalid {param_name}, must be a literal or sequence of literals."
+        )
+
+    def set_marker_sequences(
+        self,
+        sequences: Union[MarkerSequences, MarkerSequence, Marker],
+        param_name: str,
+    ):
+        if self._multi_data:
+            if is_marker_sequences(sequences):
+                validate_sequence_length(sequences, self._n_sequences, param_name)
+                validate_subsequences_length(sequences, [1, self.data_size], param_name)
+                setattr(self, param_name, sequences)
+                self._multi_params_structure[param_name] = "sequences"
+                return self
+            elif is_marker_sequence(sequences):
+                validate_sequence_length(sequences, self._n_sequences, param_name)
+                setattr(self, param_name, sequences)
+                self._multi_params_structure[param_name] = "sequence"
+                return self
+            elif is_marker(sequences):
+                setattr(self, param_name, sequences)
+                self._multi_params_structure[param_name] = "value"
+                return self
+        else:
+            if is_marker_sequence(sequences):
+                validate_sequence_length(sequences, self.data_size, param_name)
+                setattr(self, param_name, sequences)
+                self._multi_params_structure[param_name] = "sequence"
+                return self
+            elif is_marker(sequences):
+                setattr(self, param_name, sequences)
+                self._multi_params_structure[param_name] = "value"
+                return self
+        raise ArgumentStructureError(
+            f"Invalid {param_name}, must be a marker, sequence of markers, or sequences of markers."
+        )
+
+    def set_marker_sequence(
+        self, sequence: Union[MarkerSequence, Marker], param_name: str
+    ):
+        if self._multi_data and is_marker_sequence(sequence):
+            validate_sequence_length(sequence, self._n_sequences, param_name)
+            setattr(self, param_name, sequence)
+            self._multi_params_structure[param_name] = "sequence"
+            return self
+        elif is_marker(sequence):
+            setattr(self, param_name, sequence)
+            self._multi_params_structure[param_name] = "value"
+            return self
+        raise ArgumentStructureError(
+            f"Invalid {param_name}, must be a marker or sequence of markers."
+        )
+
+    def set_edgecolor_sequences(
+        self,
+        sequences: Union[EdgeColorSequences, EdgeColorSequence, EdgeColor],
+        param_name: str,
+    ):
+        if self._multi_data:
+            if is_edgecolor_sequences(sequences):
+                validate_sequence_length(sequences, self._n_sequences, param_name)
+                validate_subsequences_length(sequences, [1, self.data_size], param_name)
+                setattr(self, param_name, sequences)
+                self._multi_params_structure[param_name] = "sequences"
+                return self
+            elif is_edgecolor_sequence(sequences):
+                validate_sequence_length(sequences, self._n_sequences, param_name)
+                setattr(self, param_name, sequences)
+                self._multi_params_structure[param_name] = "sequence"
+                return self
+            elif is_edgecolor(sequences):
+                setattr(self, param_name, sequences)
+                self._multi_params_structure[param_name] = "value"
+                return self
+        else:
+            if is_edgecolor_sequence(sequences):
+                validate_sequence_length(sequences, self.data_size, param_name)
+                setattr(self, param_name, sequences)
+                self._multi_params_structure[param_name] = "sequence"
+                return self
+            elif is_edgecolor(sequences):
+                setattr(self, param_name, sequences)
+                self._multi_params_structure[param_name] = "value"
+                return self
+        raise ArgumentStructureError(
+            f"Invalid {param_name}, must be an edgecolor, sequence of edgecolors, or sequences of edgecolors."
+        )
+
+    def set_edgecolor_sequence(
+        self, sequence: Union[EdgeColorSequence, EdgeColor], param_name: str
+    ):
+        if self._multi_data and is_edgecolor_sequence(sequence):
+            validate_sequence_length(sequence, self._n_sequences, param_name)
+            setattr(self, param_name, sequence)
+            self._multi_params_structure[param_name] = "sequence"
+            return self
+        elif is_edgecolor(sequence):
+            setattr(self, param_name, sequence)
+            self._multi_params_structure[param_name] = "value"
+            return self
+        raise ArgumentStructureError(
+            f"Invalid {param_name}, must be an edgecolor or sequence of edgecolors."
+        )
+
+    def set_colormap_sequence(
+        self, sequence: Union[CmapSequence, Cmap], param_name: str
+    ):
+        if self._multi_data and is_colormap_sequence(sequence):
+            validate_sequence_length(sequence, self._n_sequences, param_name)
+            setattr(self, param_name, sequence)
+            self._multi_params_structure[param_name] = "sequence"
+            return self
+        elif is_colormap(sequence):
+            setattr(self, param_name, sequence)
+            self._multi_params_structure[param_name] = "value"
+            return self
+        raise ArgumentStructureError(
+            f"Invalid {param_name}, must be a colormap, sequence of colormaps, or sequences of colormaps."
+        )
+
+    def set_norm_sequence(self, sequence: Union[NormSequence, Norm], param_name: str):
+        if self._multi_data and is_normalization_sequence(sequence):
+            validate_sequence_length(sequence, self._n_sequences, param_name)
+            setattr(self, param_name, sequence)
+            self._multi_params_structure[param_name] = "sequence"
+            return self
+        elif is_normalization(sequence):
+            setattr(self, param_name, sequence)
+            self._multi_params_structure[param_name] = "value"
+            return self
+        raise ArgumentStructureError(
+            f"Invalid {param_name}, must be a normalization, sequence of normalizations, or sequences of normalizations."
+        )
+
+    def set_str_sequence(self, sequence: Union[StrSequence, str], param_name: str):
+        if self._multi_data and is_str_sequence(sequence):
+            validate_sequence_length(sequence, self._n_sequences, param_name)
+            setattr(self, param_name, sequence)
+            self._multi_params_structure[param_name] = "sequence"
+            return self
+        elif is_str(sequence):
+            setattr(self, param_name, sequence)
+            self._multi_params_structure[param_name] = "value"
+            return self
+        raise ArgumentStructureError(
+            f"Invalid {param_name}, must be a string or sequence of strings."
+        )
+
+    def set_numeric_tuple_sequence(
+        self,
+        sequence: Union[NumericTupleSequence, NumericTuple],
+        sizes: Sequence[int],
+        param_name: str,
+    ):
+        if self._multi_data and is_numeric_tuple_sequence(sequence, sizes):
+            validate_sequence_length(sequence, self._n_sequences, param_name)
+            setattr(self, param_name, sequence)
+            self._multi_params_structure[param_name] = "sequence"
+            return self
+        elif is_numeric_tuple(sequence, sizes):
+            setattr(self, param_name, sequence)
+            self._multi_params_structure[param_name] = "value"
+            return self
+        raise ArgumentStructureError(
+            f"Invalid {param_name}, must be a numeric tuple, sequence of numeric tuples, or sequences of numeric tuples."
+        )
+
+    def set_bins_sequence(self, sequence: Union[BinsSequence, Bins], param_name: str):
+        if self._multi_data and is_bins_sequence(sequence):
+            validate_sequence_length(sequence, self._n_sequences, param_name)
+            setattr(self, param_name, sequence)
+            self._multi_params_structure[param_name] = "sequence"
+            return self
+        elif is_bins(sequence):
+            setattr(self, param_name, sequence)
+            self._multi_params_structure[param_name] = "value"
+            return self
+        raise ArgumentStructureError(
+            f"Invalid {param_name}, must be a bin, sequence of bins, or sequences of bins."
+        )
+
+    def set_bool_sequence(self, sequence: Union[Sequence[bool], bool], param_name: str):
+        if self._multi_data and is_bool_sequence(sequence):
+            validate_sequence_length(sequence, self._n_sequences, param_name)
+            setattr(self, param_name, sequence)
+            self._multi_params_structure[param_name] = "sequence"
+            return self
+        elif is_bool(sequence):
+            setattr(self, param_name, sequence)
+            self._multi_params_structure[param_name] = "value"
+            return self
+        raise ArgumentStructureError(
+            f"Invalid {param_name}, must be a boolean or sequence of booleans."
+        )
+
+    def set_dict_sequence(self, sequence: Union[DictSequence, Dict], param_name: str):
+        if self._multi_data and is_dict_sequence(sequence):
+            validate_sequence_length(sequence, self._n_sequences, param_name)
+            setattr(self, param_name, sequence)
+            self._multi_params_structure[param_name] = "sequence"
+            return self
+        elif is_dict(sequence):
+            setattr(self, param_name, sequence)
+            self._multi_params_structure[param_name] = "value"
+            return self
+        raise ArgumentStructureError(
+            f"Invalid {param_name}, must be a dictionary or sequence of dictionaries."
+        )

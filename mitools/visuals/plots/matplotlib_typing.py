@@ -7,6 +7,8 @@ from numpy import integer
 
 NumericType = Union[int, float, integer]
 NumericTuple = Tuple[NumericType, NumericType]
+NumericTupleSequence = Sequence[NumericTuple]
+NumericTupleSequences = Sequence[NumericTupleSequence]
 NumericSequence = Sequence[NumericType]
 NumericSequences = Sequence[NumericSequence]
 DictSequence = Sequence[Dict[str, Any]]

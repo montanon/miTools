@@ -3,7 +3,6 @@ from typing import Union
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
-from mitools.exceptions import ArgumentStructureError
 from mitools.visuals.plots.matplotlib_typing import (
     Cmap,
     CmapSequence,
@@ -25,27 +24,6 @@ from mitools.visuals.plots.matplotlib_typing import (
 from mitools.visuals.plots.plotter import Plotter
 from mitools.visuals.plots.validations import (
     NUMERIC_TYPES,
-    is_color,
-    is_color_sequence,
-    is_color_sequences,
-    is_colormap,
-    is_colormap_sequence,
-    is_edgecolor_sequence,
-    is_edgecolor_sequences,
-    is_marker_sequence,
-    is_marker_sequences,
-    is_normalization,
-    is_normalization_sequence,
-    is_numeric,
-    is_numeric_sequence,
-    is_numeric_sequences,
-    validate_color,
-    validate_consistent_len,
-    validate_edgecolor,
-    validate_marker,
-    validate_numeric,
-    validate_same,
-    validate_sequence_length,
     validate_type,
 )
 
@@ -107,237 +85,36 @@ class ScatterPlotter(Plotter):
         self.hover = hover
         return self
 
-    def set_size(self, sizes: Union[NumericSequences, NumericSequence, NumericType]):
-        if self._multi_data:
-            if is_numeric_sequences(sizes):
-                validate_consistent_len(sizes, "sizes")
-                if any(len(sequence) != 1 for sequence in sizes):
-                    max_len = max(len(sequence) for sequence in sizes)
-                    validate_same(max_len, self.data_size, "len(sizes)", "data_size")
-                self.size = sizes
-                self._multi_params_structure["size"] = "sequences"
-                return self
-            elif is_numeric_sequence(sizes):
-                validate_sequence_length(sizes, self._n_sequences, "sizes")
-                self.size = sizes
-                self._multi_params_structure["size"] = "sequence"
-                return self
-            elif is_numeric(sizes) or sizes is None:
-                self.size = sizes
-                self._multi_params_structure["size"] = "value"
-                return self
-        else:
-            if is_numeric_sequence(sizes):
-                validate_sequence_length(sizes, self.data_size, "sizes")
-                self.size = sizes
-                self._multi_params_structure["size"] = "sequence"
-                return self
-            if sizes is not None:
-                validate_numeric(sizes, "sizes")
-            self.size = sizes
-            self._multi_params_structure["size"] = "value"
-            return self
-        raise ArgumentStructureError(
-            "Invalid sizes, must be a numeric value, sequence of numbers, or sequences of numbers."
-        )
+    def set_size(self, size: Union[NumericSequences, NumericSequence, NumericType]):
+        return self.set_numeric_sequences(size, param_name="size")
 
     def set_marker(self, markers: Union[MarkerSequences, MarkerSequence, Marker]):
-        if self._multi_data:
-            if is_marker_sequences(markers):
-                validate_consistent_len(markers, "markers")
-                if any(len(sequence) != 1 for sequence in markers):
-                    max_len = max(len(sequence) for sequence in markers)
-                    validate_same(max_len, self.data_size, "len(markers)", "data_size")
-                self.marker = markers
-                self._multi_params_structure["marker"] = "sequences"
-                return self
-            elif is_marker_sequence(markers):
-                validate_sequence_length(markers, self._n_sequences, "markers")
-                self.marker = markers
-                self._multi_params_structure["marker"] = "sequence"
-                return self
-            elif is_numeric(markers):
-                self.marker = markers
-                self._multi_params_structure["marker"] = "value"
-                return self
-        else:
-            if is_marker_sequence(markers):
-                validate_sequence_length(markers, self.data_size, "markers")
-                self.marker = markers
-                self._multi_params_structure["marker"] = "sequence"
-                return self
-            validate_marker(markers)
-            self.marker = markers
-            self._multi_params_structure["marker"] = "value"
-            return self
-        raise ArgumentStructureError(
-            "Invalid markers, must be a marker, sequence of markers, or sequences of markers."
-        )
+        return self.set_marker_sequences(markers, param_name="marker")
 
     def set_linewidth(
         self, linewidths: Union[NumericSequences, NumericSequence, NumericType]
     ):
-        if self._multi_data:
-            if is_numeric_sequences(linewidths):
-                validate_consistent_len(linewidths, "linewidths")
-                if any(len(sequence) != 1 for sequence in linewidths):
-                    max_len = max(len(sequence) for sequence in linewidths)
-                    validate_same(
-                        max_len, self.data_size, "len(linewidths)", "data_size"
-                    )
-                self.linewidth = linewidths
-                self._multi_params_structure["linewidth"] = "sequences"
-                return self
-            elif is_numeric_sequence(linewidths):
-                validate_sequence_length(linewidths, self._n_sequences, "linewidths")
-                self.linewidth = linewidths
-                self._multi_params_structure["linewidth"] = "sequence"
-                return self
-            elif is_numeric(linewidths):
-                self.linewidth = linewidths
-                self._multi_params_structure["linewidth"] = "value"
-                return self
-        else:
-            if is_numeric_sequence(linewidths):
-                validate_sequence_length(linewidths, self.data_size, "linewidths")
-                self.linewidth = linewidths
-                self._multi_params_structure["linewidth"] = "sequence"
-                return self
-            validate_numeric(linewidths, "linewidths")
-            self.linewidth = linewidths
-            self._multi_params_structure["linewidth"] = "value"
-            return self
-        raise ArgumentStructureError(
-            "Invalid linewidths, must be a numeric value, sequence of numbers, or sequences of numbers."
-        )
+        return self.set_numeric_sequences(linewidths, param_name="linewidth")
 
     def set_edgecolor(
         self, edgecolors: Union[EdgeColorSequences, EdgeColorSequence, EdgeColor]
     ):
-        if self._multi_data:
-            if is_edgecolor_sequences(edgecolors):
-                validate_consistent_len(edgecolors, "edgecolors")
-                if any(len(sequence) != 1 for sequence in edgecolors):
-                    max_len = max(len(sequence) for sequence in edgecolors)
-                    validate_same(
-                        max_len, self.data_size, "len(edgecolors)", "data_size"
-                    )
-                self.edgecolor = edgecolors
-                self._multi_params_structure["edgecolor"] = "sequences"
-                return self
-            elif is_edgecolor_sequence(edgecolors):
-                validate_sequence_length(edgecolors, self._n_sequences, "edgecolors")
-                self.edgecolor = edgecolors
-                self._multi_params_structure["edgecolor"] = "sequence"
-                return self
-            elif validate_edgecolor(edgecolors):
-                self.edgecolor = edgecolors
-                self._multi_params_structure["edgecolor"] = "value"
-                return self
-        else:
-            if is_edgecolor_sequence(edgecolors):
-                validate_sequence_length(edgecolors, self.data_size, "edgecolors")
-                self.edgecolor = edgecolors
-                self._multi_params_structure["edgecolor"] = "sequence"
-                return self
-            validate_edgecolor(edgecolors)
-            self.edgecolor = edgecolors
-            self._multi_params_structure["edgecolor"] = "value"
-            return self
-        raise ArgumentStructureError(
-            "Invalid edgecolors, must be a edgecolor, sequence of edgecolors, or sequences of edgecolors."
-        )
+        return self.set_edgecolor_sequences(edgecolors, param_name="edgecolor")
 
-    def set_facecolor(self, facecolors: Union[ColorSequences, ColorSequence, Color]):
-        if self._multi_data:
-            if is_color_sequences(facecolors):
-                validate_consistent_len(facecolors, "facecolors")
-                if any(len(sequence) != 1 for sequence in facecolors):
-                    max_len = max(len(sequence) for sequence in facecolors)
-                    validate_same(
-                        max_len, self.data_size, "len(facecolors)", "data_size"
-                    )
-                self.facecolor = facecolors
-                self._multi_params_structure["facecolor"] = "sequences"
-                return self
-            elif is_color_sequence(facecolors):
-                validate_sequence_length(facecolors, self._n_sequences, "facecolors")
-                self.facecolor = facecolors
-                self._multi_params_structure["facecolor"] = "sequence"
-                return self
-            elif is_color(facecolors):
-                self.facecolor = facecolors
-                self._multi_params_structure["facecolor"] = "value"
-                return self
-        else:
-            if is_color_sequence(facecolors):
-                validate_sequence_length(facecolors, self.data_size, "facecolors")
-                self.facecolor = facecolors
-                self._multi_params_structure["facecolor"] = "sequence"
-                return self
-            validate_color(facecolors)
-            self.facecolor = facecolors
-            self._multi_params_structure["facecolor"] = "value"
-            return self
-        raise ArgumentStructureError(
-            "Invalid facecolors, must be a color, sequence of colors, or sequences of colors."
-        )
+    def set_facecolor(self, facecolor: Union[ColorSequences, ColorSequence, Color]):
+        return self.set_color_sequences(facecolor, param_name="facecolor")
 
     def set_colormap(self, colormaps: Union[CmapSequence, Cmap]):
-        if self._multi_data and is_colormap_sequence(colormaps):
-            validate_sequence_length(colormaps, self._n_sequences, "colormaps")
-            self.colormap = colormaps
-            self._multi_params_structure["colormap"] = "sequence"
-            return self
-        elif is_colormap(colormaps):
-            self.colormap = colormaps
-            self._multi_params_structure["colormap"] = "value"
-            return self
-        raise ArgumentStructureError(
-            "Invalid colormaps, must be a colormap, sequence of colormaps, or sequences of colormaps."
-        )
+        return self.set_colormap_sequence(colormaps, param_name="colormap")
 
     def set_normalization(self, normalization: Union[NormSequence, Norm]):
-        if self._multi_data and is_normalization_sequence(normalization):
-            validate_sequence_length(normalization, self._n_sequences, "normalization")
-            self.normalization = normalization
-            self._multi_params_structure["normalization"] = "sequence"
-            return self
-        elif is_normalization(normalization):
-            self.normalization = normalization
-            self._multi_params_structure["normalization"] = "value"
-            return self
-        raise ArgumentStructureError(
-            "Invalid normalization, must be a normalization, sequence of normalizations, or sequences of normalizations."
-        )
+        return self.set_norm_sequence(normalization, param_name="normalization")
 
     def set_vmin(self, vmin: Union[NumericSequence, NumericType]):
-        if self._multi_data and is_numeric_sequence(vmin):
-            validate_sequence_length(vmin, self._n_sequences, "vmin")
-            self.vmin = vmin
-            self._multi_params_structure["vmin"] = "sequence"
-            return self
-        elif is_numeric(vmin):
-            self.vmin = vmin
-            self._multi_params_structure["vmin"] = "value"
-            return self
-        raise ArgumentStructureError(
-            "Invalid vmin, must be a numeric value, sequence of numbers, or sequences of numbers."
-        )
+        return self.set_numeric_sequence(vmin, "vmin")
 
     def set_vmax(self, vmax: Union[NumericSequence, NumericType]):
-        if self._multi_data and is_numeric_sequence(vmax):
-            validate_sequence_length(vmax, self._n_sequences, "vmax")
-            self.vmax = vmax
-            self._multi_params_structure["vmax"] = "sequence"
-            return self
-        elif is_numeric(vmax):
-            self.vmax = vmax
-            self._multi_params_structure["vmax"] = "value"
-            return self
-        raise ArgumentStructureError(
-            "Invalid vmax, must be a numeric value, sequence of numbers, or sequences of numbers."
-        )
+        return self.set_numeric_sequence(vmax, "vmax")
 
     def set_normalization_range(
         self,
