@@ -60,6 +60,10 @@ def is_literal_sequences(
     )
 
 
+def is_str_sequences(sequences: Sequence[Sequence[Any]]) -> bool:
+    return is_sequence(sequences) and all(is_str_sequence(seq) for seq in sequences)
+
+
 def validate_same(value1: Any, value2: Any, param_name1: str, param_name2: str):
     if value1 != value2:
         raise ArgumentValueError(

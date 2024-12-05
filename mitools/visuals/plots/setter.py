@@ -29,6 +29,7 @@ from mitools.visuals.plots.matplotlib_typing import (
     NumericTupleSequence,
     NumericType,
     StrSequence,
+    StrSequences,
 )
 from mitools.visuals.plots.validations import (
     is_bins,
@@ -60,6 +61,7 @@ from mitools.visuals.plots.validations import (
     is_numeric_tuple_sequence,
     is_str,
     is_str_sequence,
+    is_str_sequences,
     validate_sequence_length,
     validate_sequence_values_in_range,
     validate_sequences_values_in_range,
@@ -400,6 +402,39 @@ class Setter(ABC):
             return self
         raise ArgumentStructureError(
             f"Invalid {param_name}, must be a normalization, sequence of normalizations, or sequences of normalizations."
+        )
+
+    def set_str_sequences(
+        self, sequences: Union[StrSequences, StrSequence], param_name: str
+    ):
+        if self.multi_data:
+            if is_str_sequences(sequences):
+                validate_sequence_length(sequences, self.n_sequences, param_name)
+                validate_subsequences_length(sequences, [1, self.data_size], param_name)
+                setattr(self, param_name, sequences)
+                self.multi_params_structure[param_name] = "sequences"
+                return self
+            elif is_str_sequence(sequences):
+                validate_sequence_length(sequences, self.n_sequences, param_name)
+                setattr(self, param_name, sequences)
+                self.multi_params_structure[param_name] = "sequence"
+                return self
+            elif is_str(sequences):
+                setattr(self, param_name, sequences)
+                self.multi_params_structure[param_name] = "value"
+                return self
+        else:
+            if is_str_sequence(sequences):
+                validate_sequence_length(sequences, self.data_size, param_name)
+                setattr(self, param_name, sequences)
+                self.multi_params_structure[param_name] = "sequence"
+                return self
+            elif is_str(sequences):
+                setattr(self, param_name, sequences)
+                self.multi_params_structure[param_name] = "value"
+                return self
+        raise ArgumentStructureError(
+            f"Invalid {param_name}, must be a string, sequence of strings, or sequences of strings."
         )
 
     def set_str_sequence(self, sequence: Union[StrSequence, str], param_name: str):
