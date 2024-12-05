@@ -19,6 +19,7 @@ from mitools.visuals.plots.matplotlib_typing import (
     NumericSequence,
     NumericSequences,
     NumericTuple,
+    NumericTupleSequence,
     NumericType,
 )
 from mitools.visuals.plots.plotter import Plotter
@@ -127,8 +128,8 @@ class HistogramPlotter(Plotter):
     def set_bins(self, bins: Union[BinsSequence, Bins]):
         return self.set_bins_sequence(bins, "bins")
 
-    def set_range(self, range: Union[Sequence[NumericTuple], NumericTuple, None]):
-        return self.set_numeric_tuple_sequence(range, "range")
+    def set_range(self, range: Union[NumericTupleSequence, NumericTuple, None]):
+        return self.set_numeric_tuple_sequence(range, 2, "range")
 
     def set_weights(self, weights: Union[NumericSequences, NumericSequence, None]):
         return self.set_numeric_sequences(weights, "weights")
