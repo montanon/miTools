@@ -7,13 +7,13 @@
         "loc": "left"
     },
     "xlabel": {
-        "xlabel": "Age",
+        "xlabel": "Aginess",
         "color": "k",
         "fontsize": 22,
         "fontweight": "bold"
     },
     "ylabel": {
-        "ylabel": "Aginess",
+        "ylabel": "Age",
         "color": "k",
         "fontsize": 22,
         "fontweight": "bold"
@@ -21,7 +21,7 @@
     "legend": {
         "show": true,
         "kwargs": {
-            "loc": "upper left",
+            "loc": "lower right",
             "ncol": 1,
             "frameon": false,
             "fancybox": true,
@@ -50,21 +50,23 @@
     "texts": [
         {
             "s": "Agey!",
-            "x": 1,
-            "y": 3.25,
+            "y": 1,
+            "x": 3.25,
             "fontsize": 28,
             "color": "darkgray",
             "horizontalalignment": "center",
-            "verticalalignment": "bottom"
+            "va": "bottom",
+            "ha": "left"
         },
         {
             "s": "More Agey!",
-            "x": 4,
-            "y": 1.25,
+            "y": 4,
+            "x": 1.25,
             "fontsize": 28,
             "color": "darkgray",
             "horizontalalignment": "center",
-            "verticalalignment": "bottom"
+            "va": "bottom",
+            "ha": "left"
         }
     ],
     "xscale": null,
@@ -80,13 +82,6 @@
     "xlim": null,
     "ylim": null,
     "xticks": [
-        1.0,
-        2.0,
-        3.0,
-        4.0,
-        5.0
-    ],
-    "yticks": [
         0.0,
         1.0,
         2.0,
@@ -98,14 +93,14 @@
         8.0,
         9.0
     ],
-    "xticklabels": [
-        "0-10",
-        "11-15",
-        "16-25",
-        "26-30",
-        "31-35"
+    "yticks": [
+        1.0,
+        2.0,
+        3.0,
+        4.0,
+        5.0
     ],
-    "yticklabels": [
+    "xticklabels": [
         "",
         "",
         "",
@@ -117,16 +112,23 @@
         "",
         ""
     ],
+    "yticklabels": [
+        "0-10",
+        "11-15",
+        "16-25",
+        "26-30",
+        "31-35"
+    ],
     "xtickparams": {
+        "color": "k",
+        "size": 0,
+        "width": 5
+    },
+    "ytickparams": {
         "labelsize": 18,
         "color": "k",
         "rotation": 45,
         "size": 10,
-        "width": 5
-    },
-    "ytickparams": {
-        "color": "k",
-        "size": 0,
         "width": 5
     },
     "spines": {
@@ -180,17 +182,23 @@
     ],
     "alpha": 0.5,
     "label": null,
-    "zorder": 10,
+    "zorder": null,
     "log": false,
-    "orientation": "vertical",
+    "orientation": "horizontal",
     "width": 0.35,
     "bottom": 0.0,
     "align": "center",
-    "edgecolor": "black",
+    "edgecolor": [
+        "black",
+        "black",
+        "black",
+        "black",
+        "black"
+    ],
     "linewidth": 3.5,
-    "xerr": 0.1,
-    "yerr": 0.35,
-    "ecolor": "red",
+    "xerr": 0.25,
+    "yerr": 0.15,
+    "ecolor": "gray",
     "capsize": 10,
     "error_kw": null,
     "facecolor": null,
@@ -202,7 +210,7 @@
         "x",
         "|"
     ],
-    "linestyle": "-",
+    "linestyle": "--",
     "x_data": [
         [
             1,
