@@ -1,10 +1,8 @@
 from typing import Literal, Union
 
-import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
-from mitools.exceptions import ArgumentStructureError
 from mitools.visuals.plots.matplotlib_typing import (
     LINESTYLES,
     Color,
@@ -19,20 +17,7 @@ from mitools.visuals.plots.matplotlib_typing import (
     NumericType,
 )
 from mitools.visuals.plots.plotter import Plotter
-from mitools.visuals.plots.validations import (
-    NUMERIC_TYPES,
-    is_color,
-    is_color_sequence,
-    is_edgecolor,
-    is_edgecolor_sequence,
-    is_literal,
-    is_literal_sequence,
-    is_marker,
-    is_marker_sequence,
-    is_numeric,
-    is_numeric_sequence,
-    validate_sequence_length,
-)
+from mitools.visuals.plots.validations import NUMERIC_TYPES
 
 
 class LinePlotterException(Exception):
@@ -81,111 +66,30 @@ class LinePlotter(Plotter):
         self.ax: Axes = None
 
     def set_marker(self, markers: Union[MarkerSequence, Marker]):
-        if self._multi_data and is_marker_sequence(markers):
-            validate_sequence_length(markers, self._n_sequences, "markers")
-            self.marker = markers
-            self._multi_params_structure["markers"] = "sequence"
-            return self
-        elif is_marker(markers):
-            self.marker = markers
-            self._multi_params_structure["marker"] = "value"
-            return self
-        raise ArgumentStructureError(
-            "Invalid marker, must be a marker or sequence of markers."
-        )
+        self.set_marker_sequence(markers, param_name="marker")
 
     def set_markersize(self, markersize: Union[NumericSequence, NumericType]):
-        if self._multi_data and is_numeric_sequence(markersize):
-            validate_sequence_length(markersize, self._n_sequences, "markersize")
-            self.markersize = np.asarray(markersize)
-            self._multi_params_structure["markersize"] = "sequence"
-            return self
-        elif is_numeric(markersize):
-            self.markersize = markersize
-            self._multi_params_structure["markersize"] = "value"
-            return self
-        raise ArgumentStructureError(
-            "Invalid markersize, must be a numeric value or sequence of numbers."
-        )
+        self.set_numeric_sequence(markersize, param_name="markersize")
 
     def set_markeredgewidth(self, markeredgewidth: Union[NumericSequence, NumericType]):
-        if self._multi_data and is_numeric_sequence(markeredgewidth):
-            validate_sequence_length(
-                markeredgewidth, self._n_sequences, "markeredgewidth"
-            )
-            self.markeredgewidth = np.asarray(markeredgewidth)
-            self._multi_params_structure["markeredgewidth"] = "sequence"
-            return self
-        elif is_numeric(markeredgewidth):
-            self.markeredgewidth = markeredgewidth
-            self._multi_params_structure["markeredgewidth"] = "value"
-            return self
-        raise ArgumentStructureError(
-            "Invalid markeredgewidth, must be a numeric value or sequence of numbers."
-        )
+        self.set_numeric_sequence(markeredgewidth, param_name="markeredgewidth")
 
     def set_markeredgecolor(self, markeredgecolor: Union[EdgeColorSequence, EdgeColor]):
-        if self._multi_data and is_edgecolor_sequence(markeredgecolor):
-            validate_sequence_length(
-                markeredgecolor, self._n_sequences, "markeredgecolor"
-            )
-            self.markeredgecolor = markeredgecolor
-            self._multi_params_structure["markeredgecolor"] = "sequences"
-            return self
-        elif is_edgecolor(markeredgecolor):
-            self.markeredgecolor = markeredgecolor
-            self._multi_params_structure["markeredgecolor"] = "value"
-            return self
-        raise ArgumentStructureError(
-            "Invalid markeredgecolor, must be a color or sequence of colors."
-        )
+        self.set_edgecolor_sequence(markeredgecolor, param_name="markeredgecolor")
 
     def set_markerfacecolor(self, markerfacecolor: Union[ColorSequence, Color]):
-        if self._multi_data and is_color_sequence(markerfacecolor):
-            validate_sequence_length(
-                markerfacecolor, self._n_sequences, "markerfacecolor"
-            )
-            self.markerfacecolor = markerfacecolor
-            self._multi_params_structure["markerfacecolor"] = "sequences"
-            return self
-        elif is_color(markerfacecolor):
-            self.markerfacecolor = markerfacecolor
-            self._multi_params_structure["markerfacecolor"] = "value"
-            return self
-        raise ArgumentStructureError(
-            "Invalid markerfacecolor, must be a color or sequence of colors."
-        )
+        self.set_color_sequence(markerfacecolor, param_name="markerfacecolor")
 
     def set_linestyle(
         self,
         linestyles: Union[LiteralSequence, Literal["linestyles"]],
     ):
-        if self._multi_data and is_literal_sequence(linestyles, LINESTYLES):
-            validate_sequence_length(linestyles, self._n_sequences, "linestyle")
-            self.linestyle = linestyles
-            self._multi_params_structure["linestyle"] = "sequence"
-            return self
-        elif is_literal(linestyles, LINESTYLES):
-            self.linestyle = linestyles
-            self._multi_params_structure["linestyle"] = "value"
-            return self
-        raise ArgumentStructureError(
-            f"Invalid linestyle, must be a literal or sequence of literals from {LINESTYLES}."
+        self.set_literal_sequence(
+            linestyles, options=LINESTYLES, param_name="linestyle"
         )
 
     def set_linewidth(self, linewidths: Union[NumericSequence, NumericType]):
-        if self._multi_data and is_numeric_sequence(linewidths):
-            validate_sequence_length(linewidths, self._n_sequences, "linewidth")
-            self.linewidth = np.asarray(linewidths)
-            self._multi_params_structure["linewidth"] = "sequence"
-            return self
-        elif is_numeric(linewidths):
-            self.linewidth = linewidths
-            self._multi_params_structure["linewidth"] = "value"
-            return self
-        raise ArgumentStructureError(
-            "Invalid linewidth, must be a numeric value, sequence of numbers, or sequences of numbers."
-        )
+        self.set_numeric_sequence(linewidths, param_name="linewidth")
 
     def _create_line_kwargs(self, n_sequence: int):
         line_kwargs = {

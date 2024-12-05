@@ -1,10 +1,8 @@
 from typing import Literal, Sequence, Union
 
-import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
-from mitools.exceptions import ArgumentStructureError
 from mitools.visuals.plots.matplotlib_typing import (
     HATCHES,
     HIST_ALIGN,
@@ -13,7 +11,6 @@ from mitools.visuals.plots.matplotlib_typing import (
     ORIENTATIONS,
     Bins,
     BinsSequence,
-    BinsSequences,
     Color,
     ColorSequence,
     EdgeColor,
@@ -27,24 +24,7 @@ from mitools.visuals.plots.matplotlib_typing import (
 from mitools.visuals.plots.plotter import Plotter
 from mitools.visuals.plots.validations import (
     NUMERIC_TYPES,
-    is_bins,
-    is_bins_sequence,
-    is_color,
-    is_color_sequence,
-    is_edgecolor,
-    is_edgecolor_sequence,
-    is_literal,
-    is_literal_sequence,
-    is_numeric,
-    is_numeric_sequence,
-    is_numeric_sequences,
-    is_numeric_tuple_sequence,
-    is_sequence,
-    validate_consistent_len,
     validate_literal,
-    validate_numeric_tuple,
-    validate_sequence_length,
-    validate_sequence_type,
     validate_type,
 )
 
@@ -144,80 +124,22 @@ class HistogramPlotter(Plotter):
         self.log = log
         return self
 
-    def set_bins(self, bins: Union[BinsSequences, BinsSequence, Bins]):
-        if self._multi_data and is_bins_sequence(bins):
-            validate_sequence_length(bins, self._n_sequences, "bins")
-            self.bins = bins
-            self._multi_params_structure["bins"] = "sequence"
-            return self
-        elif is_bins(bins):
-            self.bins = bins
-            self._multi_params_structure["bins"] = "value"
-            return self
-        raise ArgumentStructureError(
-            "Invalid bins, must be a bin, sequence of bins, or sequences of bins."
-        )
+    def set_bins(self, bins: Union[BinsSequence, Bins]):
+        self.set_bins_sequence(bins, "bins")
 
     def set_range(self, range: Union[Sequence[NumericTuple], NumericTuple, None]):
-        if self._multi_data and is_numeric_tuple_sequence(range, size=2):
-            validate_sequence_length(range, self.data_size, "range")
-            self.range = range
-            self._multi_params_structure["range"] = "sequence"
-            return self
-        if range is not None:
-            validate_numeric_tuple(range, 2)
-        self.range = range
-        self._multi_params_structure["range"] = "value"
-        return self
+        self.set_numeric_tuple_sequence(range, "range")
 
     def set_weights(self, weights: Union[NumericSequences, NumericSequence, None]):
-        if self._multi_data and is_numeric_sequences(weights):
-            validate_consistent_len(weights, "weights")
-            validate_sequence_length(weights, self._n_sequences, "weights")
-            for sequence in weights:
-                validate_sequence_length(sequence, self.data_size, "weights")
-            self.weights = np.asarray(weights)
-            self._multi_params_structure["weights"] = "sequences"
-            return self
-        elif is_numeric_sequence(weights):
-            validate_sequence_length(weights, self.data_size, "weights")
-            self.weights = weights
-            self._multi_params_structure["weights"] = "sequence"
-            return self
-        raise ArgumentStructureError(
-            "Invalid weights, must be a sequence of numbers or a sequence of sequences of numbers."
-        )
+        self.set_numeric_sequences(weights, "weights")
 
     def set_cumulative(self, cumulative: Union[Sequence[bool], bool]):
-        if self._multi_data and is_sequence(cumulative):
-            validate_sequence_length(cumulative, self._n_sequences, "cumulative")
-            validate_sequence_type(cumulative, bool, "cumulative")
-            self.cumulative = cumulative
-            self._multi_params_structure["cumulative"] = "sequence"
-            return self
-        elif isinstance(cumulative, bool):
-            self.cumulative = cumulative
-            self._multi_params_structure["cumulative"] = "value"
-            return self
-        raise ArgumentStructureError(
-            "Invalid cumulative, must be a boolean or sequence of booleans."
-        )
+        self.set_bool_sequence(cumulative, "cumulative")
 
     def set_bottom(
         self, bottom: Union[NumericSequences, NumericSequence, NumericType, None]
     ):
-        if self._multi_data and is_numeric_sequence(bottom):
-            validate_sequence_length(bottom, self._n_sequences, "bottom")
-            self.bottom = np.asarray(bottom)
-            self._multi_params_structure["bottom"] = "sequence"
-            return self
-        elif is_numeric(bottom) or bottom is None:
-            self.bottom = bottom
-            self._multi_params_structure["bottom"] = "value"
-            return self
-        raise ArgumentStructureError(
-            "Invalid bottom, must be a numeric value, sequence of numbers, or None."
-        )
+        self.set_numeric_sequences(bottom, "bottom")
 
     def set_histtype(
         self,
@@ -226,134 +148,34 @@ class HistogramPlotter(Plotter):
             Literal["bar", "barstacked", "step", "stepfilled"],
         ],
     ):
-        if self._multi_data and is_literal_sequence(histtype, HIST_HISTTYPE):
-            validate_sequence_length(histtype, self._n_sequences, "histtype")
-            self.histtype = histtype
-            self._multi_params_structure["histtype"] = "sequence"
-            return self
-        elif is_literal(histtype, HIST_HISTTYPE):
-            self.histtype = histtype
-            self._multi_params_structure["histtype"] = "value"
-            return self
-        raise ArgumentStructureError(
-            f"Invalid histtype, must be a literal or sequence of literals from {HIST_HISTTYPE}."
-        )
+        self.set_literal_sequence(histtype, HIST_HISTTYPE, "histtype")
 
     def set_align(self, align: Union[LiteralSequence, Literal["left", "mid", "right"]]):
-        if self._multi_data and is_literal_sequence(align, HIST_ALIGN):
-            validate_sequence_length(align, self._n_sequences, "align")
-            self.align = align
-            self._multi_params_structure["align"] = "sequence"
-            return self
-        elif is_literal(align, HIST_ALIGN):
-            self.align = align
-            self._multi_params_structure["align"] = "value"
-            return self
-        raise ArgumentStructureError(
-            f"Invalid align, must be a literal or sequence of literals from {HIST_ALIGN}."
-        )
+        self.set_literal_sequence(align, HIST_ALIGN, "align")
 
     def set_rwidth(self, rwidth: Union[NumericSequence, NumericType, None]):
-        if self._multi_data and is_numeric_sequence(rwidth):
-            validate_sequence_length(rwidth, self._n_sequences, "rwidth")
-            self.rwidth = np.asarray(rwidth)
-            self._multi_params_structure["rwidth"] = "sequence"
-            return self
-        elif is_numeric(rwidth) or rwidth is None:
-            self.rwidth = rwidth
-            self._multi_params_structure["rwidth"] = "value"
-            return self
-        raise ArgumentStructureError(
-            "Invalid rwidth, must be a numeric value, sequence of numbers, or None."
-        )
+        self.set_numeric_sequence(rwidth, "rwidth")
 
     def set_edgecolor(self, edgecolors: Union[EdgeColorSequence, EdgeColor]):
-        if self._multi_data and is_edgecolor_sequence(edgecolors):
-            validate_sequence_length(edgecolors, self._n_sequences, "edgecolors")
-            self.edgecolor = edgecolors
-            self._multi_params_structure["edgecolor"] = "sequence"
-            return self
-        elif is_edgecolor(edgecolors):
-            self.edgecolor = edgecolors
-            self._multi_params_structure["edgecolor"] = "value"
-            return self
-        raise ArgumentStructureError(
-            "Invalid edgecolors, must be a color, sequence of colors, or sequences of colors."
-        )
+        self.set_edgecolor_sequence(edgecolors, "edgecolor")
 
     def set_facecolor(self, facecolors: Union[ColorSequence, Color]):
-        if self._multi_data and is_color_sequence(facecolors):
-            validate_sequence_length(facecolors, self._n_sequences, "facecolors")
-            self.facecolor = facecolors
-            self._multi_params_structure["facecolor"] = "sequence"
-            return self
-        elif is_color(facecolors):
-            self.facecolor = facecolors
-            self._multi_params_structure["facecolor"] = "value"
-            return self
-        raise ArgumentStructureError(
-            "Invalid facecolors, must be a color, sequence of colors, or sequences of colors."
-        )
+        self.set_color_sequence(facecolors, "facecolor")
 
     def set_fill(self, fill: Union[Sequence[bool], bool]):
-        if self._multi_data and is_sequence(fill):
-            validate_sequence_length(fill, self._n_sequences, "fill")
-            validate_sequence_type(fill, bool, "fill")
-            self.fill = fill
-            self._multi_params_structure["fill"] = "sequence"
-            return self
-        elif isinstance(fill, bool):
-            self.fill = fill
-            self._multi_params_structure["fill"] = "value"
-            return self
-        raise ArgumentStructureError(
-            "Invalid fill, must be a boolean or sequence of booleans."
-        )
+        self.set_bool_sequence(fill, "fill")
 
     def set_linestyle(
         self,
         linestyles: Union[LiteralSequence, Literal["linestyles"]],
     ):
-        if self._multi_data and is_literal_sequence(linestyles, LINESTYLES):
-            validate_sequence_length(linestyles, self._n_sequences, "linestyle")
-            self.linestyle = linestyles
-            self._multi_params_structure["linestyle"] = "sequence"
-            return self
-        elif is_literal(linestyles, LINESTYLES):
-            self.linestyle = linestyles
-            self._multi_params_structure["linestyle"] = "value"
-            return self
-        raise ArgumentStructureError(
-            f"Invalid linestyle, must be a literal or sequence of literals from {LINESTYLES}."
-        )
+        self.set_literal_sequence(linestyles, LINESTYLES, "linestyle")
 
     def set_linewidth(self, linewidths: Union[NumericSequence, NumericType]):
-        if self._multi_data and is_numeric_sequence(linewidths):
-            validate_sequence_length(linewidths, self._n_sequences, "linewidth")
-            self.linewidth = np.asarray(linewidths)
-            self._multi_params_structure["linewidth"] = "sequence"
-            return self
-        elif is_numeric(linewidths):
-            self.linewidth = linewidths
-            self._multi_params_structure["linewidth"] = "value"
-            return self
-        raise ArgumentStructureError(
-            "Invalid linewidth, must be a numeric value, sequence of numbers, or sequences of numbers."
-        )
+        self.set_numeric_sequence(linewidths, "linewidth")
 
     def set_hatch(self, hatches: Union[LiteralSequence, Literal["hatches"]]):
-        if self._multi_data and is_literal_sequence(hatches, HATCHES):
-            validate_sequence_length(hatches, self._n_sequences, "hatch")
-            self.hatch = hatches
-            self._multi_params_structure["hatch"] = "sequence"
-            return self
-        elif is_literal(hatches, HATCHES):
-            self.hatch = hatches
-            self._multi_params_structure["hatch"] = "value"
-            return self
-        raise ArgumentStructureError(
-            f"Invalid hatch, must be a literal or sequence of literals from {HATCHES}."
-        )
+        self.set_literal_sequence(hatches, HATCHES, "hatch")
 
     def _create_hist_kwargs(self, n_sequence: int):
         hist_kwargs = {

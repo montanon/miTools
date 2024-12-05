@@ -288,7 +288,7 @@ class TestPlotter(TestCase):
         self.assertEqual(self.multi_plotter.color, [colors, colors])
 
     def test_set_color_invalid(self):
-        with self.assertRaises(ArgumentTypeError):
+        with self.assertRaises(ArgumentStructureError):
             self.plotter.set_color(["asdasd"] * 3)
         with self.assertRaises(ArgumentStructureError):
             self.plotter.set_color([1, 2, 3, 4, 5])

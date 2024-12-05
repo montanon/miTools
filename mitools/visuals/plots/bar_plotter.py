@@ -4,7 +4,6 @@ import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
-from mitools.exceptions import ArgumentStructureError
 from mitools.visuals.plots.matplotlib_typing import (
     BARS_ALIGN,
     HATCHES,
@@ -26,28 +25,7 @@ from mitools.visuals.plots.matplotlib_typing import (
 from mitools.visuals.plots.plotter import Plotter
 from mitools.visuals.plots.validations import (
     NUMERIC_TYPES,
-    is_color,
-    is_color_sequence,
-    is_color_sequences,
-    is_dict_sequence,
-    is_edgecolor,
-    is_edgecolor_sequence,
-    is_edgecolor_sequences,
-    is_literal,
-    is_literal_sequence,
-    is_literal_sequences,
-    is_numeric,
-    is_numeric_sequence,
-    is_numeric_sequences,
-    is_sequence,
-    validate_color,
-    validate_consistent_len,
-    validate_edgecolor,
     validate_literal,
-    validate_numeric,
-    validate_same,
-    validate_sequence_length,
-    validate_sequence_type,
     validate_type,
 )
 
@@ -141,353 +119,55 @@ class BarPlotter(Plotter):
         return self
 
     def set_width(self, widths: Union[NumericSequences, NumericSequence, NumericType]):
-        if self._multi_data:
-            if is_numeric_sequences(widths):
-                validate_consistent_len(widths, "width")
-                validate_sequence_length(widths, self._n_sequences, "width")
-                if any(len(sequence) != 1 for sequence in widths):
-                    max_len = max(len(sequence) for sequence in widths)
-                    validate_same(max_len, self.data_size, "len(width)", "data_size")
-                self.width = np.asarray(widths)
-                self._multi_params_structure["width"] = "sequences"
-                return self
-            elif is_numeric_sequence(widths):
-                validate_sequence_length(widths, self.data_size, "width")
-                self.width = np.asarray(widths)
-                self._multi_params_structure["width"] = "sequence"
-                return self
-            elif is_numeric(widths):
-                self.width = widths
-                self._multi_params_structure["width"] = "value"
-                return self
-        else:
-            if is_numeric_sequence(widths):
-                validate_sequence_length(widths, self.data_size, "width")
-                self.width = np.asarray(widths)
-                self._multi_params_structure["width"] = "sequence"
-                return self
-            validate_numeric(widths, "width")
-            self.width = widths
-            self._multi_params_structure["width"] = "value"
-            return self
-        raise ArgumentStructureError(
-            "Invalid width, must be a numeric, sequence of numerics, or sequences of numerics."
-        )
+        self.set_numeric_sequences(widths, "width")
 
     def set_bottom(
         self, bottoms: Union[NumericSequences, NumericSequence, NumericType]
     ):
-        if self._multi_data:
-            if is_numeric_sequences(bottoms):
-                validate_consistent_len(bottoms, "bottom")
-                validate_sequence_length(bottoms, self._n_sequences, "bottom")
-                if any(len(sequence) != 1 for sequence in bottoms):
-                    max_len = max(len(sequence) for sequence in bottoms)
-                    validate_same(max_len, self.data_size, "len(bottom)", "data_size")
-                self.bottom = np.asarray(bottoms)
-                self._multi_params_structure["bottom"] = "sequences"
-                return self
-            elif is_numeric_sequence(bottoms):
-                validate_sequence_length(bottoms, self._n_sequences, "bottom")
-                self.bottom = np.asarray(bottoms)
-                self._multi_params_structure["bottom"] = "sequence"
-                return self
-            elif is_numeric(bottoms):
-                self.bottom = bottoms
-                self._multi_params_structure["bottom"] = "value"
-                return self
-        else:
-            if is_numeric_sequence(bottoms):
-                validate_sequence_length(bottoms, self.data_size, "bottom")
-                self.bottom = np.asarray(bottoms)
-                self._multi_params_structure["bottom"] = "sequence"
-                return self
-            validate_numeric(bottoms, "bottom")
-            self.bottom = bottoms
-            self._multi_params_structure["bottom"] = "value"
-            return self
-        raise ArgumentStructureError(
-            "Invalid bottom, must be a numeric, sequence of numerics, or sequences of numerics."
-        )
+        self.set_numeric_sequences(bottoms, "bottom")
 
     def set_align(self, align: Union[LiteralSequence, Literal["center", "edge"]]):
-        if self._multi_data and is_literal_sequence(align, BARS_ALIGN):
-            validate_sequence_length(align, self._n_sequences, "align")
-            self.align = align
-            self._multi_params_structure["align"] = "sequence"
-            return self
-        elif is_literal(align, BARS_ALIGN):
-            self.align = align
-            self._multi_params_structure["align"] = "value"
-            return self
-        raise ArgumentStructureError(
-            f"Invalid align, must be a literal or sequence of literals from {BARS_ALIGN}."
-        )
+        self.set_literal_sequence(align, BARS_ALIGN, "align")
 
     def set_edgecolor(
         self, edgecolors: Union[EdgeColorSequences, EdgeColorSequence, EdgeColor]
     ):
-        if self._multi_data:
-            if is_edgecolor_sequences(edgecolors):
-                validate_consistent_len(edgecolors, "edgecolor")
-                if any(len(sequence) != 1 for sequence in edgecolors):
-                    max_len = max(len(sequence) for sequence in edgecolors)
-                    validate_same(
-                        max_len, self.data_size, "len(edgecolor)", "data_size"
-                    )
-                self.edgecolor = edgecolors
-                self._multi_params_structure["edgecolor"] = "sequences"
-                return self
-            elif is_edgecolor_sequence(edgecolors):
-                validate_sequence_length(edgecolors, self._n_sequences, "edgecolor")
-                self.edgecolor = edgecolors
-                self._multi_params_structure["edgecolor"] = "sequence"
-                return self
-            elif is_edgecolor(edgecolors):
-                self.edgecolor = edgecolors
-                self._multi_params_structure["edgecolor"] = "value"
-                return self
-        else:
-            if is_edgecolor_sequence(edgecolors):
-                validate_sequence_length(edgecolors, self.data_size, "edgecolor")
-                self.edgecolor = edgecolors
-                self._multi_params_structure["edgecolor"] = "sequence"
-                return self
-            if edgecolors is not None:
-                validate_edgecolor(edgecolors)
-            self.edgecolor = edgecolors
-            self._multi_params_structure["edgecolor"] = "value"
-            return self
-        raise ArgumentStructureError(
-            "Invalid edgecolors, must be a color, sequence of colors, or sequences of colors."
-        )
+        self.set_edgecolor_sequences(edgecolors, "edgecolor")
 
     def set_linewidth(self, linewidths: Union[NumericSequence, NumericType]):
-        if self._multi_data and is_numeric_sequence(linewidths):
-            validate_sequence_length(linewidths, self._n_sequences, "linewidth")
-            self.linewidth = np.asarray(linewidths)
-            self._multi_params_structure["linewidth"] = "sequence"
-            return self
-        elif is_numeric(linewidths):
-            self.linewidth = linewidths
-            self._multi_params_structure["linewidth"] = "value"
-            return self
-        raise ArgumentStructureError(
-            "Invalid linewidth, must be a numeric value, sequence of numbers, or sequences of numbers."
-        )
+        self.set_numeric_sequence(linewidths, "linewidth")
 
     def set_xerr(self, xerrs: Union[NumericSequences, NumericSequence, NumericType]):
-        if self._multi_data:
-            if is_numeric_sequences(xerrs):
-                validate_consistent_len(xerrs, "xerr")
-                validate_sequence_length(xerrs, self._n_sequences, "xerr")
-                if any(len(sequence) != 1 for sequence in xerrs):
-                    max_len = max(len(sequence) for sequence in xerrs)
-                    validate_same(max_len, self.data_size, "len(xerr)", "data_size")
-                self.xerr = np.asarray(xerrs)
-                self._multi_params_structure["xerr"] = "sequences"
-                return self
-            elif is_numeric_sequence(xerrs):
-                validate_sequence_length(xerrs, self.data_size, "xerr")
-                self.xerr = np.asarray(xerrs)
-                self._multi_params_structure["xerr"] = "sequence"
-                return self
-            elif is_numeric(xerrs):
-                self.xerr = xerrs
-                self._multi_params_structure["xerr"] = "value"
-                return self
-        else:
-            if is_numeric_sequence(xerrs):
-                validate_sequence_length(xerrs, self.data_size, "xerr")
-                self.xerr = np.asarray(xerrs)
-                self._multi_params_structure["xerr"] = "sequence"
-                return self
-            validate_numeric(xerrs, "xerr")
-            self.xerr = xerrs
-            self._multi_params_structure["xerr"] = "value"
-            return self
-        raise ArgumentStructureError(
-            "Invalid xerr, must be a numeric, sequence of numerics, or sequences of numerics."
-        )
+        self.set_numeric_sequences(xerrs, "xerr")
 
     def set_yerr(self, yerrs: Union[NumericSequences, NumericSequence, NumericType]):
-        if self._multi_data:
-            if is_numeric_sequences(yerrs):
-                validate_consistent_len(yerrs, "yerr")
-                validate_sequence_length(yerrs, self._n_sequences, "yerr")
-                if any(len(sequence) != 1 for sequence in yerrs):
-                    max_len = max(len(sequence) for sequence in yerrs)
-                    validate_same(max_len, self.data_size, "len(yerr)", "data_size")
-                self.yerr = np.asarray(yerrs)
-                self._multi_params_structure["yerr"] = "sequences"
-                return self
-            elif is_numeric_sequence(yerrs):
-                validate_sequence_length(yerrs, self.data_size, "yerr")
-                self.yerr = np.asarray(yerrs)
-                self._multi_params_structure["yerr"] = "sequence"
-                return self
-            elif is_numeric(yerrs):
-                self.yerr = yerrs
-                self._multi_params_structure["yerr"] = "value"
-                return self
-        else:
-            if is_numeric_sequence(yerrs):
-                validate_sequence_length(yerrs, self.data_size, "yerr")
-                self.yerr = np.asarray(yerrs)
-                self._multi_params_structure["yerr"] = "sequence"
-                return self
-            validate_numeric(yerrs, "yerr")
-            self.yerr = yerrs
-            self._multi_params_structure["yerr"] = "value"
-            return self
-        raise ArgumentStructureError(
-            "Invalid yerr, must be a numeric, sequence of numerics, or sequences of numerics."
-        )
+        self.set_numeric_sequences(yerrs, "yerr")
 
     def set_ecolor(self, ecolors: Union[ColorSequences, ColorSequence, Color]):
-        if self._multi_data:
-            if is_color_sequences(ecolors):
-                validate_consistent_len(ecolors, "ecolor")
-                validate_sequence_length(ecolors, self._n_sequences, "ecolor")
-                if any(len(sequence) != 1 for sequence in ecolors):
-                    max_len = max(len(sequence) for sequence in ecolors)
-                    validate_same(max_len, self.data_size, "len(ecolor)", "data_size")
-                self.ecolor = ecolors
-                self._multi_params_structure["ecolor"] = "sequences"
-                return self
-            elif is_color_sequence(ecolors):
-                validate_sequence_length(ecolors, self._n_sequences, "ecolor")
-                self.ecolor = ecolors
-                self._multi_params_structure["ecolor"] = "sequence"
-                return self
-            elif is_color(ecolors):
-                self.ecolor = ecolors
-                self._multi_params_structure["ecolor"] = "value"
-                return self
-        else:
-            if is_color_sequence(ecolors):
-                validate_sequence_length(ecolors, self.data_size, "ecolor")
-                self.ecolor = ecolors
-                self._multi_params_structure["ecolor"] = "sequence"
-                return self
-            if ecolors is not None:
-                validate_color(ecolors)
-            self.ecolor = ecolors
-            self._multi_params_structure["ecolor"] = "value"
-            return self
-        raise ArgumentStructureError(
-            "Invalid ecolor, must be a color, sequence of colors, or sequences of colors."
-        )
+        self.set_color_sequences(ecolors, "ecolor")
 
     def set_capsize(self, capsize: Union[NumericSequence, NumericType]):
-        if self._multi_data and is_numeric_sequence(capsize):
-            validate_sequence_length(capsize, self._n_sequences, "capsize")
-            self.capsize = np.asarray(capsize)
-            self._multi_params_structure["capsize"] = "sequence"
-            return self
-        elif is_numeric(capsize):
-            self.capsize = capsize
-            self._multi_params_structure["capsize"] = "value"
-            return self
-        raise ArgumentStructureError(
-            "Invalid capsize, must be a numeric value or sequence of numbers."
-        )
+        self.set_numeric_sequence(capsize, "capsize")
 
     def set_error_kw(self, error_kw: Union[DictSequence, Dict]):
-        if self._multi_data and is_dict_sequence(error_kw):
-            validate_sequence_length(error_kw, self._n_sequences, "error_kw")
-            self.error_kw = error_kw
-            self._multi_params_structure["error_kw"] = "sequence"
-            return self
-        elif isinstance(error_kw, dict):
-            self.error_kw = error_kw
-            self._multi_params_structure["error_kw"] = "value"
-            return self
-        raise ArgumentStructureError(
-            "Invalid error_kw, must be a dictionary or sequence of dictionaries."
-        )
+        self.set_dict_sequence(error_kw, "error_kw")
 
     def set_facecolor(self, facecolors: Union[ColorSequence, Color]):
-        if self._multi_data and is_color_sequence(facecolors):
-            validate_sequence_length(facecolors, self._n_sequences, "facecolors")
-            self.facecolor = facecolors
-            self._multi_params_structure["facecolor"] = "sequence"
-            return self
-        elif is_color(facecolors):
-            self.facecolor = facecolors
-            self._multi_params_structure["facecolor"] = "value"
-            return self
-        raise ArgumentStructureError(
-            "Invalid facecolors, must be a color, sequence of colors, or sequences of colors."
-        )
+        self.set_color_sequence(facecolors, "facecolor")
 
     def set_fill(self, fill: Union[Sequence[bool], bool]):
-        if self._multi_data and is_sequence(fill):
-            validate_sequence_length(fill, self._n_sequences, "fill")
-            validate_sequence_type(fill, bool, "fill")
-            self.fill = fill
-            self._multi_params_structure["fill"] = "sequence"
-            return self
-        elif isinstance(fill, bool):
-            self.fill = fill
-            self._multi_params_structure["fill"] = "value"
-            return self
-        raise ArgumentStructureError(
-            "Invalid fill, must be a boolean or sequence of booleans."
-        )
+        self.set_bool_sequence(fill, "fill")
 
     def set_hatch(
         self, hatches: Union[LiteralSequences, LiteralSequence, Literal["hatches"]]
     ):
-        if self._multi_data:
-            if is_literal_sequences(hatches, HATCHES):
-                validate_consistent_len(hatches, "hatches")
-                if any(len(sequence) != 1 for sequence in hatches):
-                    max_len = max(len(sequence) for sequence in hatches)
-                    validate_same(max_len, self.data_size, "len(hatches)", "data_size")
-                self.hatch = hatches
-                self._multi_params_structure["hatch"] = "sequences"
-                return self
-            elif is_literal_sequence(hatches, HATCHES):
-                validate_sequence_length(hatches, self._n_sequences, "hatches")
-                self.hatch = hatches
-                self._multi_params_structure["hatch"] = "sequence"
-                return self
-            elif is_literal(hatches, HATCHES):
-                self.hatch = hatches
-                self._multi_params_structure["hatch"] = "value"
-                return self
-        else:
-            if is_literal_sequence(hatches, HATCHES):
-                validate_sequence_length(hatches, self.data_size, "hatches")
-                self.hatch = hatches
-                self._multi_params_structure["hatch"] = "sequence"
-                return self
-            if hatches is not None:
-                validate_literal(hatches, HATCHES)
-            self.hatch = hatches
-            self._multi_params_structure["hatch"] = "value"
-            return self
-        raise ArgumentStructureError(
-            f"Invalid hatch, must be a literal or sequence of literals from {HATCHES}."
-        )
+        self.set_literal_sequences(hatches, HATCHES, "hatch")
 
     def set_linestyle(
         self,
         linestyles: Union[LiteralSequence, Literal["linestyles"]],
     ):
-        if self._multi_data and is_literal_sequence(linestyles, LINESTYLES):
-            validate_sequence_length(linestyles, self._n_sequences, "linestyle")
-            self.linestyle = linestyles
-            self._multi_params_structure["linestyle"] = "sequence"
-            return self
-        elif is_literal(linestyles, LINESTYLES):
-            self.linestyle = linestyles
-            self._multi_params_structure["linestyle"] = "value"
-            return self
-        raise ArgumentStructureError(
-            f"Invalid linestyle, must be a literal or sequence of literals from {LINESTYLES}."
-        )
+        self.set_literal_sequence(linestyles, LINESTYLES, "linestyle")
 
     def _create_bar_kwargs(self, n_sequence: int):
         bar_kwargs = {

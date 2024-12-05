@@ -96,7 +96,6 @@ class TestScatterPlotter(unittest.TestCase):
         plotter = ScatterPlotter(self.x_data, self.y_data)
         valid_colors = ["red", "b", "#FF0000", "#0000FF", (1, 0, 0), (1, 0, 0, 1)]
         for color in valid_colors:
-            print(color)
             plotter.set_color(color)
         invalid_colors = [(1, 0), (1, 0, 0, 1, 1), "not_a_color"]
         for color in invalid_colors:

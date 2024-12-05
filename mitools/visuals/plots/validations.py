@@ -405,6 +405,13 @@ def validate_sequence_length(
         raise ArgumentStructureError(msg)
 
 
+def validate_subsequences_length(
+    sequences: Sequence, expected_length: Union[int, Tuple[int, ...]], param_name: str
+):
+    for i, sequence in enumerate(sequences):
+        validate_sequence_length(sequence, expected_length, f"{param_name}[{i}]")
+
+
 def validate_same_length(
     sequence1: Sequence, sequence2: Sequence, param_name1: str, param_name2: str
 ) -> None:
@@ -428,3 +435,29 @@ def validate_value_in_options(
         raise ArgumentValueError(
             f"'{param_name}' must be one of {valid_options}, got {value}"
         )
+
+
+def is_str(value: Any) -> bool:
+    return isinstance(value, str)
+
+
+def is_bool(value: Any) -> bool:
+    return isinstance(value, bool)
+
+
+def validate_bool(value: Any, param_name: str) -> None:
+    if not is_bool(value):
+        raise ArgumentTypeError(f"'{param_name}' must be a boolean, got {type(value)}")
+
+
+def is_bool_sequence(sequence: Any) -> bool:
+    return is_sequence(sequence) and all(isinstance(item, bool) for item in sequence)
+
+
+def validate_bool_sequence(sequence: Sequence, param_name: str) -> None:
+    if not is_bool_sequence(sequence):
+        raise ArgumentTypeError(f"Invalid bool sequence: {sequence}")
+
+
+def is_dict(value: Any) -> bool:
+    return isinstance(value, dict)
