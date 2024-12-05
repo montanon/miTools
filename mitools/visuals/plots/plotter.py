@@ -792,7 +792,16 @@ class Plotter(ABC):
         if self._multi_data:
             if is_numeric_sequences(sequences):
                 validate_sequence_length(sequences, self._n_sequences, param_name)
-                validate_subsequences_length(sequences, [1, self.data_size], param_name)
+                expanded_sequences = []
+                for seq in sequences:
+                    if len(np.asarray(seq)) == 1:
+                        expanded_sequences.append(np.repeat(seq, self.data_size))
+                    else:
+                        expanded_sequences.append(seq)
+                validate_subsequences_length(
+                    expanded_sequences, self.data_size, param_name
+                )
+                sequences = expanded_sequences
                 setattr(self, param_name, np.asarray(sequences))
                 self._multi_params_structure[param_name] = "sequences"
                 return self
@@ -1037,14 +1046,17 @@ class Plotter(ABC):
         )
 
     def set_numeric_tuple_sequence(
-        self, sequence: Union[NumericTupleSequence, NumericTuple], param_name: str
+        self,
+        sequence: Union[NumericTupleSequence, NumericTuple],
+        sizes: Sequence[int],
+        param_name: str,
     ):
-        if self._multi_data and is_numeric_tuple_sequence(sequence):
+        if self._multi_data and is_numeric_tuple_sequence(sequence, sizes):
             validate_sequence_length(sequence, self._n_sequences, param_name)
             setattr(self, param_name, sequence)
             self._multi_params_structure[param_name] = "sequence"
             return self
-        elif is_numeric_tuple(sequence):
+        elif is_numeric_tuple(sequence, sizes):
             setattr(self, param_name, sequence)
             self._multi_params_structure[param_name] = "value"
             return self
