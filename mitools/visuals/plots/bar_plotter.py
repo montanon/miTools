@@ -119,55 +119,55 @@ class BarPlotter(Plotter):
         return self
 
     def set_width(self, widths: Union[NumericSequences, NumericSequence, NumericType]):
-        self.set_numeric_sequences(widths, "width")
+        return self.set_numeric_sequences(widths, "width")
 
     def set_bottom(
         self, bottoms: Union[NumericSequences, NumericSequence, NumericType]
     ):
-        self.set_numeric_sequences(bottoms, "bottom")
+        return self.set_numeric_sequences(bottoms, "bottom")
 
     def set_align(self, align: Union[LiteralSequence, Literal["center", "edge"]]):
-        self.set_literal_sequence(align, BARS_ALIGN, "align")
+        return self.set_literal_sequence(align, BARS_ALIGN, "align")
 
     def set_edgecolor(
         self, edgecolors: Union[EdgeColorSequences, EdgeColorSequence, EdgeColor]
     ):
-        self.set_edgecolor_sequences(edgecolors, "edgecolor")
+        return self.set_edgecolor_sequences(edgecolors, "edgecolor")
 
     def set_linewidth(self, linewidths: Union[NumericSequence, NumericType]):
-        self.set_numeric_sequence(linewidths, "linewidth")
+        return self.set_numeric_sequence(linewidths, "linewidth")
 
     def set_xerr(self, xerrs: Union[NumericSequences, NumericSequence, NumericType]):
-        self.set_numeric_sequences(xerrs, "xerr")
+        return self.set_numeric_sequences(xerrs, "xerr")
 
     def set_yerr(self, yerrs: Union[NumericSequences, NumericSequence, NumericType]):
-        self.set_numeric_sequences(yerrs, "yerr")
+        return self.set_numeric_sequences(yerrs, "yerr")
 
     def set_ecolor(self, ecolors: Union[ColorSequences, ColorSequence, Color]):
-        self.set_color_sequences(ecolors, "ecolor")
+        return self.set_color_sequences(ecolors, "ecolor")
 
     def set_capsize(self, capsize: Union[NumericSequence, NumericType]):
-        self.set_numeric_sequence(capsize, "capsize")
+        return self.set_numeric_sequence(capsize, "capsize")
 
     def set_error_kw(self, error_kw: Union[DictSequence, Dict]):
-        self.set_dict_sequence(error_kw, "error_kw")
+        return self.set_dict_sequence(error_kw, "error_kw")
 
     def set_facecolor(self, facecolors: Union[ColorSequence, Color]):
-        self.set_color_sequence(facecolors, "facecolor")
+        return self.set_color_sequence(facecolors, "facecolor")
 
     def set_fill(self, fill: Union[Sequence[bool], bool]):
-        self.set_bool_sequence(fill, "fill")
+        return self.set_bool_sequence(fill, "fill")
 
     def set_hatch(
         self, hatches: Union[LiteralSequences, LiteralSequence, Literal["hatches"]]
     ):
-        self.set_literal_sequences(hatches, HATCHES, "hatch")
+        return self.set_literal_sequences(hatches, HATCHES, "hatch")
 
     def set_linestyle(
         self,
         linestyles: Union[LiteralSequence, Literal["linestyles"]],
     ):
-        self.set_literal_sequence(linestyles, LINESTYLES, "linestyle")
+        return self.set_literal_sequence(linestyles, LINESTYLES, "linestyle")
 
     def _create_bar_kwargs(self, n_sequence: int):
         bar_kwargs = {

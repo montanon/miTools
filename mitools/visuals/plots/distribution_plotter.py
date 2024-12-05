@@ -113,22 +113,22 @@ class DistributionPlotter(Plotter):
         return self
 
     def set_fill(self, fill: Union[Sequence[bool], bool]):
-        self.set_bool_sequence(fill, "fill")
+        return self.set_bool_sequence(fill, "fill")
 
     def set_linestyle(
         self,
         linestyles: Union[LiteralSequence, Literal["linestyles"]],
     ):
-        self.set_literal_sequence(linestyles, LINESTYLES, "linestyles")
+        return self.set_literal_sequence(linestyles, LINESTYLES, "linestyles")
 
     def set_linewidth(self, linewidths: Union[NumericSequence, NumericType]):
-        self.set_numeric_sequence(linewidths, "linewidth")
+        return self.set_numeric_sequence(linewidths, "linewidth")
 
     def set_facecolor(self, facecolors: Union[ColorSequence, Color]):
-        self.set_color_sequence(facecolors, "facecolor")
+        return self.set_color_sequence(facecolors, "facecolor")
 
     def set_hatch(self, hatches: Union[LiteralSequence, Literal["hatches"]]):
-        self.set_literal_sequence(hatches, HATCHES, "hatch")
+        return self.set_literal_sequence(hatches, HATCHES, "hatch")
 
     def _compute_kde(self, data):
         kde = stats.gaussian_kde(

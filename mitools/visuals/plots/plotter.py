@@ -543,7 +543,7 @@ class Plotter(ABC):
         )
 
     def set_zorder(self, zorder: Union[NumericSequences, NumericSequence, NumericType]):
-        self.set_numeric_sequences(zorder, param_name="zorder")
+        return self.set_numeric_sequences(zorder, param_name="zorder")
 
     def prepare_draw(self):
         if self.figure is not None or self.ax is not None:

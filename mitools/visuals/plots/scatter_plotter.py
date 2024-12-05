@@ -86,35 +86,35 @@ class ScatterPlotter(Plotter):
         return self
 
     def set_size(self, size: Union[NumericSequences, NumericSequence, NumericType]):
-        self.set_numeric_sequences(size, param_name="size")
+        return self.set_numeric_sequences(size, param_name="size")
 
     def set_marker(self, markers: Union[MarkerSequences, MarkerSequence, Marker]):
-        self.set_marker_sequences(markers, param_name="marker")
+        return self.set_marker_sequences(markers, param_name="marker")
 
     def set_linewidth(
         self, linewidths: Union[NumericSequences, NumericSequence, NumericType]
     ):
-        self.set_numeric_sequences(linewidths, param_name="linewidth")
+        return self.set_numeric_sequences(linewidths, param_name="linewidth")
 
     def set_edgecolor(
         self, edgecolors: Union[EdgeColorSequences, EdgeColorSequence, EdgeColor]
     ):
-        self.set_edgecolor_sequences(edgecolors, param_name="edgecolor")
+        return self.set_edgecolor_sequences(edgecolors, param_name="edgecolor")
 
     def set_facecolor(self, facecolor: Union[ColorSequences, ColorSequence, Color]):
-        self.set_color_sequences(facecolor, param_name="facecolor")
+        return self.set_color_sequences(facecolor, param_name="facecolor")
 
     def set_colormap(self, colormaps: Union[CmapSequence, Cmap]):
-        self.set_colormap_sequence(colormaps, param_name="colormap")
+        return self.set_colormap_sequence(colormaps, param_name="colormap")
 
     def set_normalization(self, normalization: Union[NormSequence, Norm]):
-        self.set_norm_sequence(normalization, param_name="normalization")
+        return self.set_norm_sequence(normalization, param_name="normalization")
 
     def set_vmin(self, vmin: Union[NumericSequence, NumericType]):
-        self.set_numeric_sequence(vmin, "vmin")
+        return self.set_numeric_sequence(vmin, "vmin")
 
     def set_vmax(self, vmax: Union[NumericSequence, NumericType]):
-        self.set_numeric_sequence(vmax, "vmax")
+        return self.set_numeric_sequence(vmax, "vmax")
 
     def set_normalization_range(
         self,

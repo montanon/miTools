@@ -125,21 +125,21 @@ class HistogramPlotter(Plotter):
         return self
 
     def set_bins(self, bins: Union[BinsSequence, Bins]):
-        self.set_bins_sequence(bins, "bins")
+        return self.set_bins_sequence(bins, "bins")
 
     def set_range(self, range: Union[Sequence[NumericTuple], NumericTuple, None]):
-        self.set_numeric_tuple_sequence(range, "range")
+        return self.set_numeric_tuple_sequence(range, "range")
 
     def set_weights(self, weights: Union[NumericSequences, NumericSequence, None]):
-        self.set_numeric_sequences(weights, "weights")
+        return self.set_numeric_sequences(weights, "weights")
 
     def set_cumulative(self, cumulative: Union[Sequence[bool], bool]):
-        self.set_bool_sequence(cumulative, "cumulative")
+        return self.set_bool_sequence(cumulative, "cumulative")
 
     def set_bottom(
         self, bottom: Union[NumericSequences, NumericSequence, NumericType, None]
     ):
-        self.set_numeric_sequences(bottom, "bottom")
+        return self.set_numeric_sequences(bottom, "bottom")
 
     def set_histtype(
         self,
@@ -148,34 +148,34 @@ class HistogramPlotter(Plotter):
             Literal["bar", "barstacked", "step", "stepfilled"],
         ],
     ):
-        self.set_literal_sequence(histtype, HIST_HISTTYPE, "histtype")
+        return self.set_literal_sequence(histtype, HIST_HISTTYPE, "histtype")
 
     def set_align(self, align: Union[LiteralSequence, Literal["left", "mid", "right"]]):
-        self.set_literal_sequence(align, HIST_ALIGN, "align")
+        return self.set_literal_sequence(align, HIST_ALIGN, "align")
 
     def set_rwidth(self, rwidth: Union[NumericSequence, NumericType, None]):
-        self.set_numeric_sequence(rwidth, "rwidth")
+        return self.set_numeric_sequence(rwidth, "rwidth")
 
     def set_edgecolor(self, edgecolors: Union[EdgeColorSequence, EdgeColor]):
-        self.set_edgecolor_sequence(edgecolors, "edgecolor")
+        return self.set_edgecolor_sequence(edgecolors, "edgecolor")
 
     def set_facecolor(self, facecolors: Union[ColorSequence, Color]):
-        self.set_color_sequence(facecolors, "facecolor")
+        return self.set_color_sequence(facecolors, "facecolor")
 
     def set_fill(self, fill: Union[Sequence[bool], bool]):
-        self.set_bool_sequence(fill, "fill")
+        return self.set_bool_sequence(fill, "fill")
 
     def set_linestyle(
         self,
         linestyles: Union[LiteralSequence, Literal["linestyles"]],
     ):
-        self.set_literal_sequence(linestyles, LINESTYLES, "linestyle")
+        return self.set_literal_sequence(linestyles, LINESTYLES, "linestyle")
 
     def set_linewidth(self, linewidths: Union[NumericSequence, NumericType]):
-        self.set_numeric_sequence(linewidths, "linewidth")
+        return self.set_numeric_sequence(linewidths, "linewidth")
 
     def set_hatch(self, hatches: Union[LiteralSequence, Literal["hatches"]]):
-        self.set_literal_sequence(hatches, HATCHES, "hatch")
+        return self.set_literal_sequence(hatches, HATCHES, "hatch")
 
     def _create_hist_kwargs(self, n_sequence: int):
         hist_kwargs = {
