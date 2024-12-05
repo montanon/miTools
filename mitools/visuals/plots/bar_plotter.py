@@ -202,13 +202,11 @@ class BarPlotter(Plotter):
         for n_sequence in range(self._n_sequences):
             bar_kwargs = self._create_bar_kwargs(n_sequence)
             bar_kwargs = {k: v for k, v in bar_kwargs.items() if v is not None}
-            if self._multi_data and self._kind == "stacked":
-                reference = bar_kwargs.get(
-                    "bottom", np.zeros_like(self.x_data[n_sequence])
+            if self._kind == "stacked" and n_sequence == 0:
+                bottom_reference = bar_kwargs.get(
+                    "bottom", np.zeros_like(self.y_data[n_sequence])
                 )
-                if np.asarray(reference).shape != self.x_data[n_sequence].shape:
-                    pass
-
+            bar_kwargs["bottom"] = bottom_reference
             try:
                 if self.orientation == "vertical":
                     self.ax.bar(
@@ -225,7 +223,8 @@ class BarPlotter(Plotter):
                         y_data,
                         **bar_kwargs,
                     )
-                if self._multi_data and self._kind == "stacked":
-                    reference += self.x_data[n_sequence]
+                if self._kind == "stacked":
+                    bottom_reference += self.y_data[n_sequence]
+                    print(bottom_reference)
             except Exception as e:
                 raise BarPlotterException(f"Error while creating bar plot: {e}")
