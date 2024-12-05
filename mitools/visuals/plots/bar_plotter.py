@@ -214,18 +214,20 @@ class BarPlotter(Plotter):
                 bar_kwargs["bottom"] = bottom_reference
             try:
                 if self.orientation == "vertical":
+                    bar_kwargs["x"] = self.x_data[n_sequence]
+                    bar_kwargs["height"] = self.y_data[n_sequence]
                     self.ax.bar(
-                        self.x_data[n_sequence],
-                        self.y_data[n_sequence],
                         **bar_kwargs,
                     )
                 else:
-                    bar_kwargs["height"] = self.y_data[n_sequence]
-                    y_data = bar_kwargs.pop("width")
-                    bar_kwargs["left"] = bar_kwargs.pop("bottom")
+                    bar_kwargs["y"] = self.x_data[n_sequence]
+                    bar_kwargs["width"], bar_kwargs["height"] = (
+                        self.y_data[n_sequence],
+                        bar_kwargs["width"],
+                    )
+                    if "bottom" in bar_kwargs:
+                        bar_kwargs["left"] = bar_kwargs.pop("bottom")
                     self.ax.barh(
-                        self.x_data[n_sequence],
-                        y_data,
                         **bar_kwargs,
                     )
                 if self.kind == "stacked":
