@@ -47,7 +47,7 @@ class PlotterException(Exception):
     pass
 
 
-class Plotter(ABC, Setter):
+class Plotter(Setter, ABC):
     def __init__(
         self,
         x_data: Union[NumericSequence, NumericSequences],

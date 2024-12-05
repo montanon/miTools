@@ -143,17 +143,14 @@ class Setter(ABC):
         if self.multi_data:
             if is_numeric_sequences(sequences):
                 validate_sequence_length(sequences, self.n_sequences, param_name)
-                expanded_sequences = []
-                for seq in sequences:
-                    if len(np.asarray(seq)) == 1:
-                        expanded_sequences.append(np.repeat(seq, self.data_size))
-                    else:
-                        expanded_sequences.append(seq)
+                expanded_sequences = [
+                    np.repeat(seq, self.data_size) if len(seq) == 1 else seq
+                    for seq in sequences
+                ]
                 validate_subsequences_length(
                     expanded_sequences, self.data_size, param_name
                 )
-                sequences = expanded_sequences
-                setattr(self, param_name, np.asarray(sequences))
+                setattr(self, param_name, np.asarray(expanded_sequences))
                 self.multi_params_structure[param_name] = "sequences"
                 return self
             elif is_numeric_sequence(sequences):
