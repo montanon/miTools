@@ -1,5 +1,6 @@
 from typing import Literal, Sequence, Union
 
+import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
@@ -175,7 +176,7 @@ class HistogramPlotter(Plotter):
             validate_sequence_length(weights, self._n_sequences, "weights")
             for sequence in weights:
                 validate_sequence_length(sequence, self.data_size, "weights")
-            self.weights = weights
+            self.weights = np.asarray(weights)
             self._multi_params_structure["weights"] = "sequences"
             return self
         elif is_numeric_sequence(weights):
@@ -207,7 +208,7 @@ class HistogramPlotter(Plotter):
     ):
         if self._multi_data and is_numeric_sequence(bottom):
             validate_sequence_length(bottom, self._n_sequences, "bottom")
-            self.bottom = bottom
+            self.bottom = np.asarray(bottom)
             self._multi_params_structure["bottom"] = "sequence"
             return self
         elif is_numeric(bottom) or bottom is None:
@@ -255,7 +256,7 @@ class HistogramPlotter(Plotter):
     def set_rwidth(self, rwidth: Union[NumericSequence, NumericType, None]):
         if self._multi_data and is_numeric_sequence(rwidth):
             validate_sequence_length(rwidth, self._n_sequences, "rwidth")
-            self.rwidth = rwidth
+            self.rwidth = np.asarray(rwidth)
             self._multi_params_structure["rwidth"] = "sequence"
             return self
         elif is_numeric(rwidth) or rwidth is None:
@@ -329,7 +330,7 @@ class HistogramPlotter(Plotter):
     def set_linewidth(self, linewidths: Union[NumericSequence, NumericType]):
         if self._multi_data and is_numeric_sequence(linewidths):
             validate_sequence_length(linewidths, self._n_sequences, "linewidth")
-            self.linewidth = linewidths
+            self.linewidth = np.asarray(linewidths)
             self._multi_params_structure["linewidth"] = "sequence"
             return self
         elif is_numeric(linewidths):

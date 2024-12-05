@@ -1,5 +1,6 @@
 from typing import Union
 
+import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
@@ -114,12 +115,12 @@ class ScatterPlotter(Plotter):
                 if any(len(sequence) != 1 for sequence in sizes):
                     max_len = max(len(sequence) for sequence in sizes)
                     validate_same(max_len, self.data_size, "len(sizes)", "data_size")
-                self.size = sizes
+                self.size = np.asarray(sizes)
                 self._multi_params_structure["size"] = "sequences"
                 return self
             elif is_numeric_sequence(sizes):
                 validate_sequence_length(sizes, self._n_sequences, "sizes")
-                self.size = sizes
+                self.size = np.asarray(sizes)
                 self._multi_params_structure["size"] = "sequence"
                 return self
             elif is_numeric(sizes) or sizes is None:
@@ -129,7 +130,7 @@ class ScatterPlotter(Plotter):
         else:
             if is_numeric_sequence(sizes):
                 validate_sequence_length(sizes, self.data_size, "sizes")
-                self.size = sizes
+                self.size = np.asarray(sizes)
                 self._multi_params_structure["size"] = "sequence"
                 return self
             if sizes is not None:
@@ -185,12 +186,12 @@ class ScatterPlotter(Plotter):
                     validate_same(
                         max_len, self.data_size, "len(linewidths)", "data_size"
                     )
-                self.linewidth = linewidths
+                self.linewidth = np.asarray(linewidths)
                 self._multi_params_structure["linewidth"] = "sequences"
                 return self
             elif is_numeric_sequence(linewidths):
                 validate_sequence_length(linewidths, self._n_sequences, "linewidths")
-                self.linewidth = linewidths
+                self.linewidth = np.asarray(linewidths)
                 self._multi_params_structure["linewidth"] = "sequence"
                 return self
             elif is_numeric(linewidths):
@@ -200,7 +201,7 @@ class ScatterPlotter(Plotter):
         else:
             if is_numeric_sequence(linewidths):
                 validate_sequence_length(linewidths, self.data_size, "linewidths")
-                self.linewidth = linewidths
+                self.linewidth = np.asarray(linewidths)
                 self._multi_params_structure["linewidth"] = "sequence"
                 return self
             validate_numeric(linewidths, "linewidths")
@@ -314,7 +315,7 @@ class ScatterPlotter(Plotter):
     def set_vmin(self, vmin: Union[NumericSequence, NumericType]):
         if self._multi_data and is_numeric_sequence(vmin):
             validate_sequence_length(vmin, self._n_sequences, "vmin")
-            self.vmin = vmin
+            self.vmin = np.asarray(vmin)
             self._multi_params_structure["vmin"] = "sequence"
             return self
         elif is_numeric(vmin):
@@ -328,7 +329,7 @@ class ScatterPlotter(Plotter):
     def set_vmax(self, vmax: Union[NumericSequence, NumericType]):
         if self._multi_data and is_numeric_sequence(vmax):
             validate_sequence_length(vmax, self._n_sequences, "vmax")
-            self.vmax = vmax
+            self.vmax = np.asarray(vmax)
             self._multi_params_structure["vmax"] = "sequence"
             return self
         elif is_numeric(vmax):

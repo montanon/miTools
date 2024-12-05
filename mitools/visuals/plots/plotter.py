@@ -532,14 +532,14 @@ class Plotter(ABC):
                 for seq in alpha:
                     for val in seq:
                         validate_value_in_range(val, 0, 1, "alpha")
-                self.alpha = alpha
+                self.alpha = np.asarray(alpha)
                 self._multi_params_structure["alpha"] = "sequences"
                 return self
             elif is_numeric_sequence(alpha):
                 validate_sequence_length(alpha, self._n_sequences, "alpha")
                 for val in alpha:
                     validate_value_in_range(val, 0, 1, "alpha")
-                self.alpha = alpha
+                self.alpha = np.asarray(alpha)
                 self._multi_params_structure["alpha"] = "sequence"
                 return self
             elif is_numeric(alpha):
@@ -549,7 +549,7 @@ class Plotter(ABC):
         else:
             if is_numeric_sequence(alpha):
                 validate_sequence_length(alpha, self.data_size, "alpha")
-                self.alpha = alpha
+                self.alpha = np.asarray(alpha)
                 self._multi_params_structure["alpha"] = "sequence"
                 return self
             validate_numeric(alpha, "alpha")
@@ -581,12 +581,12 @@ class Plotter(ABC):
                 if any(len(sequence) != 1 for sequence in zorder):
                     max_len = max(len(sequence) for sequence in zorder)
                     validate_same(max_len, self.data_size, "len(zorder)", "data_size")
-                self.zorder = zorder
+                self.zorder = np.asarray(zorder)
                 self._multi_params_structure["zorder"] = "sequences"
                 return self
             elif is_numeric_sequence(zorder):
                 validate_sequence_length(zorder, self._n_sequences, "zorder")
-                self.zorder = zorder
+                self.zorder = np.asarray(zorder)
                 self._multi_params_structure["zorder"] = "sequence"
                 return self
             elif is_numeric(zorder):
@@ -596,7 +596,7 @@ class Plotter(ABC):
         else:
             if is_numeric_sequence(zorder):
                 validate_sequence_length(zorder, self.data_size, "zorder")
-                self.zorder = zorder
+                self.zorder = np.asarray(zorder)
                 self._multi_params_structure["zorder"] = "sequence"
                 return self
             validate_numeric(zorder, "zorder")

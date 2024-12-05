@@ -157,7 +157,7 @@ class DistributionPlotter(Plotter):
     def set_linewidth(self, linewidths: Union[NumericSequence, NumericType]):
         if self._multi_data and is_numeric_sequence(linewidths):
             validate_sequence_length(linewidths, self._n_sequences, "linewidth")
-            self.linewidth = linewidths
+            self.linewidth = np.asarray(linewidths)
             self._multi_params_structure["linewidth"] = "sequence"
             return self
         elif is_numeric(linewidths):

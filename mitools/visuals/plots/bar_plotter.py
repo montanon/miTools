@@ -1,5 +1,6 @@
 from typing import Dict, Literal, Sequence, Union
 
+import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
@@ -60,6 +61,7 @@ class BarPlotter(Plotter):
         self,
         x_data: Union[NumericSequences, NumericSequence],
         y_data: Union[NumericSequences, NumericSequence],
+        kind: Literal["bar", "stacked"],
         **kwargs,
     ):
         self._bar_params = {
@@ -124,6 +126,7 @@ class BarPlotter(Plotter):
         super().__init__(x_data, y_data, **kwargs)
         self._init_params.update(self._bar_params)
         self._set_init_params(**kwargs)
+        self._kind = kind
         self.figure: Figure = None
         self.ax: Axes = None
 
@@ -145,12 +148,12 @@ class BarPlotter(Plotter):
                 if any(len(sequence) != 1 for sequence in widths):
                     max_len = max(len(sequence) for sequence in widths)
                     validate_same(max_len, self.data_size, "len(width)", "data_size")
-                self.width = widths
+                self.width = np.asarray(widths)
                 self._multi_params_structure["width"] = "sequences"
                 return self
             elif is_numeric_sequence(widths):
                 validate_sequence_length(widths, self.data_size, "width")
-                self.width = widths
+                self.width = np.asarray(widths)
                 self._multi_params_structure["width"] = "sequence"
                 return self
             elif is_numeric(widths):
@@ -160,7 +163,7 @@ class BarPlotter(Plotter):
         else:
             if is_numeric_sequence(widths):
                 validate_sequence_length(widths, self.data_size, "width")
-                self.width = widths
+                self.width = np.asarray(widths)
                 self._multi_params_structure["width"] = "sequence"
                 return self
             validate_numeric(widths, "width")
@@ -181,12 +184,12 @@ class BarPlotter(Plotter):
                 if any(len(sequence) != 1 for sequence in bottoms):
                     max_len = max(len(sequence) for sequence in bottoms)
                     validate_same(max_len, self.data_size, "len(bottom)", "data_size")
-                self.bottom = bottoms
+                self.bottom = np.asarray(bottoms)
                 self._multi_params_structure["bottom"] = "sequences"
                 return self
             elif is_numeric_sequence(bottoms):
                 validate_sequence_length(bottoms, self._n_sequences, "bottom")
-                self.bottom = bottoms
+                self.bottom = np.asarray(bottoms)
                 self._multi_params_structure["bottom"] = "sequence"
                 return self
             elif is_numeric(bottoms):
@@ -196,7 +199,7 @@ class BarPlotter(Plotter):
         else:
             if is_numeric_sequence(bottoms):
                 validate_sequence_length(bottoms, self.data_size, "bottom")
-                self.bottom = bottoms
+                self.bottom = np.asarray(bottoms)
                 self._multi_params_structure["bottom"] = "sequence"
                 return self
             validate_numeric(bottoms, "bottom")
@@ -262,7 +265,7 @@ class BarPlotter(Plotter):
     def set_linewidth(self, linewidths: Union[NumericSequence, NumericType]):
         if self._multi_data and is_numeric_sequence(linewidths):
             validate_sequence_length(linewidths, self._n_sequences, "linewidth")
-            self.linewidth = linewidths
+            self.linewidth = np.asarray(linewidths)
             self._multi_params_structure["linewidth"] = "sequence"
             return self
         elif is_numeric(linewidths):
@@ -281,12 +284,12 @@ class BarPlotter(Plotter):
                 if any(len(sequence) != 1 for sequence in xerrs):
                     max_len = max(len(sequence) for sequence in xerrs)
                     validate_same(max_len, self.data_size, "len(xerr)", "data_size")
-                self.xerr = xerrs
+                self.xerr = np.asarray(xerrs)
                 self._multi_params_structure["xerr"] = "sequences"
                 return self
             elif is_numeric_sequence(xerrs):
                 validate_sequence_length(xerrs, self.data_size, "xerr")
-                self.xerr = xerrs
+                self.xerr = np.asarray(xerrs)
                 self._multi_params_structure["xerr"] = "sequence"
                 return self
             elif is_numeric(xerrs):
@@ -296,7 +299,7 @@ class BarPlotter(Plotter):
         else:
             if is_numeric_sequence(xerrs):
                 validate_sequence_length(xerrs, self.data_size, "xerr")
-                self.xerr = xerrs
+                self.xerr = np.asarray(xerrs)
                 self._multi_params_structure["xerr"] = "sequence"
                 return self
             validate_numeric(xerrs, "xerr")
@@ -315,12 +318,12 @@ class BarPlotter(Plotter):
                 if any(len(sequence) != 1 for sequence in yerrs):
                     max_len = max(len(sequence) for sequence in yerrs)
                     validate_same(max_len, self.data_size, "len(yerr)", "data_size")
-                self.yerr = yerrs
+                self.yerr = np.asarray(yerrs)
                 self._multi_params_structure["yerr"] = "sequences"
                 return self
             elif is_numeric_sequence(yerrs):
                 validate_sequence_length(yerrs, self.data_size, "yerr")
-                self.yerr = yerrs
+                self.yerr = np.asarray(yerrs)
                 self._multi_params_structure["yerr"] = "sequence"
                 return self
             elif is_numeric(yerrs):
@@ -330,7 +333,7 @@ class BarPlotter(Plotter):
         else:
             if is_numeric_sequence(yerrs):
                 validate_sequence_length(yerrs, self.data_size, "yerr")
-                self.yerr = yerrs
+                self.yerr = np.asarray(yerrs)
                 self._multi_params_structure["yerr"] = "sequence"
                 return self
             validate_numeric(yerrs, "yerr")
@@ -379,7 +382,7 @@ class BarPlotter(Plotter):
     def set_capsize(self, capsize: Union[NumericSequence, NumericType]):
         if self._multi_data and is_numeric_sequence(capsize):
             validate_sequence_length(capsize, self._n_sequences, "capsize")
-            self.capsize = capsize
+            self.capsize = np.asarray(capsize)
             self._multi_params_structure["capsize"] = "sequence"
             return self
         elif is_numeric(capsize):
@@ -519,6 +522,13 @@ class BarPlotter(Plotter):
         for n_sequence in range(self._n_sequences):
             bar_kwargs = self._create_bar_kwargs(n_sequence)
             bar_kwargs = {k: v for k, v in bar_kwargs.items() if v is not None}
+            if self._multi_data and self._kind == "stacked":
+                reference = bar_kwargs.get(
+                    "bottom", np.zeros_like(self.x_data[n_sequence])
+                )
+                if np.asarray(reference).shape != self.x_data[n_sequence].shape:
+                    pass
+
             try:
                 if self.orientation == "vertical":
                     self.ax.bar(
@@ -535,5 +545,7 @@ class BarPlotter(Plotter):
                         y_data,
                         **bar_kwargs,
                     )
+                if self._multi_data and self._kind == "stacked":
+                    reference += self.x_data[n_sequence]
             except Exception as e:
                 raise BarPlotterException(f"Error while creating bar plot: {e}")

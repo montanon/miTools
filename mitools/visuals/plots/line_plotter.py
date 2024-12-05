@@ -1,5 +1,6 @@
 from typing import Literal, Union
 
+import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
@@ -96,7 +97,7 @@ class LinePlotter(Plotter):
     def set_markersize(self, markersize: Union[NumericSequence, NumericType]):
         if self._multi_data and is_numeric_sequence(markersize):
             validate_sequence_length(markersize, self._n_sequences, "markersize")
-            self.markersize = markersize
+            self.markersize = np.asarray(markersize)
             self._multi_params_structure["markersize"] = "sequence"
             return self
         elif is_numeric(markersize):
@@ -112,7 +113,7 @@ class LinePlotter(Plotter):
             validate_sequence_length(
                 markeredgewidth, self._n_sequences, "markeredgewidth"
             )
-            self.markeredgewidth = markeredgewidth
+            self.markeredgewidth = np.asarray(markeredgewidth)
             self._multi_params_structure["markeredgewidth"] = "sequence"
             return self
         elif is_numeric(markeredgewidth):
@@ -175,7 +176,7 @@ class LinePlotter(Plotter):
     def set_linewidth(self, linewidths: Union[NumericSequence, NumericType]):
         if self._multi_data and is_numeric_sequence(linewidths):
             validate_sequence_length(linewidths, self._n_sequences, "linewidth")
-            self.linewidth = linewidths
+            self.linewidth = np.asarray(linewidths)
             self._multi_params_structure["linewidth"] = "sequence"
             return self
         elif is_numeric(linewidths):
