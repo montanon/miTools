@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any, Dict, Literal, Sequence, Tuple, Union
 
 import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.colors import Colormap, Normalize
 from matplotlib.figure import Figure
@@ -161,7 +162,7 @@ class Plotter(ABC):
             data = [data]
         validate_numeric_sequences(data, name)
         validate_consistent_len(data, name)
-        return data
+        return np.asarray(data)
 
     def set_title(self, label: str, **kwargs):
         """https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.set_title.html"""
