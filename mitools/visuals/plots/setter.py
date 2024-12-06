@@ -27,6 +27,7 @@ from mitools.visuals.plots.matplotlib_typing import (
     NumericSequences,
     NumericTuple,
     NumericTupleSequence,
+    NumericTupleSequences,
     NumericType,
     StrSequence,
     StrSequences,
@@ -59,6 +60,7 @@ from mitools.visuals.plots.validations import (
     is_numeric_sequences,
     is_numeric_tuple,
     is_numeric_tuple_sequence,
+    is_numeric_tuple_sequences,
     is_str,
     is_str_sequence,
     is_str_sequences,
@@ -146,6 +148,7 @@ class Setter(ABC):
         param_name: str,
         min_value: NumericType = None,
         max_value: NumericType = None,
+        single_value: bool = True,
     ):
         if self.multi_data:
             if is_numeric_sequences(sequences):
@@ -169,7 +172,7 @@ class Setter(ABC):
                 setattr(self, param_name, sequences)
                 self.multi_params_structure[param_name] = "sequence"
                 return self
-            elif is_numeric(sequences):
+            elif single_value and is_numeric(sequences):
                 setattr(self, param_name, sequences)
                 self.multi_params_structure[param_name] = "value"
                 return self
@@ -182,14 +185,16 @@ class Setter(ABC):
                 setattr(self, param_name, sequences)
                 self.multi_params_structure[param_name] = "sequence"
                 return self
-            elif is_numeric(sequences):
+            elif single_value and is_numeric(sequences):
                 validate_value_in_range(sequences, min_value, max_value, param_name)
                 setattr(self, param_name, sequences)
                 self.multi_params_structure[param_name] = "value"
                 return self
-        raise ArgumentStructureError(
-            f"Invalid {param_name}, must be a numeric value, numeric sequences, or sequence of numeric sequences."
-        )
+        if single_value:
+            msg = f"Invalid {param_name}, must be a numeric value, numeric sequences, or sequence of numeric sequences."
+        else:
+            msg = f"Invalid {param_name}, must be a numeric sequences, or sequence of numeric sequences."
+        raise ArgumentStructureError(msg)
 
     def set_numeric_sequence(
         self,
@@ -447,6 +452,42 @@ class Setter(ABC):
             return self
         raise ArgumentStructureError(
             f"Invalid {param_name}, must be a string or sequence of strings."
+        )
+
+    def set_numeric_tuple_sequences(
+        self,
+        sequences: Union[NumericTupleSequences, NumericTupleSequence, NumericTuple],
+        sizes: Sequence[int],
+        param_name: str,
+    ):
+        if self.multi_data:
+            if is_numeric_tuple_sequences(sequences, sizes):
+                validate_sequence_length(sequences, self.n_sequences, param_name)
+                validate_subsequences_length(sequences, [1, self.data_size], param_name)
+                setattr(self, param_name, sequences)
+                self.multi_params_structure[param_name] = "sequences"
+                return self
+            elif is_numeric_tuple_sequence(sequences, sizes):
+                validate_sequence_length(sequences, self.n_sequences, param_name)
+                setattr(self, param_name, sequences)
+                self.multi_params_structure[param_name] = "sequence"
+                return self
+            elif is_numeric_tuple(sequences, sizes):
+                setattr(self, param_name, sequences)
+                self.multi_params_structure[param_name] = "value"
+                return self
+        else:
+            if is_numeric_tuple_sequence(sequences, sizes):
+                validate_sequence_length(sequences, self.data_size, param_name)
+                setattr(self, param_name, sequences)
+                self.multi_params_structure[param_name] = "sequence"
+                return self
+            elif is_numeric_tuple(sequences, sizes):
+                setattr(self, param_name, sequences)
+                self.multi_params_structure[param_name] = "value"
+                return self
+        raise ArgumentStructureError(
+            f"Invalid {param_name}, must be a numeric tuple, sequence of numeric tuples, or sequences of numeric tuples."
         )
 
     def set_numeric_tuple_sequence(

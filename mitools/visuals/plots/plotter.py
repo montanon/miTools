@@ -31,7 +31,9 @@ from mitools.visuals.plots.setter import Setter
 from mitools.visuals.plots.validations import (
     NUMERIC_TYPES,
     SEQUENCE_TYPES,
+    is_numeric,
     is_numeric_sequence,
+    is_numeric_sequences,
     is_sequence,
     is_str_sequence,
     validate_consistent_len,
@@ -134,6 +136,12 @@ class Plotter(Setter, ABC):
                         "ytickparams",
                         "textprops",
                         "wedgeprops",  # Awful
+                        "capprops",
+                        "whiskerprops",
+                        "boxprops",
+                        "flierprops",
+                        "medianprops",
+                        "meanprops",
                     ]:
                         getattr(self, setter_name)(**kwargs[param])
                     else:
@@ -697,23 +705,44 @@ class Plotter(Setter, ABC):
             json.dump(init_params, f, indent=4)
 
     @classmethod
+    def _convert_list_to_tuple(
+        cls,
+        value: Union[NumericSequences, NumericSequence, None],
+        expected_size: Union[Tuple[NumericType], NumericType] = None,
+    ) -> Any:
+        if value is None:
+            return None
+        if expected_size is not None and is_numeric(expected_size):
+            expected_size = (expected_size,)
+        if is_numeric_sequences(value):
+            if expected_size is not None:
+                if all(len(item) in expected_size for item in value):
+                    return [tuple(val) for val in value]
+        elif is_numeric_sequence(value):
+            if expected_size is not None:
+                if len(value) in expected_size:
+                    return tuple(value)
+        return value
+
+    @classmethod
     def from_json(cls, file_path: Union[str, Path]) -> "Plotter":
         with open(file_path, "r") as f:
             params = json.load(f)
         x_data = params.pop("x_data") if "x_data" in params else None
         y_data = params.pop("y_data") if "y_data" in params else None
-        # Awful
-        if "xlim" in params and params["xlim"] is not None:
-            params["xlim"] = tuple(params["xlim"])
-        if "ylim" in params and params["ylim"] is not None:
-            params["ylim"] = tuple(params["ylim"])
-        if "center" in params and params["center"] is not None:
-            params["center"] = tuple(params["center"])
-        if "range" in params and params["range"] is not None:
-            params["range"] = tuple(params["range"])
-        if "center" in params and params["center"] is not None:
-            if is_sequence(params["center"]):
-                params["center"] = [tuple(center) for center in params["center"]]
-            else:
-                params["center"] = tuple(params["center"])
+        # Convert lists to tuples where needed
+        if "xlim" in params:
+            params["xlim"] = cls._convert_list_to_tuple(params["xlim"], 2)
+        if "ylim" in params:
+            params["ylim"] = cls._convert_list_to_tuple(params["ylim"], 2)
+        if "figsize" in params:
+            params["figsize"] = cls._convert_list_to_tuple(params["figsize"], 2)
+        if "center" in params:
+            params["center"] = cls._convert_list_to_tuple(params["center"], 2)
+        if "range" in params:
+            params["range"] = cls._convert_list_to_tuple(params["range"], 2)
+        if "color" in params:
+            params["color"] = cls._convert_list_to_tuple(params["color"], (3, 4))
+        if "whis" in params:
+            params["whis"] = cls._convert_list_to_tuple(params["whis"], 2)
         return cls(x_data=x_data, y_data=y_data, **params)
