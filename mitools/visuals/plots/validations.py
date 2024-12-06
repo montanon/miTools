@@ -30,8 +30,14 @@ NUMERIC_TYPES = (float, int, integer)
 SEQUENCE_TYPES = (list, tuple, ndarray, Series)
 
 
+def is_dict_sequences(sequences: Sequence[Sequence[Any]]) -> bool:
+    return is_sequences(sequences) and all(is_dict_sequence(seq) for seq in sequences)
+
+
 def is_dict_sequence(sequence: Sequence[Any]) -> bool:
-    return is_sequence(sequence) and all(isinstance(item, dict) for item in sequence)
+    return is_sequence(sequence) and all(
+        isinstance(item, dict) or item is None for item in sequence
+    )
 
 
 def is_literal(value: Any, options: Sequence[Any]) -> bool:
@@ -404,7 +410,7 @@ def is_str_sequence(sequence: Any) -> bool:
 def validate_type(
     value: Any, expected_type: Union[Type, Tuple[Type, ...]], param_name: str
 ) -> None:
-    if not isinstance(value, expected_type):
+    if value is not None and not isinstance(value, expected_type):
         raise ArgumentTypeError(
             f"'{param_name}' must be of type {expected_type}, got {type(value)}"
         )
@@ -413,7 +419,7 @@ def validate_type(
 def validate_sequence_type(
     sequence: Sequence, item_type: Union[Type, Tuple[Type, ...]], param_name: str
 ) -> None:
-    if not all(isinstance(item, item_type) for item in sequence):
+    if not all(isinstance(item, item_type) or item is None for item in sequence):
         raise ArgumentTypeError(
             f"All elements in '{param_name}' must be of type {item_type}."
         )
