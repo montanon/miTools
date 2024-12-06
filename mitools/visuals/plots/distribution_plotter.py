@@ -16,6 +16,7 @@ from mitools.visuals.plots.matplotlib_typing import (
     KERNELS,
     LINESTYLES,
     ORIENTATIONS,
+    BoolSequence,
     Color,
     ColorSequence,
     LiteralSequence,
@@ -58,7 +59,7 @@ class DistributionPlotter(Plotter):
                 "type": Literal["horizontal", "vertical"],
             },
             # Specific Parameters that are based on the number of data sequences
-            "fill": {"default": True, "type": Union[Sequence[bool], bool]},
+            "fill": {"default": True, "type": Union[BoolSequence, bool]},
             "linestyle": {
                 "default": "-",
                 "type": Union[LiteralSequence, Literal["linestyles"]],
@@ -112,7 +113,7 @@ class DistributionPlotter(Plotter):
         self.orientation = orientation
         return self
 
-    def set_fill(self, fill: Union[Sequence[bool], bool]):
+    def set_fill(self, fill: Union[BoolSequence, bool]):
         return self.set_bool_sequence(fill, "fill")
 
     def set_linestyle(
