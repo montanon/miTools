@@ -1,22 +1,15 @@
-import re
-from typing import Any, Dict, Literal, Sequence, Union
+from typing import Dict, Literal, Union
 
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.patches import PathPatch
-from numpy import integer, ndarray
-from pandas import Series
 
 from mitools.exceptions import (
     ArgumentStructureError,
-    ArgumentTypeError,
-    ArgumentValueError,
 )
 from mitools.visuals.plots.matplotlib_typing import (
-    COLORS,
     ORIENTATIONS,
     BoolSequence,
-    Color,
     DictSequence,
     NumericSequence,
     NumericSequences,
@@ -30,25 +23,16 @@ from mitools.visuals.plots.matplotlib_typing import (
 from mitools.visuals.plots.plotter import Plotter
 from mitools.visuals.plots.validations import (
     NUMERIC_TYPES,
-    SEQUENCE_TYPES,
-    is_bool,
-    is_bool_sequence,
-    is_literal,
     is_numeric,
     is_numeric_sequence,
     is_numeric_sequences,
     is_numeric_tuple,
     is_numeric_tuple_sequence,
     is_numeric_tuple_sequences,
-    is_sequence,
     is_str,
     is_str_sequence,
-    validate_length,
     validate_literal,
-    validate_sequence_length,
-    validate_sequence_type,
     validate_type,
-    validate_value_in_options,
 )
 
 
