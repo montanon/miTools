@@ -2,6 +2,7 @@ import re
 from pathlib import Path
 from typing import Any, Sequence, Tuple, Type, TypeVar, Union
 
+import numpy as np
 from matplotlib.colors import Colormap, Normalize
 from matplotlib.markers import MarkerStyle
 from numpy import integer, ndarray
@@ -29,8 +30,14 @@ NUMERIC_TYPES = (float, int, integer)
 SEQUENCE_TYPES = (list, tuple, ndarray, Series)
 
 
+def is_dict_sequences(sequences: Sequence[Sequence[Any]]) -> bool:
+    return is_sequences(sequences) and all(is_dict_sequence(seq) for seq in sequences)
+
+
 def is_dict_sequence(sequence: Sequence[Any]) -> bool:
-    return is_sequence(sequence) and all(isinstance(item, dict) for item in sequence)
+    return is_sequence(sequence) and all(
+        isinstance(item, dict) or item is None for item in sequence
+    )
 
 
 def is_literal(value: Any, options: Sequence[Any]) -> bool:
@@ -57,6 +64,10 @@ def is_literal_sequences(
     return is_sequence(sequences) and all(
         is_literal_sequence(seq, options) for seq in sequences
     )
+
+
+def is_str_sequences(sequences: Sequence[Sequence[Any]]) -> bool:
+    return is_sequence(sequences) and all(is_str_sequence(seq) for seq in sequences)
 
 
 def validate_same(value1: Any, value2: Any, param_name1: str, param_name2: str):
@@ -248,13 +259,43 @@ def is_value_in_range(value: Any, min_value: NumericType, max_value: NumericType
     )
 
 
-def validate_value_in_range(value: Any, min_value: float, max_value: float, name: str):
+def validate_value_in_range(
+    value: Any, min_value: Union[float, None], max_value: Union[float, None], name: str
+):
+    max_value = max_value if max_value is not None else np.inf
+    min_value = min_value if min_value is not None else -np.inf
     if not isinstance(value, (float, int)):
         raise ArgumentTypeError(f"'{name}'={value} must be a number.")
     if not min_value <= value <= max_value:
         raise ArgumentValueError(
             f"'{name}'={value} must be between {min_value} and {max_value}."
         )
+
+
+def validate_sequence_values_in_range(
+    sequence: Sequence,
+    min_value: Union[float, None],
+    max_value: Union[float, None],
+    name: str,
+):
+    if min_value is None and max_value is None:
+        return
+    if not is_numeric_sequence(sequence):
+        raise ArgumentTypeError(f"Invalid numeric sequence: {sequence}")
+    for val in sequence:
+        validate_value_in_range(val, min_value, max_value, name)
+
+
+def validate_sequences_values_in_range(
+    sequences: Sequence[Sequence],
+    min_value: Union[float, None],
+    max_value: Union[float, None],
+    name: str,
+):
+    if min_value is None and max_value is None:
+        return
+    for sequence in sequences:
+        validate_sequence_values_in_range(sequence, min_value, max_value, name)
 
 
 def is_numeric(value: Any) -> bool:
@@ -341,7 +382,11 @@ def validate_color(value: Any) -> None:
 
 
 def is_color_sequence(value: Any) -> bool:
-    return is_sequence(value) and all(is_color(item) for item in value)
+    return (
+        not isinstance(value, tuple)
+        and is_sequence(value)
+        and all(is_color(item) for item in value)
+    )
 
 
 def validate_color_sequence(value: Any) -> None:
@@ -365,7 +410,7 @@ def is_str_sequence(sequence: Any) -> bool:
 def validate_type(
     value: Any, expected_type: Union[Type, Tuple[Type, ...]], param_name: str
 ) -> None:
-    if not isinstance(value, expected_type):
+    if value is not None and not isinstance(value, expected_type):
         raise ArgumentTypeError(
             f"'{param_name}' must be of type {expected_type}, got {type(value)}"
         )
@@ -374,7 +419,7 @@ def validate_type(
 def validate_sequence_type(
     sequence: Sequence, item_type: Union[Type, Tuple[Type, ...]], param_name: str
 ) -> None:
-    if not all(isinstance(item, item_type) for item in sequence):
+    if not all(isinstance(item, item_type) or item is None for item in sequence):
         raise ArgumentTypeError(
             f"All elements in '{param_name}' must be of type {item_type}."
         )

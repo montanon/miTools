@@ -210,7 +210,7 @@ class HistogramPlotter(Plotter):
         return hist_kwargs
 
     def _create_plot(self):
-        for n_sequence in range(self._n_sequences):
+        for n_sequence in range(self.n_sequences):
             hist_kwargs = self._create_hist_kwargs(n_sequence)
             hist_kwargs = {k: v for k, v in hist_kwargs.items() if v is not None}
             try:

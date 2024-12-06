@@ -108,6 +108,10 @@ class BarPlotter(Plotter):
         self.figure: Figure = None
         self.ax: Axes = None
 
+    @property
+    def kind(self):
+        return self._kind
+
     def set_log(self, log: bool):
         validate_type(log, bool, "log")
         self.log = log
@@ -199,33 +203,34 @@ class BarPlotter(Plotter):
         return bar_kwargs
 
     def _create_plot(self):
-        for n_sequence in range(self._n_sequences):
+        for n_sequence in range(self.n_sequences):
             bar_kwargs = self._create_bar_kwargs(n_sequence)
             bar_kwargs = {k: v for k, v in bar_kwargs.items() if v is not None}
-            if self._multi_data and self._kind == "stacked":
-                reference = bar_kwargs.get(
-                    "bottom", np.zeros_like(self.x_data[n_sequence])
-                )
-                if np.asarray(reference).shape != self.x_data[n_sequence].shape:
-                    pass
-
+            if self.kind == "stacked":
+                if n_sequence == 0:
+                    bottom_reference = bar_kwargs.get(
+                        "bottom", np.zeros_like(self.y_data[n_sequence])
+                    )
+                bar_kwargs["bottom"] = bottom_reference
             try:
                 if self.orientation == "vertical":
+                    bar_kwargs["x"] = self.x_data[n_sequence]
+                    bar_kwargs["height"] = self.y_data[n_sequence]
                     self.ax.bar(
-                        self.x_data[n_sequence],
-                        self.y_data[n_sequence],
                         **bar_kwargs,
                     )
                 else:
-                    bar_kwargs["height"] = self.y_data[n_sequence]
-                    y_data = bar_kwargs.pop("width")
-                    bar_kwargs["left"] = bar_kwargs.pop("bottom")
+                    bar_kwargs["y"] = self.x_data[n_sequence]
+                    bar_kwargs["width"], bar_kwargs["height"] = (
+                        self.y_data[n_sequence],
+                        bar_kwargs["width"],
+                    )
+                    if "bottom" in bar_kwargs:
+                        bar_kwargs["left"] = bar_kwargs.pop("bottom")
                     self.ax.barh(
-                        self.x_data[n_sequence],
-                        y_data,
                         **bar_kwargs,
                     )
-                if self._multi_data and self._kind == "stacked":
-                    reference += self.x_data[n_sequence]
+                if self.kind == "stacked":
+                    bottom_reference += self.y_data[n_sequence]
             except Exception as e:
                 raise BarPlotterException(f"Error while creating bar plot: {e}")

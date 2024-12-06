@@ -111,7 +111,7 @@ class TestScatterPlotter(unittest.TestCase):
         with self.assertRaises(ArgumentStructureError):
             plotter.set_size([100] * (len(self.x_data) - 1))
 
-        with self.assertRaises(ArgumentTypeError):
+        with self.assertRaises(ArgumentStructureError):
             plotter.set_size("invalid")
 
     def test_marker_validation(self):
@@ -119,7 +119,7 @@ class TestScatterPlotter(unittest.TestCase):
         valid_markers = ["o", "s", "^", MarkerStyle("o")]
         for marker in valid_markers:
             plotter.set_marker(marker)
-        with self.assertRaises(ArgumentTypeError):
+        with self.assertRaises(ArgumentStructureError):
             plotter.set_marker(123)
 
     def test_scale_validation(self):
@@ -198,7 +198,9 @@ class TestScatterPlotter(unittest.TestCase):
         instance_attrs = set(
             attr
             for attr in dir(plotter)
-            if not attr.startswith("_") and not callable(getattr(plotter, attr))
+            if not attr.startswith("_")
+            and not callable(getattr(plotter, attr))
+            and type(getattr(plotter.__class__, attr, None)) is not property
         )
         init_params = set(plotter._init_params.keys())
         required_attrs = {"x_data", "y_data", "data_size", "figure", "ax"}

@@ -167,7 +167,7 @@ class DistributionPlotter(Plotter):
         return fill_kwargs
 
     def _create_plot(self):
-        for n_sequence in range(self._n_sequences):
+        for n_sequence in range(self.n_sequences):
             try:
                 if isinstance(self.x_data[n_sequence], (list, tuple, ndarray, Series)):
                     grid, density = self._compute_kde(self.x_data[n_sequence])
