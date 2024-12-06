@@ -35,7 +35,11 @@ from mitools.visuals.plots.validations import (
     is_bool_sequence,
     is_literal,
     is_numeric,
+    is_numeric_sequence,
+    is_numeric_sequences,
     is_numeric_tuple,
+    is_numeric_tuple_sequence,
+    is_numeric_tuple_sequences,
     is_sequence,
     is_str,
     is_str_sequence,
@@ -109,13 +113,13 @@ class BoxPlotter(Plotter):
             "medianprops": {"default": None, "type": Union[DictSequence, Dict]},
             "meanprops": {"default": None, "type": Union[DictSequence, Dict]},
         }
-        super().__init__(
-            x_data=x_data, y_data=x_data if y_data is None else y_data, **kwargs
-        )
+        super().__init__(x_data=x_data, y_data=None, **kwargs)
         self._init_params.update(self._box_params)
+        self._data_size = len(self.x_data)
         self._set_init_params(**kwargs)
-        if y_data is not None:
-            self.set_positions(y_data)
+        self.set_positions(
+            y_data if y_data is not None else list(range(1, self.n_sequences + 1))
+        )
         self.figure: Figure = None
         self.ax: Axes = None
 
@@ -125,7 +129,7 @@ class BoxPlotter(Plotter):
         return self
 
     def set_orientation(self, orientation: Literal["vertical", "horizontal"]):
-        validate_literal(orientation, ORIENTATIONS, "orientation")
+        validate_literal(orientation, ORIENTATIONS)
         self.orientation = orientation
         return self
 
@@ -143,10 +147,29 @@ class BoxPlotter(Plotter):
             return self
         raise ArgumentStructureError("sym must be a string or a sequence of strings")
 
-    def set_whis(self, whis: Union[NumericSequence, NumericType]):
-        return self.set_numeric_sequence(whis, "whis")
+    def set_whis(
+        self,
+        whis: Union[NumericSequence, NumericTupleSequence, NumericType, NumericTuple],
+    ):
+        if (
+            is_numeric_tuple_sequences(whis)
+            or is_numeric_tuple_sequence(whis)
+            or is_numeric_tuple(whis, 2)
+        ):
+            return self.set_numeric_tuple_sequence(whis, 2, "whis")
+        elif (
+            is_numeric_sequences(whis) or is_numeric_sequence(whis) or is_numeric(whis)
+        ):
+            return self.set_numeric_sequence(whis, "whis")
+        raise ArgumentStructureError(
+            "whis must be a number or tuple, or sequence of numbers or tuples, or sequence of sequences of numbers or tuples."
+        )
 
-    def set_usermedians(self, usermedians: Union[NumericSequences, NumericSequence]):
+    def set_usermedians(
+        self, usermedians: Union[NumericSequences, NumericSequence, None]
+    ):
+        if usermedians is None:
+            return self
         return self.set_numeric_sequences(
             usermedians, "usermedians", single_value=False
         )
@@ -154,9 +177,9 @@ class BoxPlotter(Plotter):
     def set_conf_intervals(
         self, conf_intervals: Union[NumericTupleSequences, NumericTupleSequence]
     ):
-        return self.set_numeric_tuple_sequences(
-            conf_intervals, "conf_intervals", single_value=False
-        )
+        if conf_intervals is None:
+            return self
+        return self.set_numeric_tuple_sequences(conf_intervals, 2, "conf_intervals")
 
     def set_positions(self, positions: Union[NumericSequences, NumericSequence]):
         return self.set_numeric_sequences(positions, "positions", single_value=False)
@@ -216,7 +239,7 @@ class BoxPlotter(Plotter):
 
     def _create_box_kwargs(self, n_sequence: int):
         box_kwargs = {
-            "x": self.x_data[n_sequence],
+            "x": [self.x_data[n_sequence]],
             "notch": self.get_sequences_param("notch", n_sequence),
             "sym": self.get_sequences_param("sym", n_sequence),
             "vert": self.orientation == "vertical",
@@ -227,7 +250,7 @@ class BoxPlotter(Plotter):
             "positions": self.get_sequences_param("positions", n_sequence),
             "widths": self.get_sequences_param("widths", n_sequence),
             "patch_artist": self.get_sequences_param("patch_artist", n_sequence),
-            "tick_labels": self.get_sequences_param("box_labels", n_sequence),
+            "labels": self.get_sequences_param("box_labels", n_sequence),
             "manage_ticks": self.get_sequences_param("manage_ticks", n_sequence),
             "autorange": self.get_sequences_param("autorange", n_sequence),
             "meanline": self.get_sequences_param("meanline", n_sequence),
@@ -246,6 +269,8 @@ class BoxPlotter(Plotter):
             "label": self.get_sequences_param("label", n_sequence),
         }
         box_kwargs = {k: v for k, v in box_kwargs.items() if v is not None}
+        if box_kwargs["positions"] is not None and is_numeric(box_kwargs["positions"]):
+            box_kwargs["positions"] = [box_kwargs["positions"]]
         return box_kwargs
 
     def _create_plot(self):

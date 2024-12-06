@@ -463,7 +463,7 @@ class Setter(ABC):
         if self.multi_data:
             if is_numeric_tuple_sequences(sequences, sizes):
                 validate_sequence_length(sequences, self.n_sequences, param_name)
-                validate_subsequences_length(sequences, self.data_size, param_name)
+                validate_subsequences_length(sequences, [1, self.data_size], param_name)
                 setattr(self, param_name, sequences)
                 self.multi_params_structure[param_name] = "sequences"
                 return self
