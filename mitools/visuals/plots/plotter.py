@@ -32,6 +32,7 @@ from mitools.visuals.plots.validations import (
     NUMERIC_TYPES,
     SEQUENCE_TYPES,
     is_numeric_sequence,
+    is_sequence,
     is_str_sequence,
     validate_consistent_len,
     validate_numeric_sequences,
@@ -701,6 +702,7 @@ class Plotter(Setter, ABC):
             params = json.load(f)
         x_data = params.pop("x_data") if "x_data" in params else None
         y_data = params.pop("y_data") if "y_data" in params else None
+        # Awful
         if "xlim" in params and params["xlim"] is not None:
             params["xlim"] = tuple(params["xlim"])
         if "ylim" in params and params["ylim"] is not None:
@@ -709,4 +711,9 @@ class Plotter(Setter, ABC):
             params["center"] = tuple(params["center"])
         if "range" in params and params["range"] is not None:
             params["range"] = tuple(params["range"])
+        if "center" in params and params["center"] is not None:
+            if is_sequence(params["center"]):
+                params["center"] = [tuple(center) for center in params["center"]]
+            else:
+                params["center"] = tuple(params["center"])
         return cls(x_data=x_data, y_data=y_data, **params)
