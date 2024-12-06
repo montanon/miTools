@@ -39,9 +39,10 @@ class HistogramPlotter(Plotter):
         self,
         x_data: Union[NumericSequences, NumericSequence],
         y_data: None = None,
+        ax: Axes = None,
         **kwargs,
     ):
-        super().__init__(x_data=x_data, y_data=None, **kwargs)
+        super().__init__(x_data=x_data, y_data=None, ax=ax, **kwargs)
         self._hist_params = {
             # General Axes.scatter Parameters that are independent of the number of data sequences
             "orientation": {
@@ -107,8 +108,6 @@ class HistogramPlotter(Plotter):
         }
         self._init_params.update(self._hist_params)
         self._set_init_params(**kwargs)
-        self.figure: Figure = None
-        self.ax: Axes = None
 
     def set_orientation(self, orientation: Literal["horizontal", "vertical"]):
         validate_literal(orientation, ORIENTATIONS)

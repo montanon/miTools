@@ -29,6 +29,7 @@ class LinePlotter(Plotter):
         self,
         x_data: Union[NumericSequences, NumericSequence],
         y_data: Union[NumericSequences, NumericSequence],
+        ax: Axes = None,
         **kwargs,
     ):
         self._line_params = {
@@ -59,11 +60,9 @@ class LinePlotter(Plotter):
             },
             "linewidth": {"default": None, "type": Union[NumericSequence, NumericType]},
         }
-        super().__init__(x_data, y_data, **kwargs)
+        super().__init__(x_data, y_data, ax=ax, **kwargs)
         self._init_params.update(self._line_params)
         self._set_init_params(**kwargs)
-        self.figure: Figure = None
-        self.ax: Axes = None
 
     def set_marker(self, markers: Union[MarkerSequence, Marker]):
         return self.set_marker_sequence(markers, param_name="marker")

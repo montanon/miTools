@@ -37,9 +37,10 @@ class ScatterPlotter(Plotter):
         self,
         x_data: Union[NumericSequences, NumericSequence],
         y_data: Union[NumericSequences, NumericSequence],
+        ax: Axes = None,
         **kwargs,
     ):
-        super().__init__(x_data, y_data, **kwargs)
+        super().__init__(x_data, y_data, ax=ax, **kwargs)
         self._scatter_params = {
             # General Axes.scatter Parameters that are independent of the number of data sequences
             "plot_non_finite": {"default": False, "type": bool},
@@ -72,8 +73,6 @@ class ScatterPlotter(Plotter):
         }
         self._init_params.update(self._scatter_params)
         self._set_init_params(**kwargs)
-        self.figure: Figure = None
-        self.ax: Axes = None
 
     def set_plot_non_finite(self, plot_non_finite: bool):
         validate_type(plot_non_finite, bool, "plot_non_finite")

@@ -36,6 +36,7 @@ class PiePlotter(Plotter):
         self,
         x_data: Union[NumericSequences, NumericSequence],
         y_data: Union[NumericSequences, NumericSequence, None] = None,
+        ax: Axes = None,
         **kwargs,
     ):
         self._pie_params = {
@@ -83,8 +84,6 @@ class PiePlotter(Plotter):
         self._set_init_params(**kwargs)
         if y_data is not None:
             self.set_center(y_data)
-        self.figure: Figure = None
-        self.ax: Axes = None
 
     def set_frame(self, frame: bool):
         if isinstance(frame, bool):

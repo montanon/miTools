@@ -55,6 +55,7 @@ class Plotter(Setter, ABC):
         self,
         x_data: Union[NumericSequence, NumericSequences],
         y_data: Union[NumericSequence, NumericSequences, None],
+        ax: Axes = None,
         **kwargs,
     ):
         self.x_data = self._validate_data(x_data, "x_data")
@@ -122,8 +123,8 @@ class Plotter(Setter, ABC):
             **self._multi_data_params,
         }
         self._set_init_params(**kwargs)
-        self.figure: Figure = None
-        self.ax: Axes = None
+        self.ax: Axes = ax if ax is not None else None
+        self.figure: Figure = None if self.ax is None else self.ax.figure
 
     def _set_init_params(self, **kwargs):
         for param, config in self._init_params.items():

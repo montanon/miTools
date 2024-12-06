@@ -42,9 +42,10 @@ class DistributionPlotter(Plotter):
         self,
         x_data: Union[NumericSequences, NumericSequence],
         y_data: None = None,
+        ax: Axes = None,
         **kwargs,
     ):
-        super().__init__(x_data=x_data, y_data=None, **kwargs)
+        super().__init__(x_data=x_data, y_data=None, ax=ax, **kwargs)
         self._dist_params = {
             # General Axes.scatter Parameters that are independent of the number of data sequences
             "kernel": {"default": "gaussian", "type": Literal["kernels"]},
@@ -79,8 +80,6 @@ class DistributionPlotter(Plotter):
         }
         self._init_params.update(self._dist_params)
         self._set_init_params(**kwargs)
-        self.figure: Figure = None
-        self.ax: Axes = None
 
     def set_kernel(self, kernel: str):
         validate_literal(kernel, KERNELS)
