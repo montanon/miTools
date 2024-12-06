@@ -1,15 +1,9 @@
-import re
-from typing import Any, Dict, Literal, Sequence, Union
+from typing import Dict, Literal, Sequence, Union
 
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
-from mitools.exceptions import (
-    ArgumentTypeError,
-    ArgumentValueError,
-)
 from mitools.visuals.plots.matplotlib_typing import (
-    COLORS,
     HATCHES,
     BoolSequence,
     Color,
@@ -28,14 +22,9 @@ from mitools.visuals.plots.matplotlib_typing import (
 )
 from mitools.visuals.plots.plotter import Plotter
 from mitools.visuals.plots.validations import (
-    NUMERIC_TYPES,
-    SEQUENCE_TYPES,
     is_sequence,
-    validate_length,
-    validate_sequence_length,
     validate_sequence_type,
     validate_type,
-    validate_value_in_options,
 )
 
 
@@ -46,8 +35,8 @@ class PiePlotterException(Exception):
 class PiePlotter(Plotter):
     def __init__(
         self,
-        data: Union[NumericSequences, NumericSequence],
-        pos_data: Union[NumericSequences, NumericSequence, None] = None,
+        x_data: Union[NumericSequences, NumericSequence],
+        y_data: Union[NumericSequences, NumericSequence, None] = None,
         **kwargs,
     ):
         self._pie_params = {
@@ -90,9 +79,11 @@ class PiePlotter(Plotter):
             "rotatelabels": {"default": False, "type": Union[BoolSequence, bool]},
             "normalize": {"default": True, "type": Union[BoolSequence, bool]},
         }
-        super().__init__(x_data=data, y_data=pos_data, **kwargs)
+        super().__init__(x_data=x_data, y_data=None, **kwargs)
         self._init_params.update(self._pie_params)
         self._set_init_params(**kwargs)
+        if y_data is not None:
+            self.set_center(y_data)
         self.figure: Figure = None
         self.ax: Axes = None
 
@@ -140,7 +131,7 @@ class PiePlotter(Plotter):
     def set_counterclock(self, counterclock: Union[BoolSequence, bool]):
         return self.set_bool_sequence(counterclock, "counterclock")
 
-    def set_wedgeprops(self, **kwargs):
+    def set_wedgeprops(self, kwargs: Union[DictSequence, Dict]):
         self.wedgeprops = kwargs
         return self
 
@@ -149,7 +140,7 @@ class PiePlotter(Plotter):
         return self
 
     def set_center(self, center: Union[NumericTupleSequence, NumericTuple]):
-        return self.set_numeric_tuple_sequence(center, "center")
+        return self.set_numeric_tuple_sequence(center, 2, "center")
 
     def set_frame(self, frame: Union[BoolSequence, bool]):
         return self.set_bool_sequence(frame, "frame")
@@ -160,31 +151,35 @@ class PiePlotter(Plotter):
     def set_normalize(self, normalize: Union[BoolSequence, bool]):
         return self.set_bool_sequence(normalize, "normalize")
 
-    def _create_plot(self):
+    def _create_pie_kwargs(self, n_sequence: int):
         pie_kwargs = {
-            "x": self.x_data,
-            "explode": self.explode,
-            "hatch": self.hatch,
-            "labels": self.label,
-            "colors": self.color,
-            "autopct": self.autopct,
-            "pctdistance": self.pctdistance,
-            "labeldistance": self.labeldistance,
-            "shadow": self.shadow,
-            "startangle": self.startangle,
-            "radius": self.radius,
-            "counterclock": self.counterclock,
-            "wedgeprops": self.wedgeprops,
-            "textprops": self.textprops,
-            "center": self.center,
-            "frame": self.frame,
-            "rotatelabels": self.rotatelabels,
-            "normalize": self.normalize,
+            "x": self.x_data[n_sequence],
+            "explode": self.get_sequences_param("explode", n_sequence),
+            "labels": self.get_sequences_param("labels", n_sequence),
+            "hatch": self.get_sequences_param("hatch", n_sequence),
+            "colors": self.get_sequences_param("color", n_sequence),
+            "autopct": self.get_sequences_param("autopct", n_sequence),
+            "pctdistance": self.get_sequences_param("pctdistance", n_sequence),
+            "labeldistance": self.get_sequences_param("labeldistance", n_sequence),
+            "shadow": self.get_sequences_param("shadow", n_sequence),
+            "startangle": self.get_sequences_param("startangle", n_sequence),
+            "radius": self.get_sequences_param("radius", n_sequence),
+            "counterclock": self.get_sequences_param("counterclock", n_sequence),
+            "wedgeprops": self.get_sequences_param("wedgeprops", n_sequence),
+            "textprops": self.get_sequences_param("textprops", n_sequence),
+            "center": self.get_sequences_param("center", n_sequence),
+            "frame": self.get_sequences_param("frame", n_sequence),
+            "rotatelabels": self.get_sequences_param("rotatelabels", n_sequence),
+            "normalize": self.get_sequences_param("normalize", n_sequence),
         }
-        pie_kwargs = {k: v for k, v in pie_kwargs.items() if v is not None}
+        return pie_kwargs
 
-        try:
-            self.ax.pie(**pie_kwargs)
-            self.ax.axis("equal")
-        except Exception as e:
-            raise PiePlotterException(f"Error while creating pie plot: {e}")
+    def _create_plot(self):
+        for n_sequence in range(self.n_sequences):
+            pie_kwargs = self._create_pie_kwargs(n_sequence)
+            pie_kwargs = {k: v for k, v in pie_kwargs.items() if v is not None}
+            try:
+                self.ax.pie(**pie_kwargs)
+                self.ax.axis("equal")
+            except Exception as e:
+                raise PiePlotterException(f"Error while creating pie plot: {e}")

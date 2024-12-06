@@ -131,6 +131,8 @@ class Plotter(Setter, ABC):
                     if isinstance(kwargs[param], dict) and param not in [
                         "xtickparams",
                         "ytickparams",
+                        "textprops",
+                        "wedgeprops",  # Awful
                     ]:
                         getattr(self, setter_name)(**kwargs[param])
                     else:
@@ -697,8 +699,8 @@ class Plotter(Setter, ABC):
     def from_json(cls, file_path: Union[str, Path]) -> "Plotter":
         with open(file_path, "r") as f:
             params = json.load(f)
-        x_data = params.pop("x_data") if "x_data" in params else []
-        y_data = params.pop("y_data") if "y_data" in params else []
+        x_data = params.pop("x_data") if "x_data" in params else None
+        y_data = params.pop("y_data") if "y_data" in params else None
         if "xlim" in params and params["xlim"] is not None:
             params["xlim"] = tuple(params["xlim"])
         if "ylim" in params and params["ylim"] is not None:
