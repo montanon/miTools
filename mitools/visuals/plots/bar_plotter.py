@@ -233,3 +233,4 @@ class BarPlotter(Plotter):
                     bottom_reference += self.y_data[n_sequence]
             except Exception as e:
                 raise BarPlotterException(f"Error while creating bar plot: {e}")
+        return self.ax

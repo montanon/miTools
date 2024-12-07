@@ -123,3 +123,4 @@ class LinePlotter(Plotter):
                 )
             except Exception as e:
                 raise LinePlotterException(f"Error while creating line plot: {e}")
+        return self.ax

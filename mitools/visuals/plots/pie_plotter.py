@@ -79,7 +79,7 @@ class PiePlotter(Plotter):
             "rotatelabels": {"default": False, "type": Union[BoolSequence, bool]},
             "normalize": {"default": True, "type": Union[BoolSequence, bool]},
         }
-        super().__init__(x_data=x_data, y_data=None, **kwargs)
+        super().__init__(x_data=x_data, y_data=None, ax=ax, **kwargs)
         self._init_params.update(self._pie_params)
         self._set_init_params(**kwargs)
         if y_data is not None:

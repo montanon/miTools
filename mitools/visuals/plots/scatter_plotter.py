@@ -160,3 +160,4 @@ class ScatterPlotter(Plotter):
                 raise ScatterPlotterException(f"Error while creating scatter plot: {e}")
         if self.hover and self.label is not None:
             pass
+        return self.ax
