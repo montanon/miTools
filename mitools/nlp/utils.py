@@ -53,6 +53,10 @@ from mitools.nlp.typing import BaseString, PennTag, PosTag, WordNetTag
 from mitools.utils.helper_objects import LazyDict, LazyList
 
 
+def find_relations(tokens: Sequence[BaseString]):
+    raise NotImplementedError("find_relations() is not implemented.")
+
+
 def avg(list: Iterable[float]) -> float:
     return sum(list) / float(len(list) or 1)
 
