@@ -36,7 +36,7 @@ from mitools.nlp.definitions import (
     X,
 )
 from mitools.nlp.tokenizers import SentenceTokenizer, WordTokenizer
-from mitools.nlp.typing import BaseString, PennTag, WordNetTag
+from mitools.nlp.typing import BaseString, PennTag, PosTag, WordNetTag
 from mitools.utils.helper_objects import LazyDict, LazyList
 
 
@@ -558,3 +558,243 @@ class Morphology(LazyList, Rules):
             rules = []
         for rule in rules:
             self.append(*rule)
+
+
+class Context(LazyList, Rules):
+    def __init__(
+        self, lexicon: Union[Dict[str, str], None] = None, path: Path = Path("")
+    ):
+        if lexicon is None:
+            lexicon = {}
+        morph_operations = (
+            "prevtag",  # Preceding word is tagged x.
+            "nexttag",  # Following word is tagged x.
+            "prev2tag",  # Word 2 before is tagged x.
+            "next2tag",  # Word 2 after is tagged x.
+            "prev1or2tag",  # One of 2 preceding words is tagged x.
+            "next1or2tag",  # One of 2 following words is tagged x.
+            "prev1or2or3tag",  # One of 3 preceding words is tagged x.
+            "next1or2or3tag",  # One of 3 following words is tagged x.
+            "surroundtag",  # Preceding word is tagged x and following word is tagged y.
+            "curwd",  # Current word is x.
+            "prevwd",  # Preceding word is x.
+            "nextwd",  # Following word is x.
+            "prev1or2wd",  # One of 2 preceding words is x.
+            "next1or2wd",  # One of 2 following words is x.
+            "next1or2or3wd",  # One of 3 preceding words is x.
+            "prev1or2or3wd",  # One of 3 following words is x.
+            "prevwdtag",  # Preceding word is x and tagged y.
+            "nextwdtag",  # Following word is x and tagged y.
+            "wdprevtag",  # Current word is y and preceding word is tagged x.
+            "wdnexttag",  # Current word is x and following word is tagged y.
+            "wdand2aft",  # Current word is x and word 2 after is y.
+            "wdand2tagbfr",  # Current word is y and word 2 before is tagged x.
+            "wdand2tagaft",  # Current word is x and word 2 after is tagged y.
+            "lbigram",  # Current word is y and word before is x.
+            "rbigram",  # Current word is x and word after is y.
+            "prevbigram",  # Preceding word is tagged x and word before is tagged y.
+            "nextbigram",  # Following word is tagged x and word after is tagged y.
+        )
+        Rules.__init__(self, lexicon, dict.fromkeys(morph_operations, True))
+        self._path = path
+
+    @property
+    def path(self):
+        return self._path
+
+    def load(self):
+        list.extend(self, (x.split() for x in read(self._path)))
+
+    def apply(self, tokens: Iterable[Tuple[str, str]]):
+        padding_tokens = [("STAART", "STAART")] * 3
+        padded_tokens = padding_tokens + tokens + padding_tokens
+        for current_pos, current_token in enumerate(padded_tokens):
+            for transformation_rule in self:
+                if current_token[1] == "STAART":
+                    continue
+                if (
+                    current_token[1] != transformation_rule[0]
+                    and transformation_rule[0] != "*"
+                ):
+                    continue
+                operation = transformation_rule[2].lower()
+                pattern = transformation_rule[3]
+                pattern2 = (
+                    transformation_rule[4] if len(transformation_rule) > 4 else ""
+                )
+
+                if (
+                    (
+                        operation == "prevtag"
+                        and pattern == padded_tokens[current_pos - 1][1]
+                    )
+                    or (
+                        operation == "nexttag"
+                        and pattern == padded_tokens[current_pos + 1][1]
+                    )
+                    or (
+                        operation == "prev2tag"
+                        and pattern == padded_tokens[current_pos - 2][1]
+                    )
+                    or (
+                        operation == "next2tag"
+                        and pattern == padded_tokens[current_pos + 2][1]
+                    )
+                    or (
+                        operation == "prev1or2tag"
+                        and pattern
+                        in (
+                            padded_tokens[current_pos - 1][1],
+                            padded_tokens[current_pos - 2][1],
+                        )
+                    )
+                    or (
+                        operation == "next1or2tag"
+                        and pattern
+                        in (
+                            padded_tokens[current_pos + 1][1],
+                            padded_tokens[current_pos + 2][1],
+                        )
+                    )
+                    or (
+                        operation == "prev1or2or3tag"
+                        and pattern
+                        in (
+                            padded_tokens[current_pos - 1][1],
+                            padded_tokens[current_pos - 2][1],
+                            padded_tokens[current_pos - 3][1],
+                        )
+                    )
+                    or (
+                        operation == "next1or2or3tag"
+                        and pattern
+                        in (
+                            padded_tokens[current_pos + 1][1],
+                            padded_tokens[current_pos + 2][1],
+                            padded_tokens[current_pos + 3][1],
+                        )
+                    )
+                    or (
+                        operation == "surroundtag"
+                        and pattern == padded_tokens[current_pos - 1][1]
+                        and pattern2 == padded_tokens[current_pos + 1][1]
+                    )
+                    or (
+                        operation == "curwd"
+                        and pattern == padded_tokens[current_pos][0]
+                    )
+                    or (
+                        operation == "prevwd"
+                        and pattern == padded_tokens[current_pos - 1][0]
+                    )
+                    or (
+                        operation == "nextwd"
+                        and pattern == padded_tokens[current_pos + 1][0]
+                    )
+                    or (
+                        operation == "prev1or2wd"
+                        and pattern
+                        in (
+                            padded_tokens[current_pos - 1][0],
+                            padded_tokens[current_pos - 2][0],
+                        )
+                    )
+                    or (
+                        operation == "next1or2wd"
+                        and pattern
+                        in (
+                            padded_tokens[current_pos + 1][0],
+                            padded_tokens[current_pos + 2][0],
+                        )
+                    )
+                    or (
+                        operation == "prevwdtag"
+                        and pattern == padded_tokens[current_pos - 1][0]
+                        and pattern2 == padded_tokens[current_pos - 1][1]
+                    )
+                    or (
+                        operation == "nextwdtag"
+                        and pattern == padded_tokens[current_pos + 1][0]
+                        and pattern2 == padded_tokens[current_pos + 1][1]
+                    )
+                    or (
+                        operation == "wdprevtag"
+                        and pattern == padded_tokens[current_pos - 1][1]
+                        and pattern2 == padded_tokens[current_pos][0]
+                    )
+                    or (
+                        operation == "wdnexttag"
+                        and pattern == padded_tokens[current_pos][0]
+                        and pattern2 == padded_tokens[current_pos + 1][1]
+                    )
+                    or (
+                        operation == "wdand2aft"
+                        and pattern == padded_tokens[current_pos][0]
+                        and pattern2 == padded_tokens[current_pos + 2][0]
+                    )
+                    or (
+                        operation == "wdand2tagbfr"
+                        and pattern == padded_tokens[current_pos - 2][1]
+                        and pattern2 == padded_tokens[current_pos][0]
+                    )
+                    or (
+                        operation == "wdand2tagaft"
+                        and pattern == padded_tokens[current_pos][0]
+                        and pattern2 == padded_tokens[current_pos + 2][1]
+                    )
+                    or (
+                        operation == "lbigram"
+                        and pattern == padded_tokens[current_pos - 1][0]
+                        and pattern2 == padded_tokens[current_pos][0]
+                    )
+                    or (
+                        operation == "rbigram"
+                        and pattern == padded_tokens[current_pos][0]
+                        and pattern2 == padded_tokens[current_pos + 1][0]
+                    )
+                    or (
+                        operation == "prevbigram"
+                        and pattern == padded_tokens[current_pos - 2][1]
+                        and pattern2 == padded_tokens[current_pos - 1][1]
+                    )
+                    or (
+                        operation == "nextbigram"
+                        and pattern == padded_tokens[current_pos + 1][1]
+                        and pattern2 == padded_tokens[current_pos + 2][1]
+                    )
+                ):
+                    padded_tokens[current_pos] = [
+                        padded_tokens[current_pos][0],
+                        transformation_rule[1],
+                    ]
+        return padded_tokens[len(padding_tokens) : -len(padding_tokens)]
+
+    def insert(
+        self,
+        position: int,
+        source_tag: PosTag,
+        target_tag: PosTag,
+        operation: str = "prevtag",
+        pattern1: str = None,
+        pattern2: str = None,
+    ):
+        if " < " in source_tag and not pattern1 and not pattern2:
+            source_tag, pattern1 = source_tag.split(" < ")
+            operation = "prevtag"
+        if " > " in source_tag and not pattern1 and not pattern2:
+            pattern1, source_tag = source_tag.split(" > ")
+            operation = "nexttag"
+        LazyList.insert(
+            self,
+            position,
+            [source_tag, target_tag, operation, pattern1 or "", pattern2 or ""],
+        )
+
+    def append(self, *args, **kwargs):
+        self.insert(len(self) - 1, *args, **kwargs)
+
+    def extend(self, rules: Iterable[Tuple[str]] = None):
+        if rules is None:
+            rules = []
+        for r in rules:
+            self.append(*r)
