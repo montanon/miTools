@@ -1,14 +1,11 @@
-from typing import Literal
-
 from nltk.corpus import wordnet
 from nltk.stem.api import StemmerI
 from nltk.stem.porter import PorterStemmer
 from nltk.stem.wordnet import WordNetLemmatizer
 
+from mitools.nlp.typing import PosTag
 from mitools.nlp.utils import penn_to_wordnet, pluralize, singularize, suggest
 from mitools.utils.decorators import cached_property
-
-PosTag = Literal["tags"]
 
 
 class Word(str):
