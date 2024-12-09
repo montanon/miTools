@@ -17,6 +17,7 @@ from mitools.nlp.definitions import (
     ADV,
     ADVERB,
     CD,
+    CHUNKS,
     CONJ,
     DET,
     EMOTICONS,
@@ -42,6 +43,7 @@ from mitools.nlp.definitions import (
     RE_SARCASM,
     RE_SYNSET,
     REPLACEMENTS,
+    SEPARATOR,
     TOKEN,
     VERB,
     X,
@@ -1300,7 +1302,6 @@ def find_tags(
     default_tags: Tuple[PosTag, PosTag, PosTag] = ("NN", "NNP", "CD"),
     language_code: str = "en",
     tag_mapper: Callable = None,
-    **kwargs,
 ):
     if lexicon is None:
         lexicon = {}
@@ -1355,3 +1356,47 @@ def find_tags(
             for word, tag in tagged_tokens
         ]
     return tagged_tokens
+
+
+def find_chunks(
+    tagged_tokens: List[Tuple[BaseString, PosTag]], language: str = "en"
+) -> List[Tuple[BaseString, PosTag, str]]:
+    tokens_with_chunks = [x for x in tagged_tokens]
+    tag_sequence = "".join(f"{tag}{SEPARATOR}" for token, tag in tagged_tokens)
+    # Use Germanic or Romance chunking rules according to given language
+    is_romance = int(language in ("ca", "es", "pt", "fr", "it", "pt", "ro"))
+    for chunk_type, chunk_pattern in CHUNKS[is_romance]:
+        for match in chunk_pattern.finditer(tag_sequence):
+            # Find the start of chunks inside the tags-string.
+            # Number of preceding separators = number of preceding tokens.
+            match_start = match.start()
+            token_start_idx = tag_sequence[:match_start].count(SEPARATOR)
+            chunk_length = match.group(0).count(SEPARATOR)
+            for token_idx in range(token_start_idx, token_start_idx + chunk_length):
+                if len(tokens_with_chunks[token_idx]) == 3:
+                    continue
+                if len(tokens_with_chunks[token_idx]) < 3:
+                    # A conjunction can not be start of a chunk.
+                    if token_idx == token_start_idx and tokens_with_chunks[token_idx][
+                        1
+                    ] in ("CC", "CJ", "KON", "Conj(neven)"):
+                        token_start_idx += 1
+                    # Mark first token in chunk with B-.
+                    elif token_idx == token_start_idx:
+                        tokens_with_chunks[token_idx].append("B-" + chunk_type)
+                    # Mark other tokens in chunk with I-.
+                    else:
+                        tokens_with_chunks[token_idx].append("I-" + chunk_type)
+    # Mark chinks (tokens outside of a chunk) with O-.
+    for unchunked_token in filter(lambda x: len(x) < 3, tokens_with_chunks):
+        unchunked_token.append("O")
+    # Post-processing corrections.
+    for i, (_word, pos_tag, chunk_label) in enumerate(tokens_with_chunks):
+        if pos_tag.startswith("RB") and chunk_label == "B-NP":
+            # "Very nice work" (NP) <=> "Perhaps" (ADVP) + "you" (NP).
+            if i < len(tokens_with_chunks) - 1 and not tokens_with_chunks[i + 1][
+                1
+            ].startswith("JJ"):
+                tokens_with_chunks[i + 0][2] = "B-ADVP"
+                tokens_with_chunks[i + 1][2] = "B-NP"
+    return tokens_with_chunks
