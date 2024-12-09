@@ -16,6 +16,7 @@ from mitools.nlp.definitions import (
     ADJECTIVE,
     ADV,
     ADVERB,
+    CD,
     CONJ,
     DET,
     EMOTICONS,
@@ -1264,3 +1265,93 @@ class Sentiment(LazyDict):
         word_scores[pos] = word_scores[None] = sentiment_tuple
         if label:
             self.labeler[word] = label
+
+
+def suffix_rules(token: BaseString, tag: PosTag = "NN"):
+    if isinstance(token, (list, tuple)):
+        token, tag = token
+    if token.endswith("ing"):
+        tag = "VBG"
+    if token.endswith("ly"):
+        tag = "RB"
+    if token.endswith("s") and not token.endswith(("is", "ous", "ss")):
+        tag = "NNS"
+    if (
+        token.endswith(
+            ("able", "al", "ful", "ible", "ient", "ish", "ive", "less", "tic", "ous")
+        )
+        or "-" in token
+    ):
+        tag = "JJ"
+    if token.endswith("ed"):
+        tag = "VBN"
+    if token.endswith(("ate", "ify", "ise", "ize")):
+        tag = "VBP"
+    return [token, tag]
+
+
+def find_tags(
+    word_tokens,
+    lexicon: Dict[str, PosTag] = None,
+    language_model: Callable = None,
+    morphology_analyzer: Morphology = None,
+    context_analyzer: Context = None,
+    entity_recognizer: Entities = None,
+    default_tags: Tuple[PosTag, PosTag, PosTag] = ("NN", "NNP", "CD"),
+    language_code: str = "en",
+    tag_mapper: Callable = None,
+    **kwargs,
+):
+    if lexicon is None:
+        lexicon = {}
+    tagged_tokens = []
+    # Tag known words.
+    for i, word in enumerate(word_tokens):
+        tagged_tokens.append(
+            [word, lexicon.get(word, i == 0 and lexicon.get(word.lower()) or None)]
+        )
+    # Tag unknown words.
+    for i, (word, word_tag) in enumerate(tagged_tokens):
+        prev_token, next_token = (None, None), (None, None)
+        if i > 0:
+            prev_token = tagged_tokens[i - 1]
+        if i < len(tagged_tokens) - 1:
+            next_token = tagged_tokens[i + 1]
+        if word_tag is None or word in (
+            language_model is not None and language_model.unknown or ()
+        ):
+            # Use language model (i.e., SLP).
+            if language_model is not None:
+                tagged_tokens[i] = language_model.apply(
+                    [word, None], prev_token, next_token
+                )
+            # Use NNP for capitalized words (except in German).
+            elif word.istitle() and language_code != "de":
+                tagged_tokens[i] = [word, default_tags[1]]
+            # Use CD for digits and numbers.
+            elif CD.match(word) is not None:
+                tagged_tokens[i] = [word, default_tags[2]]
+            # Use suffix rules (e.g., -ly = RB).
+            elif morphology_analyzer is not None:
+                tagged_tokens[i] = morphology_analyzer.apply(
+                    [word, default_tags[0]], prev_token, next_token
+                )
+            # Use suffix rules (English default).
+            elif language_code == "en":
+                tagged_tokens[i] = suffix_rules([word, default_tags[0]])
+            # Use most frequent tag (NN).
+            else:
+                tagged_tokens[i] = [word, default_tags[0]]
+    # Tag words by context.
+    if context_analyzer is not None and language_model is None:
+        tagged_tokens = context_analyzer.apply(tagged_tokens)
+    # Tag named entities.
+    if entity_recognizer is not None:
+        tagged_tokens = entity_recognizer.apply(tagged_tokens)
+    # Map tags with a custom function.
+    if tag_mapper is not None:
+        tagged_tokens = [
+            list(tag_mapper(word, tag)) or [word, default_tags[0]]
+            for word, tag in tagged_tokens
+        ]
+    return tagged_tokens
