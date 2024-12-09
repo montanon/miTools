@@ -192,3 +192,12 @@ class PositiveNaiveBayesClassifier(NLTKClassifier):
             **kwargs,
         )
         return True
+
+
+class MaxEntClassifier(NLTKClassifier):
+    __doc__ = MaxentClassifier.__doc__
+    nltk_class = MaxentClassifier
+
+    def prob_classify(self, text: BaseString):
+        feats = self.extract_features(text)
+        return self.classifier.prob_classify(feats)
