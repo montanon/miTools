@@ -2,7 +2,7 @@ from abc import ABCMeta, abstractmethod
 from typing import Iterable, Sequence, Set
 
 import nltk
-from nltk import BigramTagger, ChunkParserI, RegexpTagger, UnigramTagger
+from nltk import BigramTagger, RegexpTagger, UnigramTagger
 from nltk.tokenize import sent_tokenize
 from nltk.tree import Tree
 
