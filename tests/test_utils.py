@@ -57,6 +57,167 @@ from mitools.utils import (
 )
 
 
+class TestLazyList(TestCase):
+    def setUp(self):
+        class TestableLazyList(LazyList):
+            def __init__(self):
+                super().__init__()
+                self.load_called = False
+
+            def load(self):
+                self.load_called = True
+                list.extend(self, [1, 2, 3])
+
+        self.TestableLazyList = TestableLazyList
+
+    def test_no_load_before_usage(self):
+        d = self.TestableLazyList()
+        self.assertFalse(d.load_called)
+        repr_str = repr(d)
+        self.assertTrue(d.load_called)
+        self.assertIn("1", repr_str)
+        self.assertEqual(len(d), 3)
+
+    def test_len_triggers_load(self):
+        d = self.TestableLazyList()
+        self.assertFalse(d.load_called)
+        length = len(d)
+        self.assertTrue(d.load_called)
+        self.assertEqual(length, 3)
+
+    def test_iter_triggers_load(self):
+        d = self.TestableLazyList()
+        self.assertFalse(d.load_called)
+        items = list(d)  # Should trigger load
+        self.assertTrue(d.load_called)
+        self.assertEqual(items, [1, 2, 3])
+
+    def test_contains_triggers_load(self):
+        d = self.TestableLazyList()
+        self.assertFalse(d.load_called)
+        self.assertIn(1, d)  # Should trigger load
+        self.assertTrue(d.load_called)
+
+    def test_insert_triggers_load(self):
+        d = self.TestableLazyList()
+        self.assertFalse(d.load_called)
+        d.insert(0, 0)  # Should trigger load
+        self.assertTrue(d.load_called)
+        self.assertEqual(d[0], 0)
+        self.assertEqual(d[1], 1)
+
+    def test_append_triggers_load(self):
+        d = self.TestableLazyList()
+        self.assertFalse(d.load_called)
+        d.append(4)  # Should trigger load
+        self.assertTrue(d.load_called)
+        self.assertEqual(d[-1], 4)
+        self.assertEqual(d[0], 1)
+
+    def test_extend_triggers_load(self):
+        d = self.TestableLazyList()
+        self.assertFalse(d.load_called)
+        d.extend([4, 5])  # Should trigger load
+        self.assertTrue(d.load_called)
+        self.assertEqual(d[-2:], [4, 5])
+        self.assertEqual(d[:3], [1, 2, 3])
+
+    def test_remove_triggers_load(self):
+        d = self.TestableLazyList()
+        self.assertFalse(d.load_called)
+        d.remove(2)  # Should trigger load and remove '2'
+        self.assertTrue(d.load_called)
+        self.assertNotIn(2, d)
+        self.assertEqual(d, [1, 3])
+
+    def test_remove_non_existent(self):
+        d = self.TestableLazyList()
+        _ = len(d)
+        with self.assertRaises(ValueError):
+            d.remove(99)
+
+    def test_pop_triggers_load(self):
+        d = self.TestableLazyList()
+        self.assertFalse(d.load_called)
+        val = d.pop()  # Should trigger load, default pop removes last
+        self.assertTrue(d.load_called)
+        self.assertEqual(val, 3)
+        self.assertEqual(d, [1, 2])
+
+    def test_pop_with_index(self):
+        d = self.TestableLazyList()
+        _ = len(d)
+        val = d.pop(0)
+        self.assertEqual(val, 1)
+        self.assertEqual(d, [2, 3])
+
+    def test_pop_non_existent(self):
+        d = self.TestableLazyList()
+        # Trigger load first
+        _ = len(d)
+        with self.assertRaises(IndexError):
+            d.pop(99)
+
+    def test_multiple_instances(self):
+        d1 = self.TestableLazyList()
+        d2 = self.TestableLazyList()
+        self.assertFalse(d1.load_called)
+        self.assertFalse(d2.load_called)
+        _ = len(d1)  # trigger load in d1
+        self.assertTrue(d1.load_called)
+        self.assertFalse(d2.load_called)
+        _ = len(d2)  # now trigger load in d2
+        self.assertTrue(d2.load_called)
+
+    def test_repr_after_load(self):
+        d = self.TestableLazyList()
+        _ = len(d)  # trigger load
+        rep = repr(d)
+        self.assertIn("1", rep)
+        self.assertIn("2", rep)
+        self.assertIn("3", rep)
+
+    def test_after_load_normal_list_behavior(self):
+        d = self.TestableLazyList()
+        _ = len(d)  # trigger load
+        d.append(10)
+        d.insert(0, 0)
+        d.remove(3)
+        val = d.pop()
+        self.assertEqual(val, 10)
+        self.assertEqual(d, [0, 1, 2])
+        items = list(d)
+        self.assertEqual(items, [0, 1, 2])
+
+    def test_subclass_behavior(self):
+        class CustomLoadLazyList(LazyList):
+            def load(self):
+                list.append(self, 100)
+
+        d = CustomLoadLazyList()
+        self.assertEqual(len(d), 1)
+        self.assertEqual(d[0], 100)
+
+    def test_contains_non_existent_after_load(self):
+        d = self.TestableLazyList()
+        _ = len(d)  # trigger load
+        self.assertNotIn(999, d)
+
+    def test_extend_merge_values(self):
+        d = self.TestableLazyList()
+        _ = len(d)  # trigger load
+        d.extend([4, 5, 6])
+        self.assertEqual(d, [1, 2, 3, 4, 5, 6])
+
+    def test_insert_positions(self):
+        d = self.TestableLazyList()
+        _ = len(d)  # trigger load
+        d.insert(0, 0)  # front
+        d.insert(2, "x")  # middle
+        d.insert(len(d), "end")  # at the end
+        self.assertEqual(d, [0, 1, "x", 2, 3, "end"])
+
+
 class TestLazyDict(TestCase):
     def setUp(self):
         class TestableLazyDict(LazyDict):

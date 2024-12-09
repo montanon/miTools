@@ -132,3 +132,9 @@ class LazyList(list):
 
     def pop(self, *args):
         return self._lazy("pop", *args)
+
+    def __getitem__(self, *args):
+        return self._lazy("__getitem__", *args)
+
+    def __setitem__(self, *args):
+        return self._lazy("__setitem__", *args)
