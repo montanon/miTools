@@ -43,6 +43,10 @@ from mitools.nlp.typing import BaseString, PennTag, PosTag, WordNetTag
 from mitools.utils.helper_objects import LazyDict, LazyList
 
 
+def avg(list: Iterable[float]) -> float:
+    return sum(list) / float(len(list) or 1)
+
+
 def singularize(word: Union[str, Word]) -> Word:
     pass
 
@@ -875,3 +879,19 @@ class Entities(LazyDict, Rules):
     def extend(self, entities: Iterable[Tuple[str, str]]):
         for entity, name in entities:
             self.append(entity, name)
+
+
+class Score(tuple):
+    def __new__(
+        self, polarity: float, subjectivity: float, assessments: Iterable[float] = None
+    ):
+        if assessments is None:
+            assessments = []
+        return tuple.__new__(self, [polarity, subjectivity])
+
+    def __init__(
+        self, polarity: float, subjectivity: float, assessments: Iterable[float] = None
+    ):
+        if assessments is None:
+            assessments = []
+        self.assessments = assessments
