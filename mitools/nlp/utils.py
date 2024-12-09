@@ -1427,3 +1427,116 @@ def find_prepositions(token_sequence: List[Tuple[BaseString, PosTag, str]]):
                         next_token[-1] = "I-PNP"
                         is_prep_phrase = False
     return token_sequence
+
+
+class Spelling(LazyDict):
+    ALPHA = "abcdefghijklmnopqrstuvwxyz"
+
+    def __init__(self, path: Path = Path("")):
+        self._path = path
+
+    def load(self):
+        for x in read(self._path):
+            x = x.split()
+            dict.__setitem__(self, x[0], int(x[1]))
+
+    @property
+    def path(self):
+        return self._path
+
+    @property
+    def language(self):
+        return self._language
+
+    @classmethod
+    def train(self, text: BaseString, output_path: Path = Path("spelling.txt")):
+        word_frequencies = {}
+        for word in re.findall("[a-z]+", text.lower()):
+            word_frequencies[word] = word_frequencies.get(word, 0) + 1
+
+        formatted_entries = (
+            f"{word} {count}" for word, count in sorted(word_frequencies.items())
+        )
+        model_content = "\n".join(formatted_entries)
+
+        with open(output_path, "w") as output_file:
+            output_file.write(model_content)
+
+    def _edit1(self, word: BaseString) -> Set[BaseString]:
+        # Of all spelling errors, 80% is covered by edit distance 1.
+        # Edit distance 1 = one character deleted, swapped, replaced or inserted.
+        word_splits = [(word[:i], word[i:]) for i in range(len(word) + 1)]
+        deletions = [prefix + suffix[1:] for prefix, suffix in word_splits if suffix]
+        transpositions = [
+            prefix + suffix[1] + suffix[0] + suffix[2:]
+            for prefix, suffix in word_splits
+            if len(suffix) > 1
+        ]
+        replacements = [
+            prefix + new_char + suffix[1:]
+            for prefix, suffix in word_splits
+            for new_char in Spelling.ALPHA
+            if suffix
+        ]
+        insertions = [
+            prefix + new_char + suffix
+            for prefix, suffix in word_splits
+            for new_char in Spelling.ALPHA
+        ]
+        return set(deletions + transpositions + replacements + insertions)
+
+    def _edit2(self, word: BaseString) -> Set[BaseString]:
+        # Of all spelling errors, 99% is covered by edit distance 2.
+        # Only keep candidates that are actually known words (20% speedup).
+        return set(
+            second_edit
+            for first_edit in self._edit1(word)
+            for second_edit in self._edit1(first_edit)
+            if second_edit in self
+        )
+
+    def _known(self, candidate_words: Sequence[BaseString] = None) -> Set[BaseString]:
+        if candidate_words is None:
+            candidate_words = []
+        return set(word for word in candidate_words if word in self)
+
+    def suggest(self, word: BaseString) -> List[Tuple[BaseString, float]]:
+        if len(self) == 0:
+            self.load()
+        if len(word) == 1:
+            return [(word, 1.0)]  # I
+        if word in PUNCTUATION:
+            return [(word, 1.0)]  # .?!
+        if word in string.whitespace:
+            return [(word, 1.0)]  # \n
+        if word.replace(".", "").isdigit():
+            return [(word, 1.0)]  # 1.5
+        # Find valid word candidates with increasing edit distance
+        spelling_candidates = (
+            self._known([word])
+            or self._known(self._edit1(word))
+            or self._known(self._edit2(word))
+            or [word]
+        )
+        # Get frequency scores for each candidate
+        scored_candidates = [
+            (self.get(candidate, 0.0), candidate) for candidate in spelling_candidates
+        ]
+        # Normalize scores to probabilities
+        total_frequency = float(sum(freq for freq, word in scored_candidates) or 1)
+        normalized_candidates = sorted(
+            ((freq / total_frequency, word) for freq, word in scored_candidates),
+            reverse=True,
+        )
+        # Preserve original capitalization
+        if word.istitle():
+            final_candidates = [
+                (word.title(), probability)
+                for probability, word in normalized_candidates
+            ]
+        else:
+            final_candidates = [
+                (word, probability) for probability, word in normalized_candidates
+            ]
+
+        return final_candidates
