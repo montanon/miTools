@@ -52,6 +52,11 @@ class ChunkParser(ChunkParserI):
         return nltk.chunk.util.conlltags2tree(word_pos_chunk_tuples)
 
 
+class PatternParser(BaseParser):
+    def parse(self, text: BaseString):
+        return pattern_parse(text)
+
+
 class Parser:
     def __init__(
         self,
