@@ -2,11 +2,10 @@ from abc import ABCMeta, abstractmethod
 from typing import Sequence, Tuple
 
 import nltk
-from nltk.tree import Tree
 
 from mitools.nlp.blobs import TextBlob
+from mitools.nlp.en import tag as pattern_tag
 from mitools.nlp.typing import BaseString
-from mitools.nlp.utils import pattern_tag
 
 
 class BaseTagger(ABCMeta):

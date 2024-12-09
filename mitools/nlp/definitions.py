@@ -1,6 +1,9 @@
 import re
 import string
 
+from nltk.corpus import wordnet
+
+VERB, NOUN, ADJ, ADV = wordnet.VERB, wordnet.NOUN, wordnet.ADJ, wordnet.ADV
 PUNCTUATION_REGEX = re.compile(f"[{re.escape(string.punctuation)}]")
 SLASH, WORD, POS, CHUNK, PNP, REL, ANCHOR, LEMMA = (
     "&slash;",

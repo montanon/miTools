@@ -1,4 +1,4 @@
-from typing import Callable, Iterable, Tuple
+from typing import Callable, Iterable, Tuple, Union
 
 import nltk
 from nltk.classify import (
@@ -140,7 +140,7 @@ class PositiveNaiveBayesClassifier(NLTKClassifier):
         self,
         positive_set: Iterable[BaseString],
         unlabeled_set: Iterable[BaseString],
-        feature_extractor: Callable = None,
+        feature_extractor: Union[Callable, None] = None,
         positive_prob_prior: float = 0.5,
     ):
         self.feature_extractor = (

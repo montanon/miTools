@@ -1,5 +1,5 @@
 from abc import ABCMeta, abstractmethod
-from typing import Iterable, Sequence, Set
+from typing import Sequence
 
 import nltk
 from nltk import BigramTagger, RegexpTagger, UnigramTagger
