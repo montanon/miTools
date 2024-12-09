@@ -97,3 +97,19 @@ def validate_dataframe_structure(
         return wrapper
 
     return decorator
+
+
+def cached_property(func):
+    name = func.__name__
+    doc = func.__doc__
+
+    def getter(self):
+        try:
+            return self.__dict__[name]
+        except KeyError:
+            value = self.__dict__[name] = func(self)
+            return value
+
+    getter.__name__ = name
+    getter.__doc__ = doc
+    return property(getter)

@@ -22,6 +22,7 @@ from mitools.utils import (
     add_significance,
     auto_adjust_sheet_columns_width,
     build_dir_tree,
+    cached_property,
     can_convert_to,
     check_symmetrical_matrix,
     clean_str,
@@ -52,6 +53,74 @@ from mitools.utils import (
     write_json_file,
     write_text_file,
 )
+
+
+class TestCachedProperty(TestCase):
+    def setUp(self):
+        class Sample:
+            def __init__(self, value):
+                self._value = value
+                self.compute_count = 0
+
+            @cached_property
+            def computed_property(self):
+                "Sample computed property."
+                self.compute_count += 1
+                return self._value * 2
+
+        self.Sample = Sample
+
+    def test_cached_property_basic(self):
+        obj = self.Sample(10)
+        self.assertEqual(obj.computed_property, 20)
+        self.assertEqual(obj.computed_property, 20)
+        self.assertEqual(obj.compute_count, 1)
+
+    def test_cached_property_caching(self):
+        obj = self.Sample(5)
+        first_access = obj.computed_property
+        second_access = obj.computed_property
+        self.assertEqual(first_access, 10)
+        self.assertEqual(second_access, 10)
+        self.assertEqual(obj.compute_count, 1)
+
+    def test_cached_property_mutability(self):
+        obj = self.Sample(3)
+        self.assertEqual(obj.computed_property, 6)
+        obj.__dict__["computed_property"] = 15
+        self.assertEqual(obj.computed_property, 15)
+        self.assertEqual(obj.compute_count, 1)
+
+    def test_cached_property_exceptions(self):
+        class ExceptionSample:
+            def __init__(self, raise_exception):
+                self.raise_exception = raise_exception
+
+            @cached_property
+            def error_property(self):
+                if self.raise_exception:
+                    raise ValueError("Intentional error")
+                return 42
+
+        obj = ExceptionSample(raise_exception=True)
+        with self.assertRaises(ValueError):
+            _ = obj.error_property
+        obj.raise_exception = False
+        self.assertEqual(obj.error_property, 42)
+
+    def test_cached_property_docstring(self):
+        obj = self.Sample(4)
+        self.assertEqual(
+            obj.__class__.computed_property.__doc__, "Sample computed property."
+        )
+
+    def test_cached_property_separate_instances(self):
+        obj1 = self.Sample(7)
+        obj2 = self.Sample(8)
+        self.assertEqual(obj1.computed_property, 14)
+        self.assertEqual(obj2.computed_property, 16)
+        self.assertEqual(obj1.compute_count, 1)
+        self.assertEqual(obj2.compute_count, 1)
 
 
 class TestIterableChunks(TestCase):
