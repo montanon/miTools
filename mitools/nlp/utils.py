@@ -11,6 +11,121 @@ from mitools.nlp.tokenizers import SentenceTokenizer, WordTokenizer
 from mitools.nlp.typing import BaseString, PennTag, WordNetTag
 
 PUNCTUATION_REGEX = re.compile(f"[{re.escape(string.punctuation)}]")
+SLASH, WORD, POS, CHUNK, PNP, REL, ANCHOR, LEMMA = (
+    "&slash;",
+    "word",
+    "part-of-speech",
+    "chunk",
+    "preposition",
+    "relation",
+    "anchor",
+    "lemma",
+)
+UNIVERSAL = "universal"
+NOUN, VERB, ADJ, ADV, PRON, DET, PREP, ADP, NUM, CONJ, INTJ, PRT, PUNC, X = (
+    "NN",
+    "VB",
+    "JJ",
+    "RB",
+    "PR",
+    "DT",
+    "PP",
+    "PP",
+    "NO",
+    "CJ",
+    "UH",
+    "PT",
+    ".",
+    "X",
+)
+TOKEN = re.compile(r"(\S+)\s")
+PUNCTUATION = punctuation = ".,;:!?()[]{}`''\"@#$^&*+-|=~_"
+ABBREVIATIONS = abbreviations = set(
+    (
+        "a.",
+        "adj.",
+        "adv.",
+        "al.",
+        "a.m.",
+        "c.",
+        "cf.",
+        "comp.",
+        "conf.",
+        "def.",
+        "ed.",
+        "e.g.",
+        "esp.",
+        "etc.",
+        "ex.",
+        "f.",
+        "fig.",
+        "gen.",
+        "id.",
+        "i.e.",
+        "int.",
+        "l.",
+        "m.",
+        "Med.",
+        "Mil.",
+        "Mr.",
+        "n.",
+        "n.q.",
+        "orig.",
+        "pl.",
+        "pred.",
+        "pres.",
+        "p.m.",
+        "ref.",
+        "v.",
+        "vs.",
+        "w/",
+    )
+)
+RE_ABBR1 = re.compile(r"^[A-Za-z]\.$")  # single letter, "T. De Smedt"
+RE_ABBR2 = re.compile(r"^([A-Za-z]\.)+$")  # alternating letters, "U.S."
+RE_ABBR3 = re.compile(
+    "^[A-Z]["
+    + "|".join(  # capital followed by consonants, "Mr."
+        "bcdfghjklmnpqrstvwxz"
+    )
+    + "]+.$"
+)
+EMOTICONS = {  # (facial expression, sentiment)-keys
+    ("love", +1.00): set(("<3", "♥")),
+    ("grin", +1.00): set(
+        (">:D", ":-D", ":D", "=-D", "=D", "X-D", "x-D", "XD", "xD", "8-D")
+    ),
+    ("taunt", +0.75): set(
+        (">:P", ":-P", ":P", ":-p", ":p", ":-b", ":b", ":c)", ":o)", ":^)")
+    ),
+    ("smile", +0.50): set(
+        (">:)", ":-)", ":)", "=)", "=]", ":]", ":}", ":>", ":3", "8)", "8-)")
+    ),
+    ("wink", +0.25): set((">;]", ";-)", ";)", ";-]", ";]", ";D", ";^)", "*-)", "*)")),
+    ("gasp", +0.05): set((">:o", ":-O", ":O", ":o", ":-o", "o_O", "o.O", "°O°", "°o°")),
+    ("worry", -0.25): set(
+        (">:/", ":-/", ":/", ":\\", ">:\\", ":-.", ":-s", ":s", ":S", ":-S", ">.>")
+    ),
+    ("frown", -0.75): set(
+        (">:[", ":-(", ":(", "=(", ":-[", ":[", ":{", ":-<", ":c", ":-c", "=/")
+    ),
+    ("cry", -1.00): set((":'(", ":'''(", ";'(")),
+}
+RE_EMOTICONS = [
+    r" ?".join([re.escape(each) for each in e]) for v in EMOTICONS.values() for e in v
+]
+RE_EMOTICONS = re.compile(r"(%s)($|\s)" % "|".join(RE_EMOTICONS))
+RE_SARCASM = re.compile(r"\( ?\! ?\)")
+REPLACEMENTS = {
+    "'d": " 'd",
+    "'m": " 'm",
+    "'s": " 's",
+    "'ll": " 'll",
+    "'re": " 're",
+    "'ve": " 've",
+    "n't": " n't",
+}
+EOS = "END-OF-SENTENCE"
 
 
 def singularize(word: Union[str, Word]) -> Word:
@@ -102,6 +217,12 @@ def basic_extractor(
     return features
 
 
+def contains_extractor(corpus: Iterable[BaseString]) -> Dict[str, bool]:
+    tokens = get_corpus_tokens(corpus)
+    features = dict((f"contains({word})", True) for word in tokens)
+    return features
+
+
 def normalize_tags(chunk: Sequence[Tuple[str, str]]) -> Sequence[Tuple[str, str]]:
     normalized_tags = []
     for word, pos_tag in chunk:
@@ -168,3 +289,175 @@ def tree_to_string(tree: Tree, concat: str = " ") -> str:
 
 def default_feature_extractor(words: Iterable[str]) -> Dict[str, bool]:
     return dict((word, True) for word in words)
+
+
+def decode_string(value, encoding="utf-8"):
+    if isinstance(encoding, BaseString):
+        encoding = ((encoding,),) + (("windows-1252",), ("utf-8", "ignore"))
+    if isinstance(value, bytes):
+        for e in encoding:
+            try:
+                return value.decode(*e)
+            except Exception:
+                pass
+        return value
+    return str(value)
+
+
+def encode_string(value, encoding="utf-8"):
+    if isinstance(encoding, BaseString):
+        encoding = ((encoding,),) + (("windows-1252",), ("utf-8", "ignore"))
+    if isinstance(value, str):
+        for e in encoding:
+            try:
+                return value.encode(*e)
+            except Exception:
+                pass
+        return value
+    return str(value)
+
+
+def is_numeric(value: BaseString) -> bool:
+    try:
+        float(value)
+    except ValueError:
+        return False
+    return True
+
+
+def penntreebank_to_universal(token, tag):
+    if tag.startswith(("NNP-", "NNPS-")):
+        return (token, "{}-{}".format(NOUN, tag.split("-")[-1]))
+    if tag in ("NN", "NNS", "NNP", "NNPS", "NP"):
+        return (token, NOUN)
+    if tag in ("MD", "VB", "VBD", "VBG", "VBN", "VBP", "VBZ"):
+        return (token, VERB)
+    if tag in ("JJ", "JJR", "JJS"):
+        return (token, ADJ)
+    if tag in ("RB", "RBR", "RBS", "WRB"):
+        return (token, ADV)
+    if tag in ("PRP", "PRP$", "WP", "WP$"):
+        return (token, PRON)
+    if tag in ("DT", "PDT", "WDT", "EX"):
+        return (token, DET)
+    if tag in ("IN",):
+        return (token, PREP)
+    if tag in ("CD",):
+        return (token, NUM)
+    if tag in ("CC",):
+        return (token, CONJ)
+    if tag in ("UH",):
+        return (token, INTJ)
+    if tag in ("POS", "RP", "TO"):
+        return (token, PRT)
+    if tag in ("SYM", "LS", ".", "!", "?", ",", ":", "(", ")", '"', "#", "$"):
+        return (token, PUNC)
+    return (token, X)
+
+
+def find_tokens(
+    text: BaseString,
+    punctuation_chars: Tuple[str] = PUNCTUATION,
+    known_abbreviations: Set[str] = ABBREVIATIONS,
+    contraction_replacements: Dict[str, str] = REPLACEMENTS,
+    paragraph_break: str = r"\n{2,}",
+):
+    # Handle periods separately.
+    punctuation_chars = tuple(punctuation_chars.replace(".", ""))
+    # Handle replacements (contractions).
+    for contraction, expanded in list(contraction_replacements.items()):
+        text = re.sub(contraction, expanded, text)
+    # Handle Unicode quotes.
+    if isinstance(text, str):
+        text = (
+            str(text)
+            .replace("“", " “ ")
+            .replace("”", " ” ")
+            .replace("‘", " ‘ ")
+            .replace("’", " ’ ")
+            .replace("'", " ' ")
+            .replace('"', ' " ')
+        )
+    # Collapse whitespace.
+    text = re.sub("\r\n", "\n", text)
+    text = re.sub(paragraph_break, " %s " % EOS, text)
+    text = re.sub(r"\s+", " ", text)
+    token_list = []
+    for current_token in TOKEN.findall(text + " "):
+        if len(current_token) > 0:
+            trailing_punctuation = []
+            while (
+                current_token.startswith(punctuation_chars)
+                and current_token not in contraction_replacements
+            ):
+                # Split leading punctuation.
+                if current_token.startswith(punctuation_chars):
+                    token_list.append(current_token[0])
+                    current_token = current_token[1:]
+            while (
+                current_token.endswith(punctuation_chars + (".",))
+                and current_token not in contraction_replacements
+            ):
+                # Split trailing punctuation.
+                if current_token.endswith(punctuation_chars):
+                    trailing_punctuation.append(current_token[-1])
+                    current_token = current_token[:-1]
+                # Split ellipsis (...) before splitting period.
+                if current_token.endswith("..."):
+                    trailing_punctuation.append("...")
+                    current_token = current_token[:-3].rstrip(".")
+                # Split period (if not an abbreviation).
+                if current_token.endswith("."):
+                    if (
+                        current_token in known_abbreviations
+                        or RE_ABBR1.match(current_token) is not None
+                        or RE_ABBR2.match(current_token) is not None
+                        or RE_ABBR3.match(current_token) is not None
+                    ):
+                        break
+                    else:
+                        trailing_punctuation.append(current_token[-1])
+                        current_token = current_token[:-1]
+            if current_token != "":
+                token_list.append(current_token)
+            token_list.extend(reversed(trailing_punctuation))
+    sentence_list, start_idx, current_idx = [[]], 0, 0
+    while current_idx < len(token_list):
+        if token_list[current_idx] in ("...", ".", "!", "?", EOS):
+            # Handle citations, trailing parenthesis, repeated punctuation (!?).
+            while current_idx < len(token_list) and token_list[current_idx] in (
+                "'",
+                '"',
+                "”",
+                "’",
+                "...",
+                ".",
+                "!",
+                "?",
+                ")",
+                EOS,
+            ):
+                if (
+                    token_list[current_idx] in ("'", '"')
+                    and sentence_list[-1].count(token_list[current_idx]) % 2 == 0
+                ):
+                    break  # Balanced quotes.
+                current_idx += 1
+            sentence_list[-1].extend(
+                token for token in token_list[start_idx:current_idx] if token != EOS
+            )
+            sentence_list.append([])
+            start_idx = current_idx
+        current_idx += 1
+    sentence_list[-1].extend(token_list[start_idx:current_idx])
+    sentence_strings = (
+        " ".join(sentence) for sentence in sentence_list if len(sentence) > 0
+    )
+    sentence_strings = (
+        RE_SARCASM.sub("(!)", sentence) for sentence in sentence_strings
+    )
+    sentence_strings = [
+        RE_EMOTICONS.sub(lambda m: m.group(1).replace(" ", "") + m.group(2), sentence)
+        for sentence in sentence_strings
+    ]
+    return sentence_strings
