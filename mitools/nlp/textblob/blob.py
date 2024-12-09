@@ -380,3 +380,22 @@ class TextBlob(BaseBlob):
             )
             sentence_objects.append(s)
         return sentence_objects
+
+
+class Sentence(BaseBlob):
+    def __init__(self, sentence, start_index=0, end_index=None, *args, **kwargs):
+        super().__init__(sentence, *args, **kwargs)
+        self.start = self.start_index = start_index
+        self.end = self.end_index = end_index or len(sentence) - 1
+
+    @property
+    def dict(self):
+        return {
+            "raw": self.raw,
+            "start_index": self.start_index,
+            "end_index": self.end_index,
+            "stripped": self.stripped,
+            "noun_phrases": self.noun_phrases,
+            "polarity": self.polarity,
+            "subjectivity": self.subjectivity,
+        }
