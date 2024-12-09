@@ -333,3 +333,50 @@ class BaseBlob(StringlikeMixin, BlobComparableMixin):
 
     def split(self, sep=None, maxsplit=sys.maxsize):
         return WordList(self._strkey().split(sep, maxsplit))
+
+
+class TextBlob(BaseBlob):
+    @CachedProperty
+    def sentences(self):
+        return self._create_sentence_objects()
+
+    @CachedProperty
+    def words(self):
+        return WordList(word_tokenize(self.raw, include_punc=False))
+
+    @property
+    def raw_sentences(self):
+        return [sentence.raw for sentence in self.sentences]
+
+    @property
+    def serialized(self):
+        return [sentence.dict for sentence in self.sentences]
+
+    def to_json(self, *args, **kwargs):
+        return json.dumps(self.serialized, *args, **kwargs)
+
+    @property
+    def json(self):
+        return self.to_json()
+
+    def _create_sentence_objects(self):
+        sentence_objects = []
+        sentences = sentence_tokenize(self.raw)
+        char_index = 0
+        for sent in sentences:
+            start_index = self.raw.index(sent, char_index)
+            char_index += len(sent)
+            end_index = start_index + len(sent)
+            s = Sentence(
+                sent,
+                start_index=start_index,
+                end_index=end_index,
+                tokenizer=self.tokenizer,
+                np_extractor=self.np_extractor,
+                pos_tagger=self.pos_tagger,
+                analyzer=self.analyzer,
+                parser=self.parser,
+                classifier=self.classifier,
+            )
+            sentence_objects.append(s)
+        return sentence_objects
