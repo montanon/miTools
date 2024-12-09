@@ -1400,3 +1400,30 @@ def find_chunks(
                 tokens_with_chunks[i + 0][2] = "B-ADVP"
                 tokens_with_chunks[i + 1][2] = "B-NP"
     return tokens_with_chunks
+
+
+def find_prepositions(token_sequence: List[Tuple[BaseString, PosTag, str]]):
+    for token_item in token_sequence:
+        token_item.append("O")
+    for current_idx, current_token in enumerate(token_sequence):
+        is_preposition = current_token[2].endswith("PP") and current_token[-1] == "O"
+        if is_preposition:
+            has_valid_next_token = current_idx < len(token_sequence) - 1 and (
+                token_sequence[current_idx + 1][2].endswith(("NP", "PP"))
+                or token_sequence[current_idx + 1][1] in ("VBG", "VBN")
+            )
+            if has_valid_next_token:
+                current_token[-1] = "B-PNP"
+                is_prep_phrase = True
+                for next_token in token_sequence[current_idx + 1 :]:
+                    is_valid_continuation = next_token[2].endswith(
+                        ("NP", "PP")
+                    ) or next_token[1] in ("VBG", "VBN")
+                    if not is_valid_continuation:
+                        break
+                    if next_token[2].endswith("PP") and is_prep_phrase:
+                        next_token[-1] = "I-PNP"
+                    if not next_token[2].endswith("PP"):
+                        next_token[-1] = "I-PNP"
+                        is_prep_phrase = False
+    return token_sequence
