@@ -399,3 +399,51 @@ class Sentence(BaseBlob):
             "polarity": self.polarity,
             "subjectivity": self.subjectivity,
         }
+
+
+class Blobber:
+    np_extractor = FastNPExtractor()
+    pos_tagger = NLTKTagger()
+    tokenizer = WordTokenizer()
+    analyzer = PatternAnalyzer()
+    parser = PatternParser()
+
+    def __init__(
+        self,
+        tokenizer=None,
+        pos_tagger=None,
+        np_extractor=None,
+        analyzer=None,
+        parser=None,
+        classifier=None,
+    ):
+        initialize_models(
+            self, tokenizer, pos_tagger, np_extractor, analyzer, parser, classifier
+        )
+
+    def __call__(self, text):
+        return TextBlob(
+            text,
+            tokenizer=self.tokenizer,
+            pos_tagger=self.pos_tagger,
+            np_extractor=self.np_extractor,
+            analyzer=self.analyzer,
+            parser=self.parser,
+            classifier=self.classifier,
+        )
+
+    def __repr__(self):
+        classifier_name = (
+            self.classifier.__class__.__name__ + "()" if self.classifier else "None"
+        )
+        return (
+            f"Blobber(tokenizer={self.tokenizer.__class__.__name__}(), "
+            f"pos_tagger={self.pos_tagger.__class__.__name__}(), "
+            f"np_extractor={self.np_extractor.__class__.__name__}(), "
+            f"analyzer={self.analyzer.__class__.__name__}(), "
+            f"parser={self.parser.__class__.__name__}(), "
+            f"classifier={classifier_name})"
+        )
+
+    def __str__(self):
+        return self.__repr__()
