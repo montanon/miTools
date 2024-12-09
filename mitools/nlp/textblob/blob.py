@@ -19,6 +19,7 @@ from mitools.nlp.textblob.tokenizers import (
 )
 from mitools.nlp.textblob.utils import PUNCTUATION_REGEX, CachedProperty, lowerstrip
 
+BaseString = (str, bytes)
 sentence_tokenize = SentenceTokenizer().itokenize
 wordnet = nltk.corpus.wordnet
 PorterStemmer = nltk.stem.porter.PorterStemmer()
@@ -94,3 +95,64 @@ class Word(str):
 
     def define(self, pos=None):
         return [syn.definition() for syn in self.get_synsets(pos=pos)]
+
+
+class WordList(list):
+    def __init__(self, collection):
+        super().__init__([Word(w) for w in collection])
+
+    def __str__(self):
+        return super().__repr__()
+
+    def __repr__(self):
+        class_name = self.__class__.__name__
+        return f"{class_name}({super().__repr__()})"
+
+    def __getitem__(self, key):
+        item = super().__getitem__(key)
+        if isinstance(key, slice):
+            return self.__class__(item)
+        else:
+            return item
+
+    def __getslice__(self, i, j):
+        return self.__class__(super().__getslice__(i, j))
+
+    def __setitem__(self, index, obj):
+        if isinstance(obj, BaseString):
+            super().__setitem__(index, Word(obj))
+        else:
+            super().__setitem__(index, obj)
+
+    def count(self, strg, case_sensitive=False, *args, **kwargs):
+        if not case_sensitive:
+            return [word.lower() for word in self].count(strg.lower(), *args, **kwargs)
+        return super().count(strg, *args, **kwargs)
+
+    def append(self, obj):
+        if isinstance(obj, BaseString):
+            super().append(Word(obj))
+        else:
+            super().append(obj)
+
+    def extend(self, iterable):
+        for e in iterable:
+            self.append(e)
+
+    def upper(self):
+        return self.__class__([word.upper() for word in self])
+
+    def lower(self):
+        return self.__class__([word.lower() for word in self])
+
+    def singularize(self):
+        return self.__class__([word.singularize() for word in self])
+
+    def pluralize(self):
+        return self.__class__([word.pluralize() for word in self])
+
+    def lemmatize(self):
+        return self.__class__([word.lemmatize() for word in self])
+
+    def stem(self, *args, **kwargs):
+        return self.__class__([word.stem(*args, **kwargs) for word in self])
