@@ -75,7 +75,9 @@ class Word(str):
     def lemma(self):
         return self.lemmatize(pos=self.pos_tag)
 
-    def lemmatize(self, pos: PosTag = None, lemmatizer: WordNetLemmatizer = None):
+    def lemmatize(
+        self, pos: PosTag = None, lemmatizer: Union[WordNetLemmatizer, None] = None
+    ):
         if pos is None:
             tag = wordnet.NOUN
         elif pos in wordnet._FILEMAP.keys():
@@ -93,11 +95,11 @@ class Word(str):
 
     @cached_property
     def synsets(self):
-        return self.get_synsets(pos=None)
+        return self.get_synsets(pos_tag=None)
 
     @cached_property
     def definitions(self):
-        return self.define(pos=None)
+        return self.define(pos_tag=None)
 
     def get_synsets(self, pos_tag: PosTag = None):
         return wordnet.synsets(self.string, pos_tag)
@@ -172,6 +174,9 @@ class WordList(list):
     def stem(self, *args, **kwargs):
         return self.__class__([word.stem(*args, **kwargs) for word in self])
 
+    def title(self):
+        return self.__class__([word.title() for word in self])
+
 
 class BaseBlob(StringlikeMixin, BlobComparableMixin):
     def __init__(
@@ -184,7 +189,7 @@ class BaseBlob(StringlikeMixin, BlobComparableMixin):
         parser: BaseParser = None,
         classifier: BaseClassifier = None,
     ):
-        if not isinstance(text, BaseString):
+        if not isinstance(text, (str, bytes)):
             raise ArgumentTypeError(
                 "The `text` argument passed to `__init__(text)` "
                 f"must be a string, not {type(text)}"
