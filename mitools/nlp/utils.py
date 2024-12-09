@@ -29,6 +29,9 @@ from mitools.nlp.definitions import (
     RE_ABBR2,
     RE_ABBR3,
     RE_EMOTICONS,
+    RE_ENTITY1,
+    RE_ENTITY2,
+    RE_ENTITY3,
     RE_SARCASM,
     REPLACEMENTS,
     TOKEN,
@@ -203,7 +206,7 @@ def default_feature_extractor(words: Iterable[str]) -> Dict[str, bool]:
     return dict((word, True) for word in words)
 
 
-def decode_string(value, encoding="utf-8"):
+def decode_string(value: BaseString, encoding: str = "utf-8") -> str:
     if isinstance(encoding, BaseString):
         encoding = ((encoding,),) + (("windows-1252",), ("utf-8", "ignore"))
     if isinstance(value, bytes):
@@ -216,7 +219,7 @@ def decode_string(value, encoding="utf-8"):
     return str(value)
 
 
-def encode_string(value, encoding="utf-8"):
+def encode_string(value: BaseString, encoding: str = "utf-8") -> BaseString:
     if isinstance(encoding, BaseString):
         encoding = ((encoding,),) + (("windows-1252",), ("utf-8", "ignore"))
     if isinstance(value, str):
@@ -796,5 +799,79 @@ class Context(LazyList, Rules):
     def extend(self, rules: Iterable[Tuple[str]] = None):
         if rules is None:
             rules = []
-        for r in rules:
-            self.append(*r)
+        for rule in rules:
+            self.append(*rule)
+
+
+class Entities(LazyDict, Rules):
+    def __init__(
+        self,
+        lexicon: Union[Dict[str, str], None] = None,
+        path: Path = Path(""),
+        tag: PosTag = "NNP",
+    ):
+        if lexicon is None:
+            lexicon = {}
+        morph_operations = (
+            "pers",  # Persons: George/NNP-PERS
+            "loc",  # Locations: Washington/NNP-LOC
+            "org",  # Organizations: Google/NNP-ORG
+        )
+        Rules.__init__(self, lexicon, morph_operations)
+        self._path = path
+        self.tag = tag
+
+    @property
+    def path(self):
+        return self._path
+
+    def load(self):
+        for x in read(self.path):
+            x = [x.lower() for x in x.split()]
+            dict.setdefault(self, x[0], []).append(x)
+
+    def apply(self, tokens: Iterable[Tuple[str, str]]) -> Iterable[Tuple[str, str]]:
+        current_index = 0
+        while current_index < len(tokens):
+            current_word = tokens[current_index][0].lower()
+            if (
+                RE_ENTITY1.match(current_word)
+                or RE_ENTITY2.match(current_word)
+                or RE_ENTITY3.match(current_word)
+            ):
+                tokens[current_index][1] = self.tag
+            if current_word in self:
+                for entity_parts in self[current_word]:
+                    entity_words, entity_type = (
+                        (entity_parts[:-1], "-" + entity_parts[-1].upper())
+                        if entity_parts[-1] in self.cmd
+                        else (entity_parts, "")
+                    )
+                    matches_entity = True
+                    for word_offset, entity_word in enumerate(entity_words):
+                        if (
+                            current_index + word_offset >= len(tokens)
+                            or tokens[current_index + word_offset][0].lower()
+                            != entity_word
+                        ):
+                            matches_entity = False
+                            break
+                    if matches_entity:
+                        for token in tokens[
+                            current_index : current_index + word_offset + 1
+                        ]:
+                            token[1] = (
+                                token[1] if token[1] == "NNPS" else self.tag
+                            ) + entity_type
+                        current_index += word_offset
+                        break
+            current_index += 1
+        return tokens
+
+    def append(self, entity: str, name: str = "pers"):
+        e = [s.lower() for s in entity.split(" ") + [name]]
+        self.setdefault(e[0], []).append(e)
+
+    def extend(self, entities: Iterable[Tuple[str, str]]):
+        for entity, name in entities:
+            self.append(entity, name)
