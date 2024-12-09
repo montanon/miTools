@@ -374,3 +374,50 @@ class Sentence(BaseBlob):
             "polarity": self.polarity,
             "subjectivity": self.subjectivity,
         }
+
+
+class Blobber:
+    def __init__(
+        self,
+        tokenizer: BaseTokenizer = None,
+        pos_tagger: BaseTagger = None,
+        np_extractor: BaseNPExtractor = None,
+        analyzer: BaseSentimentAnalyzer = None,
+        parser: BaseParser = None,
+        classifier: BaseClassifier = None,
+    ):
+        self.tokenizer = tokenizer if tokenizer is not None else WordTokenizer()
+        self.pos_tagger = pos_tagger if pos_tagger is not None else NLTKTagger()
+        self.np_extractor = (
+            np_extractor if np_extractor is not None else FastNPExtractor()
+        )
+        self.analyzer = analyzer if analyzer is not None else PatternAnalyzer()
+        self.parser = parser if parser is not None else PatternParser()
+        self.classifier = classifier
+
+    def __call__(self, text):
+        return TextBlob(
+            text,
+            tokenizer=self.tokenizer,
+            pos_tagger=self.pos_tagger,
+            np_extractor=self.np_extractor,
+            analyzer=self.analyzer,
+            parser=self.parser,
+            classifier=self.classifier,
+        )
+
+    def __repr__(self):
+        classifier_name = (
+            self.classifier.__class__.__name__ + "()" if self.classifier else "None"
+        )
+        return (
+            f"Blobber(tokenizer={self.tokenizer.__class__.__name__}(), "
+            f"pos_tagger={self.pos_tagger.__class__.__name__}(), "
+            f"np_extractor={self.np_extractor.__class__.__name__}(), "
+            f"analyzer={self.analyzer.__class__.__name__}(), "
+            f"parser={self.parser.__class__.__name__}(), "
+            f"classifier={classifier_name})"
+        )
+
+    def __str__(self):
+        return self.__repr__()
