@@ -1,3 +1,4 @@
+import json
 import sys
 from collections import defaultdict
 from typing import Sequence, Union
@@ -8,11 +9,12 @@ from nltk.stem.porter import PorterStemmer
 from nltk.stem.wordnet import WordNetLemmatizer
 from nltk.tokenize import regexp_tokenize
 
+from mitools.exceptions import ArgumentTypeError
 from mitools.nlp.classifiers import BaseClassifier
-from mitools.nlp.extractors import BaseExtractor, FastNPExtractor
+from mitools.nlp.extractors import BaseNPExtractor, FastNPExtractor
 from mitools.nlp.mixins import BlobComparableMixin, StringlikeMixin
 from mitools.nlp.parsers import BaseParser, PatternParser
-from mitools.nlp.sentiments import BaseAnalyzer, PatternAnalyzer
+from mitools.nlp.sentiments import BaseSentimentAnalyzer, PatternAnalyzer
 from mitools.nlp.taggers import BaseTagger, NLTKTagger
 from mitools.nlp.tokenizers import BaseTokenizer, WordTokenizer
 from mitools.nlp.typing import BaseString, PosTag
@@ -21,6 +23,7 @@ from mitools.nlp.utils import (
     lowerstrip,
     penn_to_wordnet,
     pluralize,
+    sentence_tokenize,
     singularize,
     suggest,
     word_tokenize,
@@ -162,13 +165,13 @@ class BaseBlob(StringlikeMixin, BlobComparableMixin):
         text,
         tokenizer: BaseTokenizer = None,
         pos_tagger: BaseTagger = None,
-        np_extractor: BaseExtractor = None,
-        analyzer: BaseAnalyzer = None,
+        np_extractor: BaseNPExtractor = None,
+        analyzer: BaseSentimentAnalyzer = None,
         parser: BaseParser = None,
         classifier: BaseClassifier = None,
     ):
         if not isinstance(text, BaseString):
-            raise TypeError(
+            raise ArgumentTypeError(
                 "The `text` argument passed to `__init__(text)` "
                 f"must be a string, not {type(text)}"
             )
@@ -277,14 +280,14 @@ class BaseBlob(StringlikeMixin, BlobComparableMixin):
         ret = "".join(corrected)
         return self.__class__(ret)
 
-    def _compare(self):
+    def comparable_key(self):
         return self.raw
 
-    def _strkey(self):
+    def string_key(self):
         return self.raw
 
     def __hash__(self):
-        return hash(self._compare())
+        return hash(self.comparable_key())
 
     def __add__(self, other: Union[BaseString, "BaseBlob"]):
         if isinstance(other, BaseString):
@@ -298,3 +301,76 @@ class BaseBlob(StringlikeMixin, BlobComparableMixin):
 
     def split(self, sep: str = None, maxsplit: int = sys.maxsize):
         return WordList(self._strkey().split(sep, maxsplit))
+
+
+class TextBlob(BaseBlob):
+    @cached_property
+    def sentences(self):
+        return self._create_sentence_objects()
+
+    @cached_property
+    def words(self):
+        return WordList(word_tokenize(self.raw, include_punc=False))
+
+    @property
+    def raw_sentences(self):
+        return [sentence.raw for sentence in self.sentences]
+
+    @property
+    def serialized(self):
+        return [sentence.dict for sentence in self.sentences]
+
+    def to_json(self, *args, **kwargs):
+        return json.dumps(self.serialized, *args, **kwargs)
+
+    @property
+    def json(self):
+        return self.to_json()
+
+    def _create_sentence_objects(self):
+        sentence_objects = []
+        sentences = sentence_tokenize(self.raw)
+        char_index = 0
+        for sent in sentences:
+            start_index = self.raw.index(sent, char_index)
+            char_index += len(sent)
+            end_index = start_index + len(sent)
+            s = Sentence(
+                sent,
+                start_index=start_index,
+                end_index=end_index,
+                tokenizer=self.tokenizer,
+                np_extractor=self.np_extractor,
+                pos_tagger=self.pos_tagger,
+                analyzer=self.analyzer,
+                parser=self.parser,
+                classifier=self.classifier,
+            )
+            sentence_objects.append(s)
+        return sentence_objects
+
+
+class Sentence(BaseBlob):
+    def __init__(
+        self,
+        sentence: BaseString,
+        start_index: int = 0,
+        end_index: int = None,
+        *args,
+        **kwargs,
+    ):
+        super().__init__(sentence, *args, **kwargs)
+        self.start = self.start_index = start_index
+        self.end = self.end_index = end_index or len(sentence) - 1
+
+    @property
+    def dict(self):
+        return {
+            "raw": self.raw,
+            "start_index": self.start_index,
+            "end_index": self.end_index,
+            "stripped": self.stripped,
+            "noun_phrases": self.noun_phrases,
+            "polarity": self.polarity,
+            "subjectivity": self.subjectivity,
+        }
