@@ -3,8 +3,8 @@ from typing import Sequence, Tuple
 
 import nltk
 
-from mitools.nlp.blobs import TextBlob
 from mitools.nlp.en import tag as pattern_tag
+from mitools.nlp.tokenizers import BaseTokenizer, WordTokenizer
 from mitools.nlp.typing import BaseString
 
 
@@ -22,7 +22,6 @@ class PatternTagger(BaseTagger):
 
 
 class NLTKTagger(BaseTagger):
-    def tag(self, text: BaseString):
-        if isinstance(text, BaseString):
-            text = TextBlob(text)
-        return nltk.tag.pos_tag(text.tokens)
+    def tag(self, text: BaseString, tokenizer: BaseTokenizer = None):
+        tokenizer = tokenizer if tokenizer is not None else WordTokenizer()
+        return nltk.tag.pos_tag(tokenizer.tokenize(text))

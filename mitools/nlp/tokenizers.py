@@ -4,8 +4,8 @@ from typing import Iterator, Sequence
 import nltk
 from nltk.tokenize.api import TokenizerI
 
+from mitools.nlp.string_utils import strip_punctuation
 from mitools.nlp.typing import BaseString
-from mitools.nlp.utils import strip_punctuation
 
 
 class BaseTokenizer(TokenizerI, ABCMeta):

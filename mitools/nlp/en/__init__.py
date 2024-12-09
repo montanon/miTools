@@ -3,8 +3,13 @@ from typing import Sequence, Tuple
 
 from mitools.nlp.definitions import CHUNK, PENN, PNP, POS, UNIVERSAL, WORD
 from mitools.nlp.en.inflect import singularize
-from mitools.nlp.sentiments import Sentiment
-from mitools.nlp.utils import Lexicon, Parser, Spelling, penntreebank_to_universal
+from mitools.nlp.utils import (
+    Lexicon,
+    Parser,
+    Sentiment,
+    Spelling,
+    penntreebank_to_universal,
+)
 
 try:
     MODULE = os.path.dirname(os.path.abspath(__file__))

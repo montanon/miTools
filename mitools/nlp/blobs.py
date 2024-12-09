@@ -1,7 +1,7 @@
 import json
 import sys
 from collections import defaultdict
-from typing import Sequence, Union
+from typing import Callable, Literal, Sequence, Union
 
 from nltk.corpus import wordnet
 from nltk.stem.api import StemmerI
@@ -11,6 +11,8 @@ from nltk.tokenize import regexp_tokenize
 
 from mitools.exceptions import ArgumentTypeError
 from mitools.nlp.classifiers import BaseClassifier
+from mitools.nlp.en.inflect import pluralize as en_pluralize
+from mitools.nlp.en.inflect import singularize as en_singularize
 from mitools.nlp.extractors import BaseNPExtractor, FastNPExtractor
 from mitools.nlp.mixins import BlobComparableMixin, StringlikeMixin
 from mitools.nlp.parsers import BaseParser, PatternParser
@@ -22,13 +24,25 @@ from mitools.nlp.utils import (
     PUNCTUATION_REGEX,
     lowerstrip,
     penn_to_wordnet,
-    pluralize,
     sentence_tokenize,
-    singularize,
     suggest,
     word_tokenize,
 )
 from mitools.utils.decorators import cached_property
+
+
+def singularize(word: BaseString, language: Literal["en", "other"] = "en") -> Callable:
+    if language == "en":
+        return en_singularize(word)
+    raise NotImplementedError(
+        f"Singularize is not implemented for language {language}."
+    )
+
+
+def pluralize(word: BaseString, language: Literal["en", "other"] = "en") -> Callable:
+    if language == "en":
+        return en_pluralize(word)
+    raise NotImplementedError(f"Pluralize is not implemented for language {language}.")
 
 
 class Word(str):
