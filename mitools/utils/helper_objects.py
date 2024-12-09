@@ -94,3 +94,41 @@ class LazyDict(dict):
 
     def popitem(self, *args):
         return self._lazy("popitem", *args)
+
+
+class LazyList(list):
+    def load(self):
+        pass
+
+    def _lazy(self, method, *args):
+        if list.__len__(self) == 0:
+            self.load()
+            setattr(self, method, types.MethodType(getattr(list, method), self))
+        return getattr(list, method)(self, *args)
+
+    def __repr__(self):
+        return self._lazy("__repr__")
+
+    def __len__(self):
+        return self._lazy("__len__")
+
+    def __iter__(self):
+        return self._lazy("__iter__")
+
+    def __contains__(self, *args):
+        return self._lazy("__contains__", *args)
+
+    def insert(self, *args):
+        return self._lazy("insert", *args)
+
+    def append(self, *args):
+        return self._lazy("append", *args)
+
+    def extend(self, *args):
+        return self._lazy("extend", *args)
+
+    def remove(self, *args):
+        return self._lazy("remove", *args)
+
+    def pop(self, *args):
+        return self._lazy("pop", *args)
