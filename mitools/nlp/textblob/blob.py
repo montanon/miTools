@@ -39,6 +39,39 @@ def penn_to_wordnet(tag):
     return None
 
 
+def validated_param(obj, name, base_class, default, base_class_name=None):
+    base_class_name = base_class_name if base_class_name else base_class.__name__
+    if obj is not None and not isinstance(obj, base_class):
+        raise ValueError(f"{name} must be an instance of {base_class_name}")
+    return obj or default
+
+
+def initialize_models(
+    obj, tokenizer, pos_tagger, np_extractor, analyzer, parser, classifier
+):
+    obj.tokenizer = validated_param(
+        tokenizer,
+        "tokenizer",
+        base_class=(BaseTokenizer, nltk.tokenize.api.TokenizerI),
+        default=BaseBlob.tokenizer,
+        base_class_name="BaseTokenizer",
+    )
+    obj.np_extractor = validated_param(
+        np_extractor,
+        "np_extractor",
+        base_class=BaseNPExtractor,
+        default=BaseBlob.np_extractor,
+    )
+    obj.pos_tagger = validated_param(
+        pos_tagger, "pos_tagger", BaseTagger, BaseBlob.pos_tagger
+    )
+    obj.analyzer = validated_param(
+        analyzer, "analyzer", BaseSentimentAnalyzer, BaseBlob.analyzer
+    )
+    obj.parser = validated_param(parser, "parser", BaseParser, BaseBlob.parser)
+    obj.classifier = classifier
+
+
 class Word(str):
     def __new__(cls, string, pos_tag=None):
         return super().__new__(cls, string)
@@ -156,3 +189,147 @@ class WordList(list):
 
     def stem(self, *args, **kwargs):
         return self.__class__([word.stem(*args, **kwargs) for word in self])
+
+
+class BaseBlob(StringlikeMixin, BlobComparableMixin):
+    np_extractor = FastNPExtractor()
+    pos_tagger = NLTKTagger()
+    tokenizer = WordTokenizer()
+    analyzer = PatternAnalyzer()
+    parser = PatternParser()
+
+    def __init__(
+        self,
+        text,
+        tokenizer=None,
+        pos_tagger=None,
+        np_extractor=None,
+        analyzer=None,
+        parser=None,
+        classifier=None,
+    ):
+        if not isinstance(text, BaseString):
+            raise TypeError(
+                "The `text` argument passed to `__init__(text)` "
+                f"must be a string, not {type(text)}"
+            )
+        self.raw = self.string = text
+        self.stripped = lowerstrip(self.raw, all=True)
+        initialize_models(
+            self, tokenizer, pos_tagger, np_extractor, analyzer, parser, classifier
+        )
+
+    @CachedProperty
+    def words(self):
+        return WordList(word_tokenize(self.raw, include_punc=False))
+
+    @CachedProperty
+    def tokens(self):
+        return WordList(self.tokenizer.tokenize(self.raw))
+
+    def tokenize(self, tokenizer=None):
+        t = tokenizer if tokenizer is not None else self.tokenizer
+        return WordList(t.tokenize(self.raw))
+
+    def parse(self, parser=None):
+        p = parser if parser is not None else self.parser
+        return p.parse(self.raw)
+
+    def classify(self):
+        if self.classifier is None:
+            raise NameError("This blob has no classifier. Train one first!")
+        return self.classifier.classify(self.raw)
+
+    @CachedProperty
+    def sentiment(self):
+        return self.analyzer.analyze(self.raw)
+
+    @CachedProperty
+    def sentiment_assessments(self):
+        return self.analyzer.analyze(self.raw, keep_assessments=True)
+
+    @CachedProperty
+    def polarity(self):
+        return PatternAnalyzer().analyze(self.raw)[0]
+
+    @CachedProperty
+    def subjectivity(self):
+        return PatternAnalyzer().analyze(self.raw)[1]
+
+    @CachedProperty
+    def noun_phrases(self):
+        return WordList(
+            [
+                phrase.strip().lower()
+                for phrase in self.np_extractor.extract(self.raw)
+                if len(phrase) > 1
+            ]
+        )
+
+    @CachedProperty
+    def pos_tags(self):
+        if isinstance(self, TextBlob):
+            return [
+                val
+                for sublist in [s.pos_tags for s in self.sentences]
+                for val in sublist
+            ]
+        else:
+            return [
+                (Word(str(word), pos_tag=t), str(t))
+                for word, t in self.pos_tagger.tag(self)
+                if not PUNCTUATION_REGEX.match(str(t))
+            ]
+
+    tags = pos_tags
+
+    @CachedProperty
+    def word_counts(self):
+        counts = defaultdict(int)
+        stripped_words = [lowerstrip(word) for word in self.words]
+        for word in stripped_words:
+            counts[word] += 1
+        return counts
+
+    @CachedProperty
+    def np_counts(self):
+        counts = defaultdict(int)
+        for phrase in self.noun_phrases:
+            counts[phrase] += 1
+        return counts
+
+    def ngrams(self, n=3):
+        if n <= 0:
+            return []
+        grams = [
+            WordList(self.words[i : i + n]) for i in range(len(self.words) - n + 1)
+        ]
+        return grams
+
+    def correct(self):
+        tokens = nltk.tokenize.regexp_tokenize(self.raw, r"\w+|[^\w\s]|\s")
+        corrected = (Word(w).correct() for w in tokens)
+        ret = "".join(corrected)
+        return self.__class__(ret)
+
+    def _cmpkey(self):
+        return self.raw
+
+    def _strkey(self):
+        return self.raw
+
+    def __hash__(self):
+        return hash(self._cmpkey())
+
+    def __add__(self, other):
+        if isinstance(other, BaseString):
+            return self.__class__(self.raw + other)
+        elif isinstance(other, BaseBlob):
+            return self.__class__(self.raw + other.raw)
+        else:
+            raise TypeError(
+                f"Operands must be either strings or {self.__class__.__name__} objects"
+            )
+
+    def split(self, sep=None, maxsplit=sys.maxsize):
+        return WordList(self._strkey().split(sep, maxsplit))
