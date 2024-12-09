@@ -1,131 +1,43 @@
+import codecs
 import re
 import string
 from itertools import chain
+from pathlib import Path
 from typing import Dict, Iterable, Sequence, Set, Tuple, Union
 
 from nltk.tree import Tree
 
 from mitools.exceptions import ArgumentStructureError
 from mitools.nlp.blobs import Word
+from mitools.nlp.definitions import (
+    ABBREVIATIONS,
+    ADJ,
+    ADV,
+    CONJ,
+    DET,
+    EOS,
+    INTJ,
+    NOUN,
+    NUM,
+    PREP,
+    PRON,
+    PRT,
+    PUNC,
+    PUNCTUATION,
+    PUNCTUATION_REGEX,
+    RE_ABBR1,
+    RE_ABBR2,
+    RE_ABBR3,
+    RE_EMOTICONS,
+    RE_SARCASM,
+    REPLACEMENTS,
+    TOKEN,
+    VERB,
+    X,
+)
 from mitools.nlp.tokenizers import SentenceTokenizer, WordTokenizer
 from mitools.nlp.typing import BaseString, PennTag, WordNetTag
-
-PUNCTUATION_REGEX = re.compile(f"[{re.escape(string.punctuation)}]")
-SLASH, WORD, POS, CHUNK, PNP, REL, ANCHOR, LEMMA = (
-    "&slash;",
-    "word",
-    "part-of-speech",
-    "chunk",
-    "preposition",
-    "relation",
-    "anchor",
-    "lemma",
-)
-UNIVERSAL = "universal"
-NOUN, VERB, ADJ, ADV, PRON, DET, PREP, ADP, NUM, CONJ, INTJ, PRT, PUNC, X = (
-    "NN",
-    "VB",
-    "JJ",
-    "RB",
-    "PR",
-    "DT",
-    "PP",
-    "PP",
-    "NO",
-    "CJ",
-    "UH",
-    "PT",
-    ".",
-    "X",
-)
-TOKEN = re.compile(r"(\S+)\s")
-PUNCTUATION = punctuation = ".,;:!?()[]{}`''\"@#$^&*+-|=~_"
-ABBREVIATIONS = abbreviations = set(
-    (
-        "a.",
-        "adj.",
-        "adv.",
-        "al.",
-        "a.m.",
-        "c.",
-        "cf.",
-        "comp.",
-        "conf.",
-        "def.",
-        "ed.",
-        "e.g.",
-        "esp.",
-        "etc.",
-        "ex.",
-        "f.",
-        "fig.",
-        "gen.",
-        "id.",
-        "i.e.",
-        "int.",
-        "l.",
-        "m.",
-        "Med.",
-        "Mil.",
-        "Mr.",
-        "n.",
-        "n.q.",
-        "orig.",
-        "pl.",
-        "pred.",
-        "pres.",
-        "p.m.",
-        "ref.",
-        "v.",
-        "vs.",
-        "w/",
-    )
-)
-RE_ABBR1 = re.compile(r"^[A-Za-z]\.$")  # single letter, "T. De Smedt"
-RE_ABBR2 = re.compile(r"^([A-Za-z]\.)+$")  # alternating letters, "U.S."
-RE_ABBR3 = re.compile(
-    "^[A-Z]["
-    + "|".join(  # capital followed by consonants, "Mr."
-        "bcdfghjklmnpqrstvwxz"
-    )
-    + "]+.$"
-)
-EMOTICONS = {  # (facial expression, sentiment)-keys
-    ("love", +1.00): set(("<3", "♥")),
-    ("grin", +1.00): set(
-        (">:D", ":-D", ":D", "=-D", "=D", "X-D", "x-D", "XD", "xD", "8-D")
-    ),
-    ("taunt", +0.75): set(
-        (">:P", ":-P", ":P", ":-p", ":p", ":-b", ":b", ":c)", ":o)", ":^)")
-    ),
-    ("smile", +0.50): set(
-        (">:)", ":-)", ":)", "=)", "=]", ":]", ":}", ":>", ":3", "8)", "8-)")
-    ),
-    ("wink", +0.25): set((">;]", ";-)", ";)", ";-]", ";]", ";D", ";^)", "*-)", "*)")),
-    ("gasp", +0.05): set((">:o", ":-O", ":O", ":o", ":-o", "o_O", "o.O", "°O°", "°o°")),
-    ("worry", -0.25): set(
-        (">:/", ":-/", ":/", ":\\", ">:\\", ":-.", ":-s", ":s", ":S", ":-S", ">.>")
-    ),
-    ("frown", -0.75): set(
-        (">:[", ":-(", ":(", "=(", ":-[", ":[", ":{", ":-<", ":c", ":-c", "=/")
-    ),
-    ("cry", -1.00): set((":'(", ":'''(", ";'(")),
-}
-RE_EMOTICONS = [
-    r" ?".join([re.escape(each) for each in e]) for v in EMOTICONS.values() for e in v
-]
-RE_EMOTICONS = re.compile(r"(%s)($|\s)" % "|".join(RE_EMOTICONS))
-RE_SARCASM = re.compile(r"\( ?\! ?\)")
-REPLACEMENTS = {
-    "'d": " 'd",
-    "'m": " 'm",
-    "'s": " 's",
-    "'ll": " 'll",
-    "'re": " 're",
-    "'ve": " 've",
-    "n't": " n't",
-}
-EOS = "END-OF-SENTENCE"
+from mitools.utils.helper_objects import LazyDict, LazyList
 
 
 def singularize(word: Union[str, Word]) -> Word:
@@ -325,7 +237,9 @@ def is_numeric(value: BaseString) -> bool:
     return True
 
 
-def penntreebank_to_universal(token, tag):
+def penntreebank_to_universal(
+    token: BaseString, tag: PennTag
+) -> Tuple[BaseString, WordNetTag]:
     if tag.startswith(("NNP-", "NNPS-")):
         return (token, "{}-{}".format(NOUN, tag.split("-")[-1]))
     if tag in ("NN", "NNS", "NNP", "NNPS", "NP"):
@@ -461,3 +375,186 @@ def find_tokens(
         for sentence in sentence_strings
     ]
     return sentence_strings
+
+
+def read(path: Path, encoding="utf-8", comment=";;;"):
+    if path:
+        if isinstance(path, BaseString) and path.exists():
+            f = open(path, encoding=encoding)
+        elif isinstance(path, BaseString):
+            f = path.splitlines()
+        elif hasattr(path, "read"):
+            f = path.read().splitlines()
+        else:
+            f = path
+        for i, line in enumerate(f):
+            line = (
+                line.strip(codecs.BOM_UTF8)
+                if i == 0 and isinstance(line, bytes)
+                else line
+            )
+            line = line.strip()
+            line = decode_string(line, encoding=encoding)
+            if not line or (comment and line.startswith(comment)):
+                continue
+            yield line
+    return
+
+
+class Lexicon(LazyDict):
+    def __init__(
+        self,
+        path: Path = Path(""),
+        morphology: Path = None,
+        context: Path = None,
+        entities: Path = None,
+        NNP: str = "NNP",
+        language: str = None,
+    ):
+        self._path = path
+        self._language = language
+        self.morphology = Morphology(self, path=morphology)
+        self.context = Context(self, path=context)
+        self.entities = Entities(self, path=entities, tag=NNP)
+
+    def load(self):
+        dict.update(self, (x.split(" ")[:2] for x in read(self._path) if x.strip()))
+
+    @property
+    def path(self):
+        return self._path
+
+    @property
+    def language(self):
+        return self._language
+
+
+class Rules:
+    def __init__(
+        self,
+        lexicon: Union[Dict[str, str], None] = None,
+        morph_operations: Union[Dict[str, str], None] = None,
+    ):
+        if morph_operations is None:
+            morph_operations = {}
+        if lexicon is None:
+            lexicon = {}
+        self.lexicon, self.morp_operations = lexicon, morph_operations
+
+    def apply(self, x):
+        return x
+
+
+class Morphology(LazyList, Rules):
+    def __init__(
+        self, lexicon: Union[Dict[str, str], None] = None, path: Path = Path("")
+    ):
+        if lexicon is None:
+            lexicon = {}
+        morph_operations = (
+            "char",  # Word contains x.
+            "haspref",  # Word starts with x.
+            "hassuf",  # Word end with x.
+            "addpref",  # x + word is in lexicon.
+            "addsuf",  # Word + x is in lexicon.
+            "deletepref",  # Word without x at the start is in lexicon.
+            "deletesuf",  # Word without x at the end is in lexicon.
+            "goodleft",  # Word preceded by word x.
+            "goodright",  # Word followed by word x.
+        )
+        morph_operations = dict.fromkeys(morph_operations, True)
+        morph_operations.update(
+            ("f" + operation, apply)
+            for operation, apply in list(morph_operations.items())
+        )
+        Rules.__init__(self, lexicon, morph_operations)
+        self._path = path
+
+    @property
+    def path(self):
+        return self._path
+
+    def load(self):
+        list.extend(self, (x.split() for x in read(self._path)))
+
+    def apply(
+        self,
+        token: Tuple[str, str],
+        previous: Tuple[str, str] = (None, None),
+        next: Tuple[str, str] = (None, None),
+    ):
+        word = token[0]
+        for rule in self:
+            if rule[1] in self.morp_operations:  # Rule = ly hassuf 2 RB x
+                is_forward_rule = bool(0)
+                affix = rule[0]
+                target_pos = rule[-2]
+                morph_operation = rule[1].lower()
+            if rule[2] in self.morp_operations:  # Rule = NN s fhassuf 1 NNS x
+                is_forward_rule = bool(1)
+                affix = rule[1]
+                target_pos = rule[-2]
+                morph_operation = rule[2].lower().lstrip("f")
+            if is_forward_rule and token[1] != rule[0]:
+                continue
+            if (
+                (morph_operation == "char" and affix in word)
+                or (morph_operation == "haspref" and word.startswith(affix))
+                or (morph_operation == "hassuf" and word.endswith(affix))
+                or (morph_operation == "addpref" and affix + word in self.lexicon)
+                or (morph_operation == "addsuf" and word + affix in self.lexicon)
+                or (
+                    morph_operation == "deletepref"
+                    and word.startswith(affix)
+                    and word[len(affix) :] in self.lexicon
+                )
+                or (
+                    morph_operation == "deletesuf"
+                    and word.endswith(affix)
+                    and word[: -len(affix)] in self.lexicon
+                )
+                or (morph_operation == "goodleft" and affix == next[0])
+                or (morph_operation == "goodright" and affix == previous[0])
+            ):
+                token[1] = target_pos
+        return token
+
+    def insert(
+        self,
+        position,
+        target_pos_tag,
+        affix_pattern,
+        morphological_operation="hassuf",
+        source_pos_tag=None,
+    ):
+        if affix_pattern.startswith("-") and affix_pattern.endswith("-"):
+            affix_pattern, morphological_operation = affix_pattern[1:-1], "char"
+        if affix_pattern.startswith("-"):
+            affix_pattern, morphological_operation = affix_pattern[1:], "hassuf"
+        if affix_pattern.endswith("-"):
+            affix_pattern, morphological_operation = affix_pattern[:-1], "haspref"
+        if source_pos_tag:
+            rule = [
+                source_pos_tag,
+                affix_pattern,
+                "f" + morphological_operation.lstrip("f"),
+                target_pos_tag,
+                "x",
+            ]
+        else:
+            rule = [
+                affix_pattern,
+                morphological_operation.lstrip("f"),
+                target_pos_tag,
+                "x",
+            ]
+        LazyList.insert(self, position, rule)
+
+    def append(self, *args, **kwargs):
+        self.insert(len(self) - 1, *args, **kwargs)
+
+    def extend(self, rules: Iterable[Tuple[str]] = None):
+        if rules is None:
+            rules = []
+        for rule in rules:
+            self.append(*rule)
