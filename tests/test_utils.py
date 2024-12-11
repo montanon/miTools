@@ -19,9 +19,12 @@ from treelib import Tree
 from mitools.exceptions import ArgumentTypeError, ArgumentValueError
 from mitools.utils import (
     BitArray,
+    LazyDict,
+    LazyList,
     add_significance,
     auto_adjust_sheet_columns_width,
     build_dir_tree,
+    cached_property,
     can_convert_to,
     check_symmetrical_matrix,
     clean_str,
@@ -52,6 +55,441 @@ from mitools.utils import (
     write_json_file,
     write_text_file,
 )
+
+
+class TestLazyList(TestCase):
+    def setUp(self):
+        class TestableLazyList(LazyList):
+            def __init__(self):
+                super().__init__()
+                self.load_called = False
+
+            def load(self):
+                self.load_called = True
+                list.extend(self, [1, 2, 3])
+
+        self.TestableLazyList = TestableLazyList
+
+    def test_no_load_before_usage(self):
+        d = self.TestableLazyList()
+        self.assertFalse(d.load_called)
+        repr_str = repr(d)
+        self.assertTrue(d.load_called)
+        self.assertIn("1", repr_str)
+        self.assertEqual(len(d), 3)
+
+    def test_len_triggers_load(self):
+        d = self.TestableLazyList()
+        self.assertFalse(d.load_called)
+        length = len(d)
+        self.assertTrue(d.load_called)
+        self.assertEqual(length, 3)
+
+    def test_iter_triggers_load(self):
+        d = self.TestableLazyList()
+        self.assertFalse(d.load_called)
+        items = list(d)  # Should trigger load
+        self.assertTrue(d.load_called)
+        self.assertEqual(items, [1, 2, 3])
+
+    def test_contains_triggers_load(self):
+        d = self.TestableLazyList()
+        self.assertFalse(d.load_called)
+        self.assertIn(1, d)  # Should trigger load
+        self.assertTrue(d.load_called)
+
+    def test_insert_triggers_load(self):
+        d = self.TestableLazyList()
+        self.assertFalse(d.load_called)
+        d.insert(0, 0)  # Should trigger load
+        self.assertTrue(d.load_called)
+        self.assertEqual(d[0], 0)
+        self.assertEqual(d[1], 1)
+
+    def test_append_triggers_load(self):
+        d = self.TestableLazyList()
+        self.assertFalse(d.load_called)
+        d.append(4)  # Should trigger load
+        self.assertTrue(d.load_called)
+        self.assertEqual(d[-1], 4)
+        self.assertEqual(d[0], 1)
+
+    def test_extend_triggers_load(self):
+        d = self.TestableLazyList()
+        self.assertFalse(d.load_called)
+        d.extend([4, 5])  # Should trigger load
+        self.assertTrue(d.load_called)
+        self.assertEqual(d[-2:], [4, 5])
+        self.assertEqual(d[:3], [1, 2, 3])
+
+    def test_remove_triggers_load(self):
+        d = self.TestableLazyList()
+        self.assertFalse(d.load_called)
+        d.remove(2)  # Should trigger load and remove '2'
+        self.assertTrue(d.load_called)
+        self.assertNotIn(2, d)
+        self.assertEqual(d, [1, 3])
+
+    def test_remove_non_existent(self):
+        d = self.TestableLazyList()
+        _ = len(d)
+        with self.assertRaises(ValueError):
+            d.remove(99)
+
+    def test_pop_triggers_load(self):
+        d = self.TestableLazyList()
+        self.assertFalse(d.load_called)
+        val = d.pop()  # Should trigger load, default pop removes last
+        self.assertTrue(d.load_called)
+        self.assertEqual(val, 3)
+        self.assertEqual(d, [1, 2])
+
+    def test_pop_with_index(self):
+        d = self.TestableLazyList()
+        _ = len(d)
+        val = d.pop(0)
+        self.assertEqual(val, 1)
+        self.assertEqual(d, [2, 3])
+
+    def test_pop_non_existent(self):
+        d = self.TestableLazyList()
+        # Trigger load first
+        _ = len(d)
+        with self.assertRaises(IndexError):
+            d.pop(99)
+
+    def test_multiple_instances(self):
+        d1 = self.TestableLazyList()
+        d2 = self.TestableLazyList()
+        self.assertFalse(d1.load_called)
+        self.assertFalse(d2.load_called)
+        _ = len(d1)  # trigger load in d1
+        self.assertTrue(d1.load_called)
+        self.assertFalse(d2.load_called)
+        _ = len(d2)  # now trigger load in d2
+        self.assertTrue(d2.load_called)
+
+    def test_repr_after_load(self):
+        d = self.TestableLazyList()
+        _ = len(d)  # trigger load
+        rep = repr(d)
+        self.assertIn("1", rep)
+        self.assertIn("2", rep)
+        self.assertIn("3", rep)
+
+    def test_after_load_normal_list_behavior(self):
+        d = self.TestableLazyList()
+        _ = len(d)  # trigger load
+        d.append(10)
+        d.insert(0, 0)
+        d.remove(3)
+        val = d.pop()
+        self.assertEqual(val, 10)
+        self.assertEqual(d, [0, 1, 2])
+        items = list(d)
+        self.assertEqual(items, [0, 1, 2])
+
+    def test_subclass_behavior(self):
+        class CustomLoadLazyList(LazyList):
+            def load(self):
+                list.append(self, 100)
+
+        d = CustomLoadLazyList()
+        self.assertEqual(len(d), 1)
+        self.assertEqual(d[0], 100)
+
+    def test_contains_non_existent_after_load(self):
+        d = self.TestableLazyList()
+        _ = len(d)  # trigger load
+        self.assertNotIn(999, d)
+
+    def test_extend_merge_values(self):
+        d = self.TestableLazyList()
+        _ = len(d)  # trigger load
+        d.extend([4, 5, 6])
+        self.assertEqual(d, [1, 2, 3, 4, 5, 6])
+
+    def test_insert_positions(self):
+        d = self.TestableLazyList()
+        _ = len(d)  # trigger load
+        d.insert(0, 0)  # front
+        d.insert(2, "x")  # middle
+        d.insert(len(d), "end")  # at the end
+        self.assertEqual(d, [0, 1, "x", 2, 3, "end"])
+
+
+class TestLazyDict(TestCase):
+    def setUp(self):
+        class TestableLazyDict(LazyDict):
+            def __init__(self):
+                super().__init__()
+                self.load_called = False
+
+            def load(self):
+                self.load_called = True
+                dict_values = {"a": 1, "b": 2, "c": 3}
+                for key, value in dict_values.items():
+                    dict.__setitem__(self, key, value)
+
+        self.TestableLazyDict = TestableLazyDict
+
+    def test_no_load_before_usage(self):
+        d = self.TestableLazyDict()
+        self.assertFalse(d.load_called)
+        repr_str = repr(d)
+        self.assertTrue(d.load_called)
+        self.assertIn("a", repr_str)
+        self.assertEqual(len(d), 3)
+
+    def test_len_triggers_load(self):
+        d = self.TestableLazyDict()
+        self.assertFalse(d.load_called)
+        length = len(d)  # Should trigger load
+        self.assertTrue(d.load_called)
+        self.assertEqual(length, 3)
+
+    def test_iter_triggers_load(self):
+        d = self.TestableLazyDict()
+        self.assertFalse(d.load_called)
+        keys = list(d)  # Should trigger load
+        self.assertTrue(d.load_called)
+        self.assertCountEqual(keys, ["a", "b", "c"])
+
+    def test_contains_triggers_load(self):
+        d = self.TestableLazyDict()
+        self.assertFalse(d.load_called)
+        self.assertIn("a", d)  # Should trigger load
+        self.assertTrue(d.load_called)
+
+    def test_getitem_triggers_load(self):
+        d = self.TestableLazyDict()
+        self.assertFalse(d.load_called)
+        value = d["a"]  # Should trigger load
+        self.assertTrue(d.load_called)
+        self.assertEqual(value, 1)
+
+    def test_setitem_triggers_load(self):
+        d = self.TestableLazyDict()
+        self.assertFalse(d.load_called)
+        d["d"] = 4  # Should trigger load
+        self.assertTrue(d.load_called)
+        self.assertEqual(d["d"], 4)
+        self.assertEqual(d["a"], 1)
+
+    def test_get_triggers_load(self):
+        d = self.TestableLazyDict()
+        self.assertFalse(d.load_called)
+        val = d.get("a")  # Should trigger load
+        self.assertTrue(d.load_called)
+        self.assertEqual(val, 1)
+
+    def test_setdefault_triggers_load(self):
+        d = self.TestableLazyDict()
+        self.assertFalse(d.load_called)
+        d.setdefault("e", 5)  # Should trigger load
+        self.assertTrue(d.load_called)
+        self.assertEqual(d["e"], 5)
+        val = d.setdefault("a", 10)
+        self.assertEqual(val, 1)
+        self.assertEqual(d["a"], 1)
+
+    def test_items_triggers_load(self):
+        d = self.TestableLazyDict()
+        self.assertFalse(d.load_called)
+        it = d.items()  # Should trigger load
+        self.assertTrue(d.load_called)
+        self.assertCountEqual(it, [("a", 1), ("b", 2), ("c", 3)])
+
+    def test_keys_triggers_load(self):
+        d = self.TestableLazyDict()
+        self.assertFalse(d.load_called)
+        k = d.keys()  # Should trigger load
+        self.assertTrue(d.load_called)
+        self.assertCountEqual(k, ["a", "b", "c"])
+
+    def test_values_triggers_load(self):
+        d = self.TestableLazyDict()
+        self.assertFalse(d.load_called)
+        v = d.values()  # Should trigger load
+        self.assertTrue(d.load_called)
+        self.assertCountEqual(list(v), [1, 2, 3])
+
+    def test_update_triggers_load(self):
+        d = self.TestableLazyDict()
+        self.assertFalse(d.load_called)
+        d.update({"f": 6})  # Should trigger load
+        self.assertTrue(d.load_called)
+        self.assertEqual(d["f"], 6)
+        self.assertEqual(d["a"], 1)
+
+    def test_pop_triggers_load(self):
+        d = self.TestableLazyDict()
+        self.assertFalse(d.load_called)
+        val = d.pop("a", None)  # Should trigger load
+        self.assertTrue(d.load_called)
+        self.assertEqual(val, 1)
+        self.assertNotIn("a", d)
+
+    def test_popitem_triggers_load(self):
+        d = self.TestableLazyDict()
+        self.assertFalse(d.load_called)
+        key, val = d.popitem()  # Should trigger load
+        self.assertTrue(d.load_called)
+        self.assertIn(key, ["a", "b", "c"])
+        self.assertIn(val, [1, 2, 3])
+        self.assertNotIn(key, d)
+
+    def test_no_double_load(self):
+        d = self.TestableLazyDict()
+        self.assertFalse(d.load_called)
+        _ = d["a"]  # first trigger
+        self.assertTrue(d.load_called)
+        # Reset the flag to see if it's called again
+        d.load_called = False
+        _ = d["b"]  # access another key, should NOT reload
+        self.assertFalse(d.load_called)
+
+    def test_multiple_instances(self):
+        d1 = self.TestableLazyDict()
+        d2 = self.TestableLazyDict()
+        self.assertFalse(d1.load_called)
+        self.assertFalse(d2.load_called)
+        _ = d1["a"]
+        self.assertTrue(d1.load_called)
+        self.assertFalse(d2.load_called)
+        _ = d2["b"]
+        self.assertTrue(d2.load_called)
+
+    def test_non_existent_key_after_load(self):
+        d = self.TestableLazyDict()
+        _ = d["a"]  # trigger load
+        with self.assertRaises(KeyError):
+            _ = d["not_here"]
+        val = d.get("not_here")
+        self.assertIsNone(val)
+
+    def test_pop_non_existent_key(self):
+        d = self.TestableLazyDict()
+        _ = d["a"]  # trigger load
+        val = d.pop("not_here", "default")
+        self.assertEqual(val, "default")
+        with self.assertRaises(KeyError):
+            d.pop("still_not_here")
+
+    def test_repr_after_load(self):
+        d = self.TestableLazyDict()
+        _ = d["a"]  # trigger load
+        rep = repr(d)
+        self.assertIn("a", rep)
+        self.assertIn("b", rep)
+        self.assertIn("c", rep)
+
+    def test_update_merge_values(self):
+        d = self.TestableLazyDict()
+        _ = d["a"]  # trigger load
+        d.update({"a": 10, "x": 99})
+        self.assertEqual(d["a"], 10)
+        self.assertEqual(d["x"], 99)
+        self.assertEqual(d["b"], 2)
+
+    def test_setdefault_existing_key(self):
+        d = self.TestableLazyDict()
+        _ = d["a"]  # trigger load
+        original = d.setdefault("a", 999)
+        self.assertEqual(original, 1)
+        self.assertEqual(d["a"], 1)
+
+    def test_subclass_behavior(self):
+        class CustomLoadLazyDict(LazyDict):
+            def load(self):
+                dict.__setitem__(self, "z", 100)
+
+        d = CustomLoadLazyDict()
+        _ = d["z"]
+        self.assertEqual(d["z"], 100)
+
+    def test_load_once_then_normal_dict(self):
+        d = self.TestableLazyDict()
+        _ = d["a"]  # trigger load
+        d["g"] = 7
+        self.assertEqual(d["g"], 7)
+        val = d.pop("b")
+        self.assertEqual(val, 2)
+        self.assertNotIn("b", d)
+        keys = list(d.keys())
+        self.assertCountEqual(keys, ["a", "c", "g"])
+        items = list(d.items())
+        self.assertIn(("a", 1), items)
+        self.assertIn(("c", 3), items)
+        self.assertIn(("g", 7), items)
+
+
+class TestCachedProperty(TestCase):
+    def setUp(self):
+        class Sample:
+            def __init__(self, value):
+                self._value = value
+                self.compute_count = 0
+
+            @cached_property
+            def computed_property(self):
+                "Sample computed property."
+                self.compute_count += 1
+                return self._value * 2
+
+        self.Sample = Sample
+
+    def test_cached_property_basic(self):
+        obj = self.Sample(10)
+        self.assertEqual(obj.computed_property, 20)
+        self.assertEqual(obj.computed_property, 20)
+        self.assertEqual(obj.compute_count, 1)
+
+    def test_cached_property_caching(self):
+        obj = self.Sample(5)
+        first_access = obj.computed_property
+        second_access = obj.computed_property
+        self.assertEqual(first_access, 10)
+        self.assertEqual(second_access, 10)
+        self.assertEqual(obj.compute_count, 1)
+
+    def test_cached_property_mutability(self):
+        obj = self.Sample(3)
+        self.assertEqual(obj.computed_property, 6)
+        obj.__dict__["computed_property"] = 15
+        self.assertEqual(obj.computed_property, 15)
+        self.assertEqual(obj.compute_count, 1)
+
+    def test_cached_property_exceptions(self):
+        class ExceptionSample:
+            def __init__(self, raise_exception):
+                self.raise_exception = raise_exception
+
+            @cached_property
+            def error_property(self):
+                if self.raise_exception:
+                    raise ValueError("Intentional error")
+                return 42
+
+        obj = ExceptionSample(raise_exception=True)
+        with self.assertRaises(ValueError):
+            _ = obj.error_property
+        obj.raise_exception = False
+        self.assertEqual(obj.error_property, 42)
+
+    def test_cached_property_docstring(self):
+        obj = self.Sample(4)
+        self.assertEqual(
+            obj.__class__.computed_property.__doc__, "Sample computed property."
+        )
+
+    def test_cached_property_separate_instances(self):
+        obj1 = self.Sample(7)
+        obj2 = self.Sample(8)
+        self.assertEqual(obj1.computed_property, 14)
+        self.assertEqual(obj2.computed_property, 16)
+        self.assertEqual(obj1.compute_count, 1)
+        self.assertEqual(obj2.compute_count, 1)
 
 
 class TestIterableChunks(TestCase):

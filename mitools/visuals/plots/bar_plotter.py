@@ -40,6 +40,7 @@ class BarPlotter(Plotter):
         x_data: Union[NumericSequences, NumericSequence],
         y_data: Union[NumericSequences, NumericSequence],
         kind: Literal["bar", "stacked"] = "bar",
+        ax: Axes = None,
         **kwargs,
     ):
         self._bar_params = {
@@ -101,12 +102,10 @@ class BarPlotter(Plotter):
                 "type": Union[LiteralSequence, Literal["linestyles"]],
             },
         }
-        super().__init__(x_data, y_data, **kwargs)
+        super().__init__(x_data, y_data, ax=ax, **kwargs)
         self._init_params.update(self._bar_params)
         self._set_init_params(**kwargs)
         self._kind = kind
-        self.figure: Figure = None
-        self.ax: Axes = None
 
     @property
     def kind(self):
@@ -234,3 +233,4 @@ class BarPlotter(Plotter):
                     bottom_reference += self.y_data[n_sequence]
             except Exception as e:
                 raise BarPlotterException(f"Error while creating bar plot: {e}")
+        return self.ax

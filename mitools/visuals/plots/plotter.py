@@ -34,7 +34,6 @@ from mitools.visuals.plots.validations import (
     is_numeric,
     is_numeric_sequence,
     is_numeric_sequences,
-    is_sequence,
     is_str_sequence,
     validate_consistent_len,
     validate_numeric_sequences,
@@ -55,6 +54,7 @@ class Plotter(Setter, ABC):
         self,
         x_data: Union[NumericSequence, NumericSequences],
         y_data: Union[NumericSequence, NumericSequences, None],
+        ax: Axes = None,
         **kwargs,
     ):
         self.x_data = self._validate_data(x_data, "x_data")
@@ -122,8 +122,8 @@ class Plotter(Setter, ABC):
             **self._multi_data_params,
         }
         self._set_init_params(**kwargs)
-        self.figure: Figure = None
-        self.ax: Axes = None
+        self.ax: Axes = ax if ax is not None else None
+        self.figure: Figure = None if self.ax is None else self.ax.figure
 
     def _set_init_params(self, **kwargs):
         for param, config in self._init_params.items():
@@ -530,13 +530,13 @@ class Plotter(Setter, ABC):
     def set_zorder(self, zorder: Union[NumericSequences, NumericSequence, NumericType]):
         return self.set_numeric_sequences(zorder, param_name="zorder")
 
-    def prepare_draw(self):
-        if self.figure is not None or self.ax is not None:
+    def prepare_draw(self, clear: bool = False):
+        if clear:
             self.clear()
         if self.style is not None:
             self._default_style = plt.rcParams.copy()
             plt.style.use(self.style)
-        if not self.ax and not self.figure:
+        if not self.ax:
             self.figure, self.ax = plt.subplots(figsize=self.figsize)
         if self.grid is not None and self.grid["visible"]:
             self.ax.grid(**self.grid)
@@ -608,11 +608,11 @@ class Plotter(Setter, ABC):
                             elif param == "capstyle":
                                 self.ax.spines[spine].set_capstyle(values)
 
-    def _finalize_draw(self, show: bool = True):
+    def _finalize_draw(self, show: bool = False):
         if self.tight_layout:
             plt.tight_layout()
         if show:
-            plt.show()
+            self.figure.show()
         if self.style is not None:
             plt.rcParams.update(self._default_style)
         return self.ax
@@ -631,8 +631,8 @@ class Plotter(Setter, ABC):
     def _create_plot(self):
         raise NotImplementedError
 
-    def draw(self, show: bool = True):
-        self.prepare_draw()
+    def draw(self, show: bool = False, clear: bool = False):
+        self.prepare_draw(clear=clear)
         try:
             self._create_plot()
         except Exception as e:

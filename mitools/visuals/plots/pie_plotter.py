@@ -36,6 +36,7 @@ class PiePlotter(Plotter):
         self,
         x_data: Union[NumericSequences, NumericSequence],
         y_data: Union[NumericSequences, NumericSequence, None] = None,
+        ax: Axes = None,
         **kwargs,
     ):
         self._pie_params = {
@@ -78,13 +79,11 @@ class PiePlotter(Plotter):
             "rotatelabels": {"default": False, "type": Union[BoolSequence, bool]},
             "normalize": {"default": True, "type": Union[BoolSequence, bool]},
         }
-        super().__init__(x_data=x_data, y_data=None, **kwargs)
+        super().__init__(x_data=x_data, y_data=None, ax=ax, **kwargs)
         self._init_params.update(self._pie_params)
         self._set_init_params(**kwargs)
         if y_data is not None:
             self.set_center(y_data)
-        self.figure: Figure = None
-        self.ax: Axes = None
 
     def set_frame(self, frame: bool):
         if isinstance(frame, bool):

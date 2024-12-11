@@ -45,6 +45,7 @@ class BoxPlotter(Plotter):
         self,
         x_data: Union[NumericSequences, NumericSequence],
         y_data: Union[NumericSequences, NumericSequence, None] = None,
+        ax: Axes = None,
         **kwargs,
     ):
         self._box_params = {
@@ -97,15 +98,13 @@ class BoxPlotter(Plotter):
             "medianprops": {"default": None, "type": Union[DictSequence, Dict]},
             "meanprops": {"default": None, "type": Union[DictSequence, Dict]},
         }
-        super().__init__(x_data=x_data, y_data=None, **kwargs)
+        super().__init__(x_data=x_data, y_data=None, ax=ax, **kwargs)
         self._init_params.update(self._box_params)
         self._data_size = len(self.x_data)
         self._set_init_params(**kwargs)
         self.set_positions(
             y_data if y_data is not None else list(range(1, self.n_sequences + 1))
         )
-        self.figure: Figure = None
-        self.ax: Axes = None
 
     def set_bootstrap(self, bootstrap: Union[NumericType, None]):
         validate_type(bootstrap, (*NUMERIC_TYPES, type(None)), "bootstrap")

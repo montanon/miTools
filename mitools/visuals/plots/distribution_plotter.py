@@ -16,6 +16,7 @@ from mitools.visuals.plots.matplotlib_typing import (
     KERNELS,
     LINESTYLES,
     ORIENTATIONS,
+    BoolSequence,
     Color,
     ColorSequence,
     LiteralSequence,
@@ -41,9 +42,10 @@ class DistributionPlotter(Plotter):
         self,
         x_data: Union[NumericSequences, NumericSequence],
         y_data: None = None,
+        ax: Axes = None,
         **kwargs,
     ):
-        super().__init__(x_data=x_data, y_data=None, **kwargs)
+        super().__init__(x_data=x_data, y_data=None, ax=ax, **kwargs)
         self._dist_params = {
             # General Axes.scatter Parameters that are independent of the number of data sequences
             "kernel": {"default": "gaussian", "type": Literal["kernels"]},
@@ -58,7 +60,7 @@ class DistributionPlotter(Plotter):
                 "type": Literal["horizontal", "vertical"],
             },
             # Specific Parameters that are based on the number of data sequences
-            "fill": {"default": True, "type": Union[Sequence[bool], bool]},
+            "fill": {"default": True, "type": Union[BoolSequence, bool]},
             "linestyle": {
                 "default": "-",
                 "type": Union[LiteralSequence, Literal["linestyles"]],
@@ -78,8 +80,6 @@ class DistributionPlotter(Plotter):
         }
         self._init_params.update(self._dist_params)
         self._set_init_params(**kwargs)
-        self.figure: Figure = None
-        self.ax: Axes = None
 
     def set_kernel(self, kernel: str):
         validate_literal(kernel, KERNELS)
@@ -112,7 +112,7 @@ class DistributionPlotter(Plotter):
         self.orientation = orientation
         return self
 
-    def set_fill(self, fill: Union[Sequence[bool], bool]):
+    def set_fill(self, fill: Union[BoolSequence, bool]):
         return self.set_bool_sequence(fill, "fill")
 
     def set_linestyle(
