@@ -118,7 +118,7 @@ def sentence_tokenize(
 
 def get_words_from_corpus(corpus: Iterable[BaseString]) -> Set[BaseString]:
     def tokenize(words):
-        if isinstance(words, BaseString):
+        if isinstance(words, (str, bytes)):
             return word_tokenize(words, include_punctuation=False)
         return words
 
@@ -127,7 +127,7 @@ def get_words_from_corpus(corpus: Iterable[BaseString]) -> Set[BaseString]:
 
 
 def get_corpus_tokens(corpus: Iterable[BaseString]) -> Set[BaseString]:
-    if isinstance(corpus, BaseString):
+    if isinstance(corpus, (str, bytes)):
         tokens = set(
             strip_punctuation(word, all=False)
             for word in word_tokenize(corpus, include_punctuation=False)
@@ -144,11 +144,11 @@ def basic_extractor(
         zero_item = next(iter(train_set))
     except StopIteration:
         return {}
-    if isinstance(zero_item, BaseString):
+    if isinstance(zero_item, (str, bytes)):
         word_features = [word for word in chain([zero_item], train_set)]
     else:
         try:
-            assert isinstance(zero_item[0], BaseString)
+            assert isinstance(zero_item[0], (str, bytes))
             word_features = get_words_from_corpus(chain([zero_item], train_set))
         except Exception as error:
             raise ArgumentStructureError("train_set is probably malformed.") from error
@@ -232,7 +232,7 @@ def default_feature_extractor(words: Iterable[str]) -> Dict[str, bool]:
 
 
 def decode_string(value: BaseString, encoding: str = "utf-8") -> str:
-    if isinstance(encoding, BaseString):
+    if isinstance(encoding, (str, bytes)):
         encoding = ((encoding,),) + (("windows-1252",), ("utf-8", "ignore"))
     if isinstance(value, bytes):
         for e in encoding:
@@ -245,7 +245,7 @@ def decode_string(value: BaseString, encoding: str = "utf-8") -> str:
 
 
 def encode_string(value: BaseString, encoding: str = "utf-8") -> BaseString:
-    if isinstance(encoding, BaseString):
+    if isinstance(encoding, (str, bytes)):
         encoding = ((encoding,),) + (("windows-1252",), ("utf-8", "ignore"))
     if isinstance(value, str):
         for e in encoding:
@@ -407,9 +407,9 @@ def find_tokens(
 
 def read(path: Path, encoding="utf-8", comment=";;;"):
     if path:
-        if isinstance(path, BaseString) and path.exists():
+        if isinstance(path, (str, bytes)) and Path(path).exists():
             f = open(path, encoding=encoding)
-        elif isinstance(path, BaseString):
+        elif isinstance(path, (str, bytes)):
             f = path.splitlines()
         elif hasattr(path, "read"):
             f = path.read().splitlines()
@@ -1192,20 +1192,22 @@ class Parser:
         # "The cat purs." => ["The cat purs ."]
         return find_tokens(
             str(string),
-            punctuation=kwargs.get("punctuation", PUNCTUATION),
-            abbreviations=kwargs.get("abbreviations", ABBREVIATIONS),
-            replace=kwargs.get("replace", REPLACEMENTS),
-            linebreak=r"\n{2,}",
+            punctuation_chars=kwargs.get("punctuation_chars", PUNCTUATION),
+            known_abbreviations=kwargs.get("known_abbreviations", ABBREVIATIONS),
+            contraction_replacements=kwargs.get(
+                "contraction_replacements", REPLACEMENTS
+            ),
+            paragraph_break=r"\n{2,}",
         )
 
     def find_tags(self, tokens: Sequence[BaseString], **kwargs):
         # ["The", "cat", "purs"] => [["The", "DT"], ["cat", "NN"], ["purs", "VB"]]
         return find_tags(
-            tokens,
-            language=kwargs.get("language", self.language),
+            word_tokens=tokens,
+            language_code=kwargs.get("language_code", self.language),
             lexicon=kwargs.get("lexicon", self.lexicon),
-            default=kwargs.get("default", self.default),
-            map=kwargs.get("map", None),
+            default_tags=kwargs.get("default_tags", self.default),
+            tag_mapper=kwargs.get("tag_mapper", None),
         )
 
     def find_chunks(self, tokens: Sequence[BaseString], **kwargs):
@@ -1240,10 +1242,10 @@ class Parser:
             text = self.find_tokens(text, **kwargs)
         if isinstance(text, (list, tuple)):
             text = [
-                isinstance(text, BaseString) and text.split(" ") or text
+                isinstance(text, (str, bytes)) and text.split(" ") or text
                 for text in text
             ]
-        if isinstance(text, BaseString):
+        if isinstance(text, (str, bytes)):
             text = [text.split(" ") for text in text.split("\n")]
         # Unicode.
         for sentence_idx in range(len(text)):
@@ -1446,7 +1448,7 @@ class Sentiment(LazyDict):
                 + (None,)
             ]
         elif (
-            isinstance(input_text, BaseString)
+            isinstance(input_text, (str, bytes))
             and RE_SYNSET.match(input_text)
             and hasattr(input_text, "synonyms")
         ):
@@ -1455,7 +1457,7 @@ class Sentiment(LazyDict):
                 + self.synset(input_text.id, pos=input_text.pos)
                 + (None,)
             ]
-        elif isinstance(input_text, BaseString):
+        elif isinstance(input_text, (str, bytes)):
             assessments = self.assessments(
                 (
                     (word.lower(), None)

@@ -16,8 +16,6 @@ from mitools.nlp.tokenizers import (
     WordTokenizer,
 )
 
-nltk.download("punkt")
-
 
 class TestBaseTokenizer(TestCase):
     class MockTokenizer(BaseTokenizer):
