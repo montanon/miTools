@@ -68,3 +68,8 @@ class RegexpTokenizer(BaseTokenizer):
             discard_empty=self.discard_empty,
             flags=self.flags,
         ).tokenize(text)
+
+
+class WhiteSpaceTokenizer(TokenizerI):
+    def tokenize(self, text: BaseString) -> Sequence[BaseString]:
+        return nltk.tokenize.WhitespaceTokenizer().tokenize(text)
