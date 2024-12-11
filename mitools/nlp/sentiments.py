@@ -1,4 +1,4 @@
-from abc import ABCMeta, abstractmethod
+from abc import ABC, abstractmethod
 from collections import namedtuple
 from typing import Callable, Dict, Literal, Tuple, Union
 
@@ -9,7 +9,7 @@ from mitools.nlp.nlp_typing import BaseString, SentimentType
 from mitools.nlp.utils import default_feature_extractor, word_tokenize
 
 
-class BaseSentimentAnalyzer(ABCMeta):
+class BaseSentimentAnalyzer(ABC):
     def __init__(self, kind: Literal["ds", "co"] = "ds"):
         self.kind = kind
         self._trained = False
