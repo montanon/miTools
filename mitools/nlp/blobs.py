@@ -264,7 +264,7 @@ class BaseBlob(StringlikeMixin, BlobComparableMixin):
         else:
             return [
                 (Word(str(word), pos_tag=t), str(t))
-                for word, t in self.pos_tagger.tag(self)
+                for word, t in self.pos_tagger.tag_tokens(self)
                 if not PUNCTUATION_REGEX.match(str(t))
             ]
 

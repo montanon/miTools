@@ -55,7 +55,7 @@ class ConllExtractor(BaseNPExtractor):
         return noun_phrases
 
     def _parse_sentence(self, sentence: BaseString) -> Sequence[Tree]:
-        tagged = self.tagger.tag(sentence)
+        tagged = self.tagger.tag_tokens(sentence)
         return self.parser.parse(tagged)
 
 
