@@ -1,4 +1,4 @@
-from abc import ABCMeta, abstractmethod
+from abc import ABC, abstractmethod
 from typing import Sequence, Tuple
 
 import nltk
@@ -8,7 +8,7 @@ from mitools.nlp.nlp_typing import BaseString
 from mitools.nlp.tokenizers import BaseTokenizer, WordTokenizer
 
 
-class BaseTagger(ABCMeta):
+class BaseTagger(ABC):
     @abstractmethod
     def tag(self, text: BaseString, tokenize: bool = True) -> Sequence[Tuple[str, str]]:
         pass
