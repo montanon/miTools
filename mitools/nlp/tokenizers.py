@@ -1,3 +1,4 @@
+import re
 from abc import ABCMeta, abstractmethod
 from typing import Iterator, List, Sequence, Tuple
 
@@ -45,3 +46,25 @@ class WordTokenizer(BaseTokenizer):
 class SentenceTokenizer(BaseTokenizer):
     def tokenize(self, text: BaseString) -> Sequence[BaseString]:
         return nltk.tokenize.sent_tokenize(text)
+
+
+class RegexpTokenizer(BaseTokenizer):
+    def __init__(
+        self,
+        pattern: str,
+        gaps: bool = False,
+        discard_empty: bool = True,
+        flags: int = re.UNICODE | re.MULTILINE | re.DOTALL,
+    ):
+        self.pattern = pattern
+        self.gaps = gaps
+        self.discard_empty = discard_empty
+        self.flags = flags
+
+    def tokenize(self, text: BaseString) -> Sequence[BaseString]:
+        return nltk.tokenize.RegexpTokenizer(
+            pattern=self.pattern,
+            gaps=self.gaps,
+            discard_empty=self.discard_empty,
+            flags=self.flags,
+        ).tokenize(text)
