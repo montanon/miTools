@@ -22,6 +22,16 @@ class PatternTagger(BaseTagger):
 
 
 class NLTKTagger(BaseTagger):
-    def tag(self, text: BaseString, tokenizer: BaseTokenizer = None):
+    _instance = None
+    _tagger = nltk.tag.pos_tag
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
+    def tag(
+        self, text: BaseString, tokenizer: BaseTokenizer = None
+    ) -> Sequence[Tuple[str, str]]:
         tokenizer = tokenizer if tokenizer is not None else WordTokenizer()
-        return nltk.tag.pos_tag(tokenizer.tokenize(text))
+        return self._tagger(tokenizer.tokenize(text))
