@@ -21,7 +21,6 @@ from mitools.nlp.sentiments import BaseSentimentAnalyzer, PatternAnalyzer
 from mitools.nlp.taggers import BaseTagger, NLTKTagger
 from mitools.nlp.tokenizers import BaseTokenizer, WordTokenizer
 from mitools.nlp.utils import (
-    PUNCTUATION_REGEX,
     lowerstrip,
     penn_to_wordnet,
     sentence_tokenize,
@@ -29,6 +28,7 @@ from mitools.nlp.utils import (
     word_tokenize,
 )
 from mitools.utils.decorators import cached_property
+from mitools.utils.helper_functions import PUNCTUATION_REGEX
 
 
 def singularize(word: BaseString, language: Literal["en", "other"] = "en") -> Callable:
