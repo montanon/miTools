@@ -2,6 +2,7 @@ import itertools
 import json
 import pickle
 import re
+import string
 import sys
 from os import PathLike
 from pathlib import Path
@@ -43,6 +44,18 @@ COLOR_CODES = {
 }
 # Define a cycle of colors
 color_cycler = itertools.cycle(COLOR_CODES.keys() - {"reset"})
+
+
+PUNCTUATION_REGEX = re.compile(
+    "[" + "".join(re.escape(p) for p in string.punctuation) + "]"
+)
+
+
+def strip_punctuation(s: str, all: bool = False) -> str:
+    if all:
+        return PUNCTUATION_REGEX.sub("", s.strip())
+    else:
+        return s.strip().strip(string.punctuation)
 
 
 def iterable_chunks(

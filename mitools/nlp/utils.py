@@ -49,8 +49,8 @@ from mitools.nlp.definitions import (
 )
 from mitools.nlp.nlp_typing import BaseString, PennTag, PosTag, WordNetTag
 from mitools.nlp.objects import TaggedString
-from mitools.nlp.string_utils import strip_punctuation
 from mitools.nlp.tokenizers import SentenceTokenizer, WordTokenizer
+from mitools.utils.helper_functions import strip_punctuation
 from mitools.utils.helper_objects import LazyDict, LazyList
 
 
@@ -72,13 +72,6 @@ def penn_to_wordnet(penn_tag: PennTag) -> WordNetTag:
 
 def lowerstrip(s: str, all: bool = False) -> str:
     return strip_punctuation(s.lower().strip(), all=all)
-
-
-def strip_punctuation(s: str, all: bool = False) -> str:
-    if all:
-        return PUNCTUATION_REGEX.sub("", s.strip())
-    else:
-        return s.strip().strip(string.punctuation)
 
 
 def word_tokenize(

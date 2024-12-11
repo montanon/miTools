@@ -6,7 +6,7 @@ import nltk
 from nltk.tokenize.api import TokenizerI
 
 from mitools.nlp.nlp_typing import BaseString
-from mitools.nlp.string_utils import strip_punctuation
+from mitools.utils.helper_functions import strip_punctuation
 
 
 class BaseTokenizer(TokenizerI, metaclass=ABCMeta):
