@@ -5,8 +5,8 @@ from typing import Iterator, List, Sequence, Tuple
 import nltk
 from nltk.tokenize.api import TokenizerI
 
+from mitools.nlp.nlp_typing import BaseString
 from mitools.nlp.string_utils import strip_punctuation
-from mitools.nlp.typing import BaseString
 
 
 class BaseTokenizer(TokenizerI, metaclass=ABCMeta):
@@ -136,3 +136,6 @@ class BlanklineTokenizer(BaseTokenizer):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
+
+    def tokenize(self, text: BaseString) -> Sequence[BaseString]:
+        return self._tokenizer.tokenize(text)
