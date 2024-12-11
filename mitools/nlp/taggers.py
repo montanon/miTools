@@ -4,21 +4,19 @@ from typing import Sequence, Tuple
 import nltk
 
 from mitools.nlp.en import tag as pattern_tag
-from mitools.nlp.nlp_typing import BaseString
+from mitools.nlp.nlp_typing import BaseString, PosTag
 from mitools.nlp.tokenizers import BaseTokenizer, WordTokenizer
 
 
 class BaseTagger(ABC):
     @abstractmethod
-    def tag(self, text: BaseString, tokenize: bool = True) -> Sequence[Tuple[str, str]]:
+    def tag(self, tokens: Sequence[BaseString]) -> Sequence[Tuple[BaseString, PosTag]]:
         pass
 
 
 class PatternTagger(BaseTagger):
-    def tag(self, text: BaseString, tokenize: bool = True) -> str:
-        if not isinstance(text, str):
-            text = text.raw
-        return pattern_tag(text, tokenize=tokenize)
+    def tag(self, tokens: Sequence[BaseString]) -> Sequence[Tuple[BaseString, PosTag]]:
+        return pattern_tag(tokens)
 
 
 class NLTKTagger(BaseTagger):
@@ -30,8 +28,5 @@ class NLTKTagger(BaseTagger):
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def tag(
-        self, text: BaseString, tokenizer: BaseTokenizer = None
-    ) -> Sequence[Tuple[str, str]]:
-        tokenizer = tokenizer if tokenizer is not None else WordTokenizer()
-        return self._tagger(tokenizer.tokenize(text))
+    def tag(self, tokens: Sequence[BaseString]) -> Sequence[Tuple[BaseString, PosTag]]:
+        return self._tagger(tokens)
