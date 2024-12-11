@@ -1,14 +1,11 @@
 from abc import ABCMeta, abstractmethod
-from typing import Callable, Optional, Sequence, Tuple, Union
+from typing import Iterator, Sequence, Tuple, Union
 
-import nltk
 from nltk.stem import PorterStemmer, WordNetLemmatizer
 from nltk.stem.api import StemmerI
 from nltk.stem.snowball import EnglishStemmer, SpanishStemmer
 
 from mitools.nlp.nlp_typing import BaseString, PosTag
-from mitools.nlp.taggers import BaseTagger, NLTKTagger
-from mitools.nlp.tokenizers import BaseTokenizer, WordTokenizer
 from mitools.nlp.utils import nltk_tag_to_wordnet_tag
 
 
@@ -26,6 +23,11 @@ class BaseLemmatizer(ABCMeta):
             else self.lemmatize(token)
             for token in tokens
         ]
+
+    def ilemmatize_tokens(
+        self, tokens: Union[Sequence[BaseString], Sequence[Tuple[BaseString, PosTag]]]
+    ) -> Iterator[BaseString]:
+        return (self.lemmatize(token[0], token[1]) for token in tokens)
 
 
 class WordnetLemmatizer(BaseLemmatizer):
@@ -66,6 +68,9 @@ class BaseStemmer(StemmerI, metaclass=ABCMeta):
 
     def stem_tokens(self, tokens: Sequence[BaseString]) -> Sequence[BaseString]:
         return [self.stem(token) for token in tokens]
+
+    def istem_tokens(self, tokens: Sequence[BaseString]) -> Iterator[BaseString]:
+        return (self.stem(token) for token in tokens)
 
 
 class PorterStemmer(BaseStemmer):
