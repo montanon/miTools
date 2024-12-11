@@ -1,5 +1,5 @@
 from abc import ABCMeta, abstractmethod
-from typing import Optional, Sequence, Tuple, Union
+from typing import Callable, Optional, Sequence, Tuple, Union
 
 import nltk
 from nltk.stem import PorterStemmer, WordNetLemmatizer
@@ -14,7 +14,7 @@ from mitools.nlp.utils import nltk_tag_to_wordnet_tag
 
 class BaseLemmatizer(ABCMeta):
     @abstractmethod
-    def lemmatize(self, text: BaseString, pos: PosTag = "n") -> Sequence[BaseString]:
+    def lemmatize(self, token: BaseString, pos: PosTag = "n") -> Sequence[BaseString]:
         pass
 
     def lemmatize_tokens(
@@ -27,15 +27,6 @@ class BaseLemmatizer(ABCMeta):
             for token in tokens
         ]
 
-    def lemmatize_text(
-        self, text: BaseString, tokenizer: BaseTokenizer = None
-    ) -> Sequence[BaseString]:
-        return (
-            self.lemmatize_tokens(text.split())
-            if tokenizer is None
-            else self.lemmatize_tokens(tokenizer.tokenize(text))
-        )
-
 
 class WordnetLemmatizer(BaseLemmatizer):
     _instance = None
@@ -46,8 +37,8 @@ class WordnetLemmatizer(BaseLemmatizer):
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def lemmatize(self, text: BaseString, pos: PosTag = "n") -> Sequence[BaseString]:
-        return self._lemmatizer.lemmatize(text, pos)
+    def lemmatize(self, token: BaseString, pos: PosTag = "n") -> Sequence[BaseString]:
+        return self._lemmatizer.lemmatize(token, pos)
 
 
 class NLTKLemmatizer(BaseLemmatizer):
@@ -60,36 +51,21 @@ class NLTKLemmatizer(BaseLemmatizer):
         return cls._instance
 
     def lemmatize(
-        self,
-        text: BaseString,
-        tokenizer: Optional[BaseTokenizer] = None,
-        tagger: Optional[BaseTagger] = None,
+        self, token: Union[BaseString, Tuple[BaseString, PosTag]]
     ) -> Sequence[str]:
-        tokenizer = tokenizer if tokenizer is not None else WordTokenizer()
-        tagger = tagger if tagger is not None else NLTKTagger()
-        tagged_tokens = tagger.tag(text, tokenizer=tokenizer)
-        return [
-            self._lemmatizer.lemmatize(word, pos=nltk_tag_to_wordnet_tag(tag))
-            for word, tag in tagged_tokens
-        ]
+        if isinstance(token, tuple):
+            word, tag = token
+            return self._lemmatizer.lemmatize(word, pos=nltk_tag_to_wordnet_tag(tag))
+        return self._lemmatizer.lemmatize(token)
 
 
 class BaseStemmer(StemmerI, metaclass=ABCMeta):
     @abstractmethod
-    def stem(self, text: BaseString) -> Sequence[BaseString]:
+    def stem(self, token: BaseString) -> Sequence[BaseString]:
         pass
 
     def stem_tokens(self, tokens: Sequence[BaseString]) -> Sequence[BaseString]:
         return [self.stem(token) for token in tokens]
-
-    def stem_text(
-        self, text: BaseString, tokenizer: BaseTokenizer = None
-    ) -> Sequence[BaseString]:
-        return (
-            self.stem_tokens(text.split())
-            if tokenizer is None
-            else self.stem_tokens(tokenizer.tokenize(text))
-        )
 
 
 class PorterStemmer(BaseStemmer):
@@ -101,8 +77,8 @@ class PorterStemmer(BaseStemmer):
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def stem(self, text: BaseString) -> Sequence[BaseString]:
-        return self._stemmer.stem(text)
+    def stem(self, token: BaseString) -> Sequence[BaseString]:
+        return self._stemmer.stem(token)
 
 
 class SpanishStemmer(BaseStemmer):
@@ -114,8 +90,8 @@ class SpanishStemmer(BaseStemmer):
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def stem(self, text: BaseString) -> Sequence[BaseString]:
-        return self._stemmer.stem(text)
+    def stem(self, token: BaseString) -> Sequence[BaseString]:
+        return self._stemmer.stem(token)
 
 
 class EnglishStemmer(BaseStemmer):
@@ -127,5 +103,5 @@ class EnglishStemmer(BaseStemmer):
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def stem(self, text: BaseString) -> Sequence[BaseString]:
-        return self._stemmer.stem(text)
+    def stem(self, token: BaseString) -> Sequence[BaseString]:
+        return self._stemmer.stem(token)
