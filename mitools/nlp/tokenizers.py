@@ -31,8 +31,16 @@ class BaseTokenizer(TokenizerI, metaclass=ABCMeta):
 
 
 class WordTokenizer(BaseTokenizer):
+    _instance = None
+    _tokenizer = nltk.tokenize.word_tokenize
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
     def tokenize(self, text: BaseString, include_punctuation: bool = True):
-        tokens = nltk.tokenize.word_tokenize(text)
+        tokens = self._tokenizer(text)
         if include_punctuation:
             return tokens
         else:
@@ -44,11 +52,37 @@ class WordTokenizer(BaseTokenizer):
 
 
 class SentenceTokenizer(BaseTokenizer):
+    _instance = None
+    _tokenizer = nltk.tokenize.sent_tokenize
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
     def tokenize(self, text: BaseString) -> Sequence[BaseString]:
-        return nltk.tokenize.sent_tokenize(text)
+        return self._tokenizer(text)
 
 
 class RegexpTokenizer(BaseTokenizer):
+    _instances = {}
+
+    def __new__(
+        cls,
+        pattern: str,
+        gaps: bool = False,
+        discard_empty: bool = True,
+        flags: int = re.UNICODE | re.MULTILINE | re.DOTALL,
+    ):
+        key = (pattern, gaps, discard_empty, flags)
+        if key not in cls._instances:
+            instance = super().__new__(cls)
+            instance._tokenizer = nltk.tokenize.RegexpTokenizer(
+                pattern=pattern, gaps=gaps, discard_empty=discard_empty, flags=flags
+            )
+            cls._instances[key] = instance
+        return cls._instances[key]
+
     def __init__(
         self,
         pattern: str,
@@ -62,14 +96,17 @@ class RegexpTokenizer(BaseTokenizer):
         self.flags = flags
 
     def tokenize(self, text: BaseString) -> Sequence[BaseString]:
-        return nltk.tokenize.RegexpTokenizer(
-            pattern=self.pattern,
-            gaps=self.gaps,
-            discard_empty=self.discard_empty,
-            flags=self.flags,
-        ).tokenize(text)
+        return self._tokenizer.tokenize(text)
 
 
 class WhiteSpaceTokenizer(TokenizerI):
+    _instance = None
+    _tokenizer = nltk.tokenize.WhitespaceTokenizer()
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
     def tokenize(self, text: BaseString) -> Sequence[BaseString]:
-        return nltk.tokenize.WhitespaceTokenizer().tokenize(text)
+        return self._tokenizer.tokenize(text)
