@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Callable, Dict, Iterable, List, Sequence, Set, Tuple, Union
 from xml.etree import ElementTree
 
+from nltk.corpus import wordnet
 from nltk.tree import Tree
 
 from mitools.exceptions import ArgumentStructureError
@@ -31,7 +32,6 @@ from mitools.nlp.definitions import (
     PRT,
     PUNC,
     PUNCTUATION,
-    PUNCTUATION_REGEX,
     RE_ABBR1,
     RE_ABBR2,
     RE_ABBR3,
@@ -256,6 +256,16 @@ def is_numeric(value: BaseString) -> bool:
     except ValueError:
         return False
     return True
+
+
+def nltk_tag_to_wordnet_tag(nltk_tag: str) -> str:
+    tag_dict = {
+        "J": wordnet.ADJ,
+        "V": wordnet.VERB,
+        "N": wordnet.NOUN,
+        "R": wordnet.ADV,
+    }
+    return tag_dict.get(nltk_tag[0], wordnet.NOUN)
 
 
 def penntreebank_to_universal(
