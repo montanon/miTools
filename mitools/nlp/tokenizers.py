@@ -77,9 +77,7 @@ class RegexpTokenizer(BaseTokenizer):
         key = (pattern, gaps, discard_empty, flags)
         if key not in cls._instances:
             instance = super().__new__(cls)
-            instance._tokenizer = nltk.tokenize.RegexpTokenizer(
-                pattern=pattern, gaps=gaps, discard_empty=discard_empty, flags=flags
-            )
+            instance._initialized = False
             cls._instances[key] = instance
         return cls._instances[key]
 
@@ -90,10 +88,15 @@ class RegexpTokenizer(BaseTokenizer):
         discard_empty: bool = True,
         flags: int = re.UNICODE | re.MULTILINE | re.DOTALL,
     ):
-        self.pattern = pattern
-        self.gaps = gaps
-        self.discard_empty = discard_empty
-        self.flags = flags
+        if not hasattr(self, "_initialized") or not self._initialized:
+            self.pattern = pattern
+            self.gaps = gaps
+            self.discard_empty = discard_empty
+            self.flags = flags
+            self._tokenizer = nltk.tokenize.RegexpTokenizer(
+                pattern=pattern, gaps=gaps, discard_empty=discard_empty, flags=flags
+            )
+            self._initialized = True
 
     def tokenize(self, text: BaseString) -> Sequence[BaseString]:
         return self._tokenizer.tokenize(text)
