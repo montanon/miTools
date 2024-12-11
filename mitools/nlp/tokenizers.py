@@ -1,5 +1,5 @@
 from abc import ABCMeta, abstractmethod
-from typing import Iterator, Sequence
+from typing import Iterator, List, Sequence, Tuple
 
 import nltk
 from nltk.tokenize.api import TokenizerI
@@ -8,13 +8,25 @@ from mitools.nlp.string_utils import strip_punctuation
 from mitools.nlp.typing import BaseString
 
 
-class BaseTokenizer(TokenizerI, ABCMeta):
+class BaseTokenizer(TokenizerI, metaclass=ABCMeta):
     @abstractmethod
     def tokenize(self, text: BaseString) -> Sequence[BaseString]:
         pass
 
     def itokenize(self, text: BaseString, *args, **kwargs) -> Iterator[BaseString]:
         return (t for t in self.tokenize(text, *args, **kwargs))
+
+    def span_tokenize(self, text: BaseString) -> Iterator[Tuple[int, int]]:
+        return TokenizerI.span_tokenize(self, text)
+
+    def tokenize_sents(self, strings: List[BaseString]) -> List[List[BaseString]]:
+        return [self.tokenize(s) for s in strings]
+
+    def span_tokenize_sents(
+        self, strings: List[BaseString]
+    ) -> Iterator[List[Tuple[int, int]]]:
+        for s in strings:
+            yield list(self.span_tokenize(s))
 
 
 class WordTokenizer(BaseTokenizer):
