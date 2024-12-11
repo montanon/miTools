@@ -47,10 +47,10 @@ from mitools.nlp.definitions import (
     VERB,
     X,
 )
+from mitools.nlp.nlp_typing import BaseString, PennTag, PosTag, WordNetTag
 from mitools.nlp.objects import TaggedString
 from mitools.nlp.string_utils import strip_punctuation
 from mitools.nlp.tokenizers import SentenceTokenizer, WordTokenizer
-from mitools.nlp.typing import BaseString, PennTag, PosTag, WordNetTag
 from mitools.utils.helper_objects import LazyDict, LazyList
 
 

@@ -5,7 +5,7 @@ from nltk import BigramTagger, ChunkParserI, UnigramTagger
 from nltk.tree import Tree
 
 from mitools.nlp.en import en_parser as pattern_parse
-from mitools.nlp.typing import BaseString
+from mitools.nlp.nlp_typing import BaseString
 
 
 class BaseParser(ABCMeta):

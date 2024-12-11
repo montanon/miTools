@@ -8,7 +8,7 @@ from nltk.classify import (
     PositiveNaiveBayesClassifier,
 )
 
-from mitools.nlp.typing import BaseString
+from mitools.nlp.nlp_typing import BaseString
 from mitools.nlp.utils import basic_extractor, contains_extractor, get_words_from_corpus
 from mitools.utils.decorators import cached_property
 

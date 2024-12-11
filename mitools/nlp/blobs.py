@@ -15,11 +15,11 @@ from mitools.nlp.en.inflect import pluralize as en_pluralize
 from mitools.nlp.en.inflect import singularize as en_singularize
 from mitools.nlp.extractors import BaseNPExtractor, FastNPExtractor
 from mitools.nlp.mixins import BlobComparableMixin, StringlikeMixin
+from mitools.nlp.nlp_typing import BaseString, PosTag
 from mitools.nlp.parsers import BaseParser, PatternParser
 from mitools.nlp.sentiments import BaseSentimentAnalyzer, PatternAnalyzer
 from mitools.nlp.taggers import BaseTagger, NLTKTagger
 from mitools.nlp.tokenizers import BaseTokenizer, WordTokenizer
-from mitools.nlp.typing import BaseString, PosTag
 from mitools.nlp.utils import (
     PUNCTUATION_REGEX,
     lowerstrip,

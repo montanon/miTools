@@ -4,8 +4,8 @@ from typing import Sequence, Tuple
 import nltk
 
 from mitools.nlp.en import tag as pattern_tag
+from mitools.nlp.nlp_typing import BaseString
 from mitools.nlp.tokenizers import BaseTokenizer, WordTokenizer
-from mitools.nlp.typing import BaseString
 
 
 class BaseTagger(ABCMeta):

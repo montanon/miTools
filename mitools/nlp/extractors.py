@@ -6,9 +6,9 @@ from nltk import BigramTagger, RegexpTagger, UnigramTagger
 from nltk.tokenize import sent_tokenize
 from nltk.tree import Tree
 
+from mitools.nlp.nlp_typing import BaseString
 from mitools.nlp.parsers import BaseParser, ChunkParser
 from mitools.nlp.taggers import BaseTagger, PatternTagger
-from mitools.nlp.typing import BaseString
 from mitools.nlp.utils import (
     filter_insignificant,
     is_match,

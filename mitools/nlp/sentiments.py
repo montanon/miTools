@@ -5,7 +5,7 @@ from typing import Callable, Dict, Literal, Tuple, Union
 import nltk
 
 from mitools.nlp.en import en_sentiment as pattern_sentiment
-from mitools.nlp.typing import BaseString, SentimentType
+from mitools.nlp.nlp_typing import BaseString, SentimentType
 from mitools.nlp.utils import default_feature_extractor, word_tokenize
 
 
