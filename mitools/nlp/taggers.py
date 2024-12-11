@@ -1,27 +1,42 @@
-from abc import ABCMeta, abstractmethod
-from typing import Sequence, Tuple
+from abc import ABC, abstractmethod
+from typing import Iterator, Sequence, Tuple
 
 import nltk
 
 from mitools.nlp.en import tag as pattern_tag
-from mitools.nlp.tokenizers import BaseTokenizer, WordTokenizer
-from mitools.nlp.typing import BaseString
+from mitools.nlp.nlp_typing import BaseString, PosTag
 
 
-class BaseTagger(ABCMeta):
+class BaseTagger(ABC):
     @abstractmethod
-    def tag(self, text: BaseString, tokenize: bool = True) -> Sequence[Tuple[str, str]]:
+    def tag_tokens(
+        self, tokens: Sequence[BaseString]
+    ) -> Sequence[Tuple[BaseString, PosTag]]:
         pass
+
+    def itag_tokens(
+        self, tokens: Sequence[BaseString]
+    ) -> Iterator[Tuple[BaseString, PosTag]]:
+        return (t for t in self.tag_tokens(tokens))
 
 
 class PatternTagger(BaseTagger):
-    def tag(self, text: BaseString, tokenize: bool = True) -> str:
-        if not isinstance(text, str):
-            text = text.raw
-        return pattern_tag(text, tokenize=tokenize)
+    def tag_tokens(
+        self, tokens: Sequence[BaseString]
+    ) -> Sequence[Tuple[BaseString, PosTag]]:
+        return pattern_tag(tokens)
 
 
 class NLTKTagger(BaseTagger):
-    def tag(self, text: BaseString, tokenizer: BaseTokenizer = None):
-        tokenizer = tokenizer if tokenizer is not None else WordTokenizer()
-        return nltk.tag.pos_tag(tokenizer.tokenize(text))
+    _instance = None
+    _tagger = nltk.tag.pos_tag
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
+    def tag_tokens(
+        self, tokens: Sequence[BaseString]
+    ) -> Sequence[Tuple[BaseString, PosTag]]:
+        return self._tagger(tokens)

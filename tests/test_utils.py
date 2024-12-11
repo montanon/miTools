@@ -51,10 +51,90 @@ from mitools.utils import (
     store_pkl_object,
     str_is_number,
     stretch_string,
+    strip_punctuation,
     unpack_list_of_lists,
     write_json_file,
     write_text_file,
 )
+
+
+class TestStripPunctuation(TestCase):
+    def test_strip_punctuation_all_true(self):
+        self.assertEqual(strip_punctuation("!Hello, World!", all=True), "Hello World")
+        self.assertEqual(
+            strip_punctuation("...This, is! a test?", all=True), "This is a test"
+        )
+        self.assertEqual(
+            strip_punctuation("No-punctuation-here.", all=True), "Nopunctuationhere"
+        )
+        self.assertEqual(strip_punctuation("!!!", all=True), "")
+        self.assertEqual(strip_punctuation("", all=True), "")
+        self.assertEqual(strip_punctuation("1234!@#$", all=True), "1234")
+
+    def test_strip_punctuation_all_false(self):
+        self.assertEqual(strip_punctuation("!Hello, World!", all=False), "Hello, World")
+        self.assertEqual(
+            strip_punctuation("...This, is! a test?", all=False), "This, is! a test"
+        )
+        self.assertEqual(
+            strip_punctuation("No-punctuation-here.", all=False), "No-punctuation-here"
+        )
+        self.assertEqual(strip_punctuation("!!!", all=False), "")
+        self.assertEqual(strip_punctuation("", all=False), "")
+        self.assertEqual(strip_punctuation("1234!@#$", all=False), "1234")
+
+    def test_strip_punctuation_whitespace_handling(self):
+        self.assertEqual(
+            strip_punctuation("   !Hello, World!   ", all=True), "Hello World"
+        )
+        self.assertEqual(
+            strip_punctuation("   ...This, is! a test?   ", all=False),
+            "This, is! a test",
+        )
+        self.assertEqual(
+            strip_punctuation("   No-punctuation-here.   ", all=False),
+            "No-punctuation-here",
+        )
+
+    def test_strip_punctuation_unicode_characters(self):
+        self.assertEqual(strip_punctuation("¡Hola, Mundo!", all=True), "¡Hola Mundo")
+        self.assertEqual(strip_punctuation("¡Hola, Mundo!", all=False), "¡Hola, Mundo")
+        self.assertEqual(
+            strip_punctuation("   ¡Hola, Mundo!   ", all=True), "¡Hola Mundo"
+        )
+        self.assertEqual(
+            strip_punctuation("   ¡Hola, Mundo!   ", all=False), "¡Hola, Mundo"
+        )
+
+    def test_strip_punctuation_non_ascii(self):
+        self.assertEqual(
+            strip_punctuation("“Hello” ‘World’!", all=True), "“Hello” ‘World’"
+        )
+        self.assertEqual(
+            strip_punctuation("“Hello” ‘World’!", all=False), "“Hello” ‘World’"
+        )
+        self.assertEqual(
+            strip_punctuation("   “Hello” ‘World’!   ", all=True), "“Hello” ‘World’"
+        )
+        self.assertEqual(
+            strip_punctuation("   “Hello” ‘World’!   ", all=False), "“Hello” ‘World’"
+        )
+
+    def test_strip_punctuation_numbers_and_special_cases(self):
+        self.assertEqual(strip_punctuation("12345", all=True), "12345")
+        self.assertEqual(strip_punctuation("12345", all=False), "12345")
+        self.assertEqual(strip_punctuation("12345!!!", all=True), "12345")
+        self.assertEqual(strip_punctuation("!!!12345", all=True), "12345")
+        self.assertEqual(strip_punctuation("12345!!!", all=False), "12345")
+        self.assertEqual(strip_punctuation("!!!12345", all=False), "12345")
+
+    def test_invalid_input_type(self):
+        with self.assertRaises(AttributeError):
+            strip_punctuation(None)
+        with self.assertRaises(AttributeError):
+            strip_punctuation(12345)
+        with self.assertRaises(AttributeError):
+            strip_punctuation(["Hello, World!"], all=True)
 
 
 class TestLazyList(TestCase):

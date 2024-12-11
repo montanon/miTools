@@ -15,13 +15,12 @@ from mitools.nlp.en.inflect import pluralize as en_pluralize
 from mitools.nlp.en.inflect import singularize as en_singularize
 from mitools.nlp.extractors import BaseNPExtractor, FastNPExtractor
 from mitools.nlp.mixins import BlobComparableMixin, StringlikeMixin
+from mitools.nlp.nlp_typing import BaseString, PosTag
 from mitools.nlp.parsers import BaseParser, PatternParser
 from mitools.nlp.sentiments import BaseSentimentAnalyzer, PatternAnalyzer
 from mitools.nlp.taggers import BaseTagger, NLTKTagger
 from mitools.nlp.tokenizers import BaseTokenizer, WordTokenizer
-from mitools.nlp.typing import BaseString, PosTag
 from mitools.nlp.utils import (
-    PUNCTUATION_REGEX,
     lowerstrip,
     penn_to_wordnet,
     sentence_tokenize,
@@ -29,6 +28,7 @@ from mitools.nlp.utils import (
     word_tokenize,
 )
 from mitools.utils.decorators import cached_property
+from mitools.utils.helper_functions import PUNCTUATION_REGEX
 
 
 def singularize(word: BaseString, language: Literal["en", "other"] = "en") -> Callable:
@@ -264,7 +264,7 @@ class BaseBlob(StringlikeMixin, BlobComparableMixin):
         else:
             return [
                 (Word(str(word), pos_tag=t), str(t))
-                for word, t in self.pos_tagger.tag(self)
+                for word, t in self.pos_tagger.tag_tokens(self)
                 if not PUNCTUATION_REGEX.match(str(t))
             ]
 

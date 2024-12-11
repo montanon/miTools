@@ -1,7 +1,5 @@
 from typing import List, Literal, Tuple, Union
 
-from nltk.corpus import wordnet
-
 PosTag = Literal["tags"]
 PennTag = Literal["tags"]
 WordNetTag = Literal["tags"]

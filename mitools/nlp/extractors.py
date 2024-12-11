@@ -6,9 +6,9 @@ from nltk import BigramTagger, RegexpTagger, UnigramTagger
 from nltk.tokenize import sent_tokenize
 from nltk.tree import Tree
 
+from mitools.nlp.nlp_typing import BaseString
 from mitools.nlp.parsers import BaseParser, ChunkParser
 from mitools.nlp.taggers import BaseTagger, PatternTagger
-from mitools.nlp.typing import BaseString
 from mitools.nlp.utils import (
     filter_insignificant,
     is_match,
@@ -55,7 +55,7 @@ class ConllExtractor(BaseNPExtractor):
         return noun_phrases
 
     def _parse_sentence(self, sentence: BaseString) -> Sequence[Tree]:
-        tagged = self.tagger.tag(sentence)
+        tagged = self.tagger.tag_tokens(sentence)
         return self.parser.parse(tagged)
 
 

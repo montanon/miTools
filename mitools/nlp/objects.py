@@ -4,7 +4,7 @@ from typing import Literal, Sequence
 from nltk.corpus import stopwords
 
 from mitools.nlp.definitions import TOKENS
-from mitools.nlp.typing import BaseString, PosTag
+from mitools.nlp.nlp_typing import BaseString, PosTag
 
 
 class StopwordsManager:
