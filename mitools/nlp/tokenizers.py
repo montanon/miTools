@@ -32,15 +32,17 @@ class BaseTokenizer(TokenizerI, metaclass=ABCMeta):
 
 class WordTokenizer(BaseTokenizer):
     _instance = None
-    _tokenizer = nltk.tokenize.word_tokenize
+    _tokenizer = staticmethod(nltk.tokenize.word_tokenize)
 
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def tokenize(self, text: BaseString, include_punctuation: bool = True):
-        tokens = self._tokenizer(text)
+    def tokenize(
+        self, text: BaseString, include_punctuation: bool = True, *args, **kwargs
+    ):
+        tokens = self._tokenizer(text, *args, **kwargs)
         if include_punctuation:
             return tokens
         else:
@@ -53,15 +55,15 @@ class WordTokenizer(BaseTokenizer):
 
 class SentenceTokenizer(BaseTokenizer):
     _instance = None
-    _tokenizer = nltk.tokenize.sent_tokenize
+    _tokenizer = staticmethod(nltk.tokenize.sent_tokenize)
 
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def tokenize(self, text: BaseString) -> Sequence[BaseString]:
-        return self._tokenizer(text)
+    def tokenize(self, text: BaseString, *args, **kwargs) -> Sequence[BaseString]:
+        return self._tokenizer(text, *args, **kwargs)
 
 
 class RegexpTokenizer(BaseTokenizer):
@@ -98,8 +100,8 @@ class RegexpTokenizer(BaseTokenizer):
             )
             self._initialized = True
 
-    def tokenize(self, text: BaseString) -> Sequence[BaseString]:
-        return self._tokenizer.tokenize(text)
+    def tokenize(self, text: BaseString, *args, **kwargs) -> Sequence[BaseString]:
+        return self._tokenizer.tokenize(text, *args, **kwargs)
 
 
 class WhiteSpaceTokenizer(TokenizerI):

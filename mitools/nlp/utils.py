@@ -87,9 +87,7 @@ def word_tokenize(
         word_tokenizer.itokenize(
             sentence, include_punctuation=include_punctuation, *args, **kwargs
         )
-        for sentence in sentence_tokenize(
-            text, sentence_tokenizer, include_punctuation, *args, **kwargs
-        )
+        for sentence in sentence_tokenize(text, sentence_tokenizer, *args, **kwargs)
     )
     return words
 
@@ -97,25 +95,41 @@ def word_tokenize(
 def sentence_tokenize(
     text: BaseString,
     sentence_tokenizer: SentenceTokenizer = None,
-    include_punctuation: bool = True,
     *args,
     **kwargs,
 ):
     sentence_tokenizer = (
         sentence_tokenizer if sentence_tokenizer is not None else SentenceTokenizer()
     )
-    return sentence_tokenizer.itokenize(
-        text, include_punctuation=include_punctuation, *args, **kwargs
-    )
+    return sentence_tokenizer.itokenize(text, *args, **kwargs)
 
 
-def get_words_from_corpus(corpus: Iterable[BaseString]) -> Set[BaseString]:
-    def tokenize(words):
+def get_words_from_corpus(
+    corpus: Union[BaseString, Sequence[BaseString]],
+    word_tokenizer: WordTokenizer = None,
+    sentence_tokenizer: SentenceTokenizer = None,
+    include_punctuation: bool = False,
+    *args,
+    **kwargs,
+) -> Set[BaseString]:
+    def tokenize(words, word_tokenizer, sentence_tokenizer, *args, **kwargs):
         if isinstance(words, (str, bytes)):
-            return word_tokenize(words, include_punctuation=False)
+            return word_tokenize(
+                words,
+                word_tokenizer=word_tokenizer,
+                sentence_tokenizer=sentence_tokenizer,
+                include_punctuation=include_punctuation,
+                *args,
+                **kwargs,
+            )
         return words
 
-    all_words = chain.from_iterable(tokenize(words) for words, _ in corpus)
+    if isinstance(corpus, str):
+        corpus = [corpus]
+    all_words = chain.from_iterable(
+        tokenize(words, word_tokenizer, sentence_tokenizer, *args, **kwargs)
+        for words in corpus
+    )
     return set(all_words)
 
 
