@@ -62,8 +62,8 @@ class SentenceTokenizer(BaseTokenizer):
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def tokenize(self, text: BaseString) -> Sequence[BaseString]:
-        return self._tokenizer(text)
+    def tokenize(self, text: BaseString, *args, **kwargs) -> Sequence[BaseString]:
+        return self._tokenizer(text, *args, **kwargs)
 
 
 class RegexpTokenizer(BaseTokenizer):
