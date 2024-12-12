@@ -11,7 +11,7 @@ from mitools.utils.helper_functions import strip_punctuation
 
 class BaseTokenizer(TokenizerI, metaclass=ABCMeta):
     @abstractmethod
-    def tokenize(self, text: BaseString) -> Sequence[BaseString]:
+    def tokenize(self, text: BaseString, lower: bool = False) -> Sequence[BaseString]:
         pass
 
     def itokenize(self, text: BaseString, *args, **kwargs) -> Iterator[BaseString]:
@@ -40,9 +40,16 @@ class WordTokenizer(BaseTokenizer):
         return cls._instance
 
     def tokenize(
-        self, text: BaseString, include_punctuation: bool = True, *args, **kwargs
+        self,
+        text: BaseString,
+        include_punctuation: bool = True,
+        lower: bool = False,
+        *args,
+        **kwargs,
     ):
         tokens = self._tokenizer(text, *args, **kwargs)
+        if lower:
+            tokens = [token.lower() for token in tokens]
         if include_punctuation:
             return tokens
         else:
@@ -62,8 +69,13 @@ class SentenceTokenizer(BaseTokenizer):
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def tokenize(self, text: BaseString, *args, **kwargs) -> Sequence[BaseString]:
-        return self._tokenizer(text, *args, **kwargs)
+    def tokenize(
+        self, text: BaseString, lower: bool = False, *args, **kwargs
+    ) -> Sequence[BaseString]:
+        tokens = self._tokenizer(text, *args, **kwargs)
+        if lower:
+            tokens = [token.lower() for token in tokens]
+        return tokens
 
 
 class RegexpTokenizer(BaseTokenizer):
@@ -100,8 +112,13 @@ class RegexpTokenizer(BaseTokenizer):
             )
             self._initialized = True
 
-    def tokenize(self, text: BaseString, *args, **kwargs) -> Sequence[BaseString]:
-        return self._tokenizer.tokenize(text, *args, **kwargs)
+    def tokenize(
+        self, text: BaseString, lower: bool = False, *args, **kwargs
+    ) -> Sequence[BaseString]:
+        tokens = self._tokenizer.tokenize(text, *args, **kwargs)
+        if lower:
+            tokens = [token.lower() for token in tokens]
+        return tokens
 
 
 class WhiteSpaceTokenizer(TokenizerI):
@@ -113,8 +130,11 @@ class WhiteSpaceTokenizer(TokenizerI):
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def tokenize(self, text: BaseString) -> Sequence[BaseString]:
-        return self._tokenizer.tokenize(text)
+    def tokenize(self, text: BaseString, lower: bool = False) -> Sequence[BaseString]:
+        tokens = self._tokenizer.tokenize(text)
+        if lower:
+            tokens = [token.lower() for token in tokens]
+        return tokens
 
 
 class WordPunctTokenizer(BaseTokenizer):
@@ -126,8 +146,13 @@ class WordPunctTokenizer(BaseTokenizer):
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def tokenize(self, text: BaseString) -> Sequence[BaseString]:
-        return self._tokenizer.tokenize(text)
+    def tokenize(
+        self, text: BaseString, lower: bool = False, *args, **kwargs
+    ) -> Sequence[BaseString]:
+        tokens = self._tokenizer.tokenize(text, *args, **kwargs)
+        if lower:
+            tokens = [token.lower() for token in tokens]
+        return tokens
 
 
 class BlanklineTokenizer(BaseTokenizer):
@@ -139,5 +164,10 @@ class BlanklineTokenizer(BaseTokenizer):
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def tokenize(self, text: BaseString) -> Sequence[BaseString]:
-        return self._tokenizer.tokenize(text)
+    def tokenize(
+        self, text: BaseString, lower: bool = False, *args, **kwargs
+    ) -> Sequence[BaseString]:
+        tokens = self._tokenizer.tokenize(text, *args, **kwargs)
+        if lower:
+            tokens = [token.lower() for token in tokens]
+        return tokens
