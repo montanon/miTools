@@ -87,9 +87,7 @@ def word_tokenize(
         word_tokenizer.itokenize(
             sentence, include_punctuation=include_punctuation, *args, **kwargs
         )
-        for sentence in sentence_tokenize(
-            text, sentence_tokenizer, include_punctuation, *args, **kwargs
-        )
+        for sentence in sentence_tokenize(text, sentence_tokenizer, *args, **kwargs)
     )
     return words
 
@@ -97,16 +95,13 @@ def word_tokenize(
 def sentence_tokenize(
     text: BaseString,
     sentence_tokenizer: SentenceTokenizer = None,
-    include_punctuation: bool = True,
     *args,
     **kwargs,
 ):
     sentence_tokenizer = (
         sentence_tokenizer if sentence_tokenizer is not None else SentenceTokenizer()
     )
-    return sentence_tokenizer.itokenize(
-        text, include_punctuation=include_punctuation, *args, **kwargs
-    )
+    return sentence_tokenizer.itokenize(text, *args, **kwargs)
 
 
 def get_words_from_corpus(corpus: Iterable[BaseString]) -> Set[BaseString]:
