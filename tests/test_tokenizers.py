@@ -57,6 +57,11 @@ class TestWordTokenizer(TestCase):
         self.assertIn("!", tokens)
         self.assertIn(".", tokens)
 
+    def test_tokenize_with_lower(self):
+        text = "Hello, world! This is a test."
+        tokens = self.tokenizer.tokenize(text, lower=True, include_punctuation=False)
+        self.assertEqual(tokens, ["hello", "world", "this", "is", "a", "test"])
+
     def test_tokenize_without_punctuation(self):
         text = "Hello, world! This is a test."
         tokens = self.tokenizer.tokenize(text, include_punctuation=False)
@@ -82,6 +87,14 @@ class TestSentenceTokenizer(TestCase):
         self.assertEqual(sents[1], "This is a test.")
         self.assertEqual(sents[2], "Another sentence!")
 
+    def test_tokenize_sentences_lower(self):
+        text = "Hello world. This is a test. Another sentence!"
+        sents = self.tokenizer.tokenize(text, lower=True)
+        self.assertEqual(len(sents), 3)
+        self.assertEqual(sents[0], "hello world.")
+        self.assertEqual(sents[1], "this is a test.")
+        self.assertEqual(sents[2], "another sentence!")
+
     def test_empty_string(self):
         self.assertEqual(self.tokenizer.tokenize(""), [])
 
@@ -103,6 +116,12 @@ class TestRegexpTokenizer(TestCase):
         text = "Hello, world! 123"
         tokens = tokenizer.tokenize(text)
         self.assertEqual(tokens, ["Hello", "world", "123"])
+
+    def test_tokenize_with_pattern_and_lower(self):
+        tokenizer = RegexpTokenizer(pattern=r"\w+")
+        text = "Hello, world! 123"
+        tokens = tokenizer.tokenize(text, lower=True)
+        self.assertEqual(tokens, ["hello", "world", "123"])
 
     def test_tokenize_gaps(self):
         tokenizer = RegexpTokenizer(pattern=r"\s+", gaps=True)
@@ -138,6 +157,11 @@ class TestWhiteSpaceTokenizer(TestCase):
         tokens = self.tokenizer.tokenize(text)
         self.assertEqual(tokens, ["Hello", "world", "test"])
 
+    def test_tokenize_lower(self):
+        text = "Hello   world \n test"
+        tokens = self.tokenizer.tokenize(text, lower=True)
+        self.assertEqual(tokens, ["hello", "world", "test"])
+
     def test_empty_string(self):
         self.assertEqual(self.tokenizer.tokenize(""), [])
 
@@ -158,6 +182,11 @@ class TestWordPunctTokenizer(TestCase):
         self.assertIn("!", tokens)
         self.assertIn(".", tokens)
 
+    def test_tokenize_lower(self):
+        text = "Hello, world! This is a test."
+        tokens = self.tokenizer.tokenize(text, lower=True)
+        self.assertEqual(tokens, ["hello", "world", "this", "is", "a", "test"])
+
 
 class TestBlanklineTokenizer(TestCase):
     def setUp(self):
@@ -173,6 +202,11 @@ class TestBlanklineTokenizer(TestCase):
         self.assertEqual(
             tokens, ["Hello world", "This is a test", "Another paragraph\n"]
         )
+
+    def test_tokenize_lower(self):
+        text = "Hello world\n\nThis is a test\n\nAnother paragraph\n"
+        tokens = self.tokenizer.tokenize(text, lower=True)
+        self.assertEqual(tokens, ["hello world", "this is a test", "another paragraph"])
 
     def test_empty_string(self):
         self.assertEqual(self.tokenizer.tokenize(""), [])
