@@ -105,7 +105,7 @@ def sentence_tokenize(
 
 
 def get_words_from_corpus(
-    corpus: Iterable[BaseString],
+    corpus: Union[BaseString, Sequence[BaseString]],
     word_tokenizer: WordTokenizer = None,
     sentence_tokenizer: SentenceTokenizer = None,
     include_punctuation: bool = False,
@@ -124,9 +124,11 @@ def get_words_from_corpus(
             )
         return words
 
+    if isinstance(corpus, str):
+        corpus = [corpus]
     all_words = chain.from_iterable(
         tokenize(words, word_tokenizer, sentence_tokenizer, *args, **kwargs)
-        for words, _ in corpus
+        for words in corpus
     )
     return set(all_words)
 
