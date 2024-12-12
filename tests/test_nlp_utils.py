@@ -1,9 +1,10 @@
 import unittest
+from itertools import chain
 from unittest import TestCase
 
 from mitools.nlp.nlp_typing import BaseString
 from mitools.nlp.tokenizers import SentenceTokenizer, WordTokenizer
-from mitools.nlp.utils import sentence_tokenize, word_tokenize
+from mitools.nlp.utils import get_words_from_corpus, sentence_tokenize, word_tokenize
 from mitools.utils.helper_functions import strip_punctuation
 
 
@@ -308,6 +309,197 @@ class TestSentenceTokenize(TestCase):
             sentences,
             ["Hello world!", "😊 How are you?", "🙃"],
             "Should handle emojis within sentences correctly.",
+        )
+
+
+class TestGetWordsFromCorpus(TestCase):
+    def setUp(self):
+        self.default_word_tokenizer = WordTokenizer()
+        self.default_sentence_tokenizer = SentenceTokenizer()
+
+    def test_single_string_input(self):
+        text = "Hello world!"
+        words = get_words_from_corpus(
+            text,
+            word_tokenizer=self.default_word_tokenizer,
+            sentence_tokenizer=self.default_sentence_tokenizer,
+            include_punctuation=True,
+        )
+        expected_words = {"Hello", "world", "!"}
+        self.assertEqual(
+            words,
+            expected_words,
+            "Should return a set of tokenized words from a single string.",
+        )
+
+    def test_single_string_no_punctuation(self):
+        text = "Hello, world!"
+        words = get_words_from_corpus(
+            text,
+            word_tokenizer=self.default_word_tokenizer,
+            sentence_tokenizer=self.default_sentence_tokenizer,
+            include_punctuation=False,
+        )
+        self.assertEqual(
+            words,
+            {"Hello", "world"},
+            "Should remove punctuation when include_punctuation=False.",
+        )
+
+    def test_multiple_strings_input(self):
+        corpus = ["Hello world!", "How are you today?", "I am fine."]
+        words = get_words_from_corpus(
+            corpus,
+            word_tokenizer=self.default_word_tokenizer,
+            sentence_tokenizer=self.default_sentence_tokenizer,
+            include_punctuation=True,
+        )
+        expected = {
+            "Hello",
+            "world",
+            "!",
+            "How",
+            "are",
+            "you",
+            "today",
+            "?",
+            "I",
+            "am",
+            "fine",
+            ".",
+        }
+        self.assertEqual(
+            words, expected, "Should tokenize all strings and combine words into a set."
+        )
+
+    def test_pre_tokenized_input(self):
+        corpus = [["Hello", "world", "!"], ["How", "are", "you", "?"]]
+        words = get_words_from_corpus(corpus)
+        expected = {"Hello", "world", "!", "How", "are", "you", "?"}
+        self.assertEqual(
+            words,
+            expected,
+            "Should accept already-tokenized lists of words and return their set.",
+        )
+
+    def test_empty_string_input(self):
+        text = ""
+        words = get_words_from_corpus(
+            text,
+            word_tokenizer=self.default_word_tokenizer,
+            sentence_tokenizer=self.default_sentence_tokenizer,
+            include_punctuation=False,
+        )
+        self.assertEqual(words, set(), "Empty string should return an empty set.")
+
+    def test_whitespace_only_input(self):
+        text = "   \n\n   "
+        words = get_words_from_corpus(
+            text,
+            word_tokenizer=self.default_word_tokenizer,
+            sentence_tokenizer=self.default_sentence_tokenizer,
+            include_punctuation=False,
+        )
+        self.assertEqual(
+            words, set(), "Whitespace-only input should return an empty set."
+        )
+
+    def test_special_characters_input(self):
+        text = "Café costs $5.00, okay?"
+        words_incl = get_words_from_corpus(
+            text,
+            word_tokenizer=self.default_word_tokenizer,
+            sentence_tokenizer=self.default_sentence_tokenizer,
+            include_punctuation=True,
+        )
+        self.assertIn("Café", words_incl)
+        self.assertIn("$", words_incl)
+        self.assertIn(",", words_incl)
+        self.assertIn("?", words_incl)
+
+        words_excl = get_words_from_corpus(
+            text,
+            word_tokenizer=self.default_word_tokenizer,
+            sentence_tokenizer=self.default_sentence_tokenizer,
+            include_punctuation=False,
+        )
+        self.assertIn("Café", words_excl)
+        self.assertNotIn("$", words_excl)
+        self.assertNotIn(",", words_excl)
+        self.assertNotIn("?", words_excl)
+
+    def test_non_english_text(self):
+        text = "¡Hola! ¿Cómo estás?"
+        words = get_words_from_corpus(
+            text,
+            word_tokenizer=self.default_word_tokenizer,
+            sentence_tokenizer=self.default_sentence_tokenizer,
+            include_punctuation=True,
+            language="spanish",
+        )
+        self.assertIn("¡Hola", words, "Should contain non-English words.")
+        self.assertIn(
+            "¿Cómo",
+            words,
+            "Should include non-English punctuation if include_punctuation=True.",
+        )
+
+        words_no_punct = get_words_from_corpus(
+            text,
+            word_tokenizer=self.default_word_tokenizer,
+            sentence_tokenizer=self.default_sentence_tokenizer,
+            include_punctuation=False,
+        )
+        self.assertIn("estás", words_no_punct)
+        self.assertNotIn("¿", words_no_punct)
+
+    def test_numeric_and_urls(self):
+        text = "Version 2.0 released. Visit https://example.com!"
+        words = get_words_from_corpus(
+            text,
+            word_tokenizer=self.default_word_tokenizer,
+            sentence_tokenizer=self.default_sentence_tokenizer,
+            include_punctuation=True,
+        )
+        self.assertIn("Version", words)
+        self.assertIn("2.0", words)
+        self.assertIn("released", words)
+        self.assertIn("Visit", words)
+
+        words_no_punct = get_words_from_corpus(
+            text,
+            word_tokenizer=self.default_word_tokenizer,
+            sentence_tokenizer=self.default_sentence_tokenizer,
+            include_punctuation=False,
+        )
+        self.assertIn("Version", words_no_punct)
+        self.assertIn("2.0", words_no_punct)
+        self.assertNotIn(".", words_no_punct)
+        self.assertNotIn("!", words_no_punct)
+
+    def test_multiple_texts_no_punctuation(self):
+        corpus = ["Hello, world!", "I am fine, thanks.", "Numbers: 123, 456."]
+        words = get_words_from_corpus(
+            corpus,
+            word_tokenizer=self.default_word_tokenizer,
+            sentence_tokenizer=self.default_sentence_tokenizer,
+            include_punctuation=False,
+        )
+        self.assertIn("Hello", words)
+        self.assertIn("world", words)
+        self.assertIn("Numbers", words)
+        self.assertIn("123", words)
+        self.assertNotIn(",", words)
+        self.assertNotIn(".", words)
+
+    def test_already_tokenized_words_no_transform(self):
+        corpus = [["Hello", "world", "!"], ["Hello", "again"]]
+        words = get_words_from_corpus(corpus)
+        expected = {"Hello", "world", "!", "again"}
+        self.assertEqual(
+            words,
+            expected,
+            "Should return set from already tokenized words without changes.",
         )
 
 
