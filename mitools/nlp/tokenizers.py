@@ -100,8 +100,8 @@ class RegexpTokenizer(BaseTokenizer):
             )
             self._initialized = True
 
-    def tokenize(self, text: BaseString) -> Sequence[BaseString]:
-        return self._tokenizer.tokenize(text)
+    def tokenize(self, text: BaseString, *args, **kwargs) -> Sequence[BaseString]:
+        return self._tokenizer.tokenize(text, *args, **kwargs)
 
 
 class WhiteSpaceTokenizer(TokenizerI):
