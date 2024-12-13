@@ -149,7 +149,7 @@ class NaiveBayesAnalyzer(BaseSentimentAnalyzer):
 
     def analyze(self, text: BaseString) -> SentimentResult:
         super().analyze(text)
-        word_tokens = word_tokenize(text, include_punc=False)
+        word_tokens = word_tokenize(text, include_punctuation=False)
         filtered_words = (word.lower() for word in word_tokens if len(word) >= 3)
         word_features = self.feature_extractor(filtered_words)
         probability_distribution = self._classifier.prob_classify(word_features)
