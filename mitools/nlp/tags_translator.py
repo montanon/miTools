@@ -1,4 +1,4 @@
-from typing import Literal, Union
+from typing import Literal, Sequence, Union
 
 from nltk.corpus import wordnet
 
@@ -36,7 +36,12 @@ WORDNET_TO_UNIVERSAL = {
     wordnet.VERB: VERB,
 }
 
-UNIVERSAL_TO_WORDNET = {v: k for k, v in WORDNET_TO_UNIVERSAL.items()}
+UNIVERSAL_TO_WORDNET = {
+    ADJ: wordnet.ADJ,
+    ADV: wordnet.ADV,
+    NOUN: wordnet.NOUN,
+    VERB: wordnet.VERB,
+}
 
 PENN_TO_UNIVERSAL = {
     "NN": NOUN,
@@ -118,8 +123,8 @@ def translate_tag(
     source_format: Literal["penn", "universal", "wordnet", "nltk"],
     target_format: Literal["penn", "universal", "wordnet", "nltk"],
 ) -> Union[PennTag, UniversalTag, WordNetTag, NLTKTag]:
-    if tag == X:
-        return X
+    if source_format == target_format or tag == X:
+        return tag
     tag_maps = {
         "penn-universal": PENN_TO_UNIVERSAL,
         "universal-penn": UNIVERSAL_TO_PENN,
@@ -138,3 +143,11 @@ def translate_tag(
         if tag == X:
             return X
     return tag
+
+
+def translate_tags(
+    tags: Sequence[Union[PennTag, UniversalTag, WordNetTag, NLTKTag]],
+    source_format: Literal["penn", "universal", "wordnet", "nltk"],
+    target_format: Literal["penn", "universal", "wordnet", "nltk"],
+) -> Sequence[Union[PennTag, UniversalTag, WordNetTag, NLTKTag]]:
+    return [translate_tag(tag, source_format, target_format) for tag in tags]
