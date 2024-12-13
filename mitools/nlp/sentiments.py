@@ -1,30 +1,104 @@
 from abc import ABC, abstractmethod
 from collections import namedtuple
-from typing import Callable, Dict, Literal, Tuple, Union
+from dataclasses import dataclass
+from typing import Callable, Dict, List, Literal, Optional, Sequence, Tuple, Union
 
 import nltk
+import torch
+from transformers import pipeline
 
 from mitools.nlp.en import en_sentiment as pattern_sentiment
 from mitools.nlp.nlp_typing import BaseString, SentimentType
+from mitools.nlp.tokenizers import BaseTokenizer, SentenceTokenizer
 from mitools.nlp.utils import default_feature_extractor, word_tokenize
 
 
-class BaseSentimentAnalyzer(ABC):
-    def __init__(self, kind: Literal["ds", "co"] = "ds"):
-        self.kind = kind
-        self._trained = False
+@dataclass
+class SentimentResult:
+    polarity: float  # Range from -1 to 1
+    confidence: float  # Range from 0 to 1
+    label: Optional[str] = None  # For categorical outputs (e.g. "positive", "negative")
+    subjectivity: Optional[float] = None  # For Pattern analyzer
+    probabilities: Optional[Dict[str, float]] = None  # For probability distributions
+    raw_output: Optional[Dict] = None  # Store original model output
 
+    @classmethod
+    def from_huggingface(cls, result: Dict) -> "SentimentResult":
+        label_polarity = 1 if result[0]["label"] == "POSITIVE" else -1
+        return cls(
+            polarity=label_polarity * result[0]["score"],
+            confidence=result[0]["score"],
+            label=result[0]["label"],
+            raw_output=result,
+        )
+
+    @classmethod
+    def from_pattern(cls, result: Tuple) -> "SentimentResult":
+        polarity, subjectivity = result
+        return cls(
+            polarity=polarity,
+            confidence=abs(polarity),  # Use absolute polarity as confidence
+            subjectivity=subjectivity,
+            raw_output={"polarity": polarity, "subjectivity": subjectivity},
+        )
+
+    @classmethod
+    def from_naive_bayes(cls, result: Tuple) -> "SentimentResult":
+        classification, p_pos, p_neg = result
+        polarity = p_pos - p_neg  # Convert probabilities to [-1, 1] range
+        return cls(
+            polarity=polarity,
+            confidence=max(p_pos, p_neg),
+            label=classification,
+            probabilities={"positive": p_pos, "negative": p_neg},
+            raw_output={
+                "classification": classification,
+                "p_pos": p_pos,
+                "p_neg": p_neg,
+            },
+        )
+
+
+class BaseSentimentAnalyzer(ABC):
     def train(self):
         self._trained = True
 
     @abstractmethod
-    def analyze(self, text: str) -> Union[Tuple, float, Dict]:
+    def analyze(self, text: Union[str, BaseString]) -> SentimentResult:
         if not self._trained:
             self.train()
         return None
 
+    def analyze_sentences(
+        self,
+        sequence: Union[BaseString, Sequence[BaseString]],
+        tokenizer: Union[BaseTokenizer, None] = None,
+    ) -> Sequence[SentimentResult]:
+        tokenizer = tokenizer if tokenizer is not None else SentenceTokenizer()
+        if isinstance(sequence, str):
+            sequence = tokenizer.tokenize(sequence)
+        return [self.analyze(sent) for sent in sequence]
+
+
+class HuggingFaceAnalyzer(BaseSentimentAnalyzer):
+    def __init__(
+        self,
+        model: str = "distilbert-base-uncased-finetuned-sst-2-english",
+        device: Union[int, str, torch.device] = None,
+    ):
+        super().__init__()
+        self.model = pipeline("sentiment-analysis", model=model, device=device)
+
+    def analyze(self, text: BaseString) -> SentimentResult:
+        result = self.model(text)
+        return SentimentResult.from_huggingface(result)
+
 
 class PatternAnalyzer(BaseSentimentAnalyzer):
+    def __init__(self, kind: Literal["ds", "co"] = "ds"):
+        self.kind = kind
+        self._trained = False
+
     def analyze(
         self, text: BaseString, keep_assessments: bool = False
     ) -> SentimentType:
@@ -69,7 +143,6 @@ class NaiveBayesAnalyzer(BaseSentimentAnalyzer):
                 self.feature_extractor(nltk.corpus.movie_reviews.words(fileids=[f])),
                 "pos",
             )
-            for f in pos_ids
         ]
         train_data = neg_feats + pos_feats
         self._classifier = nltk.classify.NaiveBayesClassifier.train(train_data)
