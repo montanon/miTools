@@ -3,12 +3,12 @@ from typing import Sequence, Tuple
 
 from mitools.nlp.definitions import CHUNK, PENN, PNP, POS, UNIVERSAL, WORD
 from mitools.nlp.en.inflect import singularize
+from mitools.nlp.tags_translator import translate_tag
 from mitools.nlp.utils import (
     Lexicon,
     Parser,
     Sentiment,
     Spelling,
-    penntreebank_to_universal,
 )
 
 try:
@@ -43,7 +43,11 @@ class EnParser(Parser):
             kwargs.setdefault("map", lambda token, tag: (token, tag))
         if kwargs.get("tagset") == UNIVERSAL:
             kwargs.setdefault(
-                "map", lambda token, tag: penntreebank_to_universal(token, tag)
+                "map",
+                lambda token, pos_tag: (
+                    token,
+                    translate_tag(pos_tag, source="penn", target="universal"),
+                ),
             )
         return Parser.find_tags(self, tokens, **kwargs)
 

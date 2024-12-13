@@ -12,25 +12,15 @@ from nltk.tree import Tree
 from mitools.exceptions import ArgumentStructureError
 from mitools.nlp.definitions import (
     ABBREVIATIONS,
-    ADJ,
     ADJECTIVE,
-    ADV,
     ADVERB,
     CD,
     CHUNKS,
-    CONJ,
-    DET,
     EMOTICONS,
     EOS,
-    INTJ,
     IRONY,
     MOOD,
     NOUN,
-    NUM,
-    PREP,
-    PRON,
-    PRT,
-    PUNC,
     PUNCTUATION,
     RE_ABBR1,
     RE_ABBR2,
@@ -45,7 +35,6 @@ from mitools.nlp.definitions import (
     SEPARATOR,
     TOKEN,
     VERB,
-    X,
 )
 from mitools.nlp.nlp_typing import BaseString, PennTag, PosTag, WordNetTag
 from mitools.nlp.objects import TaggedString
@@ -272,46 +261,27 @@ def is_numeric(value: BaseString) -> bool:
     return True
 
 
-def nltk_tag_to_wordnet_tag(nltk_tag: str) -> str:
-    tag_dict = {
-        "J": wordnet.ADJ,
-        "V": wordnet.VERB,
-        "N": wordnet.NOUN,
-        "R": wordnet.ADV,
-    }
-    return tag_dict.get(nltk_tag[0], wordnet.NOUN)
-
-
-def penntreebank_to_universal(
-    token: BaseString, tag: PennTag
-) -> Tuple[BaseString, WordNetTag]:
-    if tag.startswith(("NNP-", "NNPS-")):
-        return (token, "{}-{}".format(NOUN, tag.split("-")[-1]))
-    if tag in ("NN", "NNS", "NNP", "NNPS", "NP"):
-        return (token, NOUN)
-    if tag in ("MD", "VB", "VBD", "VBG", "VBN", "VBP", "VBZ"):
-        return (token, VERB)
-    if tag in ("JJ", "JJR", "JJS"):
-        return (token, ADJ)
-    if tag in ("RB", "RBR", "RBS", "WRB"):
-        return (token, ADV)
-    if tag in ("PRP", "PRP$", "WP", "WP$"):
-        return (token, PRON)
-    if tag in ("DT", "PDT", "WDT", "EX"):
-        return (token, DET)
-    if tag in ("IN",):
-        return (token, PREP)
-    if tag in ("CD",):
-        return (token, NUM)
-    if tag in ("CC",):
-        return (token, CONJ)
-    if tag in ("UH",):
-        return (token, INTJ)
-    if tag in ("POS", "RP", "TO"):
-        return (token, PRT)
-    if tag in ("SYM", "LS", ".", "!", "?", ",", ":", "(", ")", '"', "#", "$"):
-        return (token, PUNC)
-    return (token, X)
+def suffix_rules(token: BaseString, tag: PosTag = "NN"):
+    if isinstance(token, (list, tuple)):
+        token, tag = token
+    if token.endswith("ing"):
+        tag = "VBG"
+    if token.endswith("ly"):
+        tag = "RB"
+    if token.endswith("s") and not token.endswith(("is", "ous", "ss")):
+        tag = "NNS"
+    if (
+        token.endswith(
+            ("able", "al", "ful", "ible", "ient", "ish", "ive", "less", "tic", "ous")
+        )
+        or "-" in token
+    ):
+        tag = "JJ"
+    if token.endswith("ed"):
+        tag = "VBN"
+    if token.endswith(("ate", "ify", "ise", "ize")):
+        tag = "VBP"
+    return [token, tag]
 
 
 def find_tokens(
@@ -917,29 +887,6 @@ class Entities(LazyDict, Rules):
     def extend(self, entities: Iterable[Tuple[str, str]]):
         for entity, name in entities:
             self.append(entity, name)
-
-
-def suffix_rules(token: BaseString, tag: PosTag = "NN"):
-    if isinstance(token, (list, tuple)):
-        token, tag = token
-    if token.endswith("ing"):
-        tag = "VBG"
-    if token.endswith("ly"):
-        tag = "RB"
-    if token.endswith("s") and not token.endswith(("is", "ous", "ss")):
-        tag = "NNS"
-    if (
-        token.endswith(
-            ("able", "al", "ful", "ible", "ient", "ish", "ive", "less", "tic", "ous")
-        )
-        or "-" in token
-    ):
-        tag = "JJ"
-    if token.endswith("ed"):
-        tag = "VBN"
-    if token.endswith(("ate", "ify", "ise", "ize")):
-        tag = "VBP"
-    return [token, tag]
 
 
 def find_tags(
