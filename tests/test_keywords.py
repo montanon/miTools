@@ -28,7 +28,6 @@ from mitools.nlp import (
     lemmatize_text,
     lemmatize_token,
     lemmatize_tokens,
-    nltk_tag_to_wordnet_tag,
     nltk_tags_to_wordnet_tags,
     preprocess_country_name,
     preprocess_text,
@@ -41,6 +40,11 @@ from mitools.nlp import (
     tag_tokens,
     wordnet,
 )
+from mitools.nlp.tags_translator import translate_tag
+
+
+def nltk_tag_to_wordnet_tag(tag: str) -> str:
+    return translate_tag(tag, source="nltk", target="wordnet")
 
 
 class TestNltkTagsToWordnetTags(TestCase):

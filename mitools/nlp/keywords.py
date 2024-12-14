@@ -26,7 +26,7 @@ from sklearn.feature_extraction.text import (
 from tqdm import tqdm
 from unidecode import unidecode
 
-from mitools.nlp.utils import nltk_tag_to_wordnet_tag
+from mitools.nlp.tags_translator import translate_tag
 from mitools.utils import sankey_plot_validation, validate_dataframe_structure
 
 from ..pandas import idxslice
@@ -46,7 +46,9 @@ def tag_token(token: str) -> List[Tuple[str, str]]:
 def nltk_tags_to_wordnet_tags(
     nltk_tags: List[Tuple[str, str]],
 ) -> List[Tuple[str, str]]:
-    return list(map(lambda x: (x[0], nltk_tag_to_wordnet_tag(x[1])), nltk_tags))
+    return list(
+        map(lambda x: (x[0], translate_tag(x[1], "nltk", "wordnet")), nltk_tags)
+    )
 
 
 def lemmatize_text(text: str, lemmatizer: Optional[Type[StemmerI]] = None) -> str:
