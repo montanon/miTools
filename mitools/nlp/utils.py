@@ -59,10 +59,6 @@ def penn_to_wordnet(penn_tag: PennTag) -> WordNetTag:
     pass
 
 
-def lowerstrip(s: str, all: bool = False) -> str:
-    return strip_punctuation(s.lower().strip(), all=all)
-
-
 def word_tokenize(
     text: BaseString,
     word_tokenizer: WordTokenizer = None,

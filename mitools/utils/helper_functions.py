@@ -51,6 +51,10 @@ PUNCTUATION_REGEX = re.compile(
 )
 
 
+def lowerstrip(s: str, all: bool = False) -> str:
+    return strip_punctuation(s.lower().strip(), all=all)
+
+
 def strip_punctuation(s: str, all: bool = False) -> str:
     if all:
         return PUNCTUATION_REGEX.sub("", s.strip())
