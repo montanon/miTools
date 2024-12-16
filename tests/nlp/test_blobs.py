@@ -1,11 +1,13 @@
 import unittest
 from unittest import TestCase
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from nltk.corpus import wordnet
 from nltk.stem import PorterStemmer, WordNetLemmatizer
 
-from mitools.nlp.blobs import Word, WordList
+from mitools.exceptions import ArgumentTypeError
+from mitools.nlp.blobs import BaseBlob, Word, WordList
+from mitools.nlp.tokenizers import WordTokenizer
 
 
 def singularize(word, language):
@@ -211,6 +213,161 @@ class TestWordList(TestCase):
             titled_words = self.words.title()
             self.assertIsInstance(titled_words, WordList)
             self.assertEqual(titled_words[0].string, "Dogs")
+
+
+class TestBaseBlob(TestCase):
+    def setUp(self):
+        self.blob = BaseBlob("The quick brown fox jumps over the lazy dog.")
+
+    def test_initialization(self):
+        self.assertEqual(self.blob.raw, "The quick brown fox jumps over the lazy dog.")
+        self.assertEqual(
+            self.blob.string, "The quick brown fox jumps over the lazy dog."
+        )
+        self.assertEqual(
+            self.blob.stripped, "the quick brown fox jumps over the lazy dog"
+        )
+        self.assertIsInstance(self.blob.tokenizer, WordTokenizer)
+
+    def test_invalid_initialization(self):
+        with self.assertRaises(ArgumentTypeError):
+            BaseBlob(12345)  # Non-string input
+
+    def test_words_property(self):
+        with patch(
+            "mitools.nlp.utils.word_tokenize",
+            return_value=["The", "quick", "brown", "fox"],
+        ):
+            words = self.blob.words
+            self.assertIsInstance(words, WordList)
+            self.assertEqual(words[0].string, "The")
+
+    def test_tokens_property(self):
+        with patch.object(
+            self.blob.tokenizer,
+            "tokenize",
+            return_value=["The", "quick", "brown", "fox"],
+        ):
+            tokens = self.blob.tokens
+            self.assertIsInstance(tokens, WordList)
+            self.assertEqual(tokens[0].string, "The")
+
+    def test_tokenize_method(self):
+        with patch.object(
+            self.blob.tokenizer, "tokenize", return_value=["quick", "brown", "fox"]
+        ):
+            tokens = self.blob.tokenize()
+            self.assertIsInstance(tokens, WordList)
+            self.assertEqual(tokens[0].string, "quick")
+
+    def test_parse_method(self):
+        mock_parser = MagicMock()
+        mock_parser.parse.return_value = "parsed string"
+        result = self.blob.parse(parser=mock_parser)
+        self.assertEqual(result, "parsed string")
+        mock_parser.parse.assert_called_once_with(self.blob.raw)
+
+    def test_classify_no_classifier(self):
+        with self.assertRaises(NameError):
+            self.blob.classify()
+
+    def test_sentiment_property(self):
+        mock_analyzer = MagicMock()
+        mock_analyzer.analyze.return_value = "positive sentiment"
+        self.blob.analyzer = mock_analyzer
+        sentiment = self.blob.sentiment
+        self.assertEqual(sentiment, "positive sentiment")
+        mock_analyzer.analyze.assert_called_once_with(self.blob.raw)
+
+    def test_sentiment_assessments_property(self):
+        mock_analyzer = MagicMock()
+        mock_analyzer.analyze.return_value = "detailed sentiment"
+        self.blob.analyzer = mock_analyzer
+        assessments = self.blob.sentiment_assessments
+        self.assertEqual(assessments, "detailed sentiment")
+        mock_analyzer.analyze.assert_called_once_with(
+            self.blob.raw, keep_assessments=True
+        )
+
+    def test_ngram_generation(self):
+        ngrams = self.blob.ngrams(2)
+        self.assertEqual(len(ngrams), 8)
+        self.assertIsInstance(ngrams[0], WordList)
+        self.assertEqual(ngrams[0][0].string, "The")
+        ngrams = self.blob.ngrams(1)
+        self.assertEqual(len(ngrams), 9)
+        self.assertIsInstance(ngrams[0], WordList)
+        self.assertEqual(ngrams[0][0].string, "The")
+
+    def test_ngrams_invalid_n(self):
+        ngrams = self.blob.ngrams(-1)
+        self.assertEqual(ngrams, [])
+
+    def test_noun_phrases_property(self):
+        mock_extractor = MagicMock()
+        mock_extractor.extract.return_value = ["quick brown", "lazy dog"]
+        self.blob.np_extractor = mock_extractor
+        noun_phrases = self.blob.noun_phrases
+        self.assertIsInstance(noun_phrases, WordList)
+        self.assertEqual(noun_phrases[0].string, "quick brown")
+
+    def test_pos_tags_property(self):
+        mock_tagger = MagicMock()
+        mock_tagger.tag_tokens.return_value = [("quick", "JJ"), ("brown", "NN")]
+        self.blob.pos_tagger = mock_tagger
+        pos_tags = self.blob.pos_tags
+        self.assertEqual(pos_tags[0][0].string, "quick")
+        self.assertEqual(pos_tags[0][1], "JJ")
+
+    def test_word_counts_property(self):
+        word_counts = self.blob.word_counts
+        self.assertEqual(word_counts["quick"], 1)
+        self.assertEqual(word_counts["the"], 2)
+
+    def test_np_counts_property(self):
+        mock_extractor = MagicMock()
+        mock_extractor.extract.return_value = ["quick brown", "lazy dog", "lazy dog"]
+        self.blob.np_extractor = mock_extractor
+        np_counts = self.blob.np_counts
+        self.assertEqual(np_counts["lazy dog"], 2)
+
+    def test_correct_method(self):
+        with self.assertRaises(NotImplementedError):
+            self.blob.correct()
+
+    def test_comparable_key(self):
+        self.assertEqual(
+            self.blob.comparable_key(), "The quick brown fox jumps over the lazy dog."
+        )
+
+    def test_string_key(self):
+        self.assertEqual(
+            self.blob.string_key(), "The quick brown fox jumps over the lazy dog."
+        )
+
+    def test_addition_with_string(self):
+        new_blob = self.blob + " New sentence."
+        self.assertIsInstance(new_blob, BaseBlob)
+        self.assertEqual(
+            new_blob.raw, "The quick brown fox jumps over the lazy dog. New sentence."
+        )
+
+    def test_addition_with_blob(self):
+        other_blob = BaseBlob(" Another blob.")
+        new_blob = self.blob + other_blob
+        self.assertIsInstance(new_blob, BaseBlob)
+        self.assertEqual(
+            new_blob.raw, "The quick brown fox jumps over the lazy dog. Another blob."
+        )
+
+    def test_addition_invalid_type(self):
+        with self.assertRaises(TypeError):
+            _ = self.blob + 123
+
+    def test_split_method(self):
+        split_result = self.blob.split()
+        self.assertIsInstance(split_result, WordList)
+        self.assertEqual(split_result[0].string, "The")
 
 
 if __name__ == "__main__":
