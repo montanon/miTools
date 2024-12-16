@@ -47,11 +47,11 @@ def avg(list: Iterable[float]) -> float:
 
 
 def suggest(word: str) -> str:
-    pass
+    raise NotImplementedError("suggest() is not implemented.")
 
 
 def penn_to_wordnet(penn_tag: PennTag) -> WordNetTag:
-    pass
+    raise NotImplementedError("penn_to_wordnet() is not implemented.")
 
 
 def word_tokenize(
