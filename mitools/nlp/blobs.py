@@ -207,7 +207,7 @@ class BaseBlob(StringlikeMixin, BlobComparableMixin):
 
     @cached_property
     def words(self):
-        return WordList(word_tokenize(self.raw, include_punc=False))
+        return WordList(word_tokenize(self.raw, include_punctuation=False))
 
     @cached_property
     def tokens(self):
@@ -267,8 +267,6 @@ class BaseBlob(StringlikeMixin, BlobComparableMixin):
                 if not PUNCTUATION_REGEX.match(str(t))
             ]
 
-    tags = pos_tags
-
     @cached_property
     def word_counts(self):
         counts = defaultdict(int)
@@ -318,7 +316,7 @@ class BaseBlob(StringlikeMixin, BlobComparableMixin):
             )
 
     def split(self, sep: str = None, maxsplit: int = sys.maxsize):
-        return WordList(self._strkey().split(sep, maxsplit))
+        return WordList(self.string_key().split(sep, maxsplit))
 
 
 class TextBlob(BaseBlob):
@@ -328,7 +326,7 @@ class TextBlob(BaseBlob):
 
     @cached_property
     def words(self):
-        return WordList(word_tokenize(self.raw, include_punc=False))
+        return WordList(word_tokenize(self.raw, include_punctuation=False))
 
     @property
     def raw_sentences(self):

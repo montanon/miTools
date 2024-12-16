@@ -7,7 +7,7 @@ from nltk.tree import Tree
 from mitools.nlp.en import en_parser as pattern_parse
 
 
-class BaseParser(ABCMeta):
+class BaseParser(metaclass=ABCMeta):
     @abstractmethod
     def parse(self, text: str) -> Tree:
         pass

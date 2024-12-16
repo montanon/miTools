@@ -16,7 +16,7 @@ from mitools.nlp.utils import (
 )
 
 
-class BaseNPExtractor(ABCMeta):
+class BaseNPExtractor(metaclass=ABCMeta):
     @abstractmethod
     def extract(self, text: str) -> Sequence[str]:
         pass
