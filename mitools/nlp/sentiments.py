@@ -8,7 +8,7 @@ import torch
 from transformers import pipeline
 
 from mitools.nlp.en import en_sentiment as pattern_sentiment
-from mitools.nlp.nlp_typing import BaseString, SentimentType
+from mitools.nlp.nlp_typing import SentimentType
 from mitools.nlp.tokenizers import BaseTokenizer, SentenceTokenizer
 from mitools.nlp.utils import default_feature_extractor, word_tokenize
 
@@ -64,14 +64,14 @@ class BaseSentimentAnalyzer(ABC):
         self._trained = True
 
     @abstractmethod
-    def analyze(self, text: Union[str, BaseString]) -> SentimentResult:
+    def analyze(self, text: Union[str, str]) -> SentimentResult:
         if not self._trained:
             self.train()
         return None
 
     def analyze_sentences(
         self,
-        sequence: Union[BaseString, Sequence[BaseString]],
+        sequence: Union[str, Sequence[str]],
         tokenizer: Union[BaseTokenizer, None] = None,
     ) -> Sequence[SentimentResult]:
         tokenizer = tokenizer if tokenizer is not None else SentenceTokenizer()
@@ -89,7 +89,7 @@ class HuggingFaceAnalyzer(BaseSentimentAnalyzer):
         super().__init__()
         self.model = pipeline("sentiment-analysis", model=model, device=device)
 
-    def analyze(self, text: BaseString) -> SentimentResult:
+    def analyze(self, text: str) -> SentimentResult:
         result = self.model(text)
         return SentimentResult.from_huggingface(result)
 
@@ -99,9 +99,7 @@ class PatternAnalyzer(BaseSentimentAnalyzer):
         self.kind = kind
         self._trained = False
 
-    def analyze(
-        self, text: BaseString, keep_assessments: bool = False
-    ) -> SentimentType:
+    def analyze(self, text: str, keep_assessments: bool = False) -> SentimentType:
         if keep_assessments:
             Sentiment = namedtuple(
                 "Sentiment", ["polarity", "subjectivity", "assessments"]
@@ -147,7 +145,7 @@ class NaiveBayesAnalyzer(BaseSentimentAnalyzer):
         train_data = neg_feats + pos_feats
         self._classifier = nltk.classify.NaiveBayesClassifier.train(train_data)
 
-    def analyze(self, text: BaseString) -> SentimentResult:
+    def analyze(self, text: str) -> SentimentResult:
         super().analyze(text)
         word_tokens = word_tokenize(text, include_punctuation=False)
         filtered_words = (word.lower() for word in word_tokens if len(word) >= 3)

@@ -5,7 +5,6 @@ from unittest import TestCase
 
 import nltk
 
-from mitools.nlp.nlp_typing import BaseString
 from mitools.nlp.tokenizers import (
     BaseTokenizer,
     BlanklineTokenizer,
@@ -19,7 +18,7 @@ from mitools.nlp.tokenizers import (
 
 class TestBaseTokenizer(TestCase):
     class MockTokenizer(BaseTokenizer):
-        def tokenize(self, text: BaseString) -> Sequence[BaseString]:
+        def tokenize(self, text: str) -> Sequence[str]:
             return text.split()
 
     def setUp(self):

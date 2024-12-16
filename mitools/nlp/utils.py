@@ -33,12 +33,12 @@ from mitools.nlp.definitions import (
     SEPARATOR,
     TOKEN,
 )
-from mitools.nlp.nlp_typing import BaseString, PennTag, PosTag, WordNetTag
+from mitools.nlp.nlp_typing import PennTag, PosTag, WordNetTag
 from mitools.nlp.tokenizers import SentenceTokenizer, WordTokenizer
 from mitools.utils.helper_functions import decode_string, strip_punctuation
 
 
-def find_relations(tokens: Sequence[BaseString]):
+def find_relations(tokens: Sequence[str]):
     raise NotImplementedError("find_relations() is not implemented.")
 
 
@@ -46,7 +46,7 @@ def avg(list: Iterable[float]) -> float:
     return sum(list) / float(len(list) or 1)
 
 
-def suggest(word: BaseString) -> BaseString:
+def suggest(word: str) -> str:
     pass
 
 
@@ -55,7 +55,7 @@ def penn_to_wordnet(penn_tag: PennTag) -> WordNetTag:
 
 
 def word_tokenize(
-    text: BaseString,
+    text: str,
     word_tokenizer: WordTokenizer = None,
     sentence_tokenizer: SentenceTokenizer = None,
     include_punctuation: bool = True,
@@ -73,7 +73,7 @@ def word_tokenize(
 
 
 def sentence_tokenize(
-    text: BaseString,
+    text: str,
     sentence_tokenizer: SentenceTokenizer = None,
     *args,
     **kwargs,
@@ -85,13 +85,13 @@ def sentence_tokenize(
 
 
 def get_words_from_corpus(
-    corpus: Union[BaseString, Sequence[BaseString]],
+    corpus: Union[str, Sequence[str]],
     word_tokenizer: WordTokenizer = None,
     sentence_tokenizer: SentenceTokenizer = None,
     include_punctuation: bool = False,
     *args,
     **kwargs,
-) -> Set[BaseString]:
+) -> Set[str]:
     def tokenize(words, word_tokenizer, sentence_tokenizer, *args, **kwargs):
         if isinstance(words, (str, bytes)):
             return word_tokenize(
@@ -113,7 +113,7 @@ def get_words_from_corpus(
     return set(all_words)
 
 
-def get_corpus_tokens(corpus: Iterable[BaseString]) -> Set[BaseString]:
+def get_corpus_tokens(corpus: Iterable[str]) -> Set[str]:
     if isinstance(corpus, (str, bytes)):
         tokens = set(
             strip_punctuation(word, all=False)
@@ -124,9 +124,7 @@ def get_corpus_tokens(corpus: Iterable[BaseString]) -> Set[BaseString]:
     return tokens
 
 
-def basic_extractor(
-    corpus: Iterable[BaseString], train_set: Iterable[BaseString]
-) -> Dict[str, bool]:
+def basic_extractor(corpus: Iterable[str], train_set: Iterable[str]) -> Dict[str, bool]:
     try:
         zero_item = next(iter(train_set))
     except StopIteration:
@@ -144,7 +142,7 @@ def basic_extractor(
     return features
 
 
-def contains_extractor(corpus: Iterable[BaseString]) -> Dict[str, bool]:
+def contains_extractor(corpus: Iterable[str]) -> Dict[str, bool]:
     tokens = get_corpus_tokens(corpus)
     features = dict((f"contains({word})", True) for word in tokens)
     return features
@@ -218,7 +216,7 @@ def default_feature_extractor(words: Iterable[str]) -> Dict[str, bool]:
     return dict((word, True) for word in words)
 
 
-def is_numeric(value: BaseString) -> bool:
+def is_numeric(value: str) -> bool:
     try:
         float(value)
     except ValueError:
@@ -226,7 +224,7 @@ def is_numeric(value: BaseString) -> bool:
     return True
 
 
-def suffix_rules(token: BaseString, tag: PosTag = "NN"):
+def suffix_rules(token: str, tag: PosTag = "NN"):
     if isinstance(token, (list, tuple)):
         token, tag = token
     if token.endswith("ing"):
@@ -250,7 +248,7 @@ def suffix_rules(token: BaseString, tag: PosTag = "NN"):
 
 
 def find_tokens(
-    text: BaseString,
+    text: str,
     punctuation_chars: Tuple[str] = PUNCTUATION,
     known_abbreviations: Set[str] = ABBREVIATIONS,
     contraction_replacements: Dict[str, str] = REPLACEMENTS,
@@ -448,8 +446,8 @@ def find_tags(
 
 
 def find_chunks(
-    tagged_tokens: List[Tuple[BaseString, PosTag]], language: str = "en"
-) -> List[Tuple[BaseString, PosTag, str]]:
+    tagged_tokens: List[Tuple[str, PosTag]], language: str = "en"
+) -> List[Tuple[str, PosTag, str]]:
     tokens_with_chunks = [x for x in tagged_tokens]
     tag_sequence = "".join(f"{tag}{SEPARATOR}" for token, tag in tagged_tokens)
     # Use Germanic or Romance chunking rules according to given language
@@ -491,7 +489,7 @@ def find_chunks(
     return tokens_with_chunks
 
 
-def find_prepositions(token_sequence: List[Tuple[BaseString, PosTag, str]]):
+def find_prepositions(token_sequence: List[Tuple[str, PosTag, str]]):
     for token_item in token_sequence:
         token_item.append("O")
     for current_idx, current_token in enumerate(token_sequence):

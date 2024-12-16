@@ -6,7 +6,6 @@ from nltk import BigramTagger, RegexpTagger, UnigramTagger
 from nltk.tokenize import sent_tokenize
 from nltk.tree import Tree
 
-from mitools.nlp.nlp_typing import BaseString
 from mitools.nlp.parsers import BaseParser, ChunkParser
 from mitools.nlp.taggers import BaseTagger, PatternTagger
 from mitools.nlp.utils import (
@@ -19,7 +18,7 @@ from mitools.nlp.utils import (
 
 class BaseNPExtractor(ABCMeta):
     @abstractmethod
-    def extract(self, text: BaseString) -> Sequence[str]:
+    def extract(self, text: str) -> Sequence[str]:
         pass
 
 
@@ -37,7 +36,7 @@ class ConllExtractor(BaseNPExtractor):
         self.parser = parser if parser is not None else ChunkParser()
         self.tagger = tagger if tagger is not None else PatternTagger()
 
-    def extract(self, text: BaseString) -> Sequence[str]:
+    def extract(self, text: str) -> Sequence[str]:
         sentences = sent_tokenize(text)
         noun_phrases = []
         for sentence in sentences:
@@ -54,7 +53,7 @@ class ConllExtractor(BaseNPExtractor):
             noun_phrases.extend(nps)
         return noun_phrases
 
-    def _parse_sentence(self, sentence: BaseString) -> Sequence[Tree]:
+    def _parse_sentence(self, sentence: str) -> Sequence[Tree]:
         tagged = self.tagger.tag_tokens(sentence)
         return self.parser.parse(tagged)
 
@@ -94,11 +93,11 @@ class FastNPExtractor(BaseNPExtractor):
         self._trained = True
         return None
 
-    def _tokenize_sentence(self, sentence: BaseString) -> Sequence[str]:
+    def _tokenize_sentence(self, sentence: str) -> Sequence[str]:
         tokens = nltk.word_tokenize(sentence)
         return tokens
 
-    def extract(self, sentence: BaseString) -> Sequence[str]:
+    def extract(self, sentence: str) -> Sequence[str]:
         if not self._trained:
             self.train()
         word_tokens = self._tokenize_sentence(sentence)

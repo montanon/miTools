@@ -5,7 +5,6 @@ from unittest import TestCase
 
 import nltk
 
-from mitools.nlp.nlp_typing import BaseString
 from mitools.nlp.taggers import BaseTagger, NLTKTagger, PatternTagger
 from mitools.nlp.tokenizers import BaseTokenizer
 
@@ -16,9 +15,7 @@ print(test)
 
 
 class MockTagger(BaseTagger):
-    def tag_tokens(
-        self, text: BaseString, tokenize: bool = True
-    ) -> Sequence[Tuple[str, str]]:
+    def tag_tokens(self, text: str, tokenize: bool = True) -> Sequence[Tuple[str, str]]:
         if tokenize:
             words = text.split()
         else:
@@ -64,11 +61,11 @@ class TestPatternTagger(TestCase):
         self.assertEqual(tags, ["DT", "VBZ", "DT", "JJ", "NN"])
 
     def test_non_string_input(self):
-        class MockBaseString:
+        class Mockstr:
             def __init__(self, raw):
                 self.raw = raw
 
-        mock_text = MockBaseString("Another test")
+        mock_text = Mockstr("Another test")
         result = self.tagger.tag_tokens(mock_text, tokenize=True)
         self.assertTrue(all(isinstance(t, tuple) and len(t) == 2 for t in result))
 
@@ -92,7 +89,7 @@ class TestNLTKTagger(TestCase):
 
     def test_tag_with_custom_tokenizer(self):
         class CustomTokenizer(BaseTokenizer):
-            def tokenize(self, text: BaseString):
+            def tokenize(self, text: str):
                 return text.replace("-", " ").split()
 
         tokenizer = CustomTokenizer()
@@ -106,11 +103,11 @@ class TestNLTKTagger(TestCase):
         self.assertEqual(result, [])
 
     def test_non_string_input(self):
-        class MockBaseString:
+        class Mockstr:
             def __init__(self, raw):
                 self.raw = raw
 
-        text = MockBaseString("Testing non-string input")
+        text = Mockstr("Testing non-string input")
         result = self.tagger.tag_tokens(text)
         self.assertTrue(all(isinstance(t, tuple) and len(t) == 2 for t in result))
 

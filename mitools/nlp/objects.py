@@ -25,7 +25,7 @@ from mitools.nlp.definitions import (
     TOKENS,
     VERB,
 )
-from mitools.nlp.nlp_typing import BaseString, PosTag
+from mitools.nlp.nlp_typing import PosTag
 from mitools.nlp.utils import (
     avg,
     find_chunks,
@@ -73,7 +73,7 @@ class StopwordsManager:
 class TaggedString(str):
     def __new__(
         self,
-        string: BaseString,
+        string: str,
         tags: Sequence[PosTag] = None,
         language: Literal["en"] = None,
     ):
@@ -599,7 +599,7 @@ class Spelling(LazyDict):
         return self._language
 
     @classmethod
-    def train(self, text: BaseString, output_path: Path = Path("spelling.txt")):
+    def train(self, text: str, output_path: Path = Path("spelling.txt")):
         word_frequencies = {}
         for word in re.findall("[a-z]+", text.lower()):
             word_frequencies[word] = word_frequencies.get(word, 0) + 1
@@ -612,7 +612,7 @@ class Spelling(LazyDict):
         with open(output_path, "w") as output_file:
             output_file.write(model_content)
 
-    def _edit1(self, word: BaseString) -> Set[BaseString]:
+    def _edit1(self, word: str) -> Set[str]:
         # Of all spelling errors, 80% is covered by edit distance 1.
         # Edit distance 1 = one character deleted, swapped, replaced or inserted.
         word_splits = [(word[:i], word[i:]) for i in range(len(word) + 1)]
@@ -635,7 +635,7 @@ class Spelling(LazyDict):
         ]
         return set(deletions + transpositions + replacements + insertions)
 
-    def _edit2(self, word: BaseString) -> Set[BaseString]:
+    def _edit2(self, word: str) -> Set[str]:
         # Of all spelling errors, 99% is covered by edit distance 2.
         # Only keep candidates that are actually known words (20% speedup).
         return set(
@@ -645,12 +645,12 @@ class Spelling(LazyDict):
             if second_edit in self
         )
 
-    def _known(self, candidate_words: Sequence[BaseString] = None) -> Set[BaseString]:
+    def _known(self, candidate_words: Sequence[str] = None) -> Set[str]:
         if candidate_words is None:
             candidate_words = []
         return set(word for word in candidate_words if word in self)
 
-    def suggest(self, word: BaseString) -> List[Tuple[BaseString, float]]:
+    def suggest(self, word: str) -> List[Tuple[str, float]]:
         if len(self) == 0:
             self.load()
         if len(word) == 1:
@@ -705,7 +705,7 @@ class Parser:
         self.default = default
         self.language = language
 
-    def find_tokens(self, string: BaseString, **kwargs):
+    def find_tokens(self, string: str, **kwargs):
         # "The cat purs." => ["The cat purs ."]
         return find_tokens(
             str(string),
@@ -717,7 +717,7 @@ class Parser:
             paragraph_break=r"\n{2,}",
         )
 
-    def find_tags(self, tokens: Sequence[BaseString], **kwargs):
+    def find_tags(self, tokens: Sequence[str], **kwargs):
         # ["The", "cat", "purs"] => [["The", "DT"], ["cat", "NN"], ["purs", "VB"]]
         return find_tags(
             word_tokens=tokens,
@@ -727,25 +727,25 @@ class Parser:
             tag_mapper=kwargs.get("tag_mapper", None),
         )
 
-    def find_chunks(self, tokens: Sequence[BaseString], **kwargs):
+    def find_chunks(self, tokens: Sequence[str], **kwargs):
         # [["The", "DT"], ["cat", "NN"], ["purs", "VB"]] =>
         # [["The", "DT", "B-NP"], ["cat", "NN", "I-NP"], ["purs", "VB", "B-VP"]]
         return find_prepositions(
             find_chunks(tokens, language=kwargs.get("language", self.language))
         )
 
-    def find_prepositions(self, tokens: Sequence[BaseString], **kwargs):
+    def find_prepositions(self, tokens: Sequence[str], **kwargs):
         return find_prepositions(tokens)  # See also Parser.find_chunks().
 
-    def find_labels(self, tokens: Sequence[BaseString], **kwargs):
+    def find_labels(self, tokens: Sequence[str], **kwargs):
         return find_relations(tokens)
 
-    def find_lemmata(self, tokens: Sequence[BaseString], **kwargs):
+    def find_lemmata(self, tokens: Sequence[str], **kwargs):
         return [token + [token[0].lower()] for token in tokens]
 
     def parse(
         self,
-        text: BaseString,
+        text: str,
         tokenize: bool = True,
         tags: bool = True,
         chunks: bool = True,
@@ -944,9 +944,7 @@ class Sentiment(LazyDict):
             self.load()
         return tuple(self._synsets.get(padded_id, (0.0, 0.0))[:2])
 
-    def __call__(
-        self, input_text: BaseString, negation: bool = True, **kwargs
-    ) -> Score:
+    def __call__(self, input_text: str, negation: bool = True, **kwargs) -> Score:
         def calculate_weighted_average(
             sentiment_assessments: Iterable[Tuple[List[str], float]],
             weighting_function: Callable = lambda w: 1,
@@ -1182,7 +1180,7 @@ class Sentiment(LazyDict):
 
     def annotate(
         self,
-        word: BaseString,
+        word: str,
         pos: PosTag = None,
         polarity: float = 0.0,
         subjectivity: float = 0.0,

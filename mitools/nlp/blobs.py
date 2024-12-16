@@ -15,7 +15,7 @@ from mitools.nlp.en.inflect import pluralize as en_pluralize
 from mitools.nlp.en.inflect import singularize as en_singularize
 from mitools.nlp.extractors import BaseNPExtractor, FastNPExtractor
 from mitools.nlp.mixins import BlobComparableMixin, StringlikeMixin
-from mitools.nlp.nlp_typing import BaseString, PosTag
+from mitools.nlp.nlp_typing import PosTag
 from mitools.nlp.parsers import BaseParser, PatternParser
 from mitools.nlp.sentiments import BaseSentimentAnalyzer, PatternAnalyzer
 from mitools.nlp.taggers import BaseTagger, NLTKTagger
@@ -30,7 +30,7 @@ from mitools.utils.decorators import cached_property
 from mitools.utils.helper_functions import PUNCTUATION_REGEX, lowerstrip
 
 
-def singularize(word: BaseString, language: Literal["en", "other"] = "en") -> Callable:
+def singularize(word: str, language: Literal["en", "other"] = "en") -> Callable:
     if language == "en":
         return en_singularize(word)
     raise NotImplementedError(
@@ -38,7 +38,7 @@ def singularize(word: BaseString, language: Literal["en", "other"] = "en") -> Ca
     )
 
 
-def pluralize(word: BaseString, language: Literal["en", "other"] = "en") -> Callable:
+def pluralize(word: str, language: Literal["en", "other"] = "en") -> Callable:
     if language == "en":
         return en_pluralize(word)
     raise NotImplementedError(f"Pluralize is not implemented for language {language}.")
@@ -58,11 +58,11 @@ class Word(str):
     def __str__(self):
         return self.string
 
-    def singularize(self):
-        return Word(singularize(self.string))
+    def singularize(self, language: Literal["en", "other"] = "en"):
+        return Word(singularize(self.string, language))
 
-    def pluralize(self):
-        return Word(pluralize(self.string))
+    def pluralize(self, language: Literal["en", "other"] = "en"):
+        return Word(pluralize(self.string, language))
 
     def spellcheck(self):
         return suggest(self.string)
@@ -108,7 +108,7 @@ class Word(str):
 
 
 class WordList(list):
-    def __init__(self, word_collection: Sequence[BaseString]):
+    def __init__(self, word_collection: Sequence[str]):
         super().__init__([Word(w) for w in word_collection])
 
     def __str__(self):
@@ -128,15 +128,15 @@ class WordList(list):
     def __getslice__(self, i: int, j: int):
         return self.__class__(super().__getslice__(i, j))
 
-    def __setitem__(self, index: int, obj: Union[BaseString, Word]):
-        if isinstance(obj, BaseString):
+    def __setitem__(self, index: int, obj: Union[str, Word]):
+        if isinstance(obj, str):
             super().__setitem__(index, Word(obj))
         else:
             super().__setitem__(index, obj)
 
     def count(
         self,
-        strg: Union[BaseString, Word],
+        strg: Union[str, Word],
         case_sensitive: bool = False,
         *args,
         **kwargs,
@@ -145,13 +145,13 @@ class WordList(list):
             return [word.lower() for word in self].count(strg.lower(), *args, **kwargs)
         return super().count(strg, *args, **kwargs)
 
-    def append(self, obj: Union[BaseString, Word]):
-        if isinstance(obj, BaseString):
+    def append(self, obj: Union[str, Word]):
+        if isinstance(obj, str):
             super().append(Word(obj))
         else:
             super().append(obj)
 
-    def extend(self, iterable: Sequence[Union[BaseString, Word]]):
+    def extend(self, iterable: Sequence[Union[str, Word]]):
         for e in iterable:
             self.append(e)
 
@@ -307,8 +307,8 @@ class BaseBlob(StringlikeMixin, BlobComparableMixin):
     def __hash__(self):
         return hash(self.comparable_key())
 
-    def __add__(self, other: Union[BaseString, "BaseBlob"]):
-        if isinstance(other, BaseString):
+    def __add__(self, other: Union[str, "BaseBlob"]):
+        if isinstance(other, str):
             return self.__class__(self.raw + other)
         elif isinstance(other, BaseBlob):
             return self.__class__(self.raw + other.raw)
@@ -371,7 +371,7 @@ class TextBlob(BaseBlob):
 class Sentence(BaseBlob):
     def __init__(
         self,
-        sentence: BaseString,
+        sentence: str,
         start_index: int = 0,
         end_index: int = None,
         *args,
