@@ -19,9 +19,9 @@ from mitools.nlp.nlp_typing import BaseString, PosTag
 from mitools.nlp.parsers import BaseParser, PatternParser
 from mitools.nlp.sentiments import BaseSentimentAnalyzer, PatternAnalyzer
 from mitools.nlp.taggers import BaseTagger, NLTKTagger
+from mitools.nlp.tags_translator import translate_tag
 from mitools.nlp.tokenizers import BaseTokenizer, WordTokenizer
 from mitools.nlp.utils import (
-    penn_to_wordnet,
     sentence_tokenize,
     suggest,
     word_tokenize,
@@ -82,12 +82,12 @@ class Word(str):
         elif pos in wordnet._FILEMAP.keys():
             tag = pos
         else:
-            tag = penn_to_wordnet(pos)
+            tag = translate_tag(pos, "penn", "wordnet")
         if lemmatizer is None:
             lemmatizer = WordNetLemmatizer()
         return lemmatizer.lemmatize(self.string, tag)
 
-    def stem(self, stemmer: StemmerI = None):
+    def stem(self, stemmer: Union[StemmerI, None] = None):
         if stemmer is None:
             stemmer = PorterStemmer()
         return stemmer.stem(self.string)
