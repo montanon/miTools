@@ -10,8 +10,6 @@ from mitools.nlp.tokenizers import BaseTokenizer
 
 nltk.download("punkt", download_dir="/Users/sebastian/nltk_data")
 nltk.data.path.append("/Users/sebastian/nltk_data")
-test = nltk.tokenize.word_tokenize("This is a simple test.")
-print(test)
 
 
 class MockTagger(BaseTagger):

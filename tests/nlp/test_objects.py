@@ -39,7 +39,6 @@ class TestMorphology(unittest.TestCase):
     def test_load_from_file(self):
         morph = Morphology(path="mitools/nlp/en/en-morphology.txt")
         morph.load()
-        print(morph.morp_operations)
         self.assertGreater(len(morph), 0)
         rules_str = str(morph)
         self.assertIn("NN s fhassuf 1 NNS x", rules_str)
