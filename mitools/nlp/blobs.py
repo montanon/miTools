@@ -17,7 +17,11 @@ from mitools.nlp.extractors import BaseNPExtractor, FastNPExtractor
 from mitools.nlp.mixins import BlobComparableMixin, StringlikeMixin
 from mitools.nlp.nlp_typing import PosTag
 from mitools.nlp.parsers import BaseParser, PatternParser
-from mitools.nlp.sentiments import BaseSentimentAnalyzer, PatternAnalyzer
+from mitools.nlp.sentiments import (
+    BaseSentimentAnalyzer,
+    HuggingFaceAnalyzer,
+    PatternAnalyzer,
+)
 from mitools.nlp.taggers import BaseTagger, NLTKTagger
 from mitools.nlp.tags_translator import translate_tag
 from mitools.nlp.tokenizers import BaseTokenizer, WordTokenizer
@@ -201,7 +205,7 @@ class BaseBlob(StringlikeMixin, BlobComparableMixin):
         self.np_extractor = (
             np_extractor if np_extractor is not None else FastNPExtractor()
         )
-        self.analyzer = analyzer if analyzer is not None else PatternAnalyzer()
+        self.analyzer = analyzer if analyzer is not None else HuggingFaceAnalyzer()
         self.parser = parser if parser is not None else PatternParser()
         self.classifier = classifier
 
@@ -236,11 +240,11 @@ class BaseBlob(StringlikeMixin, BlobComparableMixin):
 
     @cached_property
     def polarity(self):
-        return PatternAnalyzer().analyze(self.raw)[0]
+        return HuggingFaceAnalyzer().analyze(self.raw).polarity
 
     @cached_property
     def subjectivity(self):
-        return PatternAnalyzer().analyze(self.raw)[1]
+        return HuggingFaceAnalyzer().analyze(self.raw).subjectivity
 
     @cached_property
     def noun_phrases(self):
@@ -407,7 +411,7 @@ class Blobber:
         self.np_extractor = (
             np_extractor if np_extractor is not None else FastNPExtractor()
         )
-        self.analyzer = analyzer if analyzer is not None else PatternAnalyzer()
+        self.analyzer = analyzer if analyzer is not None else HuggingFaceAnalyzer()
         self.parser = parser if parser is not None else PatternParser()
         self.classifier = classifier
 
