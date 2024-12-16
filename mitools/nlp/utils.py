@@ -3,6 +3,7 @@ import re
 from itertools import chain
 from pathlib import Path
 from typing import (
+    Any,
     Callable,
     Dict,
     Iterable,
@@ -33,7 +34,6 @@ from mitools.nlp.definitions import (
     TOKEN,
 )
 from mitools.nlp.nlp_typing import BaseString, PennTag, PosTag, WordNetTag
-from mitools.nlp.objects import Context, Entities, Morphology
 from mitools.nlp.tokenizers import SentenceTokenizer, WordTokenizer
 from mitools.utils.helper_functions import decode_string, strip_punctuation
 
@@ -385,9 +385,9 @@ def find_tags(
     word_tokens,
     lexicon: Dict[str, PosTag] = None,
     language_model: Callable = None,
-    morphology_analyzer: Morphology = None,
-    context_analyzer: Context = None,
-    entity_recognizer: Entities = None,
+    morphology_analyzer: Any = None,
+    context_analyzer: Any = None,
+    entity_recognizer: Any = None,
     default_tags: Tuple[PosTag, PosTag, PosTag] = ("NN", "NNP", "CD"),
     language_code: str = "en",
     tag_mapper: Callable = None,
