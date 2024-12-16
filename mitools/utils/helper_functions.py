@@ -51,6 +51,32 @@ PUNCTUATION_REGEX = re.compile(
 )
 
 
+def decode_string(value: Union[str, bytes], encoding: str = "utf-8") -> str:
+    if isinstance(encoding, (str, bytes)):
+        encoding = ((encoding,),) + (("windows-1252",), ("utf-8", "ignore"))
+    if isinstance(value, bytes):
+        for e in encoding:
+            try:
+                return value.decode(*e)
+            except Exception:
+                pass
+        return value
+    return str(value)
+
+
+def encode_string(value: Union[str, bytes], encoding: str = "utf-8") -> str:
+    if isinstance(encoding, (str, bytes)):
+        encoding = ((encoding,),) + (("windows-1252",), ("utf-8", "ignore"))
+    if isinstance(value, str):
+        for e in encoding:
+            try:
+                return value.encode(*e)
+            except Exception:
+                pass
+        return value
+    return str(value)
+
+
 def lowerstrip(s: str, all: bool = False) -> str:
     return strip_punctuation(s.lower().strip(), all=all)
 
