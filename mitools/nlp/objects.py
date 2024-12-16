@@ -153,9 +153,7 @@ class Rules:
 
 
 class Morphology(LazyList, Rules):
-    def __init__(
-        self, lexicon: Union[Dict[str, str], None] = None, path: Path = Path("")
-    ):
+    def __init__(self, lexicon: Union[Dict[str, str], None] = None, path: Path = None):
         if lexicon is None:
             lexicon = {}
         morph_operations = (
