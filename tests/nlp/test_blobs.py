@@ -1,3 +1,4 @@
+import json
 import unittest
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
@@ -6,7 +7,7 @@ from nltk.corpus import wordnet
 from nltk.stem import PorterStemmer, WordNetLemmatizer
 
 from mitools.exceptions import ArgumentTypeError
-from mitools.nlp.blobs import BaseBlob, Word, WordList
+from mitools.nlp.blobs import BaseBlob, Sentence, TextBlob, Word, WordList
 from mitools.nlp.tokenizers import WordTokenizer
 
 
@@ -368,6 +369,112 @@ class TestBaseBlob(TestCase):
         split_result = self.blob.split()
         self.assertIsInstance(split_result, WordList)
         self.assertEqual(split_result[0].string, "The")
+
+
+class TestTextBlob(TestCase):
+    def setUp(self):
+        self.text = "The quick brown fox. Jumps over the lazy dog."
+        self.blob = TextBlob(self.text)
+
+    def test_initialization(self):
+        self.assertEqual(self.blob.raw, self.text)
+        self.assertIsInstance(self.blob, TextBlob)
+
+    def test_sentences_property(self):
+        sentences = self.blob.sentences
+        self.assertEqual(len(sentences), 2)
+        self.assertIsInstance(sentences[0], Sentence)
+        self.assertEqual(sentences[0].raw, "The quick brown fox.")
+
+    def test_words_property(self):
+        words = self.blob.words
+        self.assertIsInstance(words, WordList)
+        self.assertEqual(len(words), 9)
+        self.assertEqual(words[0].string, "The")
+
+    def test_raw_sentences_property(self):
+        raw_sentences = self.blob.raw_sentences
+        self.assertEqual(len(raw_sentences), 2)
+        self.assertEqual(raw_sentences[0], "The quick brown fox.")
+
+    def test_serialized_property(self):
+        serialized = self.blob.serialized
+        self.assertEqual(len(serialized), 2)
+        self.assertEqual(serialized[0]["raw"], "The quick brown fox.")
+
+    def test_to_json(self):
+        mock_serialized = [
+            {
+                "end_index": 20,
+                "noun_phrases": ["quick brown fox"],
+                "polarity": 0.7793781757354736,
+                "raw": "The quick brown fox.",
+                "start_index": 0,
+                "stripped": "the quick brown fox",
+                "subjectivity": None,
+            },
+            {
+                "end_index": 45,
+                "noun_phrases": ["jumps", "lazy dog"],
+                "polarity": -0.8721502423286438,
+                "raw": "Jumps over the lazy dog.",
+                "start_index": 21,
+                "stripped": "jumps over the lazy dog",
+                "subjectivity": None,
+            },
+        ]
+        json_output = self.blob.to_json()
+        self.assertEqual(json.loads(json_output), mock_serialized)
+
+    def test_json_property(self):
+        mock_serialized = [
+            {
+                "end_index": 20,
+                "noun_phrases": ["quick brown fox"],
+                "polarity": 0.7793781757354736,
+                "raw": "The quick brown fox.",
+                "start_index": 0,
+                "stripped": "the quick brown fox",
+                "subjectivity": None,
+            },
+            {
+                "end_index": 45,
+                "noun_phrases": ["jumps", "lazy dog"],
+                "polarity": -0.8721502423286438,
+                "raw": "Jumps over the lazy dog.",
+                "start_index": 21,
+                "stripped": "jumps over the lazy dog",
+                "subjectivity": None,
+            },
+        ]
+        self.assertEqual(json.loads(self.blob.json), mock_serialized)
+
+
+class TestSentence(TestCase):
+    def setUp(self):
+        self.sentence_text = "The quick brown fox."
+        self.start_index = 0
+        self.end_index = len(self.sentence_text)
+        self.sentence = Sentence(
+            self.sentence_text,
+            start_index=self.start_index,
+            end_index=self.end_index,
+        )
+
+    def test_initialization(self):
+        self.assertEqual(self.sentence.raw, self.sentence_text)
+        self.assertEqual(self.sentence.start_index, self.start_index)
+        self.assertEqual(self.sentence.end_index, self.end_index)
+        self.assertIsInstance(self.sentence, Sentence)
+
+    def test_dict_property(self):
+        result = self.sentence.dict
+        self.assertEqual(result["raw"], self.sentence_text)
+        self.assertEqual(result["start_index"], self.start_index)
+        self.assertEqual(result["end_index"], self.end_index)
+        self.assertEqual(result["noun_phrases"][0].string, "quick brown fox")
+        self.assertEqual(result["polarity"], 0.7793781757354736)
+        self.assertEqual(result["subjectivity"], None)
 
 
 if __name__ == "__main__":
