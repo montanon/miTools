@@ -3,10 +3,8 @@ from typing import Literal, Sequence, Union
 from nltk.corpus import wordnet
 
 from mitools.nlp.nlp_typing import (
-    BaseString,
     NLTKTag,
     PennTag,
-    PosTag,
     UniversalTag,
     WordNetTag,
 )
