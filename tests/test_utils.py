@@ -28,8 +28,10 @@ from mitools.utils import (
     can_convert_to,
     check_symmetrical_matrix,
     clean_str,
+    decode_string,
     dict_from_kwargs,
     display_env_variables,
+    encode_string,
     find_str_line_number_in_text,
     fuzz_ratio,
     fuzz_string_in_string,
@@ -56,6 +58,59 @@ from mitools.utils import (
     write_json_file,
     write_text_file,
 )
+
+
+class TestStringEncodingDecoding(TestCase):
+    def test_decode_string_valid_utf8_bytes(self):
+        self.assertEqual(decode_string(b"hello"), "hello")
+
+    def test_decode_string_valid_windows_1252_bytes(self):
+        self.assertEqual(decode_string(b"\xe9", encoding="windows-1252"), "é")
+
+    def test_decode_string_utf8_fallback(self):
+        self.assertEqual(decode_string(b"\xe9"), "é")  # Decoded as utf-8
+
+    def test_decode_string_invalid_encoding(self):
+        result = decode_string(b"\xff\xff", encoding="ascii")
+        self.assertEqual(result, "ÿÿ")  # Returns original bytes
+
+    def test_decode_string_str_input(self):
+        self.assertEqual(decode_string("already a string"), "already a string")
+
+    def test_non_existent_encoding(self):
+        self.assertEqual(decode_string(b"\x81", encoding="windows-1252"), "")
+
+    def test_decode_string_invalid_encoding_type(self):
+        with self.assertRaises(TypeError):
+            decode_string(b"test", encoding=123)
+
+    def test_encode_string_valid_utf8(self):
+        self.assertEqual(encode_string("hello"), b"hello")
+
+    def test_encode_string_valid_windows_1252(self):
+        self.assertEqual(encode_string("é", encoding="windows-1252"), b"\xe9")
+
+    def test_encode_string_utf8_fallback(self):
+        self.assertEqual(encode_string("€", encoding="ascii"), b"\x80")
+
+    def test_encode_string_invalid_encoding(self):
+        result = encode_string("€", encoding="ascii")
+        self.assertEqual(
+            result, encode_string("€", encoding="windows-1252")
+        )  # Returns utf-8 encoded value
+
+    def test_encode_string_bytes_input(self):
+        self.assertEqual(encode_string(b"already bytes"), "b'already bytes'")
+
+    def test_encode_string_invalid_encoding_type(self):
+        with self.assertRaises(TypeError):
+            encode_string("test", encoding=123)
+
+    def test_encode_string_non_utf8_str(self):
+        self.assertEqual(encode_string("\x81", encoding="windows-1252"), b"\xc2\x81")
+
+    def test_encode_string_invalid_input_type(self):
+        self.assertEqual(encode_string(123), "123")
 
 
 class TestStripPunctuation(TestCase):
