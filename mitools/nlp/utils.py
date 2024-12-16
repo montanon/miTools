@@ -3,7 +3,18 @@ import re
 import string
 from itertools import chain
 from pathlib import Path
-from typing import Callable, Dict, Iterable, List, Sequence, Set, Tuple, Union
+from typing import (
+    Callable,
+    Dict,
+    Iterable,
+    Iterator,
+    List,
+    Sequence,
+    Set,
+    TextIO,
+    Tuple,
+    Union,
+)
 from xml.etree import ElementTree
 
 from nltk.corpus import wordnet
@@ -388,56 +399,28 @@ def find_tokens(
     return sentence_strings
 
 
-def read(path: Path, encoding="utf-8", comment=";;;"):
-    if path:
-        if isinstance(path, (str, bytes)) and Path(path).exists():
-            f = open(path, encoding=encoding)
-        elif isinstance(path, (str, bytes)):
-            f = path.splitlines()
-        elif hasattr(path, "read"):
-            f = path.read().splitlines()
-        else:
-            f = path
-        for i, line in enumerate(f):
-            line = (
-                line.strip(codecs.BOM_UTF8)
-                if i == 0 and isinstance(line, bytes)
-                else line
-            )
-            line = line.strip()
-            line = decode_string(line, encoding=encoding)
-            if not line or (comment and line.startswith(comment)):
-                continue
-            yield line
-    return
-
-
-class Lexicon(LazyDict):
-    def __init__(
-        self,
-        path: Path = Path(""),
-        morphology: Path = None,
-        context: Path = None,
-        entities: Path = None,
-        NNP: str = "NNP",
-        language: str = None,
-    ):
-        self._path = path
-        self._language = language
-        self.morphology = Morphology(self, path=morphology)
-        self.context = Context(self, path=context)
-        self.entities = Entities(self, path=entities, tag=NNP)
-
-    def load(self):
-        dict.update(self, (x.split(" ")[:2] for x in read(self._path) if x.strip()))
-
-    @property
-    def path(self):
-        return self._path
-
-    @property
-    def language(self):
-        return self._language
+def read_text(
+    source: Union[Path, str, TextIO, Iterable[str]], encoding="utf-8", comment=";;;"
+):
+    if source is None:
+        return None
+    if isinstance(source, (str, bytes)) and Path(source).exists():
+        f = open(source, encoding=encoding)
+    elif isinstance(source, (str, bytes)):
+        f = source.splitlines()
+    elif hasattr(source, "read"):
+        f = source.read().splitlines()
+    else:
+        f = source
+    for i, line in enumerate(f):
+        line = (
+            line.strip(codecs.BOM_UTF8) if i == 0 and isinstance(line, bytes) else line
+        )
+        line = line.strip()
+        line = decode_string(line, encoding=encoding)
+        if not line or (comment and line.startswith(comment)):
+            continue
+        yield line
 
 
 class Rules:
@@ -486,7 +469,7 @@ class Morphology(LazyList, Rules):
         return self._path
 
     def load(self):
-        list.extend(self, (x.split() for x in read(self._path)))
+        list.extend(self, (x.split() for x in read_text(self._path)))
 
     def apply(
         self,
@@ -614,7 +597,7 @@ class Context(LazyList, Rules):
         return self._path
 
     def load(self):
-        list.extend(self, (x.split() for x in read(self._path)))
+        list.extend(self, (x.split() for x in read_text(self._path)))
 
     def apply(self, tokens: Iterable[Tuple[str, str]]):
         padding_tokens = [("STAART", "STAART")] * 3
@@ -834,7 +817,7 @@ class Entities(LazyDict, Rules):
         return self._path
 
     def load(self):
-        for x in read(self.path):
+        for x in read_text(self.path):
             x = [x.lower() for x in x.split()]
             dict.setdefault(self, x[0], []).append(x)
 
@@ -1029,7 +1012,7 @@ class Spelling(LazyDict):
         self._path = path
 
     def load(self):
-        for x in read(self._path):
+        for x in read_text(self._path):
             x = x.split()
             dict.__setitem__(self, x[0], int(x[1]))
 
