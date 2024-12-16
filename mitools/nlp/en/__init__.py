@@ -3,13 +3,13 @@ from typing import Sequence, Tuple
 
 from mitools.nlp.definitions import CHUNK, PENN, PNP, POS, UNIVERSAL, WORD
 from mitools.nlp.en.inflect import singularize
-from mitools.nlp.tags_translator import translate_tag
-from mitools.nlp.utils import (
+from mitools.nlp.objects import (
     Lexicon,
     Parser,
     Sentiment,
     Spelling,
 )
+from mitools.nlp.tags_translator import translate_tag
 
 try:
     MODULE = os.path.dirname(os.path.abspath(__file__))
