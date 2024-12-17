@@ -115,7 +115,7 @@ def cached_property(func):
     return property(getter)
 
 
-def store_args_in_dev(func: Callable):
+def store_signature_in_dev(func: Callable):
     @wraps(func)
     def wrapper(*args, **kwargs):
         signature = inspect.signature(func)
