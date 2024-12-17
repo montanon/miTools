@@ -8,7 +8,7 @@ from nltk.classify import (
     PositiveNaiveBayesClassifier,
 )
 
-from mitools.nlp.utils import basic_extractor, contains_extractor, get_words_from_corpus
+from mitools.nlp.utils import get_words_from_corpus
 from mitools.utils.decorators import cached_property
 
 
@@ -16,7 +16,7 @@ class BaseClassifier:
     def __init__(
         self,
         train_set: Iterable[str],
-        feature_extractor: Callable = basic_extractor,
+        feature_extractor: Callable = None,
         **kwargs,
     ):
         self.format_kwargs = kwargs

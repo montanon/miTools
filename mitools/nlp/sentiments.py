@@ -33,16 +33,6 @@ class SentimentResult:
         )
 
     @classmethod
-    def from_pattern(cls, result: Tuple) -> "SentimentResult":
-        polarity, subjectivity = result
-        return cls(
-            polarity=polarity,
-            confidence=abs(polarity),  # Use absolute polarity as confidence
-            subjectivity=subjectivity,
-            raw_output={"polarity": polarity, "subjectivity": subjectivity},
-        )
-
-    @classmethod
     def from_naive_bayes(cls, result: Tuple) -> "SentimentResult":
         classification, p_pos, p_neg = result
         polarity = p_pos - p_neg  # Convert probabilities to [-1, 1] range
@@ -92,25 +82,6 @@ class HuggingFaceAnalyzer(BaseSentimentAnalyzer):
     def analyze(self, text: str) -> SentimentResult:
         result = self.model(text)
         return SentimentResult.from_huggingface(result)
-
-
-class PatternAnalyzer(BaseSentimentAnalyzer):
-    def __init__(self, kind: Literal["ds", "co"] = "ds"):
-        self.kind = kind
-        self._trained = False
-
-    def analyze(self, text: str, keep_assessments: bool = False) -> SentimentType:
-        if keep_assessments:
-            Sentiment = namedtuple(
-                "Sentiment", ["polarity", "subjectivity", "assessments"]
-            )
-            assessments = pattern_sentiment(text).assessments
-            polarity, subjectivity = pattern_sentiment(text)
-            return Sentiment(polarity, subjectivity, assessments)
-
-        else:
-            Sentiment = namedtuple("Sentiment", ["polarity", "subjectivity"])
-            return Sentiment(*pattern_sentiment(text))
 
 
 class NaiveBayesAnalyzer(BaseSentimentAnalyzer):

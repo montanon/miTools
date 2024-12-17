@@ -6,7 +6,7 @@ from nltk.stem.api import StemmerI
 from nltk.stem.snowball import EnglishStemmer, SpanishStemmer
 
 from mitools.nlp.nlp_typing import PosTag
-from mitools.nlp.utils import nltk_tag_to_wordnet_tag
+from mitools.nlp.tags_translator import translate_tags
 
 
 class BaseLemmatizer(ABCMeta):
@@ -55,7 +55,9 @@ class NLTKLemmatizer(BaseLemmatizer):
     def lemmatize(self, token: Union[str, Tuple[str, PosTag]]) -> Sequence[str]:
         if isinstance(token, tuple):
             word, tag = token
-            return self._lemmatizer.lemmatize(word, pos=nltk_tag_to_wordnet_tag(tag))
+            return self._lemmatizer.lemmatize(
+                word, pos=translate_tags(tag, "nltk", "wordnet")
+            )
         return self._lemmatizer.lemmatize(token)
 
 

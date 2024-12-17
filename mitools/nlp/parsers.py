@@ -4,8 +4,6 @@ import nltk
 from nltk import BigramTagger, ChunkParserI, UnigramTagger
 from nltk.tree import Tree
 
-from mitools.nlp.en import en_parser as pattern_parse
-
 
 class BaseParser(metaclass=ABCMeta):
     @abstractmethod
@@ -39,8 +37,3 @@ class ChunkParser(ChunkParserI):
             for ((word, pos_tag), chunk_tag) in zip(sentence_tokens, chunk_tags)
         ]
         return nltk.chunk.util.conlltags2tree(word_pos_chunk_tuples)
-
-
-class PatternParser(BaseParser):
-    def parse(self, text: str):
-        return pattern_parse(text)
