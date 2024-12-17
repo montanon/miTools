@@ -1,4 +1,3 @@
-import os
 import shutil
 import tempfile
 import time
@@ -63,7 +62,7 @@ class TestGetFileEncoding(TestCase):
         self.temp_file.close()
 
     def tearDown(self):
-        os.remove(self.temp_file.name)
+        Path(self.temp_file.name).unlink()
 
     def test_detect_utf8_encoding(self):
         encoding = get_file_encoding(self.temp_file.name)

@@ -1,5 +1,5 @@
 import json
-import os
+from pathlib import Path
 from threading import Lock
 from typing import Any, ClassVar, Optional
 
@@ -40,7 +40,7 @@ class Dev:
         print(f"Variables saved to {filepath}")
 
     def load_variables(self, filepath: str) -> None:
-        if not os.path.exists(filepath):
+        if not Path(filepath).exists():
             raise FileNotFoundError(f"File '{filepath}' does not exist.")
         with open(filepath, "r") as f:
             self.variables = json.load(f)

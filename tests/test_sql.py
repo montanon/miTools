@@ -1,4 +1,3 @@
-import os
 import sqlite3
 import unittest
 import warnings
@@ -68,8 +67,8 @@ class TestCustomConnection(TestCase):
 
     def tearDown(self):
         # Delete the 'sample_file' after the test is done
-        if os.path.exists(self.path):
-            os.remove(self.path)
+        if self.path.exists():
+            self.path.unlink()
 
     def test_initialization(self):
         # Check that the CustomConnection object is instantiated
@@ -120,15 +119,15 @@ class TestSuppressUserWarningDecorator(TestCase):
 
 class TestCheckIfTable(TestCase):
     def setUp(self):
-        self.path = ".test_db"
+        self.path = Path(".test_db")
         self.conn = connect_to_sql_db("./", self.path)
         self.conn.cursor().execute("CREATE TABLE table1(id)")
         self.conn.execute('INSERT INTO table1 VALUES ("abc")')
 
     def tearDown(self):
         # Delete the 'sample_file' after the test is done
-        if os.path.exists(self.path):
-            os.remove(self.path)
+        if self.path.exists():
+            self.path.unlink()
 
     def test_table_exists_in_db(self):
         self.assertTrue(check_if_table(self.conn, "table1"))
@@ -139,7 +138,7 @@ class TestCheckIfTable(TestCase):
 
 class TestCheckIfTables(TestCase):
     def setUp(self):
-        self.path = ".test_db"
+        self.path = Path(".test_db")
         self.conn = connect_to_sql_db("./", self.path)
         self.conn.cursor().execute("CREATE TABLE table1(id)")
         self.conn.execute('INSERT INTO table1 VALUES ("abc")')
@@ -148,8 +147,8 @@ class TestCheckIfTables(TestCase):
 
     def tearDown(self):
         # Delete the 'sample_file' after the test is done
-        if os.path.exists(self.path):
-            os.remove(self.path)
+        if self.path.exists():
+            self.path.unlink()
 
     def test_all_tables_exist(self):
         tables = ["table1", "table2"]
@@ -195,13 +194,13 @@ class TestGetConnDbFolder(TestCase):
 
 class TestConnectToSqlDb(TestCase):
     def setUp(self):
-        self.path = ".test_db"
+        self.path = Path(".test_db")
         self.conn = connect_to_sql_db("./", self.path)
 
     def tearDown(self):
         # Delete the 'sample_file' after the test is done
-        if os.path.exists(self.path):
-            os.remove(self.path)
+        if self.path.exists():
+            self.path.unlink()
 
     def test_successful_connection(self):
         conn = connect_to_sql_db("./", self.path)
@@ -265,7 +264,7 @@ class TestReadSqlTable(TestCase):
 
 class TestReadSqlTables(TestCase):
     def setUp(self):
-        self.path = ".test_db"
+        self.path = Path(".test_db")
         self.conn = connect_to_sql_db("./", self.path)
         self.conn.cursor().execute("CREATE TABLE table1(id)")
         self.conn.execute('INSERT INTO table1 VALUES ("abc")')
@@ -274,8 +273,8 @@ class TestReadSqlTables(TestCase):
 
     def tearDown(self):
         # Delete the 'sample_file' after the test is done
-        if os.path.exists(self.path):
-            os.remove(self.path)
+        if self.path.exists():
+            self.path.unlink()
 
     def test_read_existing_sql_tables(self):
         tablenames = ["table1", "table2"]

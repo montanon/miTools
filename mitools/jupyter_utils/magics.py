@@ -1,7 +1,7 @@
 import ast
 import base64
-import os
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
 from IPython import get_ipython
 from IPython.core.magic import register_cell_magic, register_line_magic
@@ -10,10 +10,10 @@ from playsound import playsound
 
 from mitools.exceptions import ArgumentValueError
 
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+CURRENT_DIR = Path(__file__).parent.absolute()
 ALARM_FOLDER = "alarms"
 ALARM_FILENAME = "short-success-sound-glockenspiel-treasure-video-game-6346.mp3"
-ALARM_FILE_PATH = os.path.join(CURRENT_DIR, ALARM_FOLDER, ALARM_FILENAME)
+ALARM_FILE_PATH = CURRENT_DIR / ALARM_FOLDER / ALARM_FILENAME
 
 executor = ThreadPoolExecutor(max_workers=1)
 

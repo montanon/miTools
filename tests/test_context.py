@@ -1,5 +1,4 @@
 import json
-import os
 import tempfile
 import time
 import unittest
@@ -228,8 +227,8 @@ class TestDev(TestCase):
         self.test_file = Path("./tests/.test_assets/dev_vars.json")
 
     def tearDown(self):
-        if os.path.exists(self.test_file):
-            os.remove(self.test_file)
+        if self.test_file.exists():
+            self.test_file.unlink()
 
     def test_singleton_instance(self):
         dev1 = Dev()
@@ -305,9 +304,9 @@ class TestSavePlotContext(TestCase):
 
     def tearDown(self):
         if self.test_file.exists():
-            os.remove(self.test_file)
+            self.test_file.unlink()
         if self.test_file_jpg.exists():
-            os.remove(self.test_file_jpg)
+            self.test_file_jpg.unlink()
 
     def test_single_axes_save(self):
         with SavePlotContext(self.test_file) as ctx:

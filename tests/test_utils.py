@@ -1,5 +1,4 @@
 import json
-import os
 import pickle
 import re
 import shutil
@@ -1108,11 +1107,11 @@ class TestRemoveChars(unittest.TestCase):
 class TestStorePklObject(unittest.TestCase):
     def setUp(self):
         self.test_object = {"key": "value"}
-        self.filename = "test.pkl"
+        self.filename = Path("test.pkl")
 
     def tearDown(self):
-        if os.path.exists(self.filename):
-            os.remove(self.filename)
+        if self.filename.exists():
+            self.filename.unlink()
 
     def test_store_pkl_object(self):
         store_pkl_object(self.test_object, self.filename)
@@ -1124,12 +1123,12 @@ class TestStorePklObject(unittest.TestCase):
 class TestLoadPklObject(unittest.TestCase):
     def setUp(self):
         self.test_object = {"key": "value"}
-        self.filename = "test.pkl"
+        self.filename = Path("test.pkl")
         store_pkl_object(self.test_object, self.filename)
 
     def tearDown(self):
-        if os.path.exists(self.filename):
-            os.remove(self.filename)
+        if self.filename.exists():
+            self.filename.unlink()
 
     def test_load_pkl_object(self):
         loaded_object = load_pkl_object(self.filename)
