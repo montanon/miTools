@@ -8,7 +8,7 @@ import torch
 from transformers import pipeline
 
 from mitools.nlp.en import en_sentiment as pattern_sentiment
-from mitools.nlp.nlp_typing import BaseString, SentimentType
+from mitools.nlp.nlp_typing import SentimentType
 from mitools.nlp.tokenizers import BaseTokenizer, SentenceTokenizer
 from mitools.nlp.utils import default_feature_extractor, word_tokenize
 
@@ -33,16 +33,6 @@ class SentimentResult:
         )
 
     @classmethod
-    def from_pattern(cls, result: Tuple) -> "SentimentResult":
-        polarity, subjectivity = result
-        return cls(
-            polarity=polarity,
-            confidence=abs(polarity),  # Use absolute polarity as confidence
-            subjectivity=subjectivity,
-            raw_output={"polarity": polarity, "subjectivity": subjectivity},
-        )
-
-    @classmethod
     def from_naive_bayes(cls, result: Tuple) -> "SentimentResult":
         classification, p_pos, p_neg = result
         polarity = p_pos - p_neg  # Convert probabilities to [-1, 1] range
@@ -64,14 +54,14 @@ class BaseSentimentAnalyzer(ABC):
         self._trained = True
 
     @abstractmethod
-    def analyze(self, text: Union[str, BaseString]) -> SentimentResult:
+    def analyze(self, text: Union[str, str]) -> SentimentResult:
         if not self._trained:
             self.train()
         return None
 
     def analyze_sentences(
         self,
-        sequence: Union[BaseString, Sequence[BaseString]],
+        sequence: Union[str, Sequence[str]],
         tokenizer: Union[BaseTokenizer, None] = None,
     ) -> Sequence[SentimentResult]:
         tokenizer = tokenizer if tokenizer is not None else SentenceTokenizer()
@@ -89,30 +79,9 @@ class HuggingFaceAnalyzer(BaseSentimentAnalyzer):
         super().__init__()
         self.model = pipeline("sentiment-analysis", model=model, device=device)
 
-    def analyze(self, text: BaseString) -> SentimentResult:
+    def analyze(self, text: str) -> SentimentResult:
         result = self.model(text)
         return SentimentResult.from_huggingface(result)
-
-
-class PatternAnalyzer(BaseSentimentAnalyzer):
-    def __init__(self, kind: Literal["ds", "co"] = "ds"):
-        self.kind = kind
-        self._trained = False
-
-    def analyze(
-        self, text: BaseString, keep_assessments: bool = False
-    ) -> SentimentType:
-        if keep_assessments:
-            Sentiment = namedtuple(
-                "Sentiment", ["polarity", "subjectivity", "assessments"]
-            )
-            assessments = pattern_sentiment(text).assessments
-            polarity, subjectivity = pattern_sentiment(text)
-            return Sentiment(polarity, subjectivity, assessments)
-
-        else:
-            Sentiment = namedtuple("Sentiment", ["polarity", "subjectivity"])
-            return Sentiment(*pattern_sentiment(text))
 
 
 class NaiveBayesAnalyzer(BaseSentimentAnalyzer):
@@ -147,7 +116,7 @@ class NaiveBayesAnalyzer(BaseSentimentAnalyzer):
         train_data = neg_feats + pos_feats
         self._classifier = nltk.classify.NaiveBayesClassifier.train(train_data)
 
-    def analyze(self, text: BaseString) -> SentimentResult:
+    def analyze(self, text: str) -> SentimentResult:
         super().analyze(text)
         word_tokens = word_tokenize(text, include_punctuation=False)
         filtered_words = (word.lower() for word in word_tokens if len(word) >= 3)

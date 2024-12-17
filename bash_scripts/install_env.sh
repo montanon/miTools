@@ -203,7 +203,6 @@ $PYTHON_PATH -m pip install selenium-requests
 $PYTHON_PATH -m pip install icalendar
 $PYTHON_PATH -m pip install python-docx
 $PYTHON_PATH -m pip install pymupdf4llm
-$PYTHON_PATH -m pip install textblob
 $PYTHON_PATH -m pip install datashader
 $PYTHON_PATH -m pip install bokeh
 $PYTHON_PATH -m pip install holoviews

@@ -1,7 +1,5 @@
-import os
 import unittest
 from unittest import TestCase
-from unittest.mock import Mock, patch
 
 import numpy as np
 import torch

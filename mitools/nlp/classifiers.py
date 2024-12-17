@@ -8,16 +8,15 @@ from nltk.classify import (
     PositiveNaiveBayesClassifier,
 )
 
-from mitools.nlp.nlp_typing import BaseString
-from mitools.nlp.utils import basic_extractor, contains_extractor, get_words_from_corpus
+from mitools.nlp.utils import get_words_from_corpus
 from mitools.utils.decorators import cached_property
 
 
 class BaseClassifier:
     def __init__(
         self,
-        train_set: Iterable[BaseString],
-        feature_extractor: Callable = basic_extractor,
+        train_set: Iterable[str],
+        feature_extractor: Callable = None,
         **kwargs,
     ):
         self.format_kwargs = kwargs
@@ -30,16 +29,16 @@ class BaseClassifier:
     def classifier(self):
         raise NotImplementedError('Must implement the "classifier" property.')
 
-    def classify(self, text: BaseString):
+    def classify(self, text: str):
         raise NotImplementedError('Must implement the "classify" method.')
 
-    def train(self, labeled_features: Iterable[Tuple[BaseString, bool]]):
+    def train(self, labeled_features: Iterable[Tuple[str, bool]]):
         raise NotImplementedError('Must implement the "train" method.')
 
     def labels(self):
         raise NotImplementedError('Must implement the "labels" method.')
 
-    def extract_features(self, text: BaseString):
+    def extract_features(self, text: str):
         try:
             return self.feature_extractor(text, self.bag_of_words)
         except (TypeError, AttributeError):
@@ -51,7 +50,7 @@ class NLTKClassifier(BaseClassifier):
 
     def __init__(
         self,
-        train_set: Iterable[BaseString],
+        train_set: Iterable[str],
         feature_extractor: Callable = None,
         **kwargs,
     ):
@@ -85,16 +84,16 @@ class NLTKClassifier(BaseClassifier):
     def labels(self):
         return self.classifier.labels()
 
-    def classify(self, text: BaseString):
+    def classify(self, text: str):
         text_features = self.extract_features(text)
         return self.classifier.classify(text_features)
 
-    def accuracy(self, test_set: Iterable[Tuple[BaseString, bool]]):
+    def accuracy(self, test_set: Iterable[Tuple[str, bool]]):
         test_data = test_set
         test_features = [(self.extract_features(d), c) for d, c in test_data]
         return nltk.classify.accuracy(self.classifier, test_features)
 
-    def update(self, new_data: Iterable[Tuple[BaseString, bool]], *args, **kwargs):
+    def update(self, new_data: Iterable[Tuple[str, bool]], *args, **kwargs):
         self.train_set += new_data
         self.bag_of_words.update(get_words_from_corpus(new_data))
         self.train_features = [(self.extract_features(d), c) for d, c in self.train_set]
@@ -112,7 +111,7 @@ class NLTKClassifier(BaseClassifier):
 class NaiveBayesClassifier(NLTKClassifier):
     nltk_class = NaiveBayesClassifier
 
-    def prob_classify(self, text: BaseString):
+    def prob_classify(self, text: str):
         text_features = self.extract_features(text)
         return self.classifier.prob_classify(text_features)
 
@@ -138,8 +137,8 @@ class PositiveNaiveBayesClassifier(NLTKClassifier):
 
     def __init__(
         self,
-        positive_set: Iterable[BaseString],
-        unlabeled_set: Iterable[BaseString],
+        positive_set: Iterable[str],
+        unlabeled_set: Iterable[str],
         feature_extractor: Union[Callable, None] = None,
         positive_prob_prior: float = 0.5,
     ):
@@ -167,8 +166,8 @@ class PositiveNaiveBayesClassifier(NLTKClassifier):
 
     def update(
         self,
-        new_positive_data: Iterable[BaseString] = None,
-        new_unlabeled_data: Iterable[BaseString] = None,
+        new_positive_data: Iterable[str] = None,
+        new_unlabeled_data: Iterable[str] = None,
         positive_prob_prior: float = 0.5,
         *args,
         **kwargs,
@@ -198,6 +197,6 @@ class MaxEntClassifier(NLTKClassifier):
     __doc__ = MaxentClassifier.__doc__
     nltk_class = MaxentClassifier
 
-    def prob_classify(self, text: BaseString):
+    def prob_classify(self, text: str):
         feats = self.extract_features(text)
         return self.classifier.prob_classify(feats)

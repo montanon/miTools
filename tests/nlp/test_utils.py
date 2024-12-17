@@ -1,8 +1,6 @@
 import unittest
-from itertools import chain
 from unittest import TestCase
 
-from mitools.nlp.nlp_typing import BaseString
 from mitools.nlp.tokenizers import SentenceTokenizer, WordTokenizer
 from mitools.nlp.utils import get_words_from_corpus, sentence_tokenize, word_tokenize
 from mitools.utils.helper_functions import strip_punctuation
