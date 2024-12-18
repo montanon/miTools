@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional
 
+import numpy as np
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
 from pandas import DataFrame
@@ -47,7 +48,6 @@ class BaseRegressionModel(ABC):
         else:
             self.variables = None
         self.fitted = False
-        self.model = None
         self.model_name = None
         self.results = None
 
@@ -74,3 +74,41 @@ class BaseRegressionModel(ABC):
             raise ArgumentStructureError(
                 "Results object does not have a summary method"
             )
+
+    @classmethod
+    def from_arrays(
+        cls,
+        y: np.ndarray,
+        X: np.ndarray,
+        controls: Optional[np.ndarray] = None,
+    ):
+        if y.ndim != 1:
+            raise ArgumentValueError("y must be 1-dimensional")
+        if X.ndim != 2:
+            raise ArgumentValueError("x must be 2-dimensional")
+        if controls is not None and controls.ndim != 2:
+            raise ArgumentValueError("controls must be 2-dimensional")
+        n_samples = len(y)
+        if len(X) != n_samples:
+            raise ArgumentValueError("x and y must have same number of samples")
+        if controls is not None and len(controls) != n_samples:
+            raise ArgumentValueError("controls must have same number of samples as y")
+        independent_vars = [f"x{i+1}" for i in range(X.shape[1])]
+        control_vars = []
+        if controls is not None:
+            control_vars = [f"c{i+1}" for i in range(controls.shape[1])]
+        data_dict = {"y": y}
+        for i, var in enumerate(independent_vars):
+            data_dict[var] = X[:, i]
+        if controls is not None:
+            for i, var in enumerate(control_vars):
+                data_dict[var] = controls[:, i]
+
+        data = DataFrame(data_dict)
+
+        return cls(
+            data=data,
+            dependent_variable="y",
+            independent_variables=independent_vars,
+            control_variables=control_vars if controls is not None else None,
+        )
