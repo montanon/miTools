@@ -4,6 +4,7 @@ from typing import List, Optional, Union
 import numpy as np
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
+from linearmodels import PanelOLS, PooledOLS
 from pandas import DataFrame
 
 from mitools.exceptions import ArgumentStructureError, ArgumentValueError
@@ -88,6 +89,8 @@ class BaseRegressionModel(ABC):
         y: np.ndarray,
         X: np.ndarray,
         controls: Optional[np.ndarray] = None,
+        *args,
+        **kwargs,
     ):
         if y.ndim != 1:
             raise ArgumentValueError("y must be 1-dimensional")
@@ -118,6 +121,8 @@ class BaseRegressionModel(ABC):
             dependent_variable="y",
             independent_variables=independent_vars,
             control_variables=control_vars if controls is not None else None,
+            *args,
+            **kwargs,
         )
 
 
@@ -219,4 +224,53 @@ class QuantileRegressionModel(BaseRegressionModel):
             print(len(self.quantiles))
             return (
                 summaries if len(self.quantiles) > 1 else summaries[self.quantiles[0]]
+            )
+
+
+class PooledOLSModel(BaseRegressionModel):
+    def __init__(
+        self,
+        data: DataFrame,
+        formula: Optional[str] = None,
+        dependent_variable: Optional[str] = None,
+        independent_variables: Optional[List[str]] = None,
+        control_variables: Optional[List[str]] = None,
+    ):
+        super().__init__(
+            data=data,
+            formula=formula,
+            dependent_variable=dependent_variable,
+            independent_variables=independent_variables,
+            control_variables=control_variables,
+        )
+        self.model_name = "PooledOLS"
+
+    def fit(self, add_constant: bool = True, *args, **kwargs):
+        if self.formula is not None:
+            model = PooledOLS.from_formula(
+                formula=self.formula,
+                data=self.data,
+                *args,
+                **kwargs,
+            )
+        else:
+            endog = self.data[self.dependent_variable]
+            exog_vars = self.independent_variables + self.control_variables
+            exog = self.data[exog_vars]
+            if add_constant:
+                exog = sm.add_constant(exog)
+            model = PooledOLS(
+                dependent=endog,
+                exog=exog,
+                *args,
+                **kwargs,
+            )
+        self.results = model.fit()
+        self.fitted = True
+        return self.results
+
+    def validate_data(self):
+        if self.data.index.nlevels != 2:
+            raise ArgumentValueError(
+                "Data must have two levels in the index, referring to the corresponding entities and time periods, in that order."
             )
