@@ -4,7 +4,13 @@ from typing import List, Optional, Union
 import numpy as np
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
-from linearmodels import BetweenOLS, PanelOLS, PooledOLS, RandomEffects
+from linearmodels import (
+    BetweenOLS,
+    FirstDifferenceOLS,
+    PanelOLS,
+    PooledOLS,
+    RandomEffects,
+)
 from pandas import DataFrame
 
 from mitools.exceptions import ArgumentStructureError, ArgumentValueError
@@ -245,7 +251,9 @@ class PooledOLSModel(BaseRegressionModel):
         )
         self.model_name = "PooledOLS"
 
-    def fit(self, add_constant: bool = True, *args, **kwargs):
+    def fit(
+        self, add_constant: bool = True, cov_type: str = "unadjusted", *args, **kwargs
+    ):
         if self.formula is not None:
             model = PooledOLS.from_formula(
                 formula=self.formula,
@@ -265,7 +273,7 @@ class PooledOLSModel(BaseRegressionModel):
                 *args,
                 **kwargs,
             )
-        self.results = model.fit()
+        self.results = model.fit(cov_type=cov_type)
         self.fitted = True
         return self.results
 
