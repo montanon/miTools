@@ -79,7 +79,20 @@ LineStyle = Union[
 ]
 Scale = Literal["linear", "log", "symlog", "logit"]
 TickParams = Dict[str, Any]
-LINESTYLES = ["-", "--", "-.", ":", "None", "none", " ", ""]
+LINESTYLES = [
+    "-",
+    "--",
+    "-.",
+    ":",
+    "None",
+    "none",
+    " ",
+    "",
+    "dotted",
+    "dashed",
+    "dashdot",
+    "solid",
+]
 HATCHES = ["/", "\\", "|", "-", "+", "x", "o", "O", ".", "*"]
 HIST_ALIGN = ["left", "mid", "right"]
 HIST_HISTTYPE = ["bar", "barstacked", "step", "stepfilled"]
