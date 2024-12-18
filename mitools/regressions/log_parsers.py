@@ -1,13 +1,10 @@
 import hashlib
-import os
 import re
-import time
 from os import PathLike
+from pathlib import Path
 from typing import Dict, List, Optional
 
-import numpy as np
 import pandas as pd
-from fuzzywuzzy import process
 from pandas import DataFrame
 
 from ..utils import (
@@ -48,8 +45,9 @@ XTREG_VAR_NAMES = [
 
 
 def process_logs_folder(folder: PathLike):
+    folder = Path(folder)
     logs_paths = [
-        f"{folder}/{f}" for f in os.listdir(f"{folder}") if f.endswith(".log")
+        folder / f for f in folder.iterdir() if f.is_file() and f.suffix == ".log"
     ]
     ols_df, csardl_df = process_logs(logs_paths)
     return ols_df, csardl_df
@@ -96,9 +94,9 @@ def load_log(log_path):
 
 
 def get_log_data_from_path(log_path: PathLike):
-    tag, model_type, group, regression_id = os.path.basename(
-        log_path.replace(".log", "")
-    ).split("_")
+    tag, model_type, group, regression_id = (
+        Path(log_path).name.replace(".log", "").split("_")
+    )
     return tag, model_type, group, regression_id
 
 
@@ -218,7 +216,7 @@ def get_xtreg_fe_data_from_log(xtreg_str: str):
     indep_variables = list(coefficients.keys())
 
     if coefficients_table.find(".        .       .            .           .") > -1:
-        from mitools.dev import store_var
+        from mitools.context.dev_object import store_var
 
         store_var("xtreg_str", xtreg_str)
         store_var("coefficients_table", coefficients_table)

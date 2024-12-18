@@ -1,4 +1,3 @@
-import os
 from os import PathLike
 from typing import Any, Dict, Iterable, List, NewType, Optional, Tuple, Type, Union
 

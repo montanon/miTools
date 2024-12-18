@@ -1,5 +1,4 @@
 import json
-import os
 import pickle
 import re
 import shutil
@@ -7,6 +6,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from typing import List, Optional
 from unittest import TestCase
 from unittest.mock import call, mock_open, patch
 
@@ -16,6 +16,7 @@ from openpyxl import Workbook
 from pandas import DataFrame, Series
 from treelib import Tree
 
+from mitools.context.dev_object import Dev, get_dev_var
 from mitools.exceptions import ArgumentTypeError, ArgumentValueError
 from mitools.utils import (
     BitArray,
@@ -51,6 +52,7 @@ from mitools.utils import (
     sort_dict_keys,
     split_strings,
     store_pkl_object,
+    store_signature_in_dev,
     str_is_number,
     stretch_string,
     strip_punctuation,
@@ -1105,11 +1107,11 @@ class TestRemoveChars(unittest.TestCase):
 class TestStorePklObject(unittest.TestCase):
     def setUp(self):
         self.test_object = {"key": "value"}
-        self.filename = "test.pkl"
+        self.filename = Path("test.pkl")
 
     def tearDown(self):
-        if os.path.exists(self.filename):
-            os.remove(self.filename)
+        if self.filename.exists():
+            self.filename.unlink()
 
     def test_store_pkl_object(self):
         store_pkl_object(self.test_object, self.filename)
@@ -1121,12 +1123,12 @@ class TestStorePklObject(unittest.TestCase):
 class TestLoadPklObject(unittest.TestCase):
     def setUp(self):
         self.test_object = {"key": "value"}
-        self.filename = "test.pkl"
+        self.filename = Path("test.pkl")
         store_pkl_object(self.test_object, self.filename)
 
     def tearDown(self):
-        if os.path.exists(self.filename):
-            os.remove(self.filename)
+        if self.filename.exists():
+            self.filename.unlink()
 
     def test_load_pkl_object(self):
         loaded_object = load_pkl_object(self.filename)
@@ -1362,6 +1364,122 @@ class TestSortDictKeys(TestCase):
         self.assertEqual(
             sort_dict_keys(input_dict, key=lambda item: len(item[1])), expected_output
         )
+
+
+class TestStoreSignatureInDev(TestCase):
+    def setUp(self):
+        Dev().clear_vars()
+
+    def test_basic_function_args(self):
+        @store_signature_in_dev
+        def example_func(x: int, y: str):
+            return x + len(y)
+
+        result = example_func(42, "test")
+        stored_args = get_dev_var("example_func")
+
+        self.assertEqual(stored_args["x"], 42)
+        self.assertEqual(stored_args["y"], "test")
+        self.assertEqual(result, 46)  # Verify function still works normally
+
+    def test_function_with_defaults(self):
+        @store_signature_in_dev
+        def func_with_defaults(x: int = 10, y: str = "default"):
+            return x + len(y)
+
+        func_with_defaults()
+        stored_args = get_dev_var("func_with_defaults")
+        self.assertEqual(stored_args["x"], 10)
+        self.assertEqual(stored_args["y"], "default")
+        func_with_defaults(x=20)
+        stored_args = get_dev_var("func_with_defaults")
+        self.assertEqual(stored_args["x"], 20)
+        self.assertEqual(stored_args["y"], "default")
+
+    def test_function_with_kwargs(self):
+        @store_signature_in_dev
+        def func_with_kwargs(x: int, **kwargs):
+            return x + len(kwargs)
+
+        func_with_kwargs(10, extra="test", another="value")
+        stored_args = get_dev_var("func_with_kwargs")
+        self.assertEqual(stored_args["x"], 10)
+        self.assertEqual(stored_args["kwargs"], {"extra": "test", "another": "value"})
+
+    def test_function_with_args(self):
+        @store_signature_in_dev
+        def func_with_args(*args):
+            return sum(args)
+
+        func_with_args(1, 2, 3)
+        stored_args = get_dev_var("func_with_args")
+        self.assertEqual(stored_args["args"], (1, 2, 3))
+
+    def test_method_in_class(self):
+        class TestClass:
+            @store_signature_in_dev
+            def test_method(self, x: int, y: Optional[str] = None):
+                return x + (len(y) if y else 0)
+
+        obj = TestClass()
+        obj.test_method(42, "test")
+        stored_args = get_dev_var("test_method")
+        self.assertIn("self", stored_args)
+        self.assertEqual(stored_args["x"], 42)
+        self.assertEqual(stored_args["y"], "test")
+
+    def test_complex_types(self):
+        @store_signature_in_dev
+        def complex_func(numbers: List[int], text: str = "default"):
+            return sum(numbers) + len(text)
+
+        complex_func([1, 2, 3], "test")
+        stored_args = get_dev_var("complex_func")
+        self.assertEqual(stored_args["numbers"], [1, 2, 3])
+        self.assertEqual(stored_args["text"], "test")
+
+    def test_multiple_calls(self):
+        @store_signature_in_dev
+        def multi_call(x: int):
+            return x * 2
+
+        multi_call(10)
+        stored_args = get_dev_var("multi_call")
+        self.assertEqual(stored_args["x"], 10)
+        multi_call(20)
+        stored_args = get_dev_var("multi_call")
+        self.assertEqual(stored_args["x"], 20)
+
+    def test_nested_functions(self):
+        @store_signature_in_dev
+        def outer(x: int):
+            @store_signature_in_dev
+            def inner(y: int):
+                return y * 2
+
+            return inner(x + 1)
+
+        result = outer(5)
+        outer_args = get_dev_var("outer")
+        inner_args = get_dev_var("inner")
+        self.assertEqual(outer_args["x"], 5)
+        self.assertEqual(inner_args["y"], 6)
+        self.assertEqual(result, 12)
+
+    def test_preserves_docstring(self):
+        @store_signature_in_dev
+        def documented_func(x: int):
+            """This is a test docstring."""
+            return x
+
+        self.assertEqual(documented_func.__doc__, "This is a test docstring.")
+
+    def test_preserves_function_name(self):
+        @store_signature_in_dev
+        def named_func(x: int):
+            return x
+
+        self.assertEqual(named_func.__name__, "named_func")
 
 
 if __name__ == "__main__":

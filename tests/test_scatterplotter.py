@@ -1,12 +1,9 @@
-import os
 import tempfile
 import unittest
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.colors import Normalize
-from matplotlib.text import Text
 
 from mitools.exceptions import (
     ArgumentStructureError,
@@ -168,7 +165,7 @@ class TestScatterPlotter(unittest.TestCase):
     def test_save_and_load_plotter(self):
         plotter1 = ScatterPlotter(self.x_data, self.y_data, **self.valid_params)
         with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tmp:
-            temp_path = tmp.name
+            temp_path = Path(tmp.name)
         try:
             plotter1.save_plotter(temp_path, data=True)
             plotter2 = ScatterPlotter.from_json(temp_path)
@@ -191,7 +188,7 @@ class TestScatterPlotter(unittest.TestCase):
             np.testing.assert_array_equal(plotter1.x_data, plotter2.x_data)
             np.testing.assert_array_equal(plotter1.y_data, plotter2.y_data)
         finally:
-            os.unlink(temp_path)
+            temp_path.unlink()
 
     def test_init_params_completeness(self):
         plotter = ScatterPlotter(self.x_data, self.y_data)

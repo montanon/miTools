@@ -1,5 +1,5 @@
-import os
 import unittest
+from pathlib import Path
 from typing import Dict, List, Tuple
 from unittest import TestCase
 from unittest.mock import Mock
@@ -1052,11 +1052,11 @@ class TestSortMultiIndexDataframe(TestCase):
 class TestStopwordsManager(unittest.TestCase):
     def setUp(self):
         self.manager = StopwordsManager()
-        self.filename = "test.pkl"
+        self.filename = Path("test.pkl")
 
     def tearDown(self):
-        if os.path.exists(self.filename):
-            os.remove(self.filename)
+        if self.filename.exists():
+            self.filename.unlink()
 
     def test_add_single_stopword(self):
         self.manager.add_stopword("testword")

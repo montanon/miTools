@@ -7,9 +7,9 @@ from typing import Any, Callable, Iterable
 from pandas import DataFrame
 from tqdm import tqdm
 
+from mitools.context.dev_object import store_dev_var
 from mitools.exceptions import ArgumentTypeError, ArgumentValueError
-
-from .helper_functions import iterable_chunks
+from mitools.utils.helper_functions import iterable_chunks
 
 
 def parallel(n_threads: int, chunk_size: int):
@@ -113,3 +113,16 @@ def cached_property(func):
     getter.__name__ = name
     getter.__doc__ = doc
     return property(getter)
+
+
+def store_signature_in_dev(func: Callable):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        signature = inspect.signature(func)
+        bound_args = signature.bind(*args, **kwargs)
+        bound_args.apply_defaults()
+        args_dict = dict(bound_args.arguments)
+        store_dev_var(func.__name__, args_dict)
+        return func(*args, **kwargs)
+
+    return wrapper

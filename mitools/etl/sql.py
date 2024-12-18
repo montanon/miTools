@@ -1,4 +1,3 @@
-import os
 from os import PathLike
 from pathlib import Path
 from sqlite3 import Connection, OperationalError
