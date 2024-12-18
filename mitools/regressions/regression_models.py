@@ -179,7 +179,9 @@ class QuantileRegressionModel(BaseRegressionModel):
         for q in self.quantiles:
             self.results[q] = model.fit(q=q, *args, **kwargs)
         self.fitted = True
-        return self.results
+        return (
+            self.results if len(self.quantiles) > 1 else self.results[self.quantiles[0]]
+        )
 
     def predict(
         self,
@@ -213,4 +215,8 @@ class QuantileRegressionModel(BaseRegressionModel):
             summaries = {q: self.results[q].summary() for q in quantiles}
             return summaries if len(quantiles) > 1 else summaries[quantiles[0]]
         else:
-            return {q: self.results[q].summary() for q in self.quantiles}
+            summaries = {q: self.results[q].summary() for q in self.quantiles}
+            print(len(self.quantiles))
+            return (
+                summaries if len(self.quantiles) > 1 else summaries[self.quantiles[0]]
+            )
