@@ -27,8 +27,8 @@ from mitools import clustering as clustering
 from mitools import economic_complexity as ec
 from mitools import etl, files, google, jupyter_utils, nlp, scraping, utils
 from mitools import notebooks as nb
+from mitools import oldregressions as reg
 from mitools import pandas as pdf
-from mitools import regressions as reg
 from mitools.context import DEV
 from mitools.country_converter import country_converter
 from mitools.project import Project

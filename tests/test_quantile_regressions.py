@@ -6,7 +6,7 @@ import numpy as np
 from pandas import DataFrame, Series
 from pandas import testing as pd_testing
 
-from mitools.regressions import (
+from mitools.oldregressions import (
     QuantileRegStrs,
     create_regression_file_paths,
     get_group_data,
