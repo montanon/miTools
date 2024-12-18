@@ -24,6 +24,8 @@ class BaseRegressionModel(ABC):
         dependent_variable: Optional[str] = None,
         independent_variables: Optional[List[str]] = None,
         control_variables: Optional[List[str]] = None,
+        *args,
+        **kwargs,
     ):
         if (dependent_variable is None) and formula is None:
             raise ArgumentValueError(
@@ -64,9 +66,11 @@ class BaseRegressionModel(ABC):
         self.fitted = False
         self.model_name = None
         self.results = None
+        self.args = list(args)
+        self.kwargs = kwargs
 
     @abstractmethod
-    def fit(self):
+    def fit(self, *args, **kwargs):
         pass
 
     def predict(self, new_data: Optional[DataFrame] = None):
@@ -146,9 +150,9 @@ class OLSModel(BaseRegressionModel):
             exog = self.data[exog_vars]
             if add_constant:
                 exog = sm.add_constant(exog)
-            model = sm.OLS(endog, exog, *args, **kwargs)
+            model = sm.OLS(endog, exog, *self.args, **self.kwargs)
         self.model_name = "OLS"
-        self.results = model.fit()
+        self.results = model.fit(*args, **kwargs)
         self.fitted = True
         return self.results
 
@@ -162,6 +166,8 @@ class QuantileRegressionModel(BaseRegressionModel):
         independent_variables: Optional[List[str]] = None,
         control_variables: Optional[List[str]] = None,
         quantiles: Union[float, List[float]] = 0.5,
+        *args,
+        **kwargs,
     ):
         super().__init__(
             data=data,
@@ -169,6 +175,8 @@ class QuantileRegressionModel(BaseRegressionModel):
             dependent_variable=dependent_variable,
             independent_variables=independent_variables,
             control_variables=control_variables,
+            *args,
+            **kwargs,
         )
         if isinstance(quantiles, float):
             self.quantiles = [quantiles]
@@ -178,14 +186,16 @@ class QuantileRegressionModel(BaseRegressionModel):
 
     def fit(self, add_constant: bool = True, *args, **kwargs):
         if self.formula is not None:
-            model = smf.quantreg(formula=self.formula, data=self.data)
+            model = smf.quantreg(
+                formula=self.formula, data=self.data, *self.args, **self.kwargs
+            )
         else:
             endog = self.data[self.dependent_variable]
             exog_vars = self.independent_variables + self.control_variables
             exog = self.data[exog_vars]
             if add_constant:
                 exog = sm.add_constant(exog)
-            model = sm.QuantReg(endog, exog)
+            model = sm.QuantReg(endog, exog, *self.args, **self.kwargs)
         self.results = {}
         for q in self.quantiles:
             self.results[q] = model.fit(q=q, *args, **kwargs)
@@ -241,6 +251,8 @@ class PooledOLSModel(BaseRegressionModel):
         dependent_variable: Optional[str] = None,
         independent_variables: Optional[List[str]] = None,
         control_variables: Optional[List[str]] = None,
+        *args,
+        **kwargs,
     ):
         super().__init__(
             data=data,
@@ -248,18 +260,23 @@ class PooledOLSModel(BaseRegressionModel):
             dependent_variable=dependent_variable,
             independent_variables=independent_variables,
             control_variables=control_variables,
+            *args,
+            **kwargs,
         )
         self.model_name = "PooledOLS"
 
     def fit(
-        self, add_constant: bool = True, cov_type: str = "unadjusted", *args, **kwargs
+        self,
+        add_constant: bool = True,
+        *args,
+        **kwargs,
     ):
         if self.formula is not None:
             model = PooledOLS.from_formula(
                 formula=self.formula,
                 data=self.data,
-                *args,
-                **kwargs,
+                *self.args,
+                **self.kwargs,
             )
         else:
             endog = self.data[self.dependent_variable]
@@ -270,10 +287,13 @@ class PooledOLSModel(BaseRegressionModel):
             model = PooledOLS(
                 dependent=endog,
                 exog=exog,
-                *args,
-                **kwargs,
+                *self.args,
+                **self.kwargs,
             )
-        self.results = model.fit(cov_type=cov_type)
+        self.results = model.fit(
+            *args,
+            **kwargs,
+        )
         self.fitted = True
         return self.results
 
@@ -292,6 +312,8 @@ class RandomEffectsModel(BaseRegressionModel):
         dependent_variable: Optional[str] = None,
         independent_variables: Optional[List[str]] = None,
         control_variables: Optional[List[str]] = None,
+        *args,
+        **kwargs,
     ):
         super().__init__(
             data=data,
@@ -299,6 +321,8 @@ class RandomEffectsModel(BaseRegressionModel):
             dependent_variable=dependent_variable,
             independent_variables=independent_variables,
             control_variables=control_variables,
+            *args,
+            **kwargs,
         )
         self.model_name = "RandomEffects"
 
@@ -307,8 +331,8 @@ class RandomEffectsModel(BaseRegressionModel):
             model = RandomEffects.from_formula(
                 formula=self.formula,
                 data=self.data,
-                *args,
-                **kwargs,
+                *self.args,
+                **self.kwargs,
             )
         else:
             endog = self.data[self.dependent_variable]
@@ -319,10 +343,10 @@ class RandomEffectsModel(BaseRegressionModel):
             model = RandomEffects(
                 dependent=endog,
                 exog=exog,
-                *args,
-                **kwargs,
+                *self.args,
+                **self.kwargs,
             )
-        self.results = model.fit()
+        self.results = model.fit(*args, **kwargs)
         self.fitted = True
         return self.results
 
@@ -341,6 +365,8 @@ class BetweenOLSModel(BaseRegressionModel):
         dependent_variable: Optional[str] = None,
         independent_variables: Optional[List[str]] = None,
         control_variables: Optional[List[str]] = None,
+        *args,
+        **kwargs,
     ):
         super().__init__(
             data=data,
@@ -348,6 +374,8 @@ class BetweenOLSModel(BaseRegressionModel):
             dependent_variable=dependent_variable,
             independent_variables=independent_variables,
             control_variables=control_variables,
+            *args,
+            **kwargs,
         )
         self.model_name = "BetweenOLS"
 
@@ -356,8 +384,8 @@ class BetweenOLSModel(BaseRegressionModel):
             model = BetweenOLS.from_formula(
                 formula=self.formula,
                 data=self.data,
-                *args,
-                **kwargs,
+                *self.args,
+                **self.kwargs,
             )
         else:
             endog = self.data[self.dependent_variable]
@@ -368,10 +396,10 @@ class BetweenOLSModel(BaseRegressionModel):
             model = BetweenOLS(
                 dependent=endog,
                 exog=exog,
-                *args,
-                **kwargs,
+                *self.args,
+                **self.kwargs,
             )
-        self.results = model.fit()
+        self.results = model.fit(*args, **kwargs)
         self.fitted = True
         return self.results
 
@@ -390,6 +418,8 @@ class FirstDifferenceOLSModel(BaseRegressionModel):
         dependent_variable: Optional[str] = None,
         independent_variables: Optional[List[str]] = None,
         control_variables: Optional[List[str]] = None,
+        *args,
+        **kwargs,
     ):
         super().__init__(
             data=data,
@@ -397,6 +427,8 @@ class FirstDifferenceOLSModel(BaseRegressionModel):
             dependent_variable=dependent_variable,
             independent_variables=independent_variables,
             control_variables=control_variables,
+            *args,
+            **kwargs,
         )
         self.model_name = "FirstDifferenceOLS"
 
@@ -405,8 +437,8 @@ class FirstDifferenceOLSModel(BaseRegressionModel):
             model = FirstDifferenceOLS.from_formula(
                 formula=self.formula,
                 data=self.data,
-                *args,
-                **kwargs,
+                *self.args,
+                **self.kwargs,
             )
         else:
             endog = self.data[self.dependent_variable]
@@ -415,10 +447,10 @@ class FirstDifferenceOLSModel(BaseRegressionModel):
             model = FirstDifferenceOLS(
                 dependent=endog,
                 exog=exog,
-                *args,
-                **kwargs,
+                *self.args,
+                **self.kwargs,
             )
-        self.results = model.fit()
+        self.results = model.fit(*args, **kwargs)
         self.fitted = True
         return self.results
 
@@ -439,6 +471,8 @@ class PanelOLSModel(BaseRegressionModel):
         control_variables: Optional[List[str]] = None,
         entity_effects: bool = False,
         time_effects: bool = False,
+        *args,
+        **kwargs,
     ):
         super().__init__(
             data=data,
@@ -446,6 +480,8 @@ class PanelOLSModel(BaseRegressionModel):
             dependent_variable=dependent_variable,
             independent_variables=independent_variables,
             control_variables=control_variables,
+            *args,
+            **kwargs,
         )
         self.model_name = "PanelOLS"
         self.entity_effects = entity_effects
@@ -458,8 +494,8 @@ class PanelOLSModel(BaseRegressionModel):
                 data=self.data,
                 entity_effects=self.entity_effects,
                 time_effects=self.time_effects,
-                *args,
-                **kwargs,
+                *self.args,
+                **self.kwargs,
             )
         else:
             endog = self.data[self.dependent_variable]
@@ -472,10 +508,10 @@ class PanelOLSModel(BaseRegressionModel):
                 exog=exog,
                 entity_effects=self.entity_effects,
                 time_effects=self.time_effects,
-                *args,
-                **kwargs,
+                *self.args,
+                **self.kwargs,
             )
-        self.results = model.fit()
+        self.results = model.fit(*args, **kwargs)
         self.fitted = True
         return self.results
 
