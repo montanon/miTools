@@ -5,7 +5,7 @@ from typing import Dict, Optional, Tuple, Type
 import pandas as pd
 from pandas import DataFrame
 
-from mitools.regressions.quantiles import QuantilesRegressionSpecs
+from mitools.oldregressions.quantiles import QuantilesRegressionSpecs
 
 LogStructure = Type[str]  # type alias for log
 

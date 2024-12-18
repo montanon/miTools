@@ -3,7 +3,7 @@ from typing import Dict, Iterable, List, Optional
 
 from pandas import DataFrame, Series
 
-from mitools.regressions.quantiles import QuantilesRegressionSpecs
+from mitools.oldregressions.quantiles import QuantilesRegressionSpecs
 
 from ..utils import remove_chars
 
