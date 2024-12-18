@@ -136,6 +136,36 @@ class BaseRegressionModel(ABC):
         )
 
 
+class BasePanelRegressionModel(BaseRegressionModel):
+    def __init__(
+        self,
+        data: DataFrame,
+        formula: Optional[str] = None,
+        dependent_variable: Optional[str] = None,
+        independent_variables: Optional[List[str]] = None,
+        control_variables: Optional[List[str]] = None,
+        *args,
+        **kwargs,
+    ):
+        self.validate_data()
+        super().__init__(
+            data,
+            formula,
+            dependent_variable,
+            independent_variables,
+            control_variables,
+            *args,
+            **kwargs,
+        )
+        self.model_name = "PanelOLS"
+
+    def validate_data(self):
+        if self.data.index.nlevels != 2:
+            raise ArgumentValueError(
+                "Data must have two levels in the index, referring to the corresponding entities and time periods, in that order."
+            )
+
+
 class OLSModel(BaseRegressionModel):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -243,7 +273,7 @@ class QuantileRegressionModel(BaseRegressionModel):
             )
 
 
-class PooledOLSModel(BaseRegressionModel):
+class PooledOLSModel(BasePanelRegressionModel):
     def __init__(
         self,
         data: DataFrame,
@@ -297,14 +327,8 @@ class PooledOLSModel(BaseRegressionModel):
         self.fitted = True
         return self.results
 
-    def validate_data(self):
-        if self.data.index.nlevels != 2:
-            raise ArgumentValueError(
-                "Data must have two levels in the index, referring to the corresponding entities and time periods, in that order."
-            )
 
-
-class RandomEffectsModel(BaseRegressionModel):
+class RandomEffectsModel(BasePanelRegressionModel):
     def __init__(
         self,
         data: DataFrame,
@@ -350,14 +374,8 @@ class RandomEffectsModel(BaseRegressionModel):
         self.fitted = True
         return self.results
 
-    def validate_data(self):
-        if self.data.index.nlevels != 2:
-            raise ArgumentValueError(
-                "Data must have two levels in the index, referring to the corresponding entities and time periods, in that order."
-            )
 
-
-class BetweenOLSModel(BaseRegressionModel):
+class BetweenOLSModel(BasePanelRegressionModel):
     def __init__(
         self,
         data: DataFrame,
@@ -403,14 +421,8 @@ class BetweenOLSModel(BaseRegressionModel):
         self.fitted = True
         return self.results
 
-    def validate_data(self):
-        if self.data.index.nlevels != 2:
-            raise ArgumentValueError(
-                "Data must have two levels in the index, referring to the corresponding entities and time periods, in that order."
-            )
 
-
-class FirstDifferenceOLSModel(BaseRegressionModel):
+class FirstDifferenceOLSModel(BasePanelRegressionModel):
     def __init__(
         self,
         data: DataFrame,
@@ -454,14 +466,8 @@ class FirstDifferenceOLSModel(BaseRegressionModel):
         self.fitted = True
         return self.results
 
-    def validate_data(self):
-        if self.data.index.nlevels != 2:
-            raise ArgumentValueError(
-                "Data must have two levels in the index, referring to the corresponding entities and time periods, in that order."
-            )
 
-
-class PanelOLSModel(BaseRegressionModel):
+class PanelOLSModel(BasePanelRegressionModel):
     def __init__(
         self,
         data: DataFrame,
@@ -514,9 +520,3 @@ class PanelOLSModel(BaseRegressionModel):
         self.results = model.fit(*args, **kwargs)
         self.fitted = True
         return self.results
-
-    def validate_data(self):
-        if self.data.index.nlevels != 2:
-            raise ArgumentValueError(
-                "Data must have two levels in the index, referring to the corresponding entities and time periods, in that order."
-            )
