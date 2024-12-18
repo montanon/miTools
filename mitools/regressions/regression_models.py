@@ -18,11 +18,9 @@ class BaseRegressionModel(ABC):
         independent_variables: Optional[List[str]] = None,
         control_variables: Optional[List[str]] = None,
     ):
-        if (
-            dependent_variable is None or independent_variables is None
-        ) and formula is None:
+        if (dependent_variable is None) and formula is None:
             raise ArgumentValueError(
-                "Either dependent_variable and independent_variables, or explicit formula must be provided"
+                "Either dependent_variable and independent_variables, only dependent_variable, or explicit formula must be provided"
             )
         elif (
             dependent_variable is not None
@@ -34,11 +32,20 @@ class BaseRegressionModel(ABC):
             )
         self.data = data
         self.formula = formula
-        self.independent_variables = independent_variables or []
+        self.dependent_variable = dependent_variable or ""
+        if (
+            self.formula is None
+            and self.dependent_variable is not None
+            and independent_variables is None
+        ):
+            self.independent_variables = [
+                c for c in data.columns if c != self.dependent_variable
+            ]
+        else:
+            self.independent_variables = independent_variables or []
         self.independent_variables.sort()
         self.control_variables = control_variables or []
         self.control_variables.sort()
-        self.dependent_variable = dependent_variable or ""
         if self.formula is None:
             self.variables = (
                 [self.dependent_variable]
@@ -128,4 +135,4 @@ class OLSModel(BaseRegressionModel):
         self.model_name = "OLS"
         self.results = model.fit()
         self.fitted = True
-        return self
+        return self.results
