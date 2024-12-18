@@ -112,3 +112,20 @@ class BaseRegressionModel(ABC):
             independent_variables=independent_vars,
             control_variables=control_vars if controls is not None else None,
         )
+
+
+class OLSModel(BaseRegressionModel):
+    def fit(self, add_constant: bool = True, *args, **kwargs):
+        if self.formula is not None:
+            model = smf.ols(formula=self.formula, data=self.data, *args, **kwargs)
+        else:
+            endog = self.data[self.dependent_variable]
+            exog_vars = self.independent_variables + self.control_variables
+            exog = self.data[exog_vars]
+            if add_constant:
+                exog = sm.add_constant(exog)
+            model = sm.OLS(endog, exog, *args, **kwargs)
+        self.model_name = "OLS"
+        self.results = model.fit()
+        self.fitted = True
+        return self
