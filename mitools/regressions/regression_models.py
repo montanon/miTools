@@ -4,7 +4,7 @@ from typing import List, Optional, Union
 import numpy as np
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
-from linearmodels import PanelOLS, PooledOLS
+from linearmodels import PanelOLS, PooledOLS, RandomEffects
 from pandas import DataFrame
 
 from mitools.exceptions import ArgumentStructureError, ArgumentValueError
@@ -260,6 +260,55 @@ class PooledOLSModel(BaseRegressionModel):
             if add_constant:
                 exog = sm.add_constant(exog)
             model = PooledOLS(
+                dependent=endog,
+                exog=exog,
+                *args,
+                **kwargs,
+            )
+        self.results = model.fit()
+        self.fitted = True
+        return self.results
+
+    def validate_data(self):
+        if self.data.index.nlevels != 2:
+            raise ArgumentValueError(
+                "Data must have two levels in the index, referring to the corresponding entities and time periods, in that order."
+            )
+
+
+class RandomEffectsModel(BaseRegressionModel):
+    def __init__(
+        self,
+        data: DataFrame,
+        formula: Optional[str] = None,
+        dependent_variable: Optional[str] = None,
+        independent_variables: Optional[List[str]] = None,
+        control_variables: Optional[List[str]] = None,
+    ):
+        super().__init__(
+            data=data,
+            formula=formula,
+            dependent_variable=dependent_variable,
+            independent_variables=independent_variables,
+            control_variables=control_variables,
+        )
+        self.model_name = "RandomEffects"
+
+    def fit(self, add_constant: bool = True, *args, **kwargs):
+        if self.formula is not None:
+            model = RandomEffects.from_formula(
+                formula=self.formula,
+                data=self.data,
+                *args,
+                **kwargs,
+            )
+        else:
+            endog = self.data[self.dependent_variable]
+            exog_vars = self.independent_variables + self.control_variables
+            exog = self.data[exog_vars]
+            if add_constant:
+                exog = sm.add_constant(exog)
+            model = RandomEffects(
                 dependent=endog,
                 exog=exog,
                 *args,
