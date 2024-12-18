@@ -147,7 +147,7 @@ class BasePanelRegressionModel(BaseRegressionModel):
         *args,
         **kwargs,
     ):
-        self.validate_data()
+        self.validate_data(data)
         super().__init__(
             data,
             formula,
@@ -159,8 +159,8 @@ class BasePanelRegressionModel(BaseRegressionModel):
         )
         self.model_name = "PanelOLS"
 
-    def validate_data(self):
-        if self.data.index.nlevels != 2:
+    def validate_data(self, data):
+        if data.index.nlevels != 2:
             raise ArgumentValueError(
                 "Data must have two levels in the index, referring to the corresponding entities and time periods, in that order."
             )
