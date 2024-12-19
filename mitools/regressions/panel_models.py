@@ -10,38 +10,7 @@ from linearmodels import (
 )
 from pandas import DataFrame
 
-from mitools.exceptions import ArgumentValueError
-from mitools.regressions.linear_models import BaseRegressionModel
-
-
-class BasePanelRegressionModel(BaseRegressionModel):
-    def __init__(
-        self,
-        data: DataFrame,
-        formula: Optional[str] = None,
-        dependent_variable: Optional[str] = None,
-        independent_variables: Optional[List[str]] = None,
-        control_variables: Optional[List[str]] = None,
-        *args,
-        **kwargs,
-    ):
-        self.validate_data(data)
-        super().__init__(
-            data,
-            formula,
-            dependent_variable,
-            independent_variables,
-            control_variables,
-            *args,
-            **kwargs,
-        )
-        self.model_name = "PanelOLS"
-
-    def validate_data(self, data):
-        if data.index.nlevels != 2:
-            raise ArgumentValueError(
-                "Data must have two levels in the index, referring to the corresponding entities and time periods, in that order."
-            )
+from mitools.regressions.base_models import BasePanelRegressionModel
 
 
 class PanelOLSModel(BasePanelRegressionModel):
