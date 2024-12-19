@@ -1,6 +1,17 @@
 import array
 import types
+from collections.abc import (
+    ItemsView,
+    Iterable,
+    Iterator,
+    KeysView,
+    Mapping,
+    MutableMapping,
+    Sequence,
+    ValuesView,
+)
 from dataclasses import dataclass
+from typing import Any, Callable, Protocol, TypeVar, cast
 
 
 @dataclass
@@ -138,3 +149,109 @@ class LazyList(list):
 
     def __setitem__(self, *args):
         return self._lazy("__setitem__", *args)
+
+
+_KT = TypeVar("_KT")
+_VT = TypeVar("_VT")
+_VT_co = TypeVar("_VT_co", covariant=True)
+
+
+class SupportsKeysAndGetItem(Protocol[_KT, _VT_co]):
+    def keys(self) -> Iterable[_KT]: ...  # noqa: E704
+
+    def __getitem__(self, __k: _KT) -> _VT_co: ...
+
+
+def _new_attr_dict_(*args: Iterable[tuple[Any, Any]]) -> "AttrDict":
+    attr_dict = AttrDict()
+    for k, v in args:
+        attr_dict[k] = v
+    return attr_dict
+
+
+class AttrDict(MutableMapping):
+    def update(
+        self,
+        *args: SupportsKeysAndGetItem[Any, Any] | Iterable[tuple[Any, Any]],
+        **kwargs: Any,
+    ) -> None:
+        self.__private_dict__.update(*args, **kwargs)
+
+    def clear(self) -> None:
+        self.__private_dict__.clear()
+
+    def copy(self) -> "AttrDict":
+        ad = AttrDict()
+        for key in self.__private_dict__.keys():
+            ad[key] = self.__private_dict__[key]
+        return ad
+
+    def keys(self) -> KeysView[Any]:
+        return self.__private_dict__.keys()
+
+    def items(self) -> ItemsView[Any, Any]:
+        return self.__private_dict__.items()
+
+    def values(self) -> ValuesView[Any]:
+        return self.__private_dict__.values()
+
+    def pop(self, key: str, default: Any = None) -> Any:
+        return self.__private_dict__.pop(key, default)
+
+    def __reduce__(
+        self,
+    ) -> tuple[
+        Callable[[Iterable[tuple[Any, Any]]], "AttrDict"], tuple[tuple[Any, Any], ...]
+    ]:
+        return _new_attr_dict_, tuple((k, v) for k, v in self.items())
+
+    def __len__(self) -> int:
+        return self.__private_dict__.__len__()
+
+    def __repr__(self) -> str:
+        out = self.__private_dict__.__str__()
+        return "AttrDict" + out
+
+    def __str__(self) -> str:
+        return self.__repr__()
+
+    def __init__(
+        self, *args: Mapping[Any, Any] | Sequence[tuple[Any, Any]], **kwargs: Any
+    ) -> None:
+        self.__dict__["__private_dict__"] = dict(*args, **kwargs)
+
+    def __contains__(self, item: str) -> bool:
+        return self.__private_dict__.__contains__(item)
+
+    def __getitem__(self, item: str) -> Any:
+        return self.__private_dict__[item]
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        if key == "__private_dict__":
+            raise KeyError("__private_dict__ is reserved and cannot be set.")
+        self.__private_dict__[key] = value
+
+    def __delitem__(self, key: str) -> None:
+        del self.__private_dict__[key]
+
+    def __getattr__(self, key: str) -> Any:
+        if key not in self.__private_dict__:
+            raise AttributeError
+        return self.__private_dict__[key]
+
+    def __setattr__(self, key: str, value: Any) -> None:
+        if key == "__private_dict__":
+            raise AttributeError("__private_dict__ is invalid")
+        self.__private_dict__[key] = value
+
+    def __delattr__(self, key: str) -> None:
+        del self.__private_dict__[key]
+
+    def __dir__(self) -> Iterable[str]:
+        out = [str(key) for key in self.__private_dict__.keys()]
+        out += list(super().__dir__())
+        filtered = [key for key in out if key.isidentifier()]
+        return sorted(set(filtered))
+
+    def __iter__(self) -> Iterator[str]:
+        return self.__private_dict__.__iter__()
