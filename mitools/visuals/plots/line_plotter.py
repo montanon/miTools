@@ -35,7 +35,7 @@ class LinePlotter(Plotter):
         self._line_params = {
             # Specific Parameters that are based on the number of data sequences
             "marker": {
-                "default": "o",
+                "default": "",
                 "type": Union[MarkerSequence, Marker],
             },
             "markersize": {
