@@ -85,8 +85,3 @@ class SURModel(BaseRegressionModel):
                 )
             pred_data = new_data
         return self.results.predict(pred_data)
-
-    def summary(self):
-        if not self.fitted:
-            raise ArgumentValueError("Model not fitted yet")
-        return self.results.summary
