@@ -1,10 +1,10 @@
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, Optional, Union
 
 import statsmodels.api as sm
 from linearmodels.system import SUR
 from pandas import DataFrame, Series
 
-from mitools.exceptions import ArgumentStructureError, ArgumentValueError
+from mitools.exceptions import ArgumentValueError
 from mitools.regressions.linear_models import BaseRegressionModel
 
 
