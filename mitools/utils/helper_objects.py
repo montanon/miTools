@@ -5,13 +5,11 @@ from collections.abc import (
     Iterable,
     Iterator,
     KeysView,
-    Mapping,
     MutableMapping,
-    Sequence,
     ValuesView,
 )
 from dataclasses import dataclass
-from typing import Any, Callable, Protocol, TypeVar, cast
+from typing import Any
 
 
 @dataclass
@@ -151,18 +149,7 @@ class LazyList(list):
         return self._lazy("__setitem__", *args)
 
 
-_KT = TypeVar("_KT")
-_VT = TypeVar("_VT")
-_VT_co = TypeVar("_VT_co", covariant=True)
-
-
-class SupportsKeysAndGetItem(Protocol[_KT, _VT_co]):
-    def keys(self) -> Iterable[_KT]: ...  # noqa: E704
-
-    def __getitem__(self, __k: _KT) -> _VT_co: ...
-
-
-def _new_attr_dict_(*args: Iterable[tuple[Any, Any]]) -> "AttrDict":
+def _new_attr_dict_(*args):
     attr_dict = AttrDict()
     for k, v in args:
         attr_dict[k] = v
@@ -172,7 +159,7 @@ def _new_attr_dict_(*args: Iterable[tuple[Any, Any]]) -> "AttrDict":
 class AttrDict(MutableMapping):
     def update(
         self,
-        *args: SupportsKeysAndGetItem[Any, Any] | Iterable[tuple[Any, Any]],
+        *args: Any,
         **kwargs: Any,
     ) -> None:
         self.__private_dict__.update(*args, **kwargs)
@@ -186,13 +173,13 @@ class AttrDict(MutableMapping):
             ad[key] = self.__private_dict__[key]
         return ad
 
-    def keys(self) -> KeysView[Any]:
+    def keys(self) -> KeysView:
         return self.__private_dict__.keys()
 
-    def items(self) -> ItemsView[Any, Any]:
+    def items(self) -> ItemsView:
         return self.__private_dict__.items()
 
-    def values(self) -> ValuesView[Any]:
+    def values(self) -> ValuesView:
         return self.__private_dict__.values()
 
     def pop(self, key: str, default: Any = None) -> Any:
@@ -200,9 +187,7 @@ class AttrDict(MutableMapping):
 
     def __reduce__(
         self,
-    ) -> tuple[
-        Callable[[Iterable[tuple[Any, Any]]], "AttrDict"], tuple[tuple[Any, Any], ...]
-    ]:
+    ):
         return _new_attr_dict_, tuple((k, v) for k, v in self.items())
 
     def __len__(self) -> int:
@@ -215,9 +200,7 @@ class AttrDict(MutableMapping):
     def __str__(self) -> str:
         return self.__repr__()
 
-    def __init__(
-        self, *args: Mapping[Any, Any] | Sequence[tuple[Any, Any]], **kwargs: Any
-    ) -> None:
+    def __init__(self, *args, **kwargs) -> None:
         self.__dict__["__private_dict__"] = dict(*args, **kwargs)
 
     def __contains__(self, item: str) -> bool:
@@ -247,11 +230,11 @@ class AttrDict(MutableMapping):
     def __delattr__(self, key: str) -> None:
         del self.__private_dict__[key]
 
-    def __dir__(self) -> Iterable[str]:
+    def __dir__(self) -> Iterable:
         out = [str(key) for key in self.__private_dict__.keys()]
         out += list(super().__dir__())
         filtered = [key for key in out if key.isidentifier()]
         return sorted(set(filtered))
 
-    def __iter__(self) -> Iterator[str]:
+    def __iter__(self) -> Iterator:
         return self.__private_dict__.__iter__()
