@@ -67,10 +67,10 @@ class QuantileRegressionModel(BaseRegressionModel):
             exog = self.data[exog_vars]
             if add_constant:
                 exog = sm.add_constant(exog)
-            model = sm.QuantReg(endog, exog, *self.args, **self.kwargs)
+            self.model = sm.QuantReg(endog, exog, *self.args, **self.kwargs)
         self.results = {}
         for q in self.quantiles:
-            self.results[q] = model.fit(q=q, *args, **kwargs)
+            self.results[q] = self.model.fit(q=q, *args, **kwargs)
         self.fitted = True
         return (
             self.results if len(self.quantiles) > 1 else self.results[self.quantiles[0]]

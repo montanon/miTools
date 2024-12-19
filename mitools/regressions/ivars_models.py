@@ -56,8 +56,10 @@ class IV2SLSModel(BaseRegressionModel):
             instr = None
             if self.instrument_variables:
                 instr = self.data[self.instrument_variables]
-            model = IV2SLS(endog, exog, endog_reg, instr, *self.args, **self.kwargs)
-        self.results = model.fit(*args, **kwargs)
+            self.model = IV2SLS(
+                endog, exog, endog_reg, instr, *self.args, **self.kwargs
+            )
+        self.results = self.model.fit(*args, **kwargs)
         self.fitted = True
         return self.results
 

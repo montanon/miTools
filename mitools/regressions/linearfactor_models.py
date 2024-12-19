@@ -35,13 +35,13 @@ class TradedFactorModel(BaseRegressionModel):
         else:
             portfolios = self.data[self.dependent_variable]
         factors = self.data[self.independent_variables]
-        model = TFModel(
+        self.model = TFModel(
             portfolios=portfolios,
             factors=factors,
             *self.args,
             **self.kwargs,
         )
-        self.results = model.fit(*args, **kwargs)
+        self.results = self.model.fit(*args, **kwargs)
         self.fitted = True
         return self.results
 
@@ -92,14 +92,14 @@ class LinearFactorModel(BaseRegressionModel):
         else:
             portfolios = self.data[self.dependent_variable]
         factors = self.data[self.independent_variables]
-        model = LFModel(
+        self.model = LFModel(
             portfolios=portfolios,
             factors=factors,
             risk_free=self.risk_free,
             *self.args,
             **self.kwargs,
         )
-        self.results = model.fit(*args, **kwargs)
+        self.results = self.model.fit(*args, **kwargs)
         self.fitted = True
         return self.results
 
@@ -150,14 +150,14 @@ class LinearFactorGMMModel(BaseRegressionModel):
         else:
             portfolios = self.data[self.dependent_variable]
         factors = self.data[self.independent_variables]
-        model = LFGMMModel(
+        self.model = LFGMMModel(
             portfolios=portfolios,
             factors=factors,
             risk_free=self.risk_free,
             *self.args,
             **self.kwargs,
         )
-        self.results = model.fit(*args, **kwargs)
+        self.results = self.model.fit(*args, **kwargs)
         self.fitted = True
         return self.results
 
