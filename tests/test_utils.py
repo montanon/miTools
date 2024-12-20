@@ -19,6 +19,7 @@ from treelib import Tree
 from mitools.context.dev_object import Dev, get_dev_var
 from mitools.exceptions import ArgumentTypeError, ArgumentValueError
 from mitools.utils import (
+    AttrDict,
     BitArray,
     LazyDict,
     LazyList,
@@ -60,6 +61,198 @@ from mitools.utils import (
     write_json_file,
     write_text_file,
 )
+from mitools.utils.helper_objects import _new_attr_dict_
+
+
+class TestAttrDict(unittest.TestCase):
+    def test_init_empty(self):
+        ad = AttrDict()
+        self.assertEqual(len(ad), 0)
+        self.assertEqual(str(ad), "AttrDict{}")
+
+    def test_init_with_dict(self):
+        input_dict = {"a": 1, "b": 2}
+        ad = AttrDict(input_dict)
+        self.assertEqual(len(ad), 2)
+        self.assertEqual(ad["a"], 1)
+        self.assertEqual(ad["b"], 2)
+
+    def test_init_with_kwargs(self):
+        ad = AttrDict(x=10, y=20)
+        self.assertEqual(ad.x, 10)
+        self.assertEqual(ad.y, 20)
+
+    def test_init_with_sequence_of_tuples(self):
+        ad = AttrDict([("key1", "val1"), ("key2", "val2")])
+        self.assertEqual(ad.key1, "val1")
+        self.assertEqual(ad.key2, "val2")
+
+    def test_attribute_access(self):
+        ad = AttrDict({"foo": "bar"})
+        self.assertEqual(ad.foo, "bar")
+        self.assertEqual(ad["foo"], "bar")
+        ad.foo = "baz"
+        self.assertEqual(ad.foo, "baz")
+        self.assertEqual(ad["foo"], "baz")
+        ad["foo"] = "qux"
+        self.assertEqual(ad.foo, "qux")
+        self.assertEqual(ad["foo"], "qux")
+
+    def test_attribute_error(self):
+        ad = AttrDict({"a": 1})
+        with self.assertRaises(AttributeError):
+            _ = ad.non_existent
+
+    def test_item_access(self):
+        ad = AttrDict({"one": 1, "two": 2})
+        self.assertEqual(ad["one"], 1)
+        self.assertEqual(ad["two"], 2)
+        with self.assertRaises(KeyError):
+            _ = ad["three"]
+
+    def test_item_assignment(self):
+        ad = AttrDict()
+        ad["test"] = 123
+        self.assertEqual(ad.test, 123)
+
+    def test_item_deletion(self):
+        ad = AttrDict({"a": 1, "b": 2})
+        del ad["a"]
+        self.assertNotIn("a", ad)
+        with self.assertRaises(KeyError):
+            del ad["a"]
+
+    def test_attribute_deletion(self):
+        ad = AttrDict({"x": 10})
+        del ad.x
+        self.assertNotIn("x", ad)
+        with self.assertRaises(KeyError):
+            del ad.x
+
+    def test_private_dict_protection(self):
+        ad = AttrDict()
+        with self.assertRaises(KeyError):
+            ad["__private_dict__"] = {}
+        with self.assertRaises(AttributeError):
+            ad.__private_dict__ = {}
+
+    def test_len(self):
+        ad = AttrDict({"a": 1, "b": 2, "c": 3})
+        self.assertEqual(len(ad), 3)
+        del ad["b"]
+        self.assertEqual(len(ad), 2)
+
+    def test_contains(self):
+        ad = AttrDict(a=1, b=2)
+        self.assertIn("a", ad)
+        self.assertNotIn("c", ad)
+
+    def test_keys_values_items(self):
+        ad = AttrDict({"a": 1, "b": 2})
+        self.assertEqual(set(ad.keys()), {"a", "b"})
+        self.assertEqual(set(ad.values()), {1, 2})
+        self.assertEqual(set(ad.items()), {("a", 1), ("b", 2)})
+
+    def test_iter(self):
+        ad = AttrDict({"x": 100, "y": 200})
+        keys = list(iter(ad))
+        self.assertIn("x", keys)
+        self.assertIn("y", keys)
+
+    def test_update_with_dict(self):
+        ad = AttrDict({"a": 1})
+        ad.update({"b": 2})
+        self.assertEqual(ad.b, 2)
+        self.assertEqual(len(ad), 2)
+
+    def test_update_with_kwargs(self):
+        ad = AttrDict({"a": 1})
+        ad.update(c=3)
+        self.assertEqual(ad.c, 3)
+
+    def test_update_with_iterable(self):
+        ad = AttrDict({"a": 1})
+        ad.update([("b", 2), ("c", 3)])
+        self.assertEqual(ad.b, 2)
+        self.assertEqual(ad.c, 3)
+
+    def test_clear(self):
+        ad = AttrDict(a=1, b=2)
+        ad.clear()
+        self.assertEqual(len(ad), 0)
+        self.assertNotIn("a", ad)
+
+    def test_copy(self):
+        ad = AttrDict(a=1, b=2)
+        ad_copy = ad.copy()
+        self.assertIsNot(ad, ad_copy)
+        self.assertEqual(ad_copy.a, 1)
+        self.assertEqual(ad_copy.b, 2)
+        ad_copy.a = 100
+        self.assertEqual(ad.a, 1)
+        self.assertEqual(ad_copy.a, 100)
+
+    def test_pop(self):
+        ad = AttrDict(a=1, b=2)
+        val = ad.pop("a")
+        self.assertEqual(val, 1)
+        self.assertNotIn("a", ad)
+
+        default_val = ad.pop("missing", "default")
+        self.assertEqual(default_val, "default")
+
+    def test_reduce(self):
+        ad = AttrDict(a=1, b=2)
+        func, args = ad.__reduce__()
+        self.assertEqual(func, _new_attr_dict_)
+        self.assertEqual(set(args), {("a", 1), ("b", 2)})
+
+    def test_pickle(self):
+        ad = AttrDict(x=42, y="foo")
+        data = pickle.dumps(ad)
+        loaded = pickle.loads(data)
+        self.assertEqual(loaded.x, 42)
+        self.assertEqual(loaded.y, "foo")
+        self.assertIsInstance(loaded, AttrDict)
+
+    def test_repr_str(self):
+        ad = AttrDict(a=1, b=2)
+        rep = repr(ad)
+        self.assertTrue(rep.startswith("AttrDict{"))
+        self.assertIn("'a': 1", rep)
+        self.assertIn("'b': 2", rep)
+        self.assertTrue(rep.endswith("}"))
+        self.assertEqual(str(ad), rep)
+
+    def test_dir(self):
+        ad = AttrDict(a=1, b=2, non_id_key="val", _private=3)
+        directory = dir(ad)
+        self.assertIn("a", directory)
+        self.assertIn("b", directory)
+        self.assertIn("non_id_key", directory)
+        self.assertIn("_private", directory)
+
+    def test_setattr(self):
+        ad = AttrDict()
+        ad.foo = "bar"
+        self.assertEqual(ad["foo"], "bar")
+
+    def test_delattr(self):
+        ad = AttrDict(foo="bar", baz="qux")
+        del ad.foo
+        self.assertNotIn("foo", ad)
+        with self.assertRaises(KeyError):
+            del ad.foo
+
+    def test_invalid_setattr_private_dict(self):
+        ad = AttrDict()
+        with self.assertRaises(AttributeError):
+            ad.__private_dict__ = {}
+
+    def test_reserved_key_error(self):
+        ad = AttrDict()
+        with self.assertRaises(KeyError):
+            ad["__private_dict__"] = 123
 
 
 class TestStringEncodingDecoding(TestCase):

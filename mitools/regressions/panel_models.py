@@ -10,38 +10,7 @@ from linearmodels import (
 )
 from pandas import DataFrame
 
-from mitools.exceptions import ArgumentValueError
-from mitools.regressions.linear_models import BaseRegressionModel
-
-
-class BasePanelRegressionModel(BaseRegressionModel):
-    def __init__(
-        self,
-        data: DataFrame,
-        formula: Optional[str] = None,
-        dependent_variable: Optional[str] = None,
-        independent_variables: Optional[List[str]] = None,
-        control_variables: Optional[List[str]] = None,
-        *args,
-        **kwargs,
-    ):
-        self.validate_data(data)
-        super().__init__(
-            data,
-            formula,
-            dependent_variable,
-            independent_variables,
-            control_variables,
-            *args,
-            **kwargs,
-        )
-        self.model_name = "PanelOLS"
-
-    def validate_data(self, data):
-        if data.index.nlevels != 2:
-            raise ArgumentValueError(
-                "Data must have two levels in the index, referring to the corresponding entities and time periods, in that order."
-            )
+from mitools.regressions.base_models import BasePanelRegressionModel
 
 
 class PanelOLSModel(BasePanelRegressionModel):
@@ -72,7 +41,7 @@ class PanelOLSModel(BasePanelRegressionModel):
 
     def fit(self, add_constant: bool = True, *args, **kwargs):
         if self.formula is not None:
-            model = PanelOLS.from_formula(
+            self.model = PanelOLS.from_formula(
                 formula=self.formula,
                 data=self.data,
                 entity_effects=self.entity_effects,
@@ -86,7 +55,7 @@ class PanelOLSModel(BasePanelRegressionModel):
             exog = self.data[exog_vars]
             if add_constant:
                 exog = sm.add_constant(exog)
-            model = PanelOLS(
+            self.model = PanelOLS(
                 dependent=endog,
                 exog=exog,
                 entity_effects=self.entity_effects,
@@ -94,7 +63,7 @@ class PanelOLSModel(BasePanelRegressionModel):
                 *self.args,
                 **self.kwargs,
             )
-        self.results = model.fit(*args, **kwargs)
+        self.results = self.model.fit(*args, **kwargs)
         self.fitted = True
         return self.results
 
@@ -128,7 +97,7 @@ class PooledOLSModel(BasePanelRegressionModel):
         **kwargs,
     ):
         if self.formula is not None:
-            model = PooledOLS.from_formula(
+            self.model = PooledOLS.from_formula(
                 formula=self.formula,
                 data=self.data,
                 *self.args,
@@ -140,13 +109,13 @@ class PooledOLSModel(BasePanelRegressionModel):
             exog = self.data[exog_vars]
             if add_constant:
                 exog = sm.add_constant(exog)
-            model = PooledOLS(
+            self.model = PooledOLS(
                 dependent=endog,
                 exog=exog,
                 *self.args,
                 **self.kwargs,
             )
-        self.results = model.fit(
+        self.results = self.model.fit(
             *args,
             **kwargs,
         )
@@ -178,7 +147,7 @@ class RandomEffectsModel(BasePanelRegressionModel):
 
     def fit(self, add_constant: bool = True, *args, **kwargs):
         if self.formula is not None:
-            model = RandomEffects.from_formula(
+            self.model = RandomEffects.from_formula(
                 formula=self.formula,
                 data=self.data,
                 *self.args,
@@ -190,13 +159,13 @@ class RandomEffectsModel(BasePanelRegressionModel):
             exog = self.data[exog_vars]
             if add_constant:
                 exog = sm.add_constant(exog)
-            model = RandomEffects(
+            self.model = RandomEffects(
                 dependent=endog,
                 exog=exog,
                 *self.args,
                 **self.kwargs,
             )
-        self.results = model.fit(*args, **kwargs)
+        self.results = self.model.fit(*args, **kwargs)
         self.fitted = True
         return self.results
 
@@ -225,7 +194,7 @@ class BetweenOLSModel(BasePanelRegressionModel):
 
     def fit(self, add_constant: bool = True, *args, **kwargs):
         if self.formula is not None:
-            model = BetweenOLS.from_formula(
+            self.model = BetweenOLS.from_formula(
                 formula=self.formula,
                 data=self.data,
                 *self.args,
@@ -237,13 +206,13 @@ class BetweenOLSModel(BasePanelRegressionModel):
             exog = self.data[exog_vars]
             if add_constant:
                 exog = sm.add_constant(exog)
-            model = BetweenOLS(
+            self.model = BetweenOLS(
                 dependent=endog,
                 exog=exog,
                 *self.args,
                 **self.kwargs,
             )
-        self.results = model.fit(*args, **kwargs)
+        self.results = self.model.fit(*args, **kwargs)
         self.fitted = True
         return self.results
 
@@ -272,7 +241,7 @@ class FirstDifferenceOLSModel(BasePanelRegressionModel):
 
     def fit(self, *args, **kwargs):
         if self.formula is not None:
-            model = FirstDifferenceOLS.from_formula(
+            self.model = FirstDifferenceOLS.from_formula(
                 formula=self.formula,
                 data=self.data,
                 *self.args,
@@ -282,12 +251,12 @@ class FirstDifferenceOLSModel(BasePanelRegressionModel):
             endog = self.data[self.dependent_variable]
             exog_vars = self.independent_variables + self.control_variables
             exog = self.data[exog_vars]
-            model = FirstDifferenceOLS(
+            self.model = FirstDifferenceOLS(
                 dependent=endog,
                 exog=exog,
                 *self.args,
                 **self.kwargs,
             )
-        self.results = model.fit(*args, **kwargs)
+        self.results = self.model.fit(*args, **kwargs)
         self.fitted = True
         return self.results
