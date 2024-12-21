@@ -3,6 +3,7 @@ from typing import List, Optional, Union
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
 from pandas import DataFrame
+from statsmodels.robust.norms import HuberT
 
 from mitools.exceptions import ArgumentValueError
 from mitools.regressions.base_models import BaseRegressionModel
@@ -113,3 +114,48 @@ class QuantileRegressionModel(BaseRegressionModel):
             return (
                 summaries if len(self.quantiles) > 1 else summaries[self.quantiles[0]]
             )
+
+
+class RLMModel(BaseRegressionModel):
+    def __init__(
+        self,
+        data: DataFrame,
+        formula: Optional[str] = None,
+        dependent_variable: Optional[str] = None,
+        independent_variables: Optional[List[str]] = None,
+        control_variables: Optional[List[str]] = None,
+        M: Optional[sm.robust.norms.RobustNorm] = None,
+        *args,
+        **kwargs,
+    ):
+        super().__init__(
+            data=data,
+            formula=formula,
+            dependent_variable=dependent_variable,
+            independent_variables=independent_variables,
+            control_variables=control_variables,
+            *args,
+            **kwargs,
+        )
+        self.model_name = "RLM"
+        self.M = M or HuberT()
+
+    def fit(self, add_constant: bool = True, *args, **kwargs):
+        if self.formula is not None:
+            model = smf.rlm(
+                formula=self.formula,
+                data=self.data,
+                M=self.M,
+                *self.args,
+                **self.kwargs,
+            )
+        else:
+            endog = self.data[self.dependent_variable]
+            exog_vars = self.independent_variables + self.control_variables
+            exog = self.data[exog_vars]
+            if add_constant:
+                exog = sm.add_constant(exog)
+            model = sm.RLM(endog, exog, M=self.M, *self.args, **self.kwargs)
+        self.results = model.fit(*args, **kwargs)
+        self.fitted = True
+        return self.results
