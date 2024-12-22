@@ -195,7 +195,12 @@ class StatisticalTests:
     ):
         self.data = data
         self.dependent_variable = dependent_variable
-        self.independent_variables = independent_variables or []
+        if independent_variables is None:
+            self.independent_variables = [
+                c for c in data.columns if c != dependent_variable
+            ]
+        else:
+            self.independent_variables = independent_variables
         self.control_variables = control_variables or []
 
         if dependent_variable and dependent_variable not in data.columns:
