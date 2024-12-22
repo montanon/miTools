@@ -17,16 +17,16 @@ class OLSModel(BaseRegressionModel):
 
     def fit(self, add_constant: bool = True, *args, **kwargs):
         if self.formula is not None:
-            model = smf.ols(formula=self.formula, data=self.data, *args, **kwargs)
+            self.model = smf.ols(formula=self.formula, data=self.data, *args, **kwargs)
         else:
             endog = self.data[self.dependent_variable]
             exog_vars = self.independent_variables + self.control_variables
             exog = self.data[exog_vars]
             if add_constant:
                 exog = sm.add_constant(exog)
-            model = sm.OLS(endog, exog, *self.args, **self.kwargs)
+            self.model = sm.OLS(endog, exog, *self.args, **self.kwargs)
         self.model_name = "OLS"
-        self.results = model.fit(*args, **kwargs)
+        self.results = self.model.fit(*args, **kwargs)
         self.fitted = True
         return self.results
 
@@ -60,7 +60,7 @@ class QuantileRegressionModel(BaseRegressionModel):
 
     def fit(self, add_constant: bool = True, *args, **kwargs):
         if self.formula is not None:
-            model = smf.quantreg(
+            self.model = smf.quantreg(
                 formula=self.formula, data=self.data, *self.args, **self.kwargs
             )
         else:
@@ -166,6 +166,7 @@ class RollingOLSModel(BaseRegressionModel):
     def __init__(
         self,
         data: DataFrame,
+        formula: Optional[bool] = None,
         dependent_variable: Optional[str] = None,
         independent_variables: Optional[List[str]] = None,
         control_variables: Optional[List[str]] = None,
@@ -178,7 +179,7 @@ class RollingOLSModel(BaseRegressionModel):
     ):
         super().__init__(
             data=data,
-            formula=None,
+            formula=formula,
             dependent_variable=dependent_variable,
             independent_variables=independent_variables,
             control_variables=control_variables,
@@ -196,22 +197,34 @@ class RollingOLSModel(BaseRegressionModel):
         self.missing = missing
 
     def fit(self, add_constant: bool = True, *args, **kwargs):
-        endog = self.data[self.dependent_variable]
-        exog_vars = self.independent_variables + self.control_variables
-        exog = self.data[exog_vars]
-        if add_constant:
-            exog = sm.add_constant(exog, has_constant="add")
-        model = RollingOLS(
-            endog,
-            exog,
-            window=self.window,
-            min_nobs=self.min_nobs,
-            expanding=self.expanding,
-            missing=self.missing,
-            *self.args,
-            **self.kwargs,
-        )
-        self.results = model.fit(*args, **kwargs)
+        if self.formula is not None:
+            self.model = RollingOLS.from_formula(
+                formula=self.formula,
+                data=self.data,
+                window=self.window,
+                min_nobs=self.min_nobs,
+                expanding=self.expanding,
+                missing=self.missing,
+                *self.args,
+                **self.kwargs,
+            )
+        else:
+            endog = self.data[self.dependent_variable]
+            exog_vars = self.independent_variables + self.control_variables
+            exog = self.data[exog_vars]
+            if add_constant:
+                exog = sm.add_constant(exog)
+            self.model = RollingOLS(
+                endog,
+                exog,
+                window=self.window,
+                min_nobs=self.min_nobs,
+                expanding=self.expanding,
+                missing=self.missing,
+                *self.args,
+                **self.kwargs,
+            )
+        self.results = self.model.fit(*args, **kwargs)
         self.fitted = True
         return self.results
 
