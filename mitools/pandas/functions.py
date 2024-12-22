@@ -1,3 +1,4 @@
+import re
 from os import PathLike
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Literal, Optional, Tuple, Union
@@ -613,3 +614,24 @@ def idxslice(
                 f"Level '{level}' does not match the Index or Columns name."
             )
         return IndexSlice[values]
+
+
+def dataframe_to_latex(dataframe: DataFrame):
+    def regex_symbol_replacement(match):
+        return rf"\{match.group(0)}"
+
+    symbols_pattern = r"([\ \_\-\&\%\$\#])"
+    table = dataframe.rename(
+        columns=lambda x: re.sub(symbols_pattern, regex_symbol_replacement, x)
+        if isinstance(x, str)
+        else str(round(x, 1)),
+        index=lambda x: re.sub(symbols_pattern, regex_symbol_replacement, x)
+        if isinstance(x, str)
+        else str(round(x, 1)),
+    ).to_latex(multirow=True, multicolumn=True, multicolumn_format="c")
+    table = (
+        "\\begin{adjustbox}{width=\\textwidth,center}\n"
+        + f"{table}"
+        + "\end{adjustbox}\n"
+    )
+    return table
