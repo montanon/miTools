@@ -3,6 +3,7 @@ from typing import List, Optional, Union
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
 from pandas import DataFrame
+from statsmodels.regression.rolling import RollingOLS
 from statsmodels.robust.norms import HuberT
 
 from mitools.exceptions import ArgumentValueError
@@ -159,3 +160,80 @@ class RLMModel(BaseRegressionModel):
         self.results = model.fit(*args, **kwargs)
         self.fitted = True
         return self.results
+
+
+class RollingOLSModel(BaseRegressionModel):
+    def __init__(
+        self,
+        data: DataFrame,
+        dependent_variable: Optional[str] = None,
+        independent_variables: Optional[List[str]] = None,
+        control_variables: Optional[List[str]] = None,
+        window: int = 30,
+        min_nobs: Optional[int] = None,
+        expanding: bool = False,
+        missing: str = "drop",
+        *args,
+        **kwargs,
+    ):
+        super().__init__(
+            data=data,
+            formula=None,
+            dependent_variable=dependent_variable,
+            independent_variables=independent_variables,
+            control_variables=control_variables,
+            *args,
+            **kwargs,
+        )
+        if self.dependent_variable is None:
+            raise ArgumentValueError(
+                "You must provide a dependent_variable for RollingOLSModel."
+            )
+        self.model_name = "RollingOLS"
+        self.window = window
+        self.min_nobs = min_nobs
+        self.expanding = expanding
+        self.missing = missing
+
+    def fit(self, add_constant: bool = True, *args, **kwargs):
+        endog = self.data[self.dependent_variable]
+        exog_vars = self.independent_variables + self.control_variables
+        exog = self.data[exog_vars]
+        if add_constant:
+            exog = sm.add_constant(exog, has_constant="add")
+        model = RollingOLS(
+            endog,
+            exog,
+            window=self.window,
+            min_nobs=self.min_nobs,
+            expanding=self.expanding,
+            missing=self.missing,
+            *self.args,
+            **self.kwargs,
+        )
+        self.results = model.fit(*args, **kwargs)
+        self.fitted = True
+        return self.results
+
+    def predict(self, new_data: Optional[DataFrame] = None):
+        if not self.fitted:
+            raise ArgumentValueError("Model not fitted yet.")
+        if new_data is None:
+            return self.results.predict()
+        else:
+            missing_vars = [
+                col
+                for col in self.independent_variables + self.control_variables
+                if col not in new_data.columns
+            ]
+            if missing_vars:
+                raise ArgumentValueError(
+                    f"new_data is missing required variables: {missing_vars}"
+                )
+            exog = new_data[self.independent_variables + self.control_variables].copy()
+            if (
+                "const" in self.results.model.exog.columns
+                and "const" not in exog.columns
+            ):
+                exog = sm.add_constant(exog, has_constant="add")
+            return self.results.predict(exog)
