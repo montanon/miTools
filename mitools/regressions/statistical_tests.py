@@ -121,11 +121,13 @@ def durbin_watson_test(
         included_variables = independent_variables
     else:
         included_variables = [c for c in data.columns if c != dependent_variable]
-    X = data[included_variables].copy(deep=True)
-    X = add_constant(X)
-    y = data[dependent_variable]
-    model = OLSModel.from_arrays(y=y, X=X)
-    dw_stat = durbin_watson(model.model.resid)
+    model = OLSModel(
+        data=data,
+        dependent_variable=dependent_variable,
+        independent_variables=included_variables,
+    )
+    results = model.fit()
+    dw_stat = durbin_watson(results.resid)
     if dw_stat < 1.5:
         hypothesis = "Reject (Positive autocorrelation)"
     elif dw_stat > 2.5:
@@ -146,11 +148,13 @@ def breusch_pagan_test(
         included_variables = independent_variables
     else:
         included_variables = [c for c in data.columns if c != dependent_variable]
-    X = data[included_variables].copy(deep=True)
-    X = add_constant(X)
-    y = data[dependent_variable]
-    model = OLSModel.from_arrays(y=y, X=X)
-    test_stat, p_value, _, _ = het_breuschpagan(model.model.resid, model.model.exog)
+    model = OLSModel(
+        data=data,
+        dependent_variable=dependent_variable,
+        independent_variables=included_variables,
+    )
+    results = model.fit()
+    test_stat, p_value, _, _ = het_breuschpagan(results.resid, results.model.exog)
     if p_value < 0.01:
         hypothesis = "Reject (Signs of heteroscedasticity)"
     else:
@@ -170,11 +174,13 @@ def white_test(
         included_variables = independent_variables
     else:
         included_variables = [c for c in data.columns if c != dependent_variable]
-    X = data[included_variables].copy(deep=True)
-    X = add_constant(X)
-    y = data[dependent_variable]
-    model = OLSModel.from_arrays(y=y, X=X)
-    test_stat, p_value, _, _ = het_white(model.model.resid, model.model.exog)
+    model = OLSModel(
+        data=data,
+        dependent_variable=dependent_variable,
+        independent_variables=included_variables,
+    )
+    results = model.fit()
+    test_stat, p_value, _, _ = het_white(results.resid, results.model.exog)
     if p_value < 0.05:
         hypothesis = "Reject (Signs of heteroscedasticity)"
     else:
@@ -261,3 +267,31 @@ class StatisticalTests:
             dependent_variable=self.dependent_variable,
             independent_variables=self.independent_variables,
         )
+
+    def __repr__(self) -> str:
+        variables = []
+        if self.dependent_variable:
+            variables.append(f"dependent_variable='{self.dependent_variable}'")
+        if self.independent_variables:
+            variables.append(f"independent_variables={self.independent_variables}")
+        if self.control_variables:
+            variables.append(f"control_variables={self.control_variables}")
+
+        return f"StatisticalTests(data.shape={self.data.shape}, {', '.join(variables)})"
+
+    def __str__(self) -> str:
+        parts = ["Statistical Tests Configuration:"]
+        parts.append(f"Data Shape: {self.data.shape}")
+
+        if self.dependent_variable:
+            parts.append(f"Dependent Variable: {self.dependent_variable}")
+
+        if self.independent_variables:
+            parts.append("Independent Variables:")
+            parts.extend(f"  - {var}" for var in self.independent_variables)
+
+        if self.control_variables:
+            parts.append("Control Variables:")
+            parts.extend(f"  - {var}" for var in self.control_variables)
+
+        return "\n".join(parts)
