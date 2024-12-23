@@ -1,5 +1,6 @@
 from typing import Literal, Union
 
+import numpy as np
 from matplotlib.axes import Axes
 
 from mitools.visuals.plots.matplotlib_typing import (
@@ -98,11 +99,40 @@ class StackedPlotter(Plotter):
         return stacked_kwargs
 
     def _create_plot(self):
-        for n_sequence in range(self.n_sequences):
-            plot_kwargs = self._create_stacked_kwargs(n_sequence)
-            plot_kwargs = {k: v for k, v in plot_kwargs.items() if v is not None}
-            try:
-                raise NotImplementedError
-            except Exception as e:
-                raise StackedPlotterException(f"Error while creating stacked plot: {e}")
-            return self.ax
+        try:
+            y_stack = np.cumsum(self.y_data, axis=0, dtype=np.float32)
+            if self.baseline == "zero":
+                first_line = np.zeros_like(self.x_data[0])
+            elif self.baseline == "sym":
+                first_line = -np.sum(self.y_data, axis=0) * 0.5
+                y_stack += first_line[None, :]
+            elif self.baseline == "wiggle":
+                m = self.y_data.shape[0]
+                first_line = (self.y_data * (m - 0.5 - np.arange(m)[:, None])).sum(0)
+                first_line /= -m
+                y_stack += first_line
+            elif self.baseline == "weighted_wiggle":
+                total = np.sum(self.y_data, axis=0)
+                inv_total = np.zeros_like(total)
+                mask = total > 0
+                inv_total[mask] = 1.0 / total[mask]
+                increase = np.hstack((self.y_data[:, 0:1], np.diff(self.y_data)))
+                below_size = total - y_stack
+                below_size += 0.5 * self.y_data
+                move_up = below_size * inv_total
+                move_up[:, 0] = 0.5
+                center = (move_up - 0.5) * increase
+                center = np.cumsum(center.sum(0))
+                first_line = center - 0.5 * total
+                y_stack += first_line
+
+            plot_kwargs = self._create_stacked_kwargs(0)
+            self.ax.fill_between(self.x_data[0], first_line, y_stack[0], **plot_kwargs)
+            for i in range(1, self.n_sequences):
+                plot_kwargs = self._create_stacked_kwargs(i)
+                self.ax.fill_between(
+                    self.x_data[0], y_stack[i - 1], y_stack[i], **plot_kwargs
+                )
+        except Exception as e:
+            raise StackedPlotterException(f"Error while creating stacked plot: {e}")
+        return self.ax
