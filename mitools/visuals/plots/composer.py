@@ -4,8 +4,8 @@ from typing import Dict, List, Sequence, Type, Union
 
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
-from matplotlib.figure import Figure
 
+from mitools.exceptions import ArgumentValueError
 from mitools.visuals.plots.plotter import Plotter
 from mitools.visuals.plots.validations import validate_type
 
@@ -15,7 +15,7 @@ class PlotComposerException(Exception):
 
 
 class PlotComposer:
-    def __init__(self, *plotters: Plotter, ax: Axes = None, **kwargs):
+    def __init__(self, plotters: Sequence[Plotter], ax: Axes = None, **kwargs):
         self.ax = ax
         self.figure = None if ax is None else ax.figure
         self.plotters: List[Plotter] = []
@@ -24,7 +24,10 @@ class PlotComposer:
             "figsize": kwargs.get("figsize", (10, 8)),
             "style": kwargs.get("style", None),
             "tight_layout": kwargs.get("tight_layout", False),
+            "grid": kwargs.get("grid", None),
         }
+        for param, value in self._composer_params.items():
+            setattr(self, param, value)
         if plotters:
             self.add_plotters(plotters)
 
