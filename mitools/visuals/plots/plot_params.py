@@ -1,9 +1,14 @@
+from pathlib import Path
 from typing import Any, Dict, Literal, Sequence, Tuple, Union
 
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
+from matplotlib.colors import Colormap, Normalize
 from matplotlib.figure import Figure
+from matplotlib.markers import MarkerStyle
 from matplotlib.text import Text
+from numpy import ndarray
+from pandas import Series
 
 from mitools.exceptions import ArgumentStructureError, ArgumentValueError
 from mitools.visuals.plots.matplotlib_typing import Color, Scale
@@ -499,3 +504,147 @@ class PlotParams:
                                 self.ax.spines[spine].set_bounds(*values)
                             elif param == "capstyle":
                                 self.ax.spines[spine].set_capstyle(values)
+
+    def _to_serializable(self, value: Any) -> Any:
+        if value is None:
+            return None
+        elif isinstance(value, dict):
+            return {k: self._to_serializable(v) for k, v in value.items()}
+        elif isinstance(value, ndarray):
+            return value.tolist()
+        elif isinstance(value, Series):
+            return value.to_list()
+        elif isinstance(value, (list, tuple)):
+            return [self._to_serializable(v) for v in value]
+        elif isinstance(value, Colormap):
+            return value.name
+        elif isinstance(value, Normalize):
+            return value.__class__.__name__.lower()
+        elif isinstance(value, Path):
+            return str(value)
+        elif isinstance(value, MarkerStyle):
+            marker = dict(
+                marker=value.get_marker(),
+                fillstyle=value.get_fillstyle(),
+                capstyle=value.get_capstyle(),
+                joinstyle=value.get_joinstyle(),
+            )
+            return marker
+
+        return value
+
+
+class FigureParams:
+    def __init__(self, figure: Figure = None, **kwargs):
+        self.figure: Figure = figure
+        self._figure_params = {
+            "figsize": {"default": (10, 8), "type": Tuple[float, float]},
+            "style": {"default": None, "type": str},
+            "tight_layout": {"default": False, "type": bool},
+            "figure_background": {"default": None, "type": Color},
+            "suptitle": {"default": None, "type": Text},
+        }
+        self._init_params = {**self._figure_params}
+        self._set_init_params(**kwargs)
+
+    def _set_init_params(self, **kwargs):
+        for param, config in self._init_params.items():
+            setattr(self, param, config["default"])
+            if param in kwargs and kwargs[param] is not None:
+                setter_name = f"set_{param}"
+                if hasattr(self, setter_name):
+                    getattr(self, setter_name)(kwargs[param])
+                else:
+                    raise ArgumentValueError(f"Parameter '{param}' is not valid.")
+
+    def reset_params(self):
+        for param, config in self._init_params.items():
+            setattr(self, param, config["default"])
+        return self
+
+    def set_figsize(self, figsize: Tuple[float, float]):
+        if isinstance(figsize, list):
+            figsize = tuple(figsize)
+        validate_type(figsize, tuple, "figsize")
+        validate_sequence_type(figsize, NUMERIC_TYPES, "figsize")
+        validate_sequence_length(figsize, 2, "figsize")
+        self.figsize = figsize
+        return self
+
+    def set_style(self, style: str):
+        if style is not None:
+            validate_value_in_options(style, plt.style.available, "style")
+        self.style = style
+        return self
+
+    def set_tight_layout(self, tight_layout: bool = False):
+        validate_type(tight_layout, bool, "tight_layout")
+        self.tight_layout = tight_layout
+        return self
+
+    def set_figure_background(self, figure_background: Color):
+        validate_type(figure_background, (str, tuple), "figure_background")
+        if isinstance(figure_background, tuple):
+            validate_sequence_type(
+                figure_background, NUMERIC_TYPES, "figure_background"
+            )
+            validate_sequence_length(figure_background, (3, 4), "figure_background")
+        self.figure_background = figure_background
+        return self
+
+    def set_suptitle(self, t: str, **kwargs):
+        validate_type(t, str, "t")
+        self.suptitle = dict(t=t, **kwargs)
+        return self
+
+    def _prepare_draw(self, clear: bool = False):
+        if clear:
+            self.clear()
+        if self.style is not None:
+            self._default_style = plt.rcParams.copy()
+            plt.style.use(self.style)
+        if not self.figure:
+            self.figure = plt.figure(figsize=self.figsize)
+
+    def _finalize_draw(self, show: bool = False):
+        if self.tight_layout:
+            plt.tight_layout()
+        if show:
+            self.figure.show()
+        if self.style is not None:
+            plt.rcParams.update(self._default_style)
+        return self.figure
+
+    def clear(self):
+        if self.figure or self.ax:
+            plt.close(self.figure)
+            self.figure = None
+        return self
+
+    def _to_serializable(self, value: Any) -> Any:
+        if value is None:
+            return None
+        elif isinstance(value, dict):
+            return {k: self._to_serializable(v) for k, v in value.items()}
+        elif isinstance(value, ndarray):
+            return value.tolist()
+        elif isinstance(value, Series):
+            return value.to_list()
+        elif isinstance(value, (list, tuple)):
+            return [self._to_serializable(v) for v in value]
+        elif isinstance(value, Colormap):
+            return value.name
+        elif isinstance(value, Normalize):
+            return value.__class__.__name__.lower()
+        elif isinstance(value, Path):
+            return str(value)
+        elif isinstance(value, MarkerStyle):
+            marker = dict(
+                marker=value.get_marker(),
+                fillstyle=value.get_fillstyle(),
+                capstyle=value.get_capstyle(),
+                joinstyle=value.get_joinstyle(),
+            )
+            return marker
+
+        return value
