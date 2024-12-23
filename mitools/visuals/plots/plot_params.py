@@ -538,7 +538,12 @@ class FigureParams:
     def __init__(self, figure: Figure = None, **kwargs):
         self.figure: Figure = figure
         self._figure_params = {
-            "figsize": {"default": (10, 8), "type": Tuple[float, float]},
+            "figsize": {
+                "default": tuple(self.figure.get_size_inches())
+                if self.figure
+                else (10, 8),
+                "type": Tuple[float, float],
+            },
             "style": {"default": None, "type": str},
             "tight_layout": {"default": False, "type": bool},
             "figure_background": {"default": None, "type": Color},
