@@ -1,6 +1,6 @@
 from mitools.visuals.plots.bar_plotter import BarPlotter
 from mitools.visuals.plots.box_plotter import BoxPlotter
-from mitools.visuals.plots.composer import PlotComposer
+from mitools.visuals.plots.composers import AxesComposer, PlotComposer
 from mitools.visuals.plots.distribution_plotter import DistributionPlotter
 from mitools.visuals.plots.histogram_plotter import HistogramPlotter
 from mitools.visuals.plots.line_plotter import LinePlotter
