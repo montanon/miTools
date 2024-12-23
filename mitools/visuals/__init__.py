@@ -15,4 +15,5 @@ from mitools.visuals.plots import (
     PiePlotter,
     PlotComposer,
     ScatterPlotter,
+    StackedPlotter,
 )

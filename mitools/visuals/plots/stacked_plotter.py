@@ -41,10 +41,6 @@ class StackedPlotter(Plotter):
                 "default": None,
                 "type": Union[LiteralSequence, Literal["hatches"]],
             },
-            "edgecolor": {
-                "default": None,
-                "type": Union[EdgeColorSequence, EdgeColor],
-            },
             "facecolor": {
                 "default": None,
                 "type": Union[ColorSequence, Color],
@@ -69,9 +65,6 @@ class StackedPlotter(Plotter):
     def set_hatch(self, hatches: Union[LiteralSequence, Literal["hatches"]]):
         return self.set_literal_sequence(hatches, HATCHES, "hatch")
 
-    def set_edgecolor(self, edgecolor: Union[EdgeColorSequence, EdgeColor]):
-        return self.set_edgecolor_sequence(edgecolor, param_name="edgecolor")
-
     def set_facecolor(self, facecolor: Union[ColorSequence, Color]):
         return self.set_color_sequence(facecolor, param_name="facecolor")
 
@@ -86,17 +79,16 @@ class StackedPlotter(Plotter):
     def set_linewidth(self, linewidths: Union[NumericSequence, NumericType]):
         return self.set_numeric_sequence(linewidths, param_name="linewidth")
 
-    def _create_stacked_kwargs(self):
+    def _create_stacked_kwargs(self, n_sequence: int):
         stacked_kwargs = {
-            "color": self.color,
-            "hatch": self.hatch,
-            "edgecolor": self.edgecolor,
-            "facecolor": self.facecolor,
-            "linestyle": self.linestyle,
-            "linewidth": self.linewidth,
-            "alpha": self.alpha,
-            "label": self.label,
-            "zorder": self.zorder,
+            "color": self.get_sequences_param("color", n_sequence),
+            "hatch": self.get_sequences_param("hatch", n_sequence),
+            "facecolor": self.get_sequences_param("facecolor", n_sequence),
+            "linestyle": self.get_sequences_param("linestyle", n_sequence),
+            "linewidth": self.get_sequences_param("linewidth", n_sequence),
+            "alpha": self.get_sequences_param("alpha", n_sequence),
+            "label": self.get_sequences_param("label", n_sequence),
+            "zorder": self.get_sequences_param("zorder", n_sequence),
         }
         if (
             not isinstance(stacked_kwargs.get("alpha", []), NUMERIC_TYPES)
@@ -106,10 +98,11 @@ class StackedPlotter(Plotter):
         return stacked_kwargs
 
     def _create_plot(self):
-        plot_kwargs = self._create_stacked_kwargs()
-        plot_kwargs = {k: v for k, v in plot_kwargs.items() if v is not None}
-        try:
-            self.ax.stackplot(self.x_data, self.y_data, **plot_kwargs)
-        except Exception as e:
-            raise StackedPlotterException(f"Error while creating stacked plot: {e}")
-        return self.ax
+        for n_sequence in range(self.n_sequences):
+            plot_kwargs = self._create_stacked_kwargs(n_sequence)
+            plot_kwargs = {k: v for k, v in plot_kwargs.items() if v is not None}
+            try:
+                raise NotImplementedError
+            except Exception as e:
+                raise StackedPlotterException(f"Error while creating stacked plot: {e}")
+            return self.ax

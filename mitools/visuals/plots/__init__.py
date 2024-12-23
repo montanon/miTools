@@ -16,3 +16,4 @@ from mitools.visuals.plots.matplotlib_typing import (
 from mitools.visuals.plots.pie_plotter import PiePlotter
 from mitools.visuals.plots.plotter import Plotter
 from mitools.visuals.plots.scatter_plotter import ScatterPlotter
+from mitools.visuals.plots.stacked_plotter import StackedPlotter
