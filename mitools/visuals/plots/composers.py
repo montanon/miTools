@@ -153,7 +153,6 @@ class AxesComposer(FigureParams):
         self,
         axes: Sequence[Axes],
         plots: Sequence[Union[PlotComposer, Plotter]],
-        figure: Optional[Figure] = None,
         **kwargs,
     ):
         validate_type(axes, (list, tuple, np.ndarray), "axes")
@@ -166,7 +165,7 @@ class AxesComposer(FigureParams):
             )
         self.axes = list(axes)
         self.plots = list(plots)
-        super().__init__(figure=figure, **kwargs)
+        super().__init__(figure=axes[0].figure, **kwargs)
 
     def add_plot(self, ax: Axes, plot: Union[PlotComposer, Plotter]) -> "AxesComposer":
         validate_type(ax, Axes, "ax")
@@ -212,7 +211,11 @@ class AxesComposer(FigureParams):
     def save_composer(
         self, file_path: Union[str, Path], return_json: bool = False
     ) -> Union[None, Dict]:
-        composer_data = {}
+        init_params = {}
+        for param, config in self._init_params.items():
+            value = getattr(self, param)
+            init_params[param] = self._to_serializable(value)
+        composer_data = {"params": init_params, "axes": [], "plots": []}
         axes_data = []
         for ax in self.axes:
             x0, y0, width, height = ax.get_position().bounds
@@ -242,7 +245,7 @@ class AxesComposer(FigureParams):
         with open(file_path, "r") as f:
             composer_data = json.load(f)
         axes_data = composer_data["axes"]
-        figure = plt.figure()
+        figure = plt.figure(figsize=composer_data["params"]["figsize"])
         new_axes = []
         for bbox in axes_data:
             x0, y0, width, height = bbox
@@ -276,5 +279,5 @@ class AxesComposer(FigureParams):
                 plot_cls = plotter_types[plot_type]
                 reconstructed_plot = plot_cls(**plot_data)
             plots.append(reconstructed_plot)
-        composer = cls(axes=axes, plots=plots, figure=figure)
+        composer = cls(axes=axes, plots=plots)
         return composer
