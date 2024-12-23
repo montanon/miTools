@@ -1,6 +1,8 @@
+import importlib
+import inspect
 import json
 from pathlib import Path
-from typing import Dict, List, Sequence, Type, Union
+from typing import Dict, List, Optional, Sequence, Type, Union
 
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
@@ -12,6 +14,33 @@ from mitools.visuals.plots.validations import validate_type
 
 class PlotComposerException(Exception):
     pass
+
+
+def _get_plotter_types() -> Dict[str, Type[Plotter]]:
+    plotter_types = {}
+    plots_module = importlib.import_module("mitools.visuals.plots")
+    for module_name in [
+        "line_plotter",
+        "scatter_plotter",
+        "bar_plotter",
+        "box_plotter",
+        "histogram_plotter",
+        "pie_plotter",
+        "distribution_plotter",
+    ]:
+        try:
+            importlib.import_module(f"mitools.visuals.plots.{module_name}")
+        except ImportError:
+            continue
+    for name, obj in inspect.getmembers(plots_module):
+        if (
+            inspect.isclass(obj)
+            and issubclass(obj, Plotter)
+            and obj != Plotter
+            and not inspect.isabstract(obj)
+        ):
+            plotter_types[obj.__name__] = obj
+    return plotter_types
 
 
 class PlotComposer:
@@ -104,29 +133,32 @@ class PlotComposer:
 
     def save_composer(self, file_path: Union[str, Path]) -> None:
         composer_data = {"params": self._composer_params, "plotters": []}
-
-        for i, plotter in enumerate(self.plotters):
-            plotter_path = Path(file_path).parent / f"plotter_{i}.json"
-            plotter.save_plotter(plotter_path)
+        for plotter in self.plotters:
+            init_params = plotter.save_plotter(file_path, return_json=True)
             composer_data["plotters"].append(
-                {"type": plotter.__class__.__name__, "path": str(plotter_path)}
+                {"type": plotter.__class__.__name__, "params": init_params}
             )
-
         with open(file_path, "w") as f:
             json.dump(composer_data, f, indent=4)
 
     @classmethod
     def from_json(
-        cls, file_path: Union[str, Path], plotter_types: Dict[str, Type[Plotter]]
+        cls,
+        file_path: Union[str, Path],
     ) -> "PlotComposer":
         with open(file_path, "r") as f:
             composer_data = json.load(f)
-
-        composer = cls(**composer_data["params"])
-
+        plotter_types = _get_plotter_types()
+        composer = cls(plotters=[], **composer_data["params"])
         for plotter_info in composer_data["plotters"]:
-            plotter_type = plotter_types[plotter_info["type"]]
-            plotter = plotter_type.from_json(plotter_info["path"])
+            plotter_type_name = plotter_info["type"]
+            if plotter_type_name not in plotter_types:
+                raise PlotComposerException(
+                    f"Unknown plotter type: {plotter_type_name}. "
+                    f"Available types: {list(plotter_types.keys())}"
+                )
+            plotter_type = plotter_types[plotter_type_name]
+            plotter = plotter_type(**plotter_info["params"])
             composer.add_plotter(plotter)
 
         return composer
