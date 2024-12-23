@@ -1,16 +1,13 @@
 from abc import ABC, abstractmethod
-from collections import namedtuple
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Literal, Optional, Sequence, Tuple, Union
+from typing import Callable, Dict, Optional, Sequence, Tuple, Union
 
 import nltk
 import torch
 from transformers import pipeline
 
-from mitools.nlp.en import en_sentiment as pattern_sentiment
-from mitools.nlp.nlp_typing import SentimentType
 from mitools.nlp.tokenizers import BaseTokenizer, SentenceTokenizer
-from mitools.nlp.utils import default_feature_extractor, word_tokenize
+from mitools.nlp.utils import word_tokenize
 
 
 @dataclass

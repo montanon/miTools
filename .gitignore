@@ -20,3 +20,4 @@ env_checkpoints/*
 .coverage
 coverage_report.txt
 lib/*
+mitools/examples/plots/.plot_params/composed_plot.json

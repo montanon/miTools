@@ -3,7 +3,6 @@ from typing import Iterator, Literal, Sequence, Tuple, Union
 
 import nltk
 
-from mitools.nlp.en import tag as pattern_tag
 from mitools.nlp.nlp_typing import PosTag
 from mitools.nlp.tags_translator import translate_tags
 
