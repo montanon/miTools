@@ -65,6 +65,7 @@ class HistogramPlotter(Plotter):
                 "type": Union[NumericSequences, NumericSequence, None],
             },
             "cumulative": {"default": False, "type": Union[Sequence[bool], bool]},
+            "density": {"default": False, "type": bool},
             "bottom": {
                 "default": None,
                 "type": Union[NumericSequence, NumericType, None],
@@ -136,6 +137,11 @@ class HistogramPlotter(Plotter):
     def set_cumulative(self, cumulative: Union[Sequence[bool], bool]):
         return self.set_bool_sequence(cumulative, "cumulative")
 
+    def set_density(self, density: bool):
+        validate_type(density, bool, "density")
+        self.density = density
+        return self
+
     def set_bottom(
         self, bottom: Union[NumericSequences, NumericSequence, NumericType, None]
     ):
@@ -186,6 +192,7 @@ class HistogramPlotter(Plotter):
             "range": self.get_sequences_param("range", n_sequence),
             "weights": self.get_sequences_param("weights", n_sequence),
             "cumulative": self.get_sequences_param("cumulative", n_sequence),
+            "density": self.density,
             "bottom": self.get_sequences_param("bottom", n_sequence),
             "histtype": self.get_sequences_param("histtype", n_sequence),
             "align": self.get_sequences_param("align", n_sequence),
