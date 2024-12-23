@@ -2,14 +2,17 @@ import importlib
 import inspect
 import json
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence, Type, Union
+from typing import Dict, List, Optional, Sequence, Tuple, Type, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
+from matplotlib.text import Text
 
-from mitools.visuals.plots.plot_params import PlotParams
+from mitools.exceptions import ArgumentValueError
+from mitools.visuals.plots.matplotlib_typing import Color
+from mitools.visuals.plots.plot_params import FigureParams, PlotParams
 from mitools.visuals.plots.plotter import Plotter
 from mitools.visuals.plots.validations import validate_type
 
@@ -102,7 +105,11 @@ class PlotComposer(PlotParams):
     def save_composer(
         self, file_path: Union[str, Path], return_json: bool = False
     ) -> Union[None, Dict]:
-        composer_data = {"params": self._init_params, "plotters": []}
+        init_params = {}
+        for param, config in self._init_params.items():
+            value = getattr(self, param)
+            init_params[param] = self._to_serializable(value)
+        composer_data = {"params": init_params, "plotters": []}
         for plotter in self.plotters:
             init_params = plotter.save_plotter(file_path, return_json=True)
             composer_data["plotters"].append(
@@ -141,12 +148,13 @@ class AxesComposerException(Exception):
     pass
 
 
-class AxesComposer:
+class AxesComposer(FigureParams):
     def __init__(
         self,
         axes: Sequence[Axes],
         plots: Sequence[Union[PlotComposer, Plotter]],
         figure: Optional[Figure] = None,
+        **kwargs,
     ):
         validate_type(axes, (list, tuple, np.ndarray), "axes")
         validate_type(plots, (list, tuple), "plots")
@@ -158,7 +166,7 @@ class AxesComposer:
             )
         self.axes = list(axes)
         self.plots = list(plots)
-        self.figure = figure if figure is not None else plt.gcf()
+        super().__init__(figure=figure, **kwargs)
 
     def add_plot(self, ax: Axes, plot: Union[PlotComposer, Plotter]) -> "AxesComposer":
         validate_type(ax, Axes, "ax")
@@ -169,12 +177,14 @@ class AxesComposer:
 
     def draw(self, show: bool = False, clear: bool = False) -> List[Axes]:
         try:
+            self._prepare_draw(clear=clear)
             for ax, plot in zip(self.axes, self.plots):
                 plot.ax = ax
                 plot.figure = self.figure
                 plot.draw(show=False, clear=clear)
             if show:
                 self.figure.show()
+            self._finalize_draw(show=show)
             return self.axes
         except Exception as e:
             raise AxesComposerException(f"Error while creating composition: {e}")
@@ -208,7 +218,6 @@ class AxesComposer:
             x0, y0, width, height = ax.get_position().bounds
             axes_data.append([x0, y0, width, height])
         composer_data["axes"] = axes_data
-
         plots_data = []
         for plot in self.plots:
             if isinstance(plot, PlotComposer):
@@ -229,28 +238,17 @@ class AxesComposer:
     def from_json(
         cls,
         file_path: Union[str, Path],
-        axes: Optional[Sequence[Axes]] = None,
-        figure: Optional[Figure] = None,
     ) -> "AxesComposer":
         with open(file_path, "r") as f:
             composer_data = json.load(f)
         axes_data = composer_data["axes"]
-        if axes is None:
-            if figure is None:
-                figure = plt.figure()
-            new_axes = []
-            for bbox in axes_data:
-                x0, y0, width, height = bbox
-                ax = figure.add_axes([x0, y0, width, height])
-                new_axes.append(ax)
-            axes = new_axes
-        else:
-            if len(axes) != len(axes_data):
-                raise AxesComposerException(
-                    f"Number of provided axes ({len(axes)}) != number of stored axes ({len(axes_data)})"
-                )
-            if figure is None:
-                figure = axes[0].figure
+        figure = plt.figure()
+        new_axes = []
+        for bbox in axes_data:
+            x0, y0, width, height = bbox
+            ax = figure.add_axes([x0, y0, width, height])
+            new_axes.append(ax)
+        axes = new_axes
         plots_info = composer_data["plots"]
         if len(plots_info) != len(axes):
             raise AxesComposerException(
@@ -268,7 +266,6 @@ class AxesComposer:
                     child_plotter_cls = _get_plotter_types()[child_plotter_type]
                     child_plotter = child_plotter_cls(**child_params)
                     reconstructed_plot.add_plotter(child_plotter)
-
             else:
                 plotter_types = _get_plotter_types()
                 if plot_type not in plotter_types:
