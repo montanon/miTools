@@ -693,7 +693,9 @@ class Plotter(Setter, ABC):
 
         return value
 
-    def save_plotter(self, file_path: Union[str, Path], data: bool = True) -> None:
+    def save_plotter(
+        self, file_path: Union[str, Path], data: bool = True, return_json: bool = False
+    ) -> None:
         init_params = {}
         for param, config in self._init_params.items():
             value = getattr(self, param)
@@ -701,6 +703,8 @@ class Plotter(Setter, ABC):
         if data:
             init_params["x_data"] = self._to_serializable(self.x_data)
             init_params["y_data"] = self._to_serializable(self.y_data)
+        if return_json:
+            return init_params
         with open(file_path, "w") as f:
             json.dump(init_params, f, indent=4)
 
