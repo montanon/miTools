@@ -10,7 +10,13 @@ from numpy import ndarray
 from pandas import DataFrame, IndexSlice
 from scipy.stats import gaussian_kde
 
-from ..exceptions import ArgumentStructureError
+from mitools.exceptions import ArgumentStructureError
+from mitools.visuals.plots import (
+    AxesComposer,
+    LinePlotter,
+    PlotComposer,
+    ScatterPlotter,
+)
 
 X_Y_SIZE_ERROR = "x values and y values must be the same size."
 
@@ -27,12 +33,18 @@ def _create_figure(with_inertia: bool) -> Tuple[plt.Figure, List[Axes]]:
 def plot_silhouette_scores(
     ax: Axes, silhouette_scores: List[float], algorithm_name: str
 ) -> None:
-    x_values = range(2, len(silhouette_scores) + 2)
-    ax.plot(x_values, silhouette_scores, "bx-")
-    ax.set_title(f"{algorithm_name} Silhouette Score")
-    ax.set_xlabel("N° of Clusters")
-    ax.set_ylabel("Silhouette Score")
-    ax.set_xticks(x_values)
+    x_values = list(range(2, len(silhouette_scores) + 2))
+    plot = (
+        LinePlotter(x_data=x_values, y_data=silhouette_scores, ax=ax)
+        .set_title(f"{algorithm_name} Silhouette Score")
+        .set_xlabel("N° of Clusters")
+        .set_marker("x")
+        .set_color("blue")
+        .set_linestyle("-")
+        .set_ylabel("Silhouette Score")
+        .set_xticks(x_values)
+    )
+    ax = plot.draw()
     min_y = ax.get_ylim()[0]
     for x, y in zip(x_values, silhouette_scores):
         ax.vlines(x, min_y, y, linestyles="dotted", colors="grey", linewidth=0.5)
@@ -41,11 +53,21 @@ def plot_silhouette_scores(
 def plot_inertia(
     ax: Axes, inertia: List[float], algorithm_name: str, max_clusters: int
 ) -> None:
-    x_values = range(2, max_clusters)
-    ax.plot(x_values, inertia, "gx-", label="Inertia")
+    x_values = list(range(2, max_clusters))
     diff = np.diff(inertia)
     diff_r = diff[1:] / diff[:-1]
     elbow = np.where(diff_r < np.mean(diff_r))[0][0]
+    plot = (
+        LinePlotter(x_data=x_values, y_data=inertia, ax=ax, label="Inertia")
+        .set_title(f"{algorithm_name} Inertia")
+        .set_marker("x")
+        .set_color("green")
+        .set_linestyle("-")
+        .set_ylabel("Inertia")
+        .set_xticks(x_values)
+        .set_xlabel("N° of Clusters")
+    )
+    ax = plot.draw()
     ax.vlines(
         x_values[elbow],
         ax.get_ylim()[0],
@@ -54,9 +76,6 @@ def plot_inertia(
         colors="r",
         label="Elbow",
     )
-    ax.set_title(f"{algorithm_name} Inertia")
-    ax.set_xlabel("N° of Clusters")
-    ax.set_xticks(x_values)
     ax.legend()
     min_y = ax.get_ylim()[0]
     for x, y in zip(x_values, inertia):
