@@ -5,10 +5,6 @@ from typing import Any, Literal, Sequence, Tuple, Union
 
 import numpy as np
 from matplotlib.axes import Axes
-from matplotlib.colors import Colormap, Normalize
-from matplotlib.markers import MarkerStyle
-from numpy import ndarray
-from pandas import Series
 
 from mitools.exceptions import (
     ArgumentStructureError,
@@ -174,34 +170,6 @@ class Plotter(PlotParams, Setter, ABC):
         else:
             raise PlotterException("Plot not drawn yet. Call draw() before saving.")
         return self
-
-    def _to_serializable(self, value: Any) -> Any:
-        if value is None:
-            return None
-        elif isinstance(value, dict):
-            return {k: self._to_serializable(v) for k, v in value.items()}
-        elif isinstance(value, ndarray):
-            return value.tolist()
-        elif isinstance(value, Series):
-            return value.to_list()
-        elif isinstance(value, (list, tuple)):
-            return [self._to_serializable(v) for v in value]
-        elif isinstance(value, Colormap):
-            return value.name
-        elif isinstance(value, Normalize):
-            return value.__class__.__name__.lower()
-        elif isinstance(value, Path):
-            return str(value)
-        elif isinstance(value, MarkerStyle):
-            marker = dict(
-                marker=value.get_marker(),
-                fillstyle=value.get_fillstyle(),
-                capstyle=value.get_capstyle(),
-                joinstyle=value.get_joinstyle(),
-            )
-            return marker
-
-        return value
 
     def save_plotter(
         self, file_path: Union[str, Path], data: bool = True, return_json: bool = False
