@@ -21,6 +21,7 @@ ColorSequences = Sequence[ColorSequence]
 COLORS = set(get_named_colors_mapping().keys())
 MARKERS = set(MarkerStyle.markers.keys()).union(set(MarkerStyle.filled_markers))
 MARKERS_FILLSTYLES = set(MarkerStyle.fillstyles)
+BASELINES = ["zero", "sym", "wiggle", "weighted_wiggle"]
 Marker = Union[str, int, Path, MarkerStyle, dict]
 MarkerSequence = Union[Marker, Sequence[Marker]]
 MarkerSequences = Sequence[MarkerSequence]
