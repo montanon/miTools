@@ -13,5 +13,6 @@ from mitools.visuals.plots import (
     HistogramPlotter,
     LinePlotter,
     PiePlotter,
+    PlotComposer,
     ScatterPlotter,
 )
