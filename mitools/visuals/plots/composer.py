@@ -4,10 +4,9 @@ import json
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Type, Union
 
-import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 
-from mitools.exceptions import ArgumentValueError
+from mitools.visuals.plots.plot_params import PlotParams
 from mitools.visuals.plots.plotter import Plotter
 from mitools.visuals.plots.validations import validate_type
 
@@ -43,20 +42,12 @@ def _get_plotter_types() -> Dict[str, Type[Plotter]]:
     return plotter_types
 
 
-class PlotComposer:
-    def __init__(self, plotters: Sequence[Plotter], ax: Axes = None, **kwargs):
-        self.ax = ax
-        self.figure = None if ax is None else ax.figure
+class PlotComposer(PlotParams):
+    def __init__(
+        self, plotters: Optional[Sequence[Plotter]] = None, ax: Axes = None, **kwargs
+    ):
+        super().__init__(ax=ax, **kwargs)
         self.plotters: List[Plotter] = []
-
-        self._composer_params = {
-            "figsize": kwargs.get("figsize", (10, 8)),
-            "style": kwargs.get("style", None),
-            "tight_layout": kwargs.get("tight_layout", False),
-            "grid": kwargs.get("grid", None),
-        }
-        for param, value in self._composer_params.items():
-            setattr(self, param, value)
         if plotters:
             self.add_plotters(plotters)
 
@@ -71,26 +62,6 @@ class PlotComposer:
             self.add_plotter(plotter)
         return self
 
-    def _prepare_draw(self, clear: bool = False):
-        if clear:
-            self.clear()
-        if self.style is not None:
-            self._default_style = plt.rcParams.copy()
-            plt.style.use(self.style)
-        if not self.ax:
-            self.figure, self.ax = plt.subplots(figsize=self.figsize)
-        if self.grid is not None and self.grid["visible"]:
-            self.ax.grid(**self.grid)
-
-    def _finalize_draw(self, show: bool = False):
-        if self.tight_layout:
-            plt.tight_layout()
-        if show:
-            self.figure.show()
-        if self.style is not None:
-            plt.rcParams.update(self._default_style)
-        return self.ax
-
     def draw(self, show: bool = False, clear: bool = False) -> Axes:
         self._prepare_draw(clear=clear)
         try:
@@ -103,13 +74,6 @@ class PlotComposer:
             return self.ax
         except Exception as e:
             raise PlotComposerException(f"Error while creating composition: {e}")
-
-    def clear(self) -> "PlotComposer":
-        if self.figure or self.ax:
-            plt.close(self.figure)
-            self.figure = None
-            self.ax = None
-        return self
 
     def save_plot(
         self,
@@ -132,7 +96,7 @@ class PlotComposer:
         return self
 
     def save_composer(self, file_path: Union[str, Path]) -> None:
-        composer_data = {"params": self._composer_params, "plotters": []}
+        composer_data = {"params": self._init_params, "plotters": []}
         for plotter in self.plotters:
             init_params = plotter.save_plotter(file_path, return_json=True)
             composer_data["plotters"].append(
