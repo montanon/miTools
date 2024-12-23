@@ -13,6 +13,8 @@ from scipy.stats import gaussian_kde
 from mitools.exceptions import ArgumentStructureError
 from mitools.visuals.plots import (
     AxesComposer,
+    DistributionPlotter,
+    HistogramPlotter,
     LinePlotter,
     PlotComposer,
     ScatterPlotter,
@@ -119,25 +121,28 @@ def plot_df_col_distribution(
     )
     if not normed:
         if bins:
-            ax = sns.histplot(
-                df_values,
-                bins=bins,
+            ax = HistogramPlotter(
+                x_data=df_values,
                 ax=ax,
+                bins=bins,
                 alpha=0.5,
-                stat="density",
                 color=color,
                 legend=False,
-            )
-        ax = sns.kdeplot(df_values, ax=ax, color=color)
+                density=True,
+            ).draw()
+        ax = DistributionPlotter(
+            x_data=df_values, ax=ax, color=color, fill=False, cut=0.05
+        ).draw()
     else:
         kde = gaussian_kde(df_values)
         x_vals = np.linspace(min(df_values), max(df_values), 1000)
         y_vals = kde(x_vals) / max(kde(x_vals))
-        ax.plot(x_vals, y_vals, alpha=1.0, color=color)
+        ax = LinePlotter(
+            x_data=x_vals, y_data=y_vals, ax=ax, alpha=1.0, color=color
+        ).draw()
     ax.set_title(f"Distributions of {col_name}")
     ax.set_xlabel(col_name)
     ax.set_ylabel("Frequency")
-    ax.legend()
     return ax
 
 
@@ -184,14 +189,15 @@ def plot_clusters(
     if colors is None:
         colors = sns.color_palette("husl", len(labels))[::1]
     for i, cls in enumerate(labels):
-        ax.scatter(
-            data[data.index.get_level_values(cluster_level) == cls][x_col],
-            data[data.index.get_level_values(cluster_level) == cls][y_col],
+        ax = ScatterPlotter(
+            x_data=data[data.index.get_level_values(cluster_level) == cls][x_col],
+            y_data=data[data.index.get_level_values(cluster_level) == cls][y_col],
+            ax=ax,
             color=colors[i],
             label=cls if labels is not None else None,
             zorder=99,
             **kwargs,
-        )
+        ).draw()
     return ax
 
 
@@ -357,12 +363,17 @@ def add_clusters_centroids(
     if kwargs is None or "zorder" not in kwargs:
         kwargs["zorder"] = 0
     for i, cls in enumerate(labels):
-        ax.scatter(
-            centroids[centroids.index.get_level_values(cluster_level) == cls][x_col],
-            centroids[centroids.index.get_level_values(cluster_level) == cls][y_col],
+        ax = ScatterPlotter(
+            x_data=centroids[centroids.index.get_level_values(cluster_level) == cls][
+                x_col
+            ],
+            y_data=centroids[centroids.index.get_level_values(cluster_level) == cls][
+                y_col
+            ],
+            ax=ax,
             color=colors[i],
             **kwargs,
-        )
+        ).draw()
     return ax
 
 
@@ -388,13 +399,17 @@ def plot_clusters_growth(
         cluster_papers = clusters_count.loc[IndexSlice[:, cl], :]
         cluster_papers.index = cluster_papers.index.droplevel(1)
         cluster_papers = cluster_papers.reindex(times, fill_value=0)
-        ax.plot(cluster_papers.index[:-1], cluster_papers.values[:-1], c=colors[n])
-
+        ax = LinePlotter(
+            x_data=cluster_papers.index[:-1].tolist(),
+            y_data=cluster_papers[cluster_papers.columns[0]].values[:-1],
+            ax=ax,
+            color=colors[n],
+            label=cl,
+        ).draw()
     ax.set_title("Cluster Size Evolution")
     ax.set_ylabel("N° Elements")
     ax.set_xlabel("Year")
     ax.legend(loc="upper left")
-
     return ax
 
 
