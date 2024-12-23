@@ -70,6 +70,7 @@ class PlotComposer(PlotParams):
                 plotter.figure = self.figure
                 plotter._create_plot()
                 plotter._apply_common_properties()
+            self._apply_common_properties()
             self._finalize_draw(show=show)
             return self.ax
         except Exception as e:
