@@ -2,6 +2,7 @@ from typing import Literal, Union
 
 import numpy as np
 from matplotlib.axes import Axes
+from seaborn import color_palette
 
 from mitools.visuals.plots.matplotlib_typing import (
     BASELINES,
@@ -56,6 +57,9 @@ class StackedPlotter(Plotter):
         self._init_params.update(self._stacked_params)
         self._set_init_params(**kwargs)
 
+    def set_color(self, color: Union[ColorSequence, Color]):
+        return self.set_color_sequence(color, param_name="color")
+
     def set_baseline(
         self, baseline: Literal["zero", "sym", "wiggle", "weighted_wiggle"]
     ):
@@ -102,7 +106,7 @@ class StackedPlotter(Plotter):
         try:
             y_stack = np.cumsum(self.y_data, axis=0, dtype=np.float32)
             if self.baseline == "zero":
-                first_line = np.zeros_like(self.x_data[0])
+                first_line = 0
             elif self.baseline == "sym":
                 first_line = -np.sum(self.y_data, axis=0) * 0.5
                 y_stack += first_line[None, :]
@@ -127,11 +131,14 @@ class StackedPlotter(Plotter):
                 y_stack += first_line
 
             plot_kwargs = self._create_stacked_kwargs(0)
-            self.ax.fill_between(self.x_data[0], first_line, y_stack[0], **plot_kwargs)
-            for i in range(1, self.n_sequences):
-                plot_kwargs = self._create_stacked_kwargs(i)
+            coll = self.ax.fill_between(
+                self.x_data[0], first_line, y_stack[0, :], **plot_kwargs
+            )
+            coll.sticky_edges.y[:] = [0]
+            for i in range(self.n_sequences - 1):
+                plot_kwargs = self._create_stacked_kwargs(i + 1)
                 self.ax.fill_between(
-                    self.x_data[0], y_stack[i - 1], y_stack[i], **plot_kwargs
+                    self.x_data[0], y_stack[i, :], y_stack[i + 1, :], **plot_kwargs
                 )
         except Exception as e:
             raise StackedPlotterException(f"Error while creating stacked plot: {e}")
