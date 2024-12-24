@@ -18,6 +18,7 @@ from mitools.visuals.plots import (
     LinePlotter,
     PlotComposer,
     ScatterPlotter,
+    StackedPlotter,
 )
 
 X_Y_SIZE_ERROR = "x values and y values must be the same size."
@@ -37,7 +38,7 @@ def plot_silhouette_scores(
 ) -> None:
     x_values = list(range(2, len(silhouette_scores) + 2))
     plot = (
-        LinePlotter(x_data=x_values, y_data=silhouette_scores, ax=ax)
+        LinePlotter(x_data=x_values, y_data=silhouette_scores, ax=ax, figsize=(21, 7))
         .set_title(f"{algorithm_name} Silhouette Score")
         .set_xlabel("N° of Clusters")
         .set_marker("x")
@@ -60,7 +61,9 @@ def plot_inertia(
     diff_r = diff[1:] / diff[:-1]
     elbow = np.where(diff_r < np.mean(diff_r))[0][0]
     plot = (
-        LinePlotter(x_data=x_values, y_data=inertia, ax=ax, label="Inertia")
+        LinePlotter(
+            x_data=x_values, y_data=inertia, ax=ax, label="Inertia", figsize=(21, 7)
+        )
         .set_title(f"{algorithm_name} Inertia")
         .set_marker("x")
         .set_color("green")
@@ -426,32 +429,34 @@ def plot_clusters_growth_stacked(
         data.groupby([time_level, cluster_level]).size().unstack(fill_value=0)
     )
     clusters_count = clusters_count[topics]
-
     if filtered_clusters:
         clusters_count = clusters_count[
             [c for c in clusters_count.columns if c not in filtered_clusters]
         ]
     if share_pct:
         clusters_count = clusters_count.div(clusters_count.sum(axis=1), axis=0) * 100
-
     _, ax = plt.subplots(figsize=(21, 7))
-
     if colors is None:
         colors = sns.color_palette("husl", len(clusters_count.columns))
     else:
         colors = [colors[c] for c in clusters_count.columns]
-
-    times = clusters_count.index
+    times = clusters_count.index.tolist()
     cluster_values = [clusters_count[cluster].values for cluster in clusters_count]
-
-    ax.stackplot(times, cluster_values, labels=clusters_count.columns, colors=colors)
-
-    ax.set_title("Stacked Cluster Size Evolution")
-    ax.set_ylabel("N° Elements")
-    ax.set_xlabel("Year")
+    ax = (
+        StackedPlotter(
+            x_data=[times] * len(clusters_count.columns),
+            y_data=cluster_values,
+            ax=ax,
+            label=clusters_count.columns.tolist(),
+            color=colors,
+            facecolor=colors,
+        )
+        .set_title("Stacked Cluster Size Evolution")
+        .set_ylabel("N° Elements")
+        .set_xlabel("Year")
+    ).draw()
     if not share_pct:
         ax.legend(loc="upper left")
     else:
         ax.legend(loc="center left", bbox_to_anchor=(1, 0.5))
-
     return ax
