@@ -75,6 +75,7 @@ class Plotter(PlotParams, Setter, ABC):
         super().__init__(ax=ax, **kwargs)
         self._init_params.update(self._multi_data_params)
         self._set_init_params(**kwargs)
+        self._clear = True if ax is None else False
 
     @property
     def data_size(self) -> int:
@@ -144,7 +145,8 @@ class Plotter(PlotParams, Setter, ABC):
     def _create_plot(self):
         raise NotImplementedError
 
-    def draw(self, show: bool = False, clear: bool = True):
+    def draw(self, show: bool = False, clear: bool = None):
+        clear = self._clear if clear is None else clear
         self._prepare_draw(clear=clear)
         try:
             self._create_plot()
