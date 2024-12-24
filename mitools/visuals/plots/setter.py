@@ -142,6 +142,20 @@ class Setter(ABC):
             f"Invalid {param_name}, must be a color or sequence of colors."
         )
 
+    def set_str_sequence(self, sequence: Union[StrSequence, str], param_name: str):
+        if self.multi_data and is_str_sequence(sequence):
+            validate_sequence_length(sequence, self.n_sequences, param_name)
+            setattr(self, param_name, sequence)
+            self.multi_params_structure[param_name] = "sequence"
+            return self
+        elif is_str(sequence):
+            setattr(self, param_name, sequence)
+            self.multi_params_structure[param_name] = "value"
+            return self
+        raise ArgumentStructureError(
+            f"Invalid {param_name}, must be a string or sequence of strings."
+        )
+
     def set_numeric_sequences(
         self,
         sequences: Union[NumericSequences, NumericSequence, NumericType],
