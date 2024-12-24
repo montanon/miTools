@@ -2,7 +2,6 @@ from typing import Literal, Union
 
 import numpy as np
 from matplotlib.axes import Axes
-from seaborn import color_palette
 
 from mitools.visuals.plots.matplotlib_typing import (
     BASELINES,
@@ -10,8 +9,6 @@ from mitools.visuals.plots.matplotlib_typing import (
     LINESTYLES,
     Color,
     ColorSequence,
-    EdgeColor,
-    EdgeColorSequence,
     LiteralSequence,
     NumericSequence,
     NumericSequences,
