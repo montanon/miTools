@@ -144,7 +144,7 @@ class Plotter(PlotParams, Setter, ABC):
     def _create_plot(self):
         raise NotImplementedError
 
-    def draw(self, show: bool = False, clear: bool = False):
+    def draw(self, show: bool = False, clear: bool = True):
         self._prepare_draw(clear=clear)
         try:
             self._create_plot()
