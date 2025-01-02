@@ -409,17 +409,16 @@ class Project:
         self.store_project()
         print(f"Added '{key}' to project paths and stored the project.")
 
-    def update_path(self, key: str, path: Path) -> None:
-        if not isinstance(path, Path):
+    def update_path(self, key: str, new_path: Path) -> None:
+        if (
+            self.version in self.version_paths
+            and key in self.version_paths[self.version]
+        ) or key in self.paths:
+            self.add_path(key, new_path, overwrite=True)
+        else:
             raise ProjectError(
-                f"Provided 'path'={path} of type {type(path)} must be of type pathlib.Path"
+                f"Cannot update '{key}' because it does not exist in version '{self.version}' or global paths."
             )
-        if key not in self.paths:
-            raise ProjectError(
-                f"Key {key} does not exist in self.paths. Cannot update non-existing path."
-            )
-        self.paths[key] = path
-        self.store_project()
         print(f"Updated '{key}' of project paths and stored the project.")
 
     def get_path(self, key: str) -> Path:
