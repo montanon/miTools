@@ -368,11 +368,16 @@ class Project:
         self.update_info()
         self.store_project()
 
-    def add_var(self, key: str, value: Any, overwrite: bool = False) -> None:
+    def add_var(
+        self, key: str, value: Any, overwrite: bool = False, exist_ok: bool = False
+    ) -> None:
         if key in self.vars and not overwrite:
-            raise ProjectError(
-                f"Key '{key}' already exists in self.vars. Use update_var() to modify existing variables."
-            )
+            if not exist_ok:
+                raise ProjectError(
+                    f"Key '{key}' already exists in self.vars. Use update_var() to modify existing variables."
+                )
+            else:
+                return
         self.vars[key] = value
         self.store_project()
         print(f"Added '{key}' to project variables and stored the project.")
@@ -386,7 +391,9 @@ class Project:
         self.store_project()
         print(f"Updated '{key}' of project variables and stored the project.")
 
-    def add_path(self, key: str, path: Path, overwrite: bool = False) -> None:
+    def add_path(
+        self, key: str, path: Path, overwrite: bool = False, exist_ok: bool = False
+    ) -> None:
         current_version_folder = (self.folder / self.version).resolve()
         path_resolved = path.resolve()
         is_version_child = file_in_folder(current_version_folder, path_resolved)
@@ -394,17 +401,23 @@ class Project:
             if self.version not in self.version_paths:
                 self.version_paths[self.version] = {}
             if key in self.version_paths[self.version] and not overwrite:
-                raise ProjectError(
-                    f"Key '{key}' already exists in version '{self.version}' version_paths. "
-                    f"Use overwrite=True to replace it."
-                )
+                if not exist_ok:
+                    raise ProjectError(
+                        f"Key '{key}' already exists in version '{self.version}' version_paths. "
+                        f"Use overwrite=True to replace it."
+                    )
+                else:
+                    return
             relative_path = path_resolved.relative_to(current_version_folder)
             self.version_paths[self.version][key] = str(relative_path)
         else:
             if key in self.paths and not overwrite:
-                raise ProjectError(
-                    f"Key '{key}' already exists in global 'paths'. Use overwrite=True to replace it."
-                )
+                if not exist_ok:
+                    raise ProjectError(
+                        f"Key '{key}' already exists in global 'paths'. Use overwrite=True to replace it."
+                    )
+                else:
+                    return
             self.paths[key] = path_resolved
         self.store_project()
         print(f"Added '{key}' to project paths and stored the project.")
