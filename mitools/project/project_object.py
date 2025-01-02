@@ -518,8 +518,8 @@ class Project:
             )
         project.vars = data.get("vars", {})
         project.paths = {k: Path(p) for k, p in data.get("paths", {}).items()}
-        project.version_paths = {}
-        for ver, path_dict in data.get("version_paths", {}).items():
-            project.version_paths[ver] = {k: Path(p) for k, p in path_dict.items()}
+        project.version_paths = {
+            k: Path(p) for k, p in data.get("version_paths", {}).items()
+        }
         project.update_info()
         return project
