@@ -85,12 +85,7 @@ class Project:
         version_path: Path = self.folder / version
         print(f"About to remove version {version} of Project {self.name}...")
         if version_path.exists() and version_path.is_dir():
-            for item in version_path.glob("**/*"):
-                if item.is_file():
-                    item.unlink()
-                elif item.is_dir():
-                    item.rmdir()
-            version_path.rmdir()
+            shutil.rmtree(version_path)
         print(f"Removed version {version} of Project {self.name}")
         if self.version == version:
             print(
