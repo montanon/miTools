@@ -12,9 +12,9 @@ from typing import Any, Dict, List, Optional
 from mitools.exceptions import ProjectError, ProjectFolderError, ProjectVersionError
 from mitools.files import file_in_folder, folder_in_subtree, folder_is_subfolder
 from mitools.notebooks import recreate_notebook_structure, save_notebook_as_ipynb
-from mitools.utils import build_dir_tree
+from mitools.utils import build_dir_tree, read_json_file, write_json_file
 
-PROJECT_FILENAME = Path("project.pkl")
+PROJECT_FILENAME = Path("project.json")
 PROJECT_FOLDER = Path(".project")
 PROJECT_NOTEBOOK = "Project.ipynb"
 PROJECT_ARCHIVE = ".archive"
@@ -257,8 +257,10 @@ class Project:
 
     def store_project(self) -> None:
         self.update_info()
-        with open(self.project_file, "wb") as file:
-            pickle.dump(self, file)
+        project_data = self.as_dict()
+        write_json_file(
+            project_data, self.project_file, ensure_ascii=False, encoding="utf-8"
+        )
 
     @classmethod
     def find_project(
@@ -298,17 +300,9 @@ class Project:
         project_path = cls.find_project(
             project_folder=project_folder, max_depth=max_depth, auto_load=auto_load
         )
-        with project_path.open("rb") as file:
-            obj = pickle.load(file)
+        project_json = read_json_file(project_path)
+        obj = cls.from_dict(project_json)
         obj.update_info()
-        # Retro-compatibility
-        obj.vars = obj.vars if hasattr(obj, "vars") else {}
-        obj.paths = obj.paths if hasattr(obj, "paths") else {}
-        obj.versions_metadata = (
-            obj.versions_metadata
-            if hasattr(obj, "versions_metadata")
-            else {v: obj.add_version_metadata(v) for v in obj.versions}
-        )
         current_path = Path.cwd().resolve()
         if folder_is_subfolder(obj.root, current_path):
             version_folder = folder_in_subtree(
@@ -470,3 +464,62 @@ class Project:
     def create_project_notebook(self) -> None:
         notebook = recreate_notebook_structure()
         save_notebook_as_ipynb(notebook, self.project_notebook)
+
+    def as_dict(self) -> Dict[str, Any]:
+        return {
+            "root": str(self.root),
+            "name": self.name,
+            "version": self.version,
+            "versions": self.versions,
+            "versions_metadata": {
+                ver: {
+                    "version": info.version,
+                    "creation": info.creation.timestamp()
+                    if isinstance(info.creation, datetime)
+                    else info.creation,
+                    "state": info.state.value if info.state else None,
+                    "description": info.description,
+                }
+                for ver, info in self.versions_metadata.items()
+            },
+            "vars": self.vars,
+            "paths": {k: str(p) for k, p in self.paths.items()},
+            "version_paths": {
+                ver: {k: str(p) for k, p in path_dict.items()}
+                for ver, path_dict in self.version_paths.items()
+            },
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any], logger: Logger = None) -> "Project":
+        root = data["root"]
+        project_name = data["name"]
+        version = data["version"]
+        project = cls(
+            project_name=project_name,
+            root=root,
+            version=version,
+            logger=logger,
+        )
+        project.versions = data.get("versions", [])
+        raw_versions_metadata = data.get("versions_metadata", {})
+        project.versions_metadata = {}
+        for ver, meta in raw_versions_metadata.items():
+            creation_ts = meta.get("creation")
+            if isinstance(creation_ts, (float, int)):
+                creation_dt = datetime.fromtimestamp(creation_ts)
+            else:
+                creation_dt = creation_ts
+            project.versions_metadata[ver] = VersionInfo(
+                version=meta["version"],
+                creation=creation_dt,
+                state=VersionState(meta["state"]) if meta["state"] else None,
+                description=meta["description"],
+            )
+        project.vars = data.get("vars", {})
+        project.paths = {k: Path(p) for k, p in data.get("paths", {}).items()}
+        project.version_paths = {}
+        for ver, path_dict in data.get("version_paths", {}).items():
+            project.version_paths[ver] = {k: Path(p) for k, p in path_dict.items()}
+        project.update_info()
+        return project
