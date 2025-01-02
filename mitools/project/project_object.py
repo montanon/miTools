@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from mitools.exceptions import ProjectError, ProjectFolderError, ProjectVersionError
-from mitools.files import folder_in_subtree, folder_is_subfolder
+from mitools.files import file_in_folder, folder_in_subtree, folder_is_subfolder
 from mitools.notebooks import recreate_notebook_structure, save_notebook_as_ipynb
 from mitools.utils import build_dir_tree
 
@@ -67,6 +67,7 @@ class Project:
         self.versions_metadata: Dict[str, VersionInfo] = {}
         self.vars: Dict[str, Any] = {}
         self.paths: Dict[str, Path] = {}
+        self.version_paths: Dict[str, Dict[str, str]] = {}
         self.tree = build_dir_tree(self.folder)
         self.update_info()
         self.store_project()
@@ -385,15 +386,25 @@ class Project:
         print(f"Updated '{key}' of project variables and stored the project.")
 
     def add_path(self, key: str, path: Path, overwrite: bool = False) -> None:
-        if not isinstance(path, Path):
-            raise ProjectError(
-                f"Provided 'path'={path} of type {type(path)} must be of type pathlib.Path"
-            )
-        if key in self.paths and not overwrite:
-            raise ProjectError(
-                f"Key '{key}' already exists in self.paths. Use update_path() to modify existing variables."
-            )
-        self.paths[key] = path
+        current_version_folder = (self.folder / self.version).resolve()
+        path_resolved = path.resolve()
+        is_version_child = file_in_folder(current_version_folder, path_resolved)
+        if is_version_child:
+            if self.version not in self.version_paths:
+                self.version_paths[self.version] = {}
+            if key in self.version_paths[self.version] and not overwrite:
+                raise ProjectError(
+                    f"Key '{key}' already exists in version '{self.version}' version_paths. "
+                    f"Use overwrite=True to replace it."
+                )
+            relative_path = path_resolved.relative_to(current_version_folder)
+            self.version_paths[self.version][key] = str(relative_path)
+        else:
+            if key in self.paths and not overwrite:
+                raise ProjectError(
+                    f"Key '{key}' already exists in global 'paths'. Use overwrite=True to replace it."
+                )
+            self.paths[key] = path_resolved
         self.store_project()
         print(f"Added '{key}' to project paths and stored the project.")
 
