@@ -434,6 +434,26 @@ class Project:
             f"Path key='{key}' not found in version '{self.version}' or global paths."
         )
 
+    def remove_path(self, key: str) -> None:
+        if (
+            self.version in self.version_paths
+            and key in self.version_paths[self.version]
+        ):
+            del self.version_paths[self.version][key]
+            if not self.version_paths[self.version]:
+                del self.version_paths[self.version]  # Clean up empty dict
+            self.store_project()
+            print(f"Removed path '{key}' from version '{self.version}' version_paths.")
+            return
+        if key in self.paths:
+            del self.paths[key]
+            self.store_project()
+            print(f"Removed path '{key}' from global paths.")
+            return
+        raise ProjectError(
+            f"Cannot remove '{key}' because it does not exist in current version '{self.version}' or global paths."
+        )
+
     def create_project_notebook(self) -> None:
         notebook = recreate_notebook_structure()
         save_notebook_as_ipynb(notebook, self.project_notebook)
