@@ -6,7 +6,7 @@ import warnings
 from dataclasses import dataclass
 from os import PathLike
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Literal, Optional, Tuple, Union
 
 import numpy as np
 import openpyxl
@@ -778,10 +778,14 @@ def quantile_regression_value(row: Series, t_values: Optional[bool] = True) -> S
 
 
 def get_quantile_regression_results(
-    regression: "QuantilesRegressionSpecs", max_iter: Optional[int] = 2_500
+    regression: "QuantilesRegressionSpecs",
+    max_iter: Optional[int] = 2_500,
+    error_method: Literal["robust", "iid"] = "robust",
 ) -> Dict[float, RegressionResultsWrapper]:
     results = {
-        q: smf.quantreg(regression.formula, regression.data).fit(q=q, max_iter=max_iter)
+        q: smf.quantreg(regression.formula, regression.data).fit(
+            q=q, max_iter=max_iter, vcov=error_method
+        )
         for q in regression.quantiles
     }
     return results
@@ -915,7 +919,6 @@ def create_quantile_regressions_results(
                                                 max_iter=max_iter,
                                             )
                                         )
-
                                     regression_coeffs = (
                                         get_quantile_regression_results_coeffs(
                                             results=regression_results,
