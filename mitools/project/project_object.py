@@ -97,6 +97,7 @@ class Project:
         self.version_folders = [
             Path(self.folder) / version for version in self.versions
         ]
+        self.version_folder = self.folder / self.version
         self.subfolders = self.list_version_subfolders()
         self.paths.update(self.folder_path_dict())
 
@@ -262,7 +263,7 @@ class Project:
     @classmethod
     def find_project(
         cls,
-        project_folder: PathLike = None,
+        project_folder: Optional[PathLike] = None,
         max_depth: int = 3,
         auto_load: bool = False,
     ):
@@ -420,6 +421,19 @@ class Project:
         self.paths[key] = path
         self.store_project()
         print(f"Updated '{key}' of project paths and stored the project.")
+
+    def get_path(self, key: str) -> Path:
+        if (
+            self.version in self.version_paths
+            and key in self.version_paths[self.version]
+        ):
+            relative_path = self.version_paths[self.version][key]
+            return (self.version_folder / relative_path).resolve()
+        if key in self.paths:
+            return self.paths[key]
+        raise ProjectError(
+            f"Path key='{key}' not found in version '{self.version}' or global paths."
+        )
 
     def create_project_notebook(self) -> None:
         notebook = recreate_notebook_structure()
