@@ -484,10 +484,7 @@ class Project:
             },
             "vars": self.vars,
             "paths": {k: str(p) for k, p in self.paths.items()},
-            "version_paths": {
-                ver: {k: str(p) for k, p in path_dict.items()}
-                for ver, path_dict in self.version_paths.items()
-            },
+            "version_paths": {k: str(p) for k, p in self.version_paths.items()},
         }
 
     @classmethod
