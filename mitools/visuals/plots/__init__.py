@@ -2,6 +2,7 @@ from mitools.visuals.plots.bar_plotter import BarPlotter
 from mitools.visuals.plots.box_plotter import BoxPlotter
 from mitools.visuals.plots.composers import AxesComposer, PlotComposer
 from mitools.visuals.plots.distribution_plotter import DistributionPlotter
+from mitools.visuals.plots.error_plotter import ErrorPlotter
 from mitools.visuals.plots.histogram_plotter import HistogramPlotter
 from mitools.visuals.plots.line_plotter import LinePlotter
 from mitools.visuals.plots.matplotlib_typing import (
