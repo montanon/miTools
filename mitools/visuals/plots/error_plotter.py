@@ -1,18 +1,14 @@
-from typing import Dict, Literal, Union
+from typing import Literal, Union
 
 from matplotlib.axes import Axes
-from matplotlib.figure import Figure
-from matplotlib.patches import PathPatch
 
-from mitools.exceptions import ArgumentStructureError, ArgumentValueError
+from mitools.exceptions import ArgumentValueError
 from mitools.visuals.plots.matplotlib_typing import (
     LINESTYLES,
-    ORIENTATIONS,
     BoolSequence,
     Color,
     ColorSequence,
     ColorSequences,
-    DictSequence,
     EdgeColor,
     EdgeColorSequence,
     LiteralSequence,
@@ -24,8 +20,6 @@ from mitools.visuals.plots.matplotlib_typing import (
     NumericTupleSequence,
     NumericTupleSequences,
     NumericType,
-    StrSequence,
-    StrSequences,
 )
 from mitools.visuals.plots.plotter import Plotter
 from mitools.visuals.plots.validations import (
@@ -36,9 +30,6 @@ from mitools.visuals.plots.validations import (
     is_numeric_tuple,
     is_numeric_tuple_sequence,
     is_numeric_tuple_sequences,
-    is_str,
-    is_str_sequence,
-    validate_literal,
     validate_type,
 )
 
