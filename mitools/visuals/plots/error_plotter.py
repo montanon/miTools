@@ -75,16 +75,16 @@ class ErrorPlotter(Plotter):
                 "type": Union[ColorSequences, ColorSequence, Color],
             },
             "elinewidth": {
-                "default": None,
+                "default": 1.0,
                 "type": Union[NumericSequence, NumericType],
             },
-            "capsize": {"default": None, "type": Union[NumericSequence, NumericType]},
-            "capthick": {"default": None, "type": Union[NumericSequence, NumericType]},
+            "capsize": {"default": 1.0, "type": Union[NumericSequence, NumericType]},
+            "capthick": {"default": 1.0, "type": Union[NumericSequence, NumericType]},
             "barsabove": {"default": None, "type": Union[BoolSequence, bool]},
             "lolims": {"default": None, "type": Union[BoolSequence, bool]},
             "uplims": {"default": None, "type": Union[BoolSequence, bool]},
             "xuplims": {"default": None, "type": Union[BoolSequence, bool]},
-            "yuplims": {"default": None, "type": Union[BoolSequence, bool]},
+            "xlolims": {"default": None, "type": Union[BoolSequence, bool]},
             "errorevery": {
                 "default": None,
                 "type": Union[
@@ -92,7 +92,7 @@ class ErrorPlotter(Plotter):
                 ],
             },
             "marker": {
-                "default": "",
+                "default": "o",
                 "type": Union[MarkerSequence, Marker],
             },
             "markersize": {
@@ -112,7 +112,7 @@ class ErrorPlotter(Plotter):
                 "type": Union[ColorSequence, Color],
             },
             "linestyle": {
-                "default": "-",
+                "default": "",
                 "type": Union[LiteralSequence, Literal["linestyles"]],
             },
             "linewidth": {"default": None, "type": Union[NumericSequence, NumericType]},
@@ -138,7 +138,7 @@ class ErrorPlotter(Plotter):
             or is_numeric_tuple_sequence(xerrs)
             or is_numeric_tuple(xerrs)
         ):
-            return self.set_numeric_tuple_sequences(xerrs, "xerr")
+            return self.set_numeric_tuple_sequences(xerrs, 2, "xerr")
         raise ArgumentValueError(
             "xerrs must be numeric or numeric tuple or sequences or sequence of them."
         )
@@ -155,7 +155,7 @@ class ErrorPlotter(Plotter):
             or is_numeric_tuple_sequence(yerrs)
             or is_numeric_tuple(yerrs)
         ):
-            return self.set_numeric_tuple_sequences(yerrs, "yerr")
+            return self.set_numeric_tuple_sequences(yerrs, 2, "yerr")
         raise ArgumentValueError(
             "yerrs must be numeric or numeric tuple or sequences or sequence of them."
         )
@@ -184,8 +184,8 @@ class ErrorPlotter(Plotter):
     def set_xuplims(self, xuplims: Union[BoolSequence, bool]):
         return self.set_bool_sequence(xuplims, "xuplims")
 
-    def set_yuplims(self, yuplims: Union[BoolSequence, bool]):
-        return self.set_bool_sequence(yuplims, "yuplims")
+    def set_xlolims(self, xlolims: Union[BoolSequence, bool]):
+        return self.set_bool_sequence(xlolims, "xlolims")
 
     def set_errorevery(
         self,
@@ -198,13 +198,13 @@ class ErrorPlotter(Plotter):
             or is_numeric_sequence(errorevery)
             or is_numeric(errorevery)
         ):
-            return self.set_numeric_tuple_sequence(errorevery, "errorevery")
+            return self.set_numeric_sequences(errorevery, "errorevery")
         elif (
             is_numeric_tuple_sequences(errorevery)
             or is_numeric_tuple_sequence(errorevery)
             or is_numeric_tuple(errorevery)
         ):
-            return self.set_numeric_tuple_sequences(errorevery, "errorevery")
+            return self.set_numeric_tuple_sequences(errorevery, 2, "errorevery")
         raise ArgumentValueError(
             "errorevery must be numeric or numeric tuple or sequences or sequence of them."
         )
@@ -239,9 +239,9 @@ class ErrorPlotter(Plotter):
 
     def _create_error_kwargs(self, n_sequence: int):
         error_kwargs = {
-            "fmt": self.get_sequences_param("fmt", n_sequence),
             "xerr": self.get_sequences_param("xerr", n_sequence),
             "yerr": self.get_sequences_param("yerr", n_sequence),
+            "fmt": self.get_sequences_param("fmt", n_sequence),
             "ecolor": self.get_sequences_param("ecolor", n_sequence),
             "elinewidth": self.get_sequences_param("elinewidth", n_sequence),
             "capsize": self.get_sequences_param("capsize", n_sequence),
@@ -249,9 +249,12 @@ class ErrorPlotter(Plotter):
             "barsabove": self.get_sequences_param("barsabove", n_sequence),
             "lolims": self.get_sequences_param("lolims", n_sequence),
             "uplims": self.get_sequences_param("uplims", n_sequence),
+            "xlolims": self.get_sequences_param("xlolims", n_sequence),
             "xuplims": self.get_sequences_param("xuplims", n_sequence),
-            "yuplims": self.get_sequences_param("yuplims", n_sequence),
             "errorevery": self.get_sequences_param("errorevery", n_sequence),
+            "alpha": self.get_sequences_param("alpha", n_sequence),
+            "color": self.get_sequences_param("color", n_sequence),
+            "label": self.get_sequences_param("label", n_sequence),
             "marker": self.get_sequences_param("marker", n_sequence),
             "markersize": self.get_sequences_param("markersize", n_sequence),
             "markeredgewidth": self.get_sequences_param("markeredgewidth", n_sequence),
@@ -259,6 +262,7 @@ class ErrorPlotter(Plotter):
             "markerfacecolor": self.get_sequences_param("markerfacecolor", n_sequence),
             "linestyle": self.get_sequences_param("linestyle", n_sequence),
             "linewidth": self.get_sequences_param("linewidth", n_sequence),
+            "zorder": self.get_sequences_param("zorder", n_sequence),
         }
         if (
             not isinstance(error_kwargs.get("alpha", []), NUMERIC_TYPES)
