@@ -1,5 +1,6 @@
 from typing import Literal, Union
 
+import numpy as np
 from matplotlib.axes import Axes
 
 from mitools.exceptions import ArgumentValueError
@@ -134,6 +135,25 @@ class ErrorPlotter(Plotter):
         ):
             return self.set_numeric_sequences(xerrs, "xerr")
         elif (
+            isinstance(xerrs, np.ndarray)
+            and xerrs.ndim == 2
+            and xerrs.shape[0] == 2
+            and xerrs.shape[1] == self.data_size
+        ):
+            self.xerr = xerrs
+            self._multi_params_structure["xerr"] = "sequence"
+            return self
+        elif (
+            isinstance(xerrs, np.ndarray)
+            and xerrs.ndim == 3
+            and xerrs.shape[0] == self.n_sequences
+            and xerrs.shape[1] == 2
+            and xerrs.shape[2] == self.data_size
+        ):
+            self.xerr = xerrs
+            self._multi_params_structure["xerr"] = "sequences"
+            return self
+        elif (
             is_numeric_tuple_sequences(xerrs)
             or is_numeric_tuple_sequence(xerrs)
             or is_numeric_tuple(xerrs)
@@ -150,6 +170,25 @@ class ErrorPlotter(Plotter):
             or is_numeric(yerrs)
         ):
             return self.set_numeric_sequences(yerrs, "yerr")
+        elif (
+            isinstance(yerrs, np.ndarray)
+            and yerrs.ndim == 2
+            and yerrs.shape[0] == 2
+            and yerrs.shape[1] == self.data_size
+        ):
+            self.yerr = yerrs
+            self._multi_params_structure["yerr"] = "sequence"
+            return self
+        elif (
+            isinstance(yerrs, np.ndarray)
+            and yerrs.ndim == 3
+            and yerrs.shape[0] == self.n_sequences
+            and yerrs.shape[1] == 2
+            and yerrs.shape[2] == self.data_size
+        ):
+            self.yerr = yerrs
+            self._multi_params_structure["yerr"] = "sequences"
+            return self
         elif (
             is_numeric_tuple_sequences(yerrs)
             or is_numeric_tuple_sequence(yerrs)
