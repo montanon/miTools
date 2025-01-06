@@ -30,6 +30,14 @@ NUMERIC_TYPES = (float, int, integer)
 SEQUENCE_TYPES = (list, tuple, ndarray, Series)
 
 
+def is_indexable(value: Any, index: int) -> bool:
+    try:
+        value[index]
+        return True
+    except (TypeError, IndexError, KeyError):
+        return False
+
+
 def is_dict_sequences(sequences: Sequence[Sequence[Any]]) -> bool:
     return is_sequences(sequences) and all(is_dict_sequence(seq) for seq in sequences)
 
