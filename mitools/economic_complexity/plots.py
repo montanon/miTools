@@ -1597,16 +1597,30 @@ def plot_export_pct_evolution_by_income(
     return ax
 
 
-def resize_image_mm(input_path, output_path, width_mm, dpi):
+def resize_image_mm(input_path, output_path, width_mm=None, height_mm=None, dpi=300):
+    if width_mm is None and height_mm is None:
+        raise ValueError("At least one of width_mm or height_mm must be provided")
     Image.MAX_IMAGE_PIXELS = None
-    width_px = int((width_mm / 25.4) * dpi)
     with Image.open(input_path) as img:
         aspect_ratio = img.height / img.width
-        new_height = int(width_px * aspect_ratio)
-        resized_img = img.resize((width_px, new_height), Image.LANCZOS)
+        if width_mm is not None and height_mm is None:
+            width_px = int((width_mm / 25.4) * dpi)
+            height_px = int(width_px * aspect_ratio)
+        elif width_mm is None and height_mm is not None:
+            height_px = int((height_mm / 25.4) * dpi)
+            width_px = int(height_px / aspect_ratio)
+        else:
+            width_px = int((width_mm / 25.4) * dpi)
+            height_px = int(height_mm / 25.4) * dpi
+        resized_img = img.resize((width_px, height_px), Image.LANCZOS)
         resized_img.save(output_path, dpi=(dpi, dpi))
+    dimensions = []
+    if width_mm is not None:
+        dimensions.append(f"{width_mm}mm width")
+    if height_mm is not None:
+        dimensions.append(f"{height_mm}mm height")
     print(
-        f"Image resized to {width_mm}mm width and saved at {output_path} with {dpi} DPI."
+        f"Image resized to {' and '.join(dimensions)} and saved at {output_path} with {dpi} DPI."
     )
 
 
