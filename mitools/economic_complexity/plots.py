@@ -1267,7 +1267,7 @@ def plot_sector_products(
         }
     )
 
-    products_valignment = [0.7, 0.475, 0.275]
+    products_valignment = [0.7, 0.425, 0.275]
 
     for q, quantile in pci_quantiles.items():
         ax.axvline(quantile, color="k", linestyle="--", linewidth=vline_width)
@@ -1483,6 +1483,7 @@ def scatter_countries_plot(
     plot_data = plot_data[[x, y]]
     if ax is None:
         fig, ax = plt.subplots(figsize=figsize)
+    plot_data = plot_data.sort_values(by=x, ascending=True)
     ax.scatter(plot_data[x], plot_data[y], alpha=0)
     for idx in plot_data.index:
         x_values = plot_data.loc[idx, x]
