@@ -28,6 +28,24 @@ def folder_is_subfolder(root_folder: PathLike, folder_to_check: PathLike) -> boo
     return root_folder in folder_to_check.parents
 
 
+def file_in_folder(folder: PathLike, file_to_check: PathLike) -> bool:
+    folder = Path(folder)
+    file_to_check = Path(file_to_check)
+    try:
+        folder = folder.resolve(strict=False)
+    except Exception as e:
+        raise ArgumentValueError(f"Invalid 'folder'={folder} path provided: {e}")
+    try:
+        file_to_check = file_to_check.resolve(strict=False)
+    except Exception as e:
+        raise ArgumentValueError(
+            f"Invalid 'file_to_check'={file_to_check} path provided: {e}"
+        )
+    if not file_to_check.is_file():
+        return False
+    return folder in file_to_check.parents or folder == file_to_check.parent
+
+
 def folder_in_subtree(
     root_folder: PathLike, branch_folder: PathLike, folders_to_check: List[PathLike]
 ) -> Union[Path, None]:

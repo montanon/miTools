@@ -7,9 +7,11 @@ from mitools.visuals.axes_functions import (
     set_axes_limits,
 )
 from mitools.visuals.plots import (
+    AxesComposer,
     BarPlotter,
     BoxPlotter,
     DistributionPlotter,
+    ErrorPlotter,
     HistogramPlotter,
     LinePlotter,
     PiePlotter,

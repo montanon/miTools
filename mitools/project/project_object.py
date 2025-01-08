@@ -10,11 +10,11 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from mitools.exceptions import ProjectError, ProjectFolderError, ProjectVersionError
-from mitools.files import folder_in_subtree, folder_is_subfolder
+from mitools.files import file_in_folder, folder_in_subtree, folder_is_subfolder
 from mitools.notebooks import recreate_notebook_structure, save_notebook_as_ipynb
-from mitools.utils import build_dir_tree
+from mitools.utils import build_dir_tree, read_json_file, write_json_file
 
-PROJECT_FILENAME = Path("project.pkl")
+PROJECT_FILENAME = Path("project.json")
 PROJECT_FOLDER = Path(".project")
 PROJECT_NOTEBOOK = "Project.ipynb"
 PROJECT_ARCHIVE = ".archive"
@@ -67,6 +67,7 @@ class Project:
         self.versions_metadata: Dict[str, VersionInfo] = {}
         self.vars: Dict[str, Any] = {}
         self.paths: Dict[str, Path] = {}
+        self.version_paths: Dict[str, Dict[str, str]] = {}
         self.tree = build_dir_tree(self.folder)
         self.update_info()
         self.store_project()
@@ -96,6 +97,7 @@ class Project:
         self.version_folders = [
             Path(self.folder) / version for version in self.versions
         ]
+        self.version_folder = self.folder / self.version
         self.subfolders = self.list_version_subfolders()
         self.paths.update(self.folder_path_dict())
 
@@ -255,13 +257,15 @@ class Project:
 
     def store_project(self) -> None:
         self.update_info()
-        with open(self.project_file, "wb") as file:
-            pickle.dump(self, file)
+        project_data = self.as_dict()
+        write_json_file(
+            project_data, self.project_file, ensure_ascii=False, encoding="utf-8"
+        )
 
     @classmethod
     def find_project(
         cls,
-        project_folder: PathLike = None,
+        project_folder: Optional[PathLike] = None,
         max_depth: int = 3,
         auto_load: bool = False,
     ):
@@ -296,17 +300,9 @@ class Project:
         project_path = cls.find_project(
             project_folder=project_folder, max_depth=max_depth, auto_load=auto_load
         )
-        with project_path.open("rb") as file:
-            obj = pickle.load(file)
+        project_json = read_json_file(project_path)
+        obj = cls.from_dict(project_json)
         obj.update_info()
-        # Retro-compatibility
-        obj.vars = obj.vars if hasattr(obj, "vars") else {}
-        obj.paths = obj.paths if hasattr(obj, "paths") else {}
-        obj.versions_metadata = (
-            obj.versions_metadata
-            if hasattr(obj, "versions_metadata")
-            else {v: obj.add_version_metadata(v) for v in obj.versions}
-        )
         current_path = Path.cwd().resolve()
         if folder_is_subfolder(obj.root, current_path):
             version_folder = folder_in_subtree(
@@ -366,11 +362,16 @@ class Project:
         self.update_info()
         self.store_project()
 
-    def add_var(self, key: str, value: Any, overwrite: bool = False) -> None:
+    def add_var(
+        self, key: str, value: Any, overwrite: bool = False, exist_ok: bool = False
+    ) -> None:
         if key in self.vars and not overwrite:
-            raise ProjectError(
-                f"Key '{key}' already exists in self.vars. Use update_var() to modify existing variables."
-            )
+            if not exist_ok:
+                raise ProjectError(
+                    f"Key '{key}' already exists in self.vars. Use update_var() to modify existing variables."
+                )
+            else:
+                return
         self.vars[key] = value
         self.store_project()
         print(f"Added '{key}' to project variables and stored the project.")
@@ -384,32 +385,138 @@ class Project:
         self.store_project()
         print(f"Updated '{key}' of project variables and stored the project.")
 
-    def add_path(self, key: str, path: Path, overwrite: bool = False) -> None:
-        if not isinstance(path, Path):
-            raise ProjectError(
-                f"Provided 'path'={path} of type {type(path)} must be of type pathlib.Path"
-            )
-        if key in self.paths and not overwrite:
-            raise ProjectError(
-                f"Key '{key}' already exists in self.paths. Use update_path() to modify existing variables."
-            )
-        self.paths[key] = path
+    def add_path(
+        self, key: str, path: Path, overwrite: bool = False, exist_ok: bool = False
+    ) -> None:
+        current_version_folder = (self.folder / self.version).resolve()
+        path_resolved = path.resolve()
+        is_version_child = file_in_folder(current_version_folder, path_resolved)
+        if is_version_child:
+            if self.version not in self.version_paths:
+                self.version_paths[self.version] = {}
+            if key in self.version_paths[self.version] and not overwrite:
+                if not exist_ok:
+                    raise ProjectError(
+                        f"Key '{key}' already exists in version '{self.version}' version_paths. "
+                        f"Use overwrite=True to replace it."
+                    )
+                else:
+                    return
+            relative_path = path_resolved.relative_to(current_version_folder)
+            self.version_paths[self.version][key] = str(relative_path)
+        else:
+            if key in self.paths and not overwrite:
+                if not exist_ok:
+                    raise ProjectError(
+                        f"Key '{key}' already exists in global 'paths'. Use overwrite=True to replace it."
+                    )
+                else:
+                    return
+            self.paths[key] = path_resolved
         self.store_project()
         print(f"Added '{key}' to project paths and stored the project.")
 
-    def update_path(self, key: str, path: Path) -> None:
-        if not isinstance(path, Path):
+    def update_path(self, key: str, new_path: Path) -> None:
+        if (
+            self.version in self.version_paths
+            and key in self.version_paths[self.version]
+        ) or key in self.paths:
+            self.add_path(key, new_path, overwrite=True)
+        else:
             raise ProjectError(
-                f"Provided 'path'={path} of type {type(path)} must be of type pathlib.Path"
+                f"Cannot update '{key}' because it does not exist in version '{self.version}' or global paths."
             )
-        if key not in self.paths:
-            raise ProjectError(
-                f"Key {key} does not exist in self.paths. Cannot update non-existing path."
-            )
-        self.paths[key] = path
-        self.store_project()
         print(f"Updated '{key}' of project paths and stored the project.")
+
+    def get_path(self, key: str) -> Path:
+        if (
+            self.version in self.version_paths
+            and key in self.version_paths[self.version]
+        ):
+            relative_path = self.version_paths[self.version][key]
+            return (self.version_folder / relative_path).resolve()
+        if key in self.paths:
+            return self.paths[key]
+        raise ProjectError(
+            f"Path key='{key}' not found in version '{self.version}' or global paths."
+        )
+
+    def remove_path(self, key: str) -> None:
+        if (
+            self.version in self.version_paths
+            and key in self.version_paths[self.version]
+        ):
+            del self.version_paths[self.version][key]
+            if not self.version_paths[self.version]:
+                del self.version_paths[self.version]  # Clean up empty dict
+            self.store_project()
+            print(f"Removed path '{key}' from version '{self.version}' version_paths.")
+            return
+        if key in self.paths:
+            del self.paths[key]
+            self.store_project()
+            print(f"Removed path '{key}' from global paths.")
+            return
+        raise ProjectError(
+            f"Cannot remove '{key}' because it does not exist in current version '{self.version}' or global paths."
+        )
 
     def create_project_notebook(self) -> None:
         notebook = recreate_notebook_structure()
         save_notebook_as_ipynb(notebook, self.project_notebook)
+
+    def as_dict(self) -> Dict[str, Any]:
+        return {
+            "root": str(self.root),
+            "name": self.name,
+            "version": self.version,
+            "versions": self.versions,
+            "versions_metadata": {
+                ver: {
+                    "version": info.version,
+                    "creation": info.creation.timestamp()
+                    if isinstance(info.creation, datetime)
+                    else info.creation,
+                    "state": info.state.value if info.state else None,
+                    "description": info.description,
+                }
+                for ver, info in self.versions_metadata.items()
+            },
+            "vars": self.vars,
+            "paths": {k: str(p) for k, p in self.paths.items()},
+            "version_paths": {k: str(p) for k, p in self.version_paths.items()},
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any], logger: Logger = None) -> "Project":
+        root = data["root"]
+        project_name = data["name"]
+        version = data["version"]
+        project = cls(
+            project_name=project_name,
+            root=root,
+            version=version,
+            logger=logger,
+        )
+        project.versions = data.get("versions", [])
+        raw_versions_metadata = data.get("versions_metadata", {})
+        project.versions_metadata = {}
+        for ver, meta in raw_versions_metadata.items():
+            creation_ts = meta.get("creation")
+            if isinstance(creation_ts, (float, int)):
+                creation_dt = datetime.fromtimestamp(creation_ts)
+            else:
+                creation_dt = creation_ts
+            project.versions_metadata[ver] = VersionInfo(
+                version=meta["version"],
+                creation=creation_dt,
+                state=VersionState(meta["state"]) if meta["state"] else None,
+                description=meta["description"],
+            )
+        project.vars = data.get("vars", {})
+        project.paths = {k: Path(p) for k, p in data.get("paths", {}).items()}
+        project.version_paths = {
+            k: Path(p) for k, p in data.get("version_paths", {}).items()
+        }
+        project.update_info()
+        return project

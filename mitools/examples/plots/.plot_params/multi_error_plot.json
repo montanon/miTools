@@ -1,0 +1,224 @@
+{
+    "title": {
+        "label": "a) Standard Errors Plot:",
+        "fontsize": 24,
+        "color": "k",
+        "loc": "left",
+        "x": -0.15,
+        "y": 1.05
+    },
+    "xlabel": {
+        "xlabel": "Coefficient Value",
+        "fontsize": 16,
+        "color": "k"
+    },
+    "ylabel": "",
+    "legend": {
+        "show": true,
+        "kwargs": {
+            "loc": "lower left",
+            "ncol": 1,
+            "frameon": true,
+            "fancybox": true,
+            "framealpha": 0.8,
+            "facecolor": "inherit"
+        }
+    },
+    "figsize": [
+        7,
+        12
+    ],
+    "style": null,
+    "grid": null,
+    "tight_layout": false,
+    "texts": null,
+    "xscale": null,
+    "yscale": null,
+    "background": null,
+    "figure_background": null,
+    "suptitle": null,
+    "xlim": null,
+    "ylim": null,
+    "xticks": null,
+    "yticks": null,
+    "xticklabels": null,
+    "yticklabels": [
+        "Variable 0",
+        "Variable 1",
+        "Variable 2",
+        "Variable 3",
+        "Variable 4",
+        "Variable 5",
+        "Variable 6",
+        "Variable 7"
+    ],
+    "xtickparams": {
+        "labelsize": 14,
+        "color": "k"
+    },
+    "ytickparams": {
+        "labelsize": 14,
+        "color": "k",
+        "rotation": 45
+    },
+    "spines": {
+        "left": {
+            "visible": true,
+            "position": null,
+            "color": "k",
+            "linewidth": 1.5,
+            "linestyle": "-",
+            "alpha": null,
+            "bounds": null,
+            "capstyle": null
+        },
+        "right": {
+            "visible": true,
+            "position": null,
+            "color": null,
+            "linewidth": null,
+            "linestyle": "",
+            "alpha": null,
+            "bounds": null,
+            "capstyle": null
+        },
+        "bottom": {
+            "visible": true,
+            "position": null,
+            "color": "k",
+            "linewidth": 1.5,
+            "linestyle": "-",
+            "alpha": null,
+            "bounds": null,
+            "capstyle": null
+        },
+        "top": {
+            "visible": true,
+            "position": null,
+            "color": null,
+            "linewidth": null,
+            "linestyle": "",
+            "alpha": null,
+            "bounds": null,
+            "capstyle": null
+        }
+    },
+    "color": [
+        "red",
+        "green",
+        "blue"
+    ],
+    "alpha": 1.0,
+    "label": [
+        "Robust Method",
+        "IID Method",
+        "Traditional Method"
+    ],
+    "zorder": null,
+    "fmt": null,
+    "xerr": [
+        [
+            0.5,
+            1.0,
+            1.5,
+            2.0,
+            2.5,
+            3.0,
+            3.5
+        ],
+        [
+            0.75,
+            0.5,
+            1.25,
+            2.2,
+            1.75,
+            2.75,
+            3.75
+        ],
+        [
+            0.25,
+            1.5,
+            1.0,
+            1.5,
+            2.75,
+            3.25,
+            2.5
+        ]
+    ],
+    "yerr": null,
+    "ecolor": null,
+    "elinewidth": 1.0,
+    "capsize": 3.5,
+    "capthick": 2.25,
+    "barsabove": null,
+    "lolims": null,
+    "uplims": null,
+    "xuplims": null,
+    "xlolims": null,
+    "errorevery": null,
+    "marker": "o",
+    "markersize": null,
+    "markeredgewidth": null,
+    "markeredgecolor": null,
+    "markerfacecolor": null,
+    "linestyle": "",
+    "linewidth": null,
+    "x_data": [
+        [
+            2.0,
+            -1.0,
+            0.0,
+            3.0,
+            4.0,
+            -3.0,
+            1.0
+        ],
+        [
+            2.5,
+            -0.5,
+            0.5,
+            3.5,
+            4.5,
+            -2.5,
+            1.5
+        ],
+        [
+            3.0,
+            -1.5,
+            0.5,
+            3.5,
+            4.5,
+            -3.5,
+            2.5
+        ]
+    ],
+    "y_data": [
+        [
+            0,
+            5,
+            10,
+            15,
+            20,
+            25,
+            30
+        ],
+        [
+            1,
+            6,
+            11,
+            16,
+            21,
+            26,
+            31
+        ],
+        [
+            -1,
+            4,
+            9,
+            14,
+            19,
+            24,
+            29
+        ]
+    ]
+}

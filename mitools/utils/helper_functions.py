@@ -136,8 +136,10 @@ def read_json_file(json_path: PathLike) -> Dict:
         return json.load(f)
 
 
-def write_json_file(data: Dict, json_path: PathLike, ensure_ascii: bool = True) -> None:
-    with open(json_path, "w") as f:
+def write_json_file(
+    data: Dict, json_path: PathLike, ensure_ascii: bool = True, encoding: str = "utf-8"
+) -> None:
+    with open(json_path, "w", encoding=encoding) as f:
         json.dump(data, f, indent=4, ensure_ascii=ensure_ascii)
 
 
