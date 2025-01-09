@@ -6,18 +6,12 @@ import pandas as pd
 from pandas import DataFrame, MultiIndex
 from pandas.testing import assert_frame_equal
 from scipy.spatial.distance import pdist, squareform
-from sklearn.cluster import AgglomerativeClustering, KMeans
-from sklearn.datasets import make_blobs
 from sklearn.metrics import pairwise_distances
 from sklearn.metrics.pairwise import cosine_similarity
 
 from mitools.clustering import (
     N_ELEMENTS_COL,
     ArgumentStructureError,
-    ArgumentTypeError,
-    ArgumentValueError,
-    agglomerative_clustering,
-    clustering_ncluster_search,
     get_clusters_centroids,
     get_clusters_size,
     get_cosine_similarities_matrix,
@@ -25,7 +19,6 @@ from mitools.clustering import (
     get_distances_to_centroids,
     get_similarities_matrix,
     get_similarities_metric_vector,
-    kmeans_clustering,
 )
 
 
