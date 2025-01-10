@@ -1,4 +1,5 @@
-from typing import List, Optional, Sequence, Tuple, Union
+from os import PathLike
+from typing import Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -7,6 +8,11 @@ from numba import jit
 from pandas import DataFrame
 
 from mitools.exceptions import ArgumentValueError
+from mitools.pandas_utils.functions import (
+    check_if_dataframe_sequence,
+    load_dataframe_sequence,
+    store_dataframe_sequence,
+)
 from mitools.utils.helper_functions import all_can_be_ints
 
 
@@ -263,3 +269,92 @@ def create_data_id(id: str, time: Union[str, int, Sequence]) -> str:
 
 def create_data_name(data_id, tag):
     return f"{data_id}_{tag}"
+
+
+def vectors_from_proximity_matrix(
+    proximity_matrix: DataFrame,
+    orig_product: str = "product_i",
+    dest_product: str = "product_j",
+    proximity_column: str = "weight",
+    sort_by: Union[str, List[str], Tuple[str]] = None,
+    sort_ascending: Union[bool, List[bool], Tuple[bool]] = False,
+) -> DataFrame:
+    if sort_by is not None:
+        if isinstance(sort_by, str) and sort_by not in [
+            orig_product,
+            dest_product,
+            proximity_column,
+        ]:
+            raise ArgumentValueError(
+                f"Column '{sort_by}' not available in output DataFrame."
+            )
+        elif isinstance(sort_by, (list, tuple)) and not all(
+            [
+                col
+                in [
+                    orig_product,
+                    dest_product,
+                    proximity_column,
+                ]
+                for col in sort_by
+            ]
+        ):
+            raise ArgumentValueError(
+                f"Columns '{sort_by}' not available in output DataFrame."
+            )
+    if sort_ascending is not None:
+        if not isinstance(sort_ascending, bool) or (
+            isinstance(sort_ascending, list)
+            and all(isinstance(b, bool) for b in sort_ascending)
+        ):
+            raise ArgumentValueError(
+                "sort_ascending must be a boolean or a list of booleans."
+            )
+    is_symmetric = proximity_matrix.equals(proximity_matrix.T)
+    proximity_vectors = proximity_matrix.unstack().reset_index()
+    proximity_vectors.columns = [orig_product, dest_product, proximity_column]
+    if is_symmetric:
+        proximity_vectors = proximity_vectors[
+            proximity_vectors[orig_product] <= proximity_vectors[dest_product]
+        ]
+    proximity_vectors = proximity_vectors.loc[proximity_vectors[proximity_column] > 0]
+    proximity_vectors = proximity_vectors.drop_duplicates()
+    proximity_vectors = proximity_vectors.sort_values(
+        by=proximity_column if sort_by is None else sort_by, ascending=sort_ascending
+    ).reset_index(drop=True)
+    proximity_vectors = proximity_vectors.rename(
+        columns={proximity_column: proximity_column}
+    )
+    proximity_vectors[orig_product] = proximity_vectors[orig_product].astype(str)
+    proximity_vectors[dest_product] = proximity_vectors[dest_product].astype(str)
+
+    return proximity_vectors
+
+
+def proximity_vectors_sequence(
+    proximity_matrices: Dict[Union[str, int], DataFrame],
+    data_dir: PathLike = None,
+    recalculate: bool = False,
+    sequence_name: str = "proximity_vectors",
+) -> Dict[Union[str, int], DataFrame]:
+    sequence_values = list(proximity_matrices.keys())
+    if (
+        not recalculate
+        and data_dir is not None
+        and check_if_dataframe_sequence(
+            data_dir=data_dir, name=sequence_name, sequence_values=sequence_values
+        )
+    ):
+        proximity_vectors = load_dataframe_sequence(
+            data_dir=data_dir, name=sequence_name, sequence_values=sequence_values
+        )
+    else:
+        proximity_vectors = {
+            key: vectors_from_proximity_matrix(proximity_matrix)
+            for key, proximity_matrix in proximity_matrices.items()
+        }
+        if data_dir is not None:
+            store_dataframe_sequence(
+                proximity_vectors, data_dir=data_dir, name=sequence_name
+            )
+    return proximity_vectors
