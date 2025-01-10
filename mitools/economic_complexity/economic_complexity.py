@@ -200,7 +200,7 @@ def calculate_economic_complexity(
 
     if fast:
         rca_np = rca_matrix.values
-        eci, pci = jit_calculate_economic_complexity(rca_np)
+        eci, pci = torch_calculate_economic_complexity(rca_np)
     else:
         diversity = rca_matrix.sum(axis=1)
         ubiquity = rca_matrix.sum(axis=0)
