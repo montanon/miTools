@@ -28,9 +28,9 @@ from mitools import economic_complexity as ec
 from mitools import etl, files, google, jupyter_utils, nlp, scraping, utils
 from mitools import notebooks as nb
 from mitools import oldregressions as oreg
-from mitools import pandas as pdf
+from mitools import pandas_utils as pdf
 from mitools import regressions as reg
 from mitools.context import DEV
-from mitools.country_converter import country_converter
+from mitools.country_utils import name_converter
 from mitools.project import Project
 from mitools.utils import iprint

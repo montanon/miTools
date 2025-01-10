@@ -27,7 +27,7 @@ from tqdm import tqdm
 from unidecode import unidecode
 
 from mitools.nlp.tags_translator import translate_tag
-from mitools.pandas import idxslice
+from mitools.pandas_utils import idxslice
 from mitools.utils import (
     lcs_similarity,
     sankey_plot_validation,

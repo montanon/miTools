@@ -9,7 +9,7 @@ from pandas import DataFrame, IndexSlice, MultiIndex, Series, testing
 from pandas.testing import assert_frame_equal
 
 from mitools.exceptions.custom_exceptions import ArgumentTypeError, ArgumentValueError
-from mitools.pandas.functions import (
+from mitools.pandas_utils.functions import (
     check_if_dataframe_sequence,
     get_entities_data,
     get_entity_data,

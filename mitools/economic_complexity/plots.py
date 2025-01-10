@@ -23,9 +23,9 @@ from pandas import DataFrame
 from PIL import Image
 from scipy.spatial.distance import squareform
 
-from mitools.country_converter import country_converter
+from mitools.country_utils import name_converter
 from mitools.economic_complexity.objects import Product, ProductsBasket
-from mitools.pandas import idxslice, prepare_quantile_columns
+from mitools.pandas_utils import idxslice, prepare_quantile_columns
 from mitools.utils import stretch_string
 from mitools.visuals import (
     adjust_axes_array_limits,
@@ -1427,7 +1427,7 @@ def extract_svg_country_mapping(html_content):
     for div in container.find_all("div"):
         img = div.find("img")
         country = div.find("p").get_text(strip=True).split(" (")[0].strip()
-        country = country_converter.convert(country, to="name_short")
+        country = name_converter.convert(country, to="name_short")
         svg_file = Path(img["src"]).name
         svg_country_dict[country] = svg_file
 

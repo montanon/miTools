@@ -19,7 +19,7 @@ from tqdm.notebook import tqdm
 
 from mitools.economic_complexity import StringMapper
 from mitools.oldregressions import generate_hash_from_dataframe
-from mitools.pandas import idxslice
+from mitools.pandas_utils import idxslice
 from mitools.utils import auto_adjust_sheet_columns_width
 
 warnings.simplefilter("ignore")

@@ -34,7 +34,7 @@ from mitools.economic_complexity import (
     vectors_from_proximity_matrix,
 )
 from mitools.exceptions import ArgumentTypeError, ArgumentValueError
-from mitools.pandas.functions import (
+from mitools.pandas_utils.functions import (
     check_if_dataframe_sequence,
     store_dataframe_sequence,
 )

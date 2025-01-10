@@ -1,4 +1,4 @@
-from mitools.pandas.functions import (
+from mitools.pandas_utils.functions import (
     get_entities_data,
     get_entity_data,
     idxslice,

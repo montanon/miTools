@@ -10,7 +10,7 @@ from mitools.exceptions.custom_exceptions import (
     ArgumentTypeError,
     ArgumentValueError,
 )
-from mitools.pandas.columns import (
+from mitools.pandas_utils.columns import (
     ADDED_COLUMN_NAME,
     DIVIDED_COLUMN_NAME,
     GROWTH_COLUMN_NAME,
