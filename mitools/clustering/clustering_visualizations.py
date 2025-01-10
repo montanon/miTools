@@ -10,7 +10,7 @@ from numpy import ndarray
 from pandas import DataFrame, IndexSlice
 from scipy.stats import gaussian_kde
 
-from ..exceptions import ArgumentStructureError
+from mitools.exceptions import ArgumentStructureError
 
 X_Y_SIZE_ERROR = "x values and y values must be the same size."
 

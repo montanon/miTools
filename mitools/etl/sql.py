@@ -7,7 +7,7 @@ import pandas as pd
 from numpy import ndarray
 from pandas import DataFrame
 
-from ..utils import suppress_user_warning
+from mitools.utils import suppress_user_warning
 
 
 class CustomConnection(Connection):

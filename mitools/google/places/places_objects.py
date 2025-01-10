@@ -14,8 +14,7 @@ from shapely import Point, Polygon
 from shapely.ops import unary_union
 
 from mitools.exceptions import ArgumentKeyError, ArgumentTypeError, ArgumentValueError
-
-from .json_schemas import NEWPLACE_SCHEMA, PLACE_SCHEMA
+from mitools.google.places.json_schemas import NEWPLACE_SCHEMA, PLACE_SCHEMA
 
 CircleType = NewType("CircleType", Polygon)
 

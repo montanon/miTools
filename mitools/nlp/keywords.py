@@ -27,10 +27,12 @@ from tqdm import tqdm
 from unidecode import unidecode
 
 from mitools.nlp.tags_translator import translate_tag
-from mitools.utils import sankey_plot_validation, validate_dataframe_structure
-
-from ..pandas import idxslice
-from ..utils import lcs_similarity
+from mitools.pandas import idxslice
+from mitools.utils import (
+    lcs_similarity,
+    sankey_plot_validation,
+    validate_dataframe_structure,
+)
 
 
 def tag_tokens(tokens: List[str]) -> List[Tuple[str, str]]:

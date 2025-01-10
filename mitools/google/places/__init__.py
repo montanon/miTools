@@ -1,4 +1,4 @@
-from .places import (
+from mitools.google.places import (
     GOOGLE_PLACES_API_KEY,
     NEW_NEARBY_SEARCH_URL,
     QUERY_HEADERS,
@@ -27,7 +27,7 @@ from .places import (
     should_save_state,
     update_progress_bar,
 )
-from .places_objects import (
+from mitools.google.places.places_objects import (
     AccessibilityOptions,
     AddressComponent,
     CircleCenterInsidePolygon,
@@ -44,7 +44,7 @@ from .places_objects import (
     ViewportCoordinate,
     intersection_condition_factory,
 )
-from .plots import (
+from mitools.google.places.plots import (
     plot_saturated_area,
     plot_saturated_circles,
     polygon_plot_with_circles_and_points,

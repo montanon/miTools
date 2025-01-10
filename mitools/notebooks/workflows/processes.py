@@ -6,8 +6,12 @@ from typing import List, Optional, Union
 import pandas as pd
 from pandas import DataFrame
 
-from ..context import DISPLAY
-from .configurations.urban_climate_papers import articles_cols, main_words, sub_words
+from mitools.context import DISPLAY
+from mitools.notebooks.configurations.urban_climate_papers import (
+    articles_cols,
+    main_words,
+    sub_words,
+)
 
 
 class Process(ABC):

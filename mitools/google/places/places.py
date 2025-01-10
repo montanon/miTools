@@ -30,8 +30,7 @@ from mitools.exceptions import (
     ArgumentTypeError,
     ArgumentValueError,
 )
-
-from .places_objects import (
+from mitools.google.places.places_objects import (
     CityGeojson,
     DummyResponse,
     NewNearbySearchRequest,
@@ -39,7 +38,7 @@ from .places_objects import (
     Place,
     intersection_condition_factory,
 )
-from .plots import (
+from mitools.google.places.plots import (
     plot_saturated_area,
     plot_saturated_circles,
     polygon_plot_with_circles_and_points,

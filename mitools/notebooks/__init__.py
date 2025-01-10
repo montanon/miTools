@@ -1,3 +1,3 @@
-from .functions import *
-from .objects import *
-from .sections import *
+from mitools.notebooks.functions import *
+from mitools.notebooks.objects import *
+from mitools.notebooks.sections import *

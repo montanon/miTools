@@ -7,7 +7,7 @@ from scipy.spatial.distance import cdist
 from sklearn.metrics.pairwise import cosine_similarity, pairwise_distances
 from sklearn.neighbors import NearestCentroid
 
-from ..exceptions import ArgumentStructureError
+from mitools.exceptions import ArgumentStructureError
 
 CLUSTER_COL_NOT_IN_INDEX_ERROR = (
     "DataFrame provided does not have the {cluster_level} index level!"

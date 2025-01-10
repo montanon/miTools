@@ -1,3 +1,3 @@
-from .clustering_algorithms import *
-from .clustering_evaluations import *
-from .clustering_visualizations import *
+from mitools.clustering.clustering_algorithms import *
+from mitools.clustering.clustering_evaluations import *
+from mitools.clustering.clustering_visualizations import *

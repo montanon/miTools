@@ -23,14 +23,14 @@ from pandas import DataFrame
 from PIL import Image
 from scipy.spatial.distance import squareform
 
-from ..country_converter import country_converter
-from ..pandas import idxslice, prepare_quantile_columns
-from ..utils import stretch_string
-from ..visuals import (
+from mitools.country_converter import country_converter
+from mitools.economic_complexity.objects import Product, ProductsBasket
+from mitools.pandas import idxslice, prepare_quantile_columns
+from mitools.utils import stretch_string
+from mitools.visuals import (
     adjust_axes_array_limits,
     is_ax_empty,
 )
-from .objects import Product, ProductsBasket
 
 Color = Union[Tuple[int, int, int], str]
 

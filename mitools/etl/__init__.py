@@ -1,1 +1,1 @@
-from .sql import *
+from mitools.etl.sql import *

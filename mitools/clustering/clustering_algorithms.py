@@ -8,7 +8,11 @@ from sklearn.cluster import AgglomerativeClustering, KMeans
 from sklearn.metrics import silhouette_score
 from tqdm import tqdm
 
-from ..exceptions import ArgumentStructureError, ArgumentTypeError, ArgumentValueError
+from mitools.exceptions import (
+    ArgumentStructureError,
+    ArgumentTypeError,
+    ArgumentValueError,
+)
 
 EMPTY_DATA_ERROR = "Input DataFrame cannot be empty."
 MAX_CLUSTERS_TYPE_ERROR = "n_clusters provided must be a positive int larger than 2."

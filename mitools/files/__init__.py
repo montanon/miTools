@@ -1,11 +1,11 @@
-from .doc_handlers import (
+from mitools.files.doc_handlers import (
     convert_directory_docxs_to_pdfs,
     convert_directory_files,
     convert_docx_to_pdf,
     convert_file,
     read_docx_file,
 )
-from .file_handlers import (
+from mitools.files.file_handlers import (
     can_move_file_or_folder,
     file_in_folder,
     folder_in_subtree,
@@ -17,7 +17,7 @@ from .file_handlers import (
     rename_files_in_folder,
     rename_folders_in_folder,
 )
-from .ics import (
+from mitools.files.ics import (
     convert_to_dataframe,
     count_events_by_date,
     extract_events,
@@ -27,7 +27,7 @@ from .ics import (
     get_unique_organizers,
     read_ics_file,
 )
-from .pdf_handlers import (
+from mitools.files.pdf_handlers import (
     extract_pdf_metadata,
     extract_pdf_title,
     pdf_to_markdown_file,
