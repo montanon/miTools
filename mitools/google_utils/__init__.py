@@ -1,4 +1,4 @@
-from mitools.google.places import (
+from mitools.google_utils.places import (
     AccessibilityOptions,
     AddressComponent,
     CircleCenterInsidePolygon,

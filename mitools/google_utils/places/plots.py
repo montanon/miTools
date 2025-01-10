@@ -14,7 +14,7 @@ from shapely.ops import transform
 from tqdm import tqdm
 
 from mitools.exceptions import ArgumentTypeError, ArgumentValueError
-from mitools.google.places.places_objects import (
+from mitools.google_utils.places.places_objects import (
     NewPlace,
     Place,
 )

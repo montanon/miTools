@@ -9,7 +9,7 @@ from shapely import Point
 from shapely.geometry import Polygon
 
 from mitools.exceptions import ArgumentTypeError, ArgumentValueError
-from mitools.google.places import (
+from mitools.google_utils.places import (
     GOOGLE_PLACES_API_KEY,
     CircleCenterInsidePolygon,
     CircleInsidePolygon,

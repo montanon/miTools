@@ -25,7 +25,7 @@ from tqdm import tqdm
 
 from mitools import clustering as clustering
 from mitools import economic_complexity as ec
-from mitools import etl, files, google, jupyter_utils, nlp, scraping, utils
+from mitools import etl, files, google_utils, jupyter_utils, nlp, scraping, utils
 from mitools import notebooks as nb
 from mitools import oldregressions as oreg
 from mitools import pandas_utils as pdf
