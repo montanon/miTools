@@ -13,13 +13,15 @@ from mitools.economic_complexity import (
     calculate_exports_matrix_rca,
     calculate_proximity_matrix,
     calculate_relatedness_matrix,
-    check_if_dataframe_sequence,
     exports_data_to_matrix,
-    load_dataframe_sequence,
     mask_matrix,
-    store_dataframe_sequence,
 )
 from mitools.exceptions.custom_exceptions import ArgumentValueError
+from mitools.pandas.functions import (
+    check_if_dataframe_sequence,
+    load_dataframe_sequence,
+    store_dataframe_sequence,
+)
 
 
 class TestExportsDataToMatrix(TestCase):

@@ -27,15 +27,17 @@ from mitools.economic_complexity import (
     build_nx_graphs,
     build_vis_graph,
     build_vis_graphs,
-    check_if_dataframe_sequence,
     distribute_items_in_communities,
     draw_nx_colored_graph,
     proximity_vectors_sequence,
     pyvis_to_networkx,
-    store_dataframe_sequence,
     vectors_from_proximity_matrix,
 )
 from mitools.exceptions import ArgumentTypeError, ArgumentValueError
+from mitools.pandas.functions import (
+    check_if_dataframe_sequence,
+    store_dataframe_sequence,
+)
 
 
 class TestVectorsFromProximityMatrix(TestCase):
