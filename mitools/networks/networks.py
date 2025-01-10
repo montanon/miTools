@@ -184,6 +184,51 @@ def build_vis_graph(
     return net
 
 
+def build_vis_graphs(
+    graphs_data: Dict[Union[str, int], Graph],
+    networks_folder: PathLike,
+    nodes_sizes: Union[NodesSizes, int, float] = None,
+    nodes_colors: Union[NodesColors, NodeColor] = None,
+    nodes_labels: Union[NodesLabels, str] = None,
+    node_label_size: Union[Dict[NodeID, int], int] = None,
+    edges_widths: EdgesWidthsBins = None,
+    net_height: int = 700,
+    notebook: bool = True,
+    physics: bool = False,
+    physics_kwargs: Dict[str, Any] = None,
+) -> Tuple[Dict[Union[str, int], VisNetwork], Dict[Union[str, int], str]]:
+    networks_folder = Path(networks_folder)
+    if not networks_folder.exists():
+        raise ArgumentValueError(f"Folder '{networks_folder}' does not exist.")
+
+    vis_graphs = {}
+    graph_files = {}
+
+    for key, graph in graphs_data.items():
+        gml_name = f"{key}_vis_graph.html".replace(" ", "_")
+        gml_path = networks_folder / gml_name
+
+        if not gml_path.exists():
+            net = build_vis_graph(
+                graph=graph,
+                nodes_sizes=nodes_sizes,
+                nodes_colors=nodes_colors,
+                nodes_labels=nodes_labels,
+                node_label_size=node_label_size,
+                edges_widths=edges_widths,
+                net_height=net_height,
+                notebook=notebook,
+                physics=physics,
+                physics_kwargs=physics_kwargs,
+            )
+            net.save_graph(str(gml_path))  # Save the graph as an HTML file
+
+        vis_graphs[key] = net
+        graph_files[key] = str(gml_path)
+
+    return vis_graphs, graph_files
+
+
 def assign_net_edges_attributes(net: VisNetwork, edges_widths: EdgesWidthsBins):
     if edges_widths is not None:
         for edge in net.edges:
@@ -255,51 +300,6 @@ def assign_net_nodes_attributes(
                 if not isinstance(label_sizes, dict)
                 else f"{label_sizes[node['id']]}px arial black"
             )
-
-
-def build_vis_graphs(
-    graphs_data: Dict[Union[str, int], Graph],
-    networks_folder: PathLike,
-    nodes_sizes: Union[NodesSizes, int, float] = None,
-    nodes_colors: Union[NodesColors, NodeColor] = None,
-    nodes_labels: Union[NodesLabels, str] = None,
-    node_label_size: Union[Dict[NodeID, int], int] = None,
-    edges_widths: EdgesWidthsBins = None,
-    net_height: int = 700,
-    notebook: bool = True,
-    physics: bool = False,
-    physics_kwargs: Dict[str, Any] = None,
-) -> Tuple[Dict[Union[str, int], VisNetwork], Dict[Union[str, int], str]]:
-    networks_folder = Path(networks_folder)
-    if not networks_folder.exists():
-        raise ArgumentValueError(f"Folder '{networks_folder}' does not exist.")
-
-    vis_graphs = {}
-    graph_files = {}
-
-    for key, graph in graphs_data.items():
-        gml_name = f"{key}_vis_graph.html".replace(" ", "_")
-        gml_path = networks_folder / gml_name
-
-        if not gml_path.exists():
-            net = build_vis_graph(
-                graph=graph,
-                nodes_sizes=nodes_sizes,
-                nodes_colors=nodes_colors,
-                nodes_labels=nodes_labels,
-                node_label_size=node_label_size,
-                edges_widths=edges_widths,
-                net_height=net_height,
-                notebook=notebook,
-                physics=physics,
-                physics_kwargs=physics_kwargs,
-            )
-            net.save_graph(str(gml_path))  # Save the graph as an HTML file
-
-        vis_graphs[key] = net
-        graph_files[key] = str(gml_path)
-
-    return vis_graphs, graph_files
 
 
 def pyvis_to_networkx(pyvis_network: VisNetwork) -> Union[Graph, DiGraph]:
