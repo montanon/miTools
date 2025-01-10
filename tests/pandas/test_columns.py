@@ -6,7 +6,11 @@ from pandas import DataFrame, MultiIndex
 from pandas.api.types import is_numeric_dtype
 from pandas.testing import assert_frame_equal
 
-from mitools.economic_complexity.columns import (
+from mitools.exceptions.custom_exceptions import (
+    ArgumentTypeError,
+    ArgumentValueError,
+)
+from mitools.pandas.columns import (
     ADDED_COLUMN_NAME,
     DIVIDED_COLUMN_NAME,
     GROWTH_COLUMN_NAME,
@@ -23,10 +27,6 @@ from mitools.economic_complexity.columns import (
     shift_columns,
     subtract_columns,
     transform_columns,
-)
-from mitools.exceptions.custom_exceptions import (
-    ArgumentTypeError,
-    ArgumentValueError,
 )
 
 

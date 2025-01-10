@@ -1,4 +1,4 @@
-from .columns import (
+from ..pandas.columns import (
     add_columns,
     growth_columns,
     multiply_columns,
