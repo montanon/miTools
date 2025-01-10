@@ -1,1 +1,1 @@
-from mitools.country_utils import name_converter
+from mitools.country_utils.rename import name_converter
