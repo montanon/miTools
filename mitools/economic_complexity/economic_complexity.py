@@ -167,8 +167,15 @@ def torch_calculate_economic_complexity(
 
     Mpp = M2.T @ M1
 
-    eigen_values, eigen_vectors = torch.linalg.eig(Mpp)
-    eigen_vectors = eigen_vectors.real  # Use the real part of the eigenvectors
+    try:
+        eigen_values, eigen_vectors = torch.linalg.eig(Mpp)
+    except NotImplementedError:
+        np_Mpp = Mpp.cpu().numpy()
+        eigen_values, eigen_vectors = np.linalg.eig(np_Mpp)
+        eigen_vectors = eigen_vectors.real  # Use the real part of the eigenvectors
+        eigen_values = torch.from_numpy(eigen_values.real).to(device)
+        eigen_vectors = torch.from_numpy(eigen_vectors).to(device)
+        del np_Mpp
 
     eigen_vector_index = torch.argsort(eigen_values.real)[-2]
     kp = eigen_vectors[:, eigen_vector_index]
