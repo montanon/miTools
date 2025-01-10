@@ -9,14 +9,13 @@ from pandas import DataFrame
 from tqdm import tqdm
 
 from mitools.economic_complexity.plots import plot_income_levels_ecis_indicator_scatter
+from mitools.oldregressions.quantiles import QuantileRegStrs, get_regression_predictions
 from mitools.utils.helper_functions import stretch_string
-
-from ..visuals import (
+from mitools.visuals import (
     adjust_ax_labels_fontsize,
     adjust_ax_text_limits,
     adjust_axes_array_limits,
 )
-from .quantiles import QuantileRegStrs, get_regression_predictions
 
 Color = Union[Tuple[int, int, int], str]
 

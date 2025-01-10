@@ -1,4 +1,4 @@
-from .embeddings import (
+from mitools.nlp.embeddings import (
     huggingface_embed_texts,
     plot_umap_connectivity,
     plot_umap_diagnostic,
@@ -8,8 +8,5 @@ from .embeddings import (
     tsne_embeddings,
     umap_embeddings,
 )
-from .keywords import *
-from .objects import *
-
-
-# from .semantic_scholar_api_key import *
+from mitools.nlp.keywords import *
+from mitools.nlp.objects import *

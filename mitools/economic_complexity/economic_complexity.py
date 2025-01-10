@@ -1,8 +1,6 @@
 from os import PathLike
-from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple, Union
 
-import chardet
 import numpy as np
 import pandas as pd
 import torch
@@ -10,31 +8,12 @@ from numba import jit
 from pandas import DataFrame
 
 from mitools.exceptions import ArgumentValueError
-
-
-def all_can_be_ints(items: Sequence) -> bool:
-    try:
-        return all(int(item) is not None for item in items)
-    except (ValueError, TypeError):
-        return False
-
-
-def get_file_encoding(file: PathLike, fallback: str = "utf-8") -> str:
-    try:
-        with open(file, "rb") as f:
-            raw_data = f.read()
-            result = chardet.detect(raw_data)
-        encoding = result.get("encoding")
-        confidence = result.get("confidence", 0.0)
-        if not encoding or confidence < 0.8:
-            return fallback
-        if encoding.lower() == "ascii":
-            return "utf-8"
-        return encoding
-    except FileNotFoundError:
-        raise FileNotFoundError(f"The file '{file}' was not found.")
-    except IOError as e:
-        raise IOError(f"An error occurred while reading the file '{file}': {e}")
+from mitools.pandas_utils.functions import (
+    check_if_dataframe_sequence,
+    load_dataframe_sequence,
+    store_dataframe_sequence,
+)
+from mitools.utils.helper_functions import all_can_be_ints
 
 
 def exports_data_to_matrix(
@@ -192,8 +171,15 @@ def torch_calculate_economic_complexity(
 
     Mpp = M2.T @ M1
 
-    eigen_values, eigen_vectors = torch.linalg.eig(Mpp)
-    eigen_vectors = eigen_vectors.real  # Use the real part of the eigenvectors
+    try:
+        eigen_values, eigen_vectors = torch.linalg.eig(Mpp)
+    except NotImplementedError:
+        np_Mpp = Mpp.cpu().numpy()
+        eigen_values, eigen_vectors = np.linalg.eig(np_Mpp)
+        eigen_vectors = eigen_vectors.real  # Use the real part of the eigenvectors
+        eigen_values = torch.from_numpy(eigen_values.real).to(device)
+        eigen_vectors = torch.from_numpy(eigen_vectors).to(device)
+        del np_Mpp
 
     eigen_vector_index = torch.argsort(eigen_values.real)[-2]
     kp = eigen_vectors[:, eigen_vector_index]
@@ -225,7 +211,7 @@ def calculate_economic_complexity(
 
     if fast:
         rca_np = rca_matrix.values
-        eci, pci = jit_calculate_economic_complexity(rca_np)
+        eci, pci = torch_calculate_economic_complexity(rca_np)
     else:
         diversity = rca_matrix.sum(axis=1)
         ubiquity = rca_matrix.sum(axis=0)
@@ -264,79 +250,6 @@ def calculate_economic_complexity(
     return eci_df, pci_df
 
 
-def store_dataframe_sequence(
-    dataframes: Dict[Union[str, int], DataFrame], name: str, data_dir: PathLike
-) -> None:
-    sequence_dir = data_dir / name
-    if not all(isinstance(df, DataFrame) for df in dataframes.values()):
-        raise ValueError("All values in 'dataframes' must be pandas DataFrames")
-    try:
-        sequence_dir.mkdir(exist_ok=True, parents=True)
-        for seq_val, dataframe in dataframes.items():
-            seq_val_name = f"{name}_{seq_val}".replace(" ", "")
-            filepath = sequence_dir / f"{seq_val_name}.parquet"
-            dataframe.to_parquet(filepath)
-        if not check_if_dataframe_sequence(data_dir, name, list(dataframes.keys())):
-            raise IOError(f"Failed to store all DataFrames for '{name}' sequence")
-    except (IOError, OSError) as e:
-        raise IOError(f"Error storing DataFrame sequence: {e}")
-
-
-def load_dataframe_sequence(
-    data_dir: PathLike,
-    name: str,
-    sequence_values: Optional[List[Union[str, int]]] = None,
-) -> Dict[Union[str, int], DataFrame]:
-    sequence_dir = data_dir / name
-    if sequence_values and not check_if_dataframe_sequence(
-        data_dir, name, sequence_values
-    ):
-        raise ArgumentValueError(
-            f"Sequence '{name}' is missing required values: {sequence_values}"
-        )
-    sequence_files = sequence_dir.glob("*.parquet")
-    dataframes = {}
-    for file in sequence_files:
-        try:
-            seq_value = file.stem.split("_")[-1]
-            seq_value = int(seq_value) if seq_value.isdigit() else seq_value
-            if sequence_values is None or seq_value in sequence_values:
-                dataframes[seq_value] = pd.read_parquet(file)
-        except (ValueError, TypeError, IndexError) as e:
-            raise ArgumentValueError(
-                f"Invalid sequence value in file: {file.name}"
-            ) from e
-    if not dataframes:
-        raise ArgumentValueError(
-            f"No dataframes were loaded from the provided 'sequence_values={sequence_values}'"
-        )
-    return dataframes
-
-
-def check_if_dataframe_sequence(
-    data_dir: PathLike,
-    name: str,
-    sequence_values: Optional[List[Union[str, int]]] = None,
-) -> bool:
-    sequence_dir = data_dir / name
-    if not sequence_dir.exists():
-        return False
-    if sequence_values is not None:
-        try:
-            sequence_files = [
-                int(file.stem.split("_")[-1])
-                if file.stem.split("_")[-1].isdigit()
-                else file.stem.split("_")[-1]
-                for file in sequence_dir.glob("*.parquet")
-            ]
-        except (ValueError, TypeError, IndexError) as e:
-            raise ArgumentValueError(f"Invalid sequence value in filenames: {e}")
-        sequence_files = sequence_dir.glob("*.parquet")
-        sequence_files = [int(file.stem.split("_")[-1]) for file in sequence_files]
-        return set(sequence_values) == set(sequence_files)
-    return False
-
-
 def create_time_id(time_values: Union[str, int, Sequence]) -> str:
     if isinstance(time_values, (str, int)):
         return str(time_values)
@@ -356,3 +269,92 @@ def create_data_id(id: str, time: Union[str, int, Sequence]) -> str:
 
 def create_data_name(data_id, tag):
     return f"{data_id}_{tag}"
+
+
+def vectors_from_proximity_matrix(
+    proximity_matrix: DataFrame,
+    orig_product: str = "product_i",
+    dest_product: str = "product_j",
+    proximity_column: str = "weight",
+    sort_by: Union[str, List[str], Tuple[str]] = None,
+    sort_ascending: Union[bool, List[bool], Tuple[bool]] = False,
+) -> DataFrame:
+    if sort_by is not None:
+        if isinstance(sort_by, str) and sort_by not in [
+            orig_product,
+            dest_product,
+            proximity_column,
+        ]:
+            raise ArgumentValueError(
+                f"Column '{sort_by}' not available in output DataFrame."
+            )
+        elif isinstance(sort_by, (list, tuple)) and not all(
+            [
+                col
+                in [
+                    orig_product,
+                    dest_product,
+                    proximity_column,
+                ]
+                for col in sort_by
+            ]
+        ):
+            raise ArgumentValueError(
+                f"Columns '{sort_by}' not available in output DataFrame."
+            )
+    if sort_ascending is not None:
+        if not isinstance(sort_ascending, bool) or (
+            isinstance(sort_ascending, list)
+            and all(isinstance(b, bool) for b in sort_ascending)
+        ):
+            raise ArgumentValueError(
+                "sort_ascending must be a boolean or a list of booleans."
+            )
+    is_symmetric = proximity_matrix.equals(proximity_matrix.T)
+    proximity_vectors = proximity_matrix.unstack().reset_index()
+    proximity_vectors.columns = [orig_product, dest_product, proximity_column]
+    if is_symmetric:
+        proximity_vectors = proximity_vectors[
+            proximity_vectors[orig_product] <= proximity_vectors[dest_product]
+        ]
+    proximity_vectors = proximity_vectors.loc[proximity_vectors[proximity_column] > 0]
+    proximity_vectors = proximity_vectors.drop_duplicates()
+    proximity_vectors = proximity_vectors.sort_values(
+        by=proximity_column if sort_by is None else sort_by, ascending=sort_ascending
+    ).reset_index(drop=True)
+    proximity_vectors = proximity_vectors.rename(
+        columns={proximity_column: proximity_column}
+    )
+    proximity_vectors[orig_product] = proximity_vectors[orig_product].astype(str)
+    proximity_vectors[dest_product] = proximity_vectors[dest_product].astype(str)
+
+    return proximity_vectors
+
+
+def proximity_vectors_sequence(
+    proximity_matrices: Dict[Union[str, int], DataFrame],
+    data_dir: PathLike = None,
+    recalculate: bool = False,
+    sequence_name: str = "proximity_vectors",
+) -> Dict[Union[str, int], DataFrame]:
+    sequence_values = list(proximity_matrices.keys())
+    if (
+        not recalculate
+        and data_dir is not None
+        and check_if_dataframe_sequence(
+            data_dir=data_dir, name=sequence_name, sequence_values=sequence_values
+        )
+    ):
+        proximity_vectors = load_dataframe_sequence(
+            data_dir=data_dir, name=sequence_name, sequence_values=sequence_values
+        )
+    else:
+        proximity_vectors = {
+            key: vectors_from_proximity_matrix(proximity_matrix)
+            for key, proximity_matrix in proximity_matrices.items()
+        }
+        if data_dir is not None:
+            store_dataframe_sequence(
+                proximity_vectors, data_dir=data_dir, name=sequence_name
+            )
+    return proximity_vectors

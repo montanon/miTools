@@ -1,89 +1,30 @@
-import shutil
-import tempfile
 import time
 import unittest
 from pathlib import Path
 from unittest import TestCase
-from unittest.mock import mock_open, patch
 
 import numpy as np
 from pandas import DataFrame, Series
 from pandas.testing import assert_frame_equal
 
 from mitools.economic_complexity import (
-    all_can_be_ints,
     calculate_economic_complexity,
     calculate_exports_matrix_rca,
     calculate_proximity_matrix,
     calculate_relatedness_matrix,
-    check_if_dataframe_sequence,
     exports_data_to_matrix,
-    get_file_encoding,
-    load_dataframe_sequence,
     mask_matrix,
+)
+from mitools.economic_complexity.economic_complexity import (
+    proximity_vectors_sequence,
+    vectors_from_proximity_matrix,
+)
+from mitools.exceptions import ArgumentValueError
+from mitools.exceptions.custom_exceptions import ArgumentValueError
+from mitools.pandas_utils.functions import (
+    check_if_dataframe_sequence,
     store_dataframe_sequence,
 )
-from mitools.exceptions.custom_exceptions import ArgumentValueError
-
-
-class TestAllCanBeInts(TestCase):
-    def test_all_ints(self):
-        self.assertTrue(all_can_be_ints([1, 2, 3]))
-
-    def test_all_strings_representing_ints(self):
-        self.assertTrue(all_can_be_ints(["1", "2", "3"]))
-
-    def test_mixed_types(self):
-        self.assertTrue(all_can_be_ints(["1", 2, 3.0]))
-
-    def test_non_convertible_item(self):
-        self.assertFalse(all_can_be_ints(["1", "a", "3"]))
-
-    def test_with_empty_list(self):
-        self.assertTrue(all_can_be_ints([]))
-
-    def test_with_none(self):
-        self.assertFalse(all_can_be_ints([None]))
-
-    def test_with_non_numeric_types(self):
-        self.assertFalse(all_can_be_ints([1, 2, "three"]))
-
-    def test_with_nested_list(self):
-        self.assertFalse(all_can_be_ints([[1, 2], 3]))
-
-    def test_with_boolean_values(self):
-        self.assertTrue(all_can_be_ints([True, False]))
-
-
-class TestGetFileEncoding(TestCase):
-    def setUp(self):
-        self.temp_file = tempfile.NamedTemporaryFile(delete=False)
-        self.temp_file.write("This is a test.".encode("utf-8"))
-        self.temp_file.close()
-
-    def tearDown(self):
-        Path(self.temp_file.name).unlink()
-
-    def test_detect_utf8_encoding(self):
-        encoding = get_file_encoding(self.temp_file.name)
-        self.assertEqual(encoding, "utf-8")
-
-    def test_file_not_found(self):
-        with self.assertRaises(FileNotFoundError):
-            get_file_encoding("non_existent_file.txt")
-
-    @patch("builtins.open", new_callable=mock_open, read_data=b"\x80\x81\x82")
-    def test_detect_low_confidence_encoding(self, mock_file):
-        with patch(
-            "chardet.detect", return_value={"encoding": "iso-8859-1", "confidence": 0.5}
-        ):
-            encoding = get_file_encoding("dummy_file.txt")
-            self.assertEqual(encoding, "utf-8")
-
-    @patch("builtins.open", side_effect=IOError("Permission denied"))
-    def test_io_error(self, mock_file):
-        with self.assertRaises(IOError):
-            get_file_encoding("dummy_file.txt")
 
 
 class TestExportsDataToMatrix(TestCase):
@@ -463,130 +404,134 @@ class TestCalculateEconomicComplexity(TestCase):
         print(f"Standard version time: {standard_time:.4f}s")
 
 
-class TestStoreDataFrameSequence(TestCase):
+class TestVectorsFromProximityMatrix(TestCase):
     def setUp(self):
-        self.temp_dir = Path("./tests/.test_assets/.data")
-        self.temp_dir.mkdir(exist_ok=True)
-        self.dataframes = {
-            1: DataFrame({"A": [1, 2, 3]}),
-            2: DataFrame({"B": [4, 5, 6]}),
-        }
+        self.proximity_matrix = DataFrame(
+            {
+                "Product A": [0.0, 0.8, 0.4],
+                "Product B": [0.8, 0.0, 0.5],
+                "Product C": [0.4, 0.5, 0.0],
+            },
+            index=["Product A", "Product B", "Product C"],
+        )
 
-    def tearDown(self):
-        if self.temp_dir.exists():
-            shutil.rmtree(self.temp_dir)
+    def test_valid_conversion(self):
+        result = vectors_from_proximity_matrix(self.proximity_matrix)
+        expected = DataFrame(
+            {
+                "product_i": ["Product A", "Product B", "Product A"],
+                "product_j": ["Product B", "Product C", "Product C"],
+                "weight": [0.8, 0.5, 0.4],
+            }
+        )
+        assert_frame_equal(result, expected)
 
-    def test_valid_storage(self):
-        store_dataframe_sequence(self.dataframes, "test_sequence", self.temp_dir)
-        for seq_val in self.dataframes:
-            filename = f"test_sequence_{seq_val}.parquet"
-            filepath = self.temp_dir / "test_sequence" / filename
-            self.assertTrue(filepath.exists())
+    def test_valid_asymmetric_conversion(self):
+        asymmetric_matrix = self.proximity_matrix.copy()
+        asymmetric_matrix.loc["Product B", "Product A"] = 0.3
+        result = vectors_from_proximity_matrix(
+            asymmetric_matrix,
+            sort_by=["product_i", "product_j"],
+            sort_ascending=True,
+        )
+        expected = DataFrame(
+            {
+                "product_i": [
+                    "Product A",
+                    "Product A",
+                    "Product B",
+                    "Product B",
+                    "Product C",
+                    "Product C",
+                ],
+                "product_j": [
+                    "Product B",
+                    "Product C",
+                    "Product A",
+                    "Product C",
+                    "Product A",
+                    "Product B",
+                ],
+                "weight": [0.3, 0.4, 0.8, 0.5, 0.4, 0.5],
+            }
+        )
+        assert_frame_equal(result, expected)
 
-    def test_non_dataframe_value(self):
-        invalid_dataframes = {1: DataFrame({"A": [1, 2, 3]}), 2: "not a dataframe"}
-        with self.assertRaises(ValueError):
-            store_dataframe_sequence(invalid_dataframes, "test_sequence", self.temp_dir)
+    def test_empty_matrix(self):
+        empty_matrix = DataFrame(dtype=float)
+        result = vectors_from_proximity_matrix(empty_matrix)
+        expected = DataFrame(columns=["product_i", "product_j", "weight"], dtype=float)
+        assert_frame_equal(result, expected, check_dtype=False)
 
-    def test_empty_dataframes(self):
-        store_dataframe_sequence({}, "empty_sequence", self.temp_dir)
-        sequence_dir = self.temp_dir / "empty_sequence"
-        self.assertTrue(sequence_dir.exists())
-        self.assertEqual(len(list(sequence_dir.iterdir())), 0)
+    def test_valid_conversion_with_renames(self):
+        result = vectors_from_proximity_matrix(
+            self.proximity_matrix,
+            orig_product="origin",
+            dest_product="destination",
+            proximity_column="proximity",
+        )
+        expected = DataFrame(
+            {
+                "origin": ["Product A", "Product B", "Product A"],
+                "destination": ["Product B", "Product C", "Product C"],
+                "proximity": [0.8, 0.5, 0.4],
+            }
+        )
+        assert_frame_equal(result, expected)
 
-    def test_io_error_handling(self):
-        self.temp_dir.chmod(0o444)  # Read-only
-        with self.assertRaises(IOError):
-            store_dataframe_sequence(self.dataframes, "test_sequence", self.temp_dir)
-        self.temp_dir.chmod(0o755)
-
-    def test_filename_formatting(self):
-        store_dataframe_sequence(self.dataframes, "test sequence", self.temp_dir)
-        for seq_val in self.dataframes:
-            filename = f"testsequence_{seq_val}.parquet"
-            filepath = self.temp_dir / "test sequence" / filename
-            self.assertTrue(filepath.exists())
-
-
-class TestLoadDataFrameSequence(TestCase):
-    def setUp(self):
-        self.temp_dir = Path("./tests/.test_assets/.data")
-        self.sequence_name = "test_sequence"
-        self.sequence_dir = self.temp_dir / self.sequence_name
-        self.sequence_dir.mkdir(parents=True, exist_ok=True)
-        self.dataframes = {
-            1: DataFrame({"A": [1, 2, 3]}),
-            2: DataFrame({"B": [4, 5, 6]}),
-        }
-        store_dataframe_sequence(self.dataframes, self.sequence_name, self.temp_dir)
-
-    def tearDown(self):
-        if self.temp_dir.exists():
-            shutil.rmtree(self.temp_dir)
-
-    def test_load_all_dataframes(self):
-        result = load_dataframe_sequence(self.temp_dir, self.sequence_name)
-        for seq_val, df in self.dataframes.items():
-            assert_frame_equal(result[seq_val], df)
-
-    def test_load_specific_sequence_values(self):
+    def test_invalid_sort_by(self):
         with self.assertRaises(ArgumentValueError):
-            load_dataframe_sequence(
-                self.temp_dir, self.sequence_name, sequence_values=[1]
+            vectors_from_proximity_matrix(self.proximity_matrix, sort_by="invalid")
+
+    def test_invalid_sort_ascending(self):
+        with self.assertRaises(ArgumentValueError):
+            vectors_from_proximity_matrix(
+                self.proximity_matrix, sort_ascending="invalid"
             )
 
-    def test_directory_not_found(self):
-        with self.assertRaises(ArgumentValueError):
-            load_dataframe_sequence(Path("non_existent_dir"), self.sequence_name)
 
-    def test_empty_directory(self):
-        empty_dir = self.temp_dir / "empty_sequence"
-        empty_dir.mkdir(parents=True, exist_ok=True)
-        with self.assertRaises(ArgumentValueError):
-            load_dataframe_sequence(self.temp_dir, "empty_sequence")
-
-
-class TestCheckIfDataFrameSequence(TestCase):
+class TestProximityVectorsSequence(TestCase):
     def setUp(self):
         self.temp_dir = Path("./tests/.test_assets/.data")
-        self.sequence_name = "test_sequence"
-        self.sequence_dir = self.temp_dir / self.sequence_name
-        self.sequence_dir.mkdir(parents=True, exist_ok=True)
-        self.dataframes = {
-            1: DataFrame({"A": [1, 2, 3]}),
-            2: DataFrame({"B": [4, 5, 6]}),
+        self.temp_dir.mkdir(parents=True, exist_ok=True)
+        self.proximity_matrices = {
+            1: DataFrame({"A": [0, 0.8], "B": [0.8, 0]}, index=["A", "B"]),
+            2: DataFrame({"A": [0, 0.4], "B": [0.4, 0]}, index=["A", "B"]),
         }
-        store_dataframe_sequence(self.dataframes, self.sequence_name, self.temp_dir)
 
     def tearDown(self):
         if self.temp_dir.exists():
             shutil.rmtree(self.temp_dir)
 
-    def test_sequence_exists_and_matches(self):
-        result = check_if_dataframe_sequence(
-            self.temp_dir, self.sequence_name, sequence_values=[1, 2]
+    def test_load_existing_vectors(self):
+        vectors = {
+            key: vectors_from_proximity_matrix(matrix)
+            for key, matrix in self.proximity_matrices.items()
+        }
+        store_dataframe_sequence(vectors, "proximity_vectors", self.temp_dir)
+        result = proximity_vectors_sequence(
+            self.proximity_matrices, data_dir=self.temp_dir, recalculate=False
         )
-        self.assertTrue(result)
+        for key, vector in vectors.items():
+            assert_frame_equal(result[key], vector)
 
-    def test_sequence_partial_match(self):
-        result = check_if_dataframe_sequence(
-            self.temp_dir, self.sequence_name, sequence_values=[1, 3]
+    def test_recalculate_vectors(self):
+        result = proximity_vectors_sequence(
+            self.proximity_matrices, data_dir=self.temp_dir, recalculate=True
         )
-        self.assertFalse(result)
+        for key, matrix in self.proximity_matrices.items():
+            expected = vectors_from_proximity_matrix(matrix)
+            assert_frame_equal(result[key], expected)
 
-    def test_nonexistent_directory(self):
-        result = check_if_dataframe_sequence(
-            Path("non_existent_dir"), self.sequence_name, sequence_values=[1]
+    def test_store_vectors_after_calculation(self):
+        proximity_vectors_sequence(
+            self.proximity_matrices, data_dir=self.temp_dir, recalculate=True
         )
-        self.assertFalse(result)
-
-    def test_empty_directory(self):
-        empty_dir = self.temp_dir / "empty_sequence"
-        empty_dir.mkdir(parents=True, exist_ok=True)
-        result = check_if_dataframe_sequence(
-            empty_dir, "empty_sequence", sequence_values=[1]
+        self.assertTrue(
+            check_if_dataframe_sequence(
+                self.temp_dir, "proximity_vectors", list(self.proximity_matrices.keys())
+            )
         )
-        self.assertFalse(result)
 
 
 if __name__ == "__main__":

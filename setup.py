@@ -24,7 +24,7 @@ setup(
         "mitools.files",
         "mitools.etl",
         "mitools.economic_complexity",
-        "mitools.country_converter",
+        "mitools.country_utils",
         "mitools.context",
         "mitools.images",
     ],

@@ -5,10 +5,10 @@ from typing import Dict, List, NewType, Optional, Pattern
 import pandas as pd
 from pandas import DataFrame
 
-from ..context import DISPLAY
-from ..exceptions.custom_exceptions import ArgumentKeyError
-from ..utils import iprint
-from .objects import NotebookSection
+from mitools.context import DISPLAY
+from mitools.exceptions import ArgumentKeyError
+from mitools.notebooks.objects import NotebookSection
+from mitools.utils import iprint
 
 FULL_TEXT_COLUMN = "full_text"
 TEXT_COLUMNS = ["Title", "Abstract"]
