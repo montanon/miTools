@@ -22,4 +22,4 @@ custom_data = pd.DataFrame.from_dict(
     }
 )
 
-country_converter = coco.CountryConverter(additional_data=custom_data)
+name_converter = coco.CountryConverter(additional_data=custom_data)
