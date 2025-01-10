@@ -385,3 +385,21 @@ def sort_dict_keys(
         return sorted_dict
     except Exception as e:
         raise ArgumentValueError(f"An error occured shile sorting the dict: {e}")
+
+
+def get_file_encoding(file: PathLike, fallback: str = "utf-8") -> str:
+    try:
+        with open(file, "rb") as f:
+            raw_data = f.read()
+            result = chardet.detect(raw_data)
+        encoding = result.get("encoding")
+        confidence = result.get("confidence", 0.0)
+        if not encoding or confidence < 0.8:
+            return fallback
+        if encoding.lower() == "ascii":
+            return "utf-8"
+        return encoding
+    except FileNotFoundError:
+        raise FileNotFoundError(f"The file '{file}' was not found.")
+    except IOError as e:
+        raise IOError(f"An error occurred while reading the file '{file}': {e}")

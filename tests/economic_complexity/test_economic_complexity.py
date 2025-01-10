@@ -18,12 +18,12 @@ from mitools.economic_complexity import (
     calculate_relatedness_matrix,
     check_if_dataframe_sequence,
     exports_data_to_matrix,
-    get_file_encoding,
     load_dataframe_sequence,
     mask_matrix,
     store_dataframe_sequence,
 )
 from mitools.exceptions.custom_exceptions import ArgumentValueError
+from mitools.utils.helper_functions import get_file_encoding
 
 
 class TestAllCanBeInts(TestCase):
