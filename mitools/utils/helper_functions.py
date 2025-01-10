@@ -15,6 +15,7 @@ from typing import (
     List,
     Optional,
     Pattern,
+    Sequence,
     Tuple,
     Type,
     TypeVar,
@@ -403,3 +404,10 @@ def get_file_encoding(file: PathLike, fallback: str = "utf-8") -> str:
         raise FileNotFoundError(f"The file '{file}' was not found.")
     except IOError as e:
         raise IOError(f"An error occurred while reading the file '{file}': {e}")
+
+
+def all_can_be_ints(items: Sequence) -> bool:
+    try:
+        return all(int(item) is not None for item in items)
+    except (ValueError, TypeError):
+        return False

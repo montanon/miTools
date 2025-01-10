@@ -11,7 +11,6 @@ from pandas import DataFrame, Series
 from pandas.testing import assert_frame_equal
 
 from mitools.economic_complexity import (
-    all_can_be_ints,
     calculate_economic_complexity,
     calculate_exports_matrix_rca,
     calculate_proximity_matrix,
@@ -23,7 +22,7 @@ from mitools.economic_complexity import (
     store_dataframe_sequence,
 )
 from mitools.exceptions.custom_exceptions import ArgumentValueError
-from mitools.utils.helper_functions import get_file_encoding
+from mitools.utils.helper_functions import all_can_be_ints, get_file_encoding
 
 
 class TestAllCanBeInts(TestCase):

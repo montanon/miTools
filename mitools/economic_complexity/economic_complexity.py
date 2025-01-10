@@ -9,13 +9,7 @@ from numba import jit
 from pandas import DataFrame
 
 from mitools.exceptions import ArgumentValueError
-
-
-def all_can_be_ints(items: Sequence) -> bool:
-    try:
-        return all(int(item) is not None for item in items)
-    except (ValueError, TypeError):
-        return False
+from mitools.utils.helper_functions import all_can_be_ints
 
 
 def exports_data_to_matrix(
