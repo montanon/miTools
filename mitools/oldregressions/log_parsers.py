@@ -7,14 +7,19 @@ from typing import Dict, List, Optional
 import pandas as pd
 from pandas import DataFrame
 
-from ..utils import (
+from mitools.oldregressions.regressions_data import (
+    CSARDLResults,
+    OLSResults,
+    RegressionData,
+    XTRegResults,
+)
+from mitools.utils import (
     find_str_line_number_in_text,
     get_numbers_from_str,
     parallel,
     read_text_file,
     remove_dataframe_duplicates,
 )
-from .regressions_data import CSARDLResults, OLSResults, RegressionData, XTRegResults
 
 # SPLIT_PATTERN = '={2,}\n'
 # MODEL_PATTERN = f'({SPLIT_PATTERN}(\n)+){{1}}'

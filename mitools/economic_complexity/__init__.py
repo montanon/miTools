@@ -1,4 +1,8 @@
-from .columns import (
+from mitools.economic_complexity.economic_complexity import *
+from mitools.economic_complexity.objects import *
+from mitools.economic_complexity.plots import *
+from mitools.networks.networks import *
+from mitools.pandas_utils.columns import (
     add_columns,
     growth_columns,
     multiply_columns,
@@ -8,7 +12,3 @@ from .columns import (
     subtract_columns,
     transform_columns,
 )
-from .economic_complexity import *
-from .networks import *
-from .objects import *
-from .plots import *

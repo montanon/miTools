@@ -7,7 +7,7 @@ from scipy.spatial.distance import cdist
 from sklearn.metrics.pairwise import cosine_similarity, pairwise_distances
 from sklearn.neighbors import NearestCentroid
 
-from ..exceptions import ArgumentStructureError
+from mitools.exceptions import ArgumentStructureError
 
 CLUSTER_COL_NOT_IN_INDEX_ERROR = (
     "DataFrame provided does not have the {cluster_level} index level!"
@@ -87,7 +87,7 @@ def get_distances_to_centroids(
     cluster_labels = data.index.get_level_values(cluster_level)
     corresponding_centroids = centroids.loc[cluster_labels]
     distances = cdist(
-        data.values, corresponding_centroids.values, metric="euclidean"
+        data.values, corresponding_centroids.values, metric=metric
     ).diagonal()
     return DataFrame(
         distances, index=data.index, columns=[f"distance_to_{cluster_level}_centroid"]

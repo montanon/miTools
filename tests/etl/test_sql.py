@@ -24,6 +24,29 @@ from mitools.etl import (
 )
 
 
+class TestCustomConnection(TestCase):
+    def setUp(self):
+        self.path = Path("sample_path").absolute()
+        self.conn = CustomConnection(self.path)
+
+    def tearDown(self):
+        # Delete the 'sample_file' after the test is done
+        if self.path.exists():
+            self.path.unlink()
+
+    def test_initialization(self):
+        # Check that the CustomConnection object is instantiated
+        self.assertIsInstance(self.conn, CustomConnection)
+
+    def test_path_attribute(self):
+        # Ensure that the 'path' attribute is correctly set during instantiation
+        self.assertEqual(self.conn.path, self.path)
+
+    def test_class_property(self):
+        # Ensure the __class__ property correctly returns Connection
+        self.assertIs(self.conn.__class__, Connection)
+
+
 class TestMainConnection(TestCase):
     def setUp(self):
         self.conn1 = Path("./tests/.test_assets/conn1.db")
@@ -58,29 +81,6 @@ class TestMainConnection(TestCase):
         conn1.some_random_attribute = True
         conn2 = MainConnection(self.conn1)
         self.assertTrue(hasattr(conn2, "some_random_attribute"))
-
-
-class TestCustomConnection(TestCase):
-    def setUp(self):
-        self.path = Path("sample_path").absolute()
-        self.conn = CustomConnection(self.path)
-
-    def tearDown(self):
-        # Delete the 'sample_file' after the test is done
-        if self.path.exists():
-            self.path.unlink()
-
-    def test_initialization(self):
-        # Check that the CustomConnection object is instantiated
-        self.assertIsInstance(self.conn, CustomConnection)
-
-    def test_path_attribute(self):
-        # Ensure that the 'path' attribute is correctly set during instantiation
-        self.assertEqual(self.conn.path, self.path)
-
-    def test_class_property(self):
-        # Ensure the __class__ property correctly returns Connection
-        self.assertIs(self.conn.__class__, Connection)
 
 
 class TestSuppressUserWarningDecorator(TestCase):

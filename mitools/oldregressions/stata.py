@@ -4,8 +4,7 @@ from typing import Dict, Iterable, List, Optional
 from pandas import DataFrame, Series
 
 from mitools.oldregressions.quantiles import QuantilesRegressionSpecs
-
-from ..utils import remove_chars
+from mitools.utils import remove_chars
 
 SECTION_BREAK = "%$&" * 20
 SUB_SECTION_BREAK = "#~^" * 20

@@ -9,10 +9,12 @@ from selenium.webdriver.support.ui import Select
 from seleniumrequests import Chrome
 
 from mitools.exceptions import WebScraperTimeoutError
-
-from .driver_checkers import AbstractElementsPresenceChecker, PresenceCheckerFactory
-from .driver_finders import AbstractElementsFinder, FinderFactory
-from .driver_waiters import AbstractElementsWaiter, WaiterFactory
+from mitools.scraping.driver_checkers import (
+    AbstractElementsPresenceChecker,
+    PresenceCheckerFactory,
+)
+from mitools.scraping.driver_finders import AbstractElementsFinder, FinderFactory
+from mitools.scraping.driver_waiters import AbstractElementsWaiter, WaiterFactory
 
 CHROME_DRIVER = "~/WebBrowser_Drivers/chromedriver"
 DOWNLOADS_DIRECTORY = os.path.expanduser("~/Downloads")

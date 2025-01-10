@@ -7,7 +7,7 @@ import pandas as pd
 from numpy import ndarray
 from pandas import DataFrame
 
-from ..utils import suppress_user_warning
+from mitools.utils import suppress_user_warning
 
 
 class CustomConnection(Connection):
@@ -36,17 +36,6 @@ class MainConnection(CustomConnection):
             self._initialized = True
 
 
-def check_if_tables(conn: Connection, tables_names: Iterable[str]) -> List[bool]:
-    return [check_if_table(conn, table_name) for table_name in tables_names]
-
-
-def get_conn_db_folder(conn: Connection) -> PathLike:
-    cursor = conn.cursor()
-    cursor.execute("PRAGMA database_list;")
-    db_path = Path(cursor.fetchone()[2])
-    return db_path.parent.absolute()
-
-
 def check_if_table(conn: Connection, table_name: str) -> bool:
     query = (
         f'SELECT name FROM sqlite_master WHERE type="table" AND name="{table_name}";'
@@ -60,6 +49,17 @@ def check_if_table(conn: Connection, table_name: str) -> bool:
             return (parquet_folder / f"{table_name}.parquet").exists()
         except Exception as e:
             return False
+
+
+def check_if_tables(conn: Connection, tables_names: Iterable[str]) -> List[bool]:
+    return [check_if_table(conn, table_name) for table_name in tables_names]
+
+
+def get_conn_db_folder(conn: Connection) -> PathLike:
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA database_list;")
+    db_path = Path(cursor.fetchone()[2])
+    return db_path.parent.absolute()
 
 
 def connect_to_sql_db(db_path: Union[str, PathLike], db_name: str) -> CustomConnection:

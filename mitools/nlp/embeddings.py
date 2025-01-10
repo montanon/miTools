@@ -18,10 +18,9 @@ from tqdm import tqdm
 from transformers import AutoModel, AutoTokenizer, PreTrainedTokenizer
 from umap import UMAP
 
+from mitools.etl import CustomConnection
 from mitools.exceptions import ArgumentValueError
-
-from ..etl import CustomConnection
-from ..utils import iterable_chunks
+from mitools.utils import iterable_chunks
 
 warnings.simplefilter("ignore", NumbaDeprecationWarning)
 warnings.simplefilter("ignore", NumbaPendingDeprecationWarning)
