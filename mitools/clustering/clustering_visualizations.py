@@ -11,6 +11,7 @@ from pandas import DataFrame, IndexSlice
 from scipy.stats import gaussian_kde
 
 from mitools.exceptions import ArgumentStructureError
+<<<<<<< HEAD
 from mitools.visuals.plots import (
     AxesComposer,
     DistributionPlotter,
@@ -20,6 +21,8 @@ from mitools.visuals.plots import (
     ScatterPlotter,
     StackedPlotter,
 )
+=======
+>>>>>>> refactor
 
 X_Y_SIZE_ERROR = "x values and y values must be the same size."
 
