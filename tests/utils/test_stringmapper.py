@@ -1,7 +1,7 @@
 import unittest
 from unittest import TestCase
 
-from mitools.economic_complexity import StringMapper
+from mitools.utils.helper_objects import StringMapper
 
 
 class TestStringMapper(TestCase):
