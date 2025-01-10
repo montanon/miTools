@@ -1,7 +1,5 @@
-import shutil
 import time
 import unittest
-from pathlib import Path
 from unittest import TestCase
 
 import numpy as np
@@ -17,11 +15,6 @@ from mitools.economic_complexity import (
     mask_matrix,
 )
 from mitools.exceptions.custom_exceptions import ArgumentValueError
-from mitools.pandas.functions import (
-    check_if_dataframe_sequence,
-    load_dataframe_sequence,
-    store_dataframe_sequence,
-)
 
 
 class TestExportsDataToMatrix(TestCase):
@@ -399,132 +392,6 @@ class TestCalculateEconomicComplexity(TestCase):
         print(f"Uncompiled Fast version time: {fast_times[0]:.4f}s")
         print(f"Fast version time: {fast_time:.4f}s")
         print(f"Standard version time: {standard_time:.4f}s")
-
-
-class TestStoreDataFrameSequence(TestCase):
-    def setUp(self):
-        self.temp_dir = Path("./tests/.test_assets/.data")
-        self.temp_dir.mkdir(exist_ok=True)
-        self.dataframes = {
-            1: DataFrame({"A": [1, 2, 3]}),
-            2: DataFrame({"B": [4, 5, 6]}),
-        }
-
-    def tearDown(self):
-        if self.temp_dir.exists():
-            shutil.rmtree(self.temp_dir)
-
-    def test_valid_storage(self):
-        store_dataframe_sequence(self.dataframes, "test_sequence", self.temp_dir)
-        for seq_val in self.dataframes:
-            filename = f"test_sequence_{seq_val}.parquet"
-            filepath = self.temp_dir / "test_sequence" / filename
-            self.assertTrue(filepath.exists())
-
-    def test_non_dataframe_value(self):
-        invalid_dataframes = {1: DataFrame({"A": [1, 2, 3]}), 2: "not a dataframe"}
-        with self.assertRaises(ValueError):
-            store_dataframe_sequence(invalid_dataframes, "test_sequence", self.temp_dir)
-
-    def test_empty_dataframes(self):
-        store_dataframe_sequence({}, "empty_sequence", self.temp_dir)
-        sequence_dir = self.temp_dir / "empty_sequence"
-        self.assertTrue(sequence_dir.exists())
-        self.assertEqual(len(list(sequence_dir.iterdir())), 0)
-
-    def test_io_error_handling(self):
-        self.temp_dir.chmod(0o444)  # Read-only
-        with self.assertRaises(IOError):
-            store_dataframe_sequence(self.dataframes, "test_sequence", self.temp_dir)
-        self.temp_dir.chmod(0o755)
-
-    def test_filename_formatting(self):
-        store_dataframe_sequence(self.dataframes, "test sequence", self.temp_dir)
-        for seq_val in self.dataframes:
-            filename = f"testsequence_{seq_val}.parquet"
-            filepath = self.temp_dir / "test sequence" / filename
-            self.assertTrue(filepath.exists())
-
-
-class TestLoadDataFrameSequence(TestCase):
-    def setUp(self):
-        self.temp_dir = Path("./tests/.test_assets/.data")
-        self.sequence_name = "test_sequence"
-        self.sequence_dir = self.temp_dir / self.sequence_name
-        self.sequence_dir.mkdir(parents=True, exist_ok=True)
-        self.dataframes = {
-            1: DataFrame({"A": [1, 2, 3]}),
-            2: DataFrame({"B": [4, 5, 6]}),
-        }
-        store_dataframe_sequence(self.dataframes, self.sequence_name, self.temp_dir)
-
-    def tearDown(self):
-        if self.temp_dir.exists():
-            shutil.rmtree(self.temp_dir)
-
-    def test_load_all_dataframes(self):
-        result = load_dataframe_sequence(self.temp_dir, self.sequence_name)
-        for seq_val, df in self.dataframes.items():
-            assert_frame_equal(result[seq_val], df)
-
-    def test_load_specific_sequence_values(self):
-        with self.assertRaises(ArgumentValueError):
-            load_dataframe_sequence(
-                self.temp_dir, self.sequence_name, sequence_values=[1]
-            )
-
-    def test_directory_not_found(self):
-        with self.assertRaises(ArgumentValueError):
-            load_dataframe_sequence(Path("non_existent_dir"), self.sequence_name)
-
-    def test_empty_directory(self):
-        empty_dir = self.temp_dir / "empty_sequence"
-        empty_dir.mkdir(parents=True, exist_ok=True)
-        with self.assertRaises(ArgumentValueError):
-            load_dataframe_sequence(self.temp_dir, "empty_sequence")
-
-
-class TestCheckIfDataFrameSequence(TestCase):
-    def setUp(self):
-        self.temp_dir = Path("./tests/.test_assets/.data")
-        self.sequence_name = "test_sequence"
-        self.sequence_dir = self.temp_dir / self.sequence_name
-        self.sequence_dir.mkdir(parents=True, exist_ok=True)
-        self.dataframes = {
-            1: DataFrame({"A": [1, 2, 3]}),
-            2: DataFrame({"B": [4, 5, 6]}),
-        }
-        store_dataframe_sequence(self.dataframes, self.sequence_name, self.temp_dir)
-
-    def tearDown(self):
-        if self.temp_dir.exists():
-            shutil.rmtree(self.temp_dir)
-
-    def test_sequence_exists_and_matches(self):
-        result = check_if_dataframe_sequence(
-            self.temp_dir, self.sequence_name, sequence_values=[1, 2]
-        )
-        self.assertTrue(result)
-
-    def test_sequence_partial_match(self):
-        result = check_if_dataframe_sequence(
-            self.temp_dir, self.sequence_name, sequence_values=[1, 3]
-        )
-        self.assertFalse(result)
-
-    def test_nonexistent_directory(self):
-        result = check_if_dataframe_sequence(
-            Path("non_existent_dir"), self.sequence_name, sequence_values=[1]
-        )
-        self.assertFalse(result)
-
-    def test_empty_directory(self):
-        empty_dir = self.temp_dir / "empty_sequence"
-        empty_dir.mkdir(parents=True, exist_ok=True)
-        result = check_if_dataframe_sequence(
-            empty_dir, "empty_sequence", sequence_values=[1]
-        )
-        self.assertFalse(result)
 
 
 if __name__ == "__main__":
