@@ -204,6 +204,7 @@ $PYTHON_PATH -m pip install datashader
 $PYTHON_PATH -m pip install bokeh
 $PYTHON_PATH -m pip install holoviews
 $PYTHON_PATH -m pip install scikit-image
+$PYTHON_PATH -m pip install pydantic
 
 $PYTHON_PATH -m pip install treelib
 treelib_path=$($PYTHON_PATH -m pip show treelib | grep -E '^Location: ' | awk '{print $2}')
